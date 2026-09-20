@@ -1,15 +1,21 @@
 <!-- The one scroll container, and the only focusable thing in the viewer: a
      scrollable region has to be keyboard reachable, and an `<article>` with
      `tabindex="0"` is reachable without being a control or a text field. -->
-<article class="doc" tabindex="0" [attr.aria-label]="label()">
-  @if (isMarkdown()) {
-    <!-- Sanitised by Angular's default sanitiser on binding; the HTML itself
-         was rendered from markdown by the application, never by this library. -->
-    <div class="markdown" [innerHTML]="html()"></div>
-  } @else {
-    <pre class="text">{{ text() }}</pre>
-  }
-</article>
+@if (isImage()) {
+  <!-- Its own viewport rather than a scroll container: the picture is zoomed
+       and panned by transform, so nothing here scrolls (PRD 001, §7.3.1). -->
+  <ui-image-view [src]="src()" [label]="label()" />
+} @else {
+  <article class="doc" tabindex="0" [attr.aria-label]="label()">
+    @if (isMarkdown()) {
+      <!-- Sanitised by Angular's default sanitiser on binding; the HTML itself
+           was rendered from markdown by the application, never by this library. -->
+      <div class="markdown" [innerHTML]="html()"></div>
+    } @else {
+      <pre class="text">{{ text() }}</pre>
+    }
+  </article>
+}
 
 <!-- A status line, not a landmark: a plain row of text under the document. -->
 <div class="status">

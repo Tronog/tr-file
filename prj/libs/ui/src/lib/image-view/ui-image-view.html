@@ -1,0 +1,53 @@
+<!--
+  The viewport is the tab stop: it is the scroll-and-pan surface, and a panel
+  asked to focus its body (PRD 001, §6.3) needs something here to focus.
+-->
+<div
+  #viewport
+  class="viewport"
+  tabindex="0"
+  [class.is-pannable]="pannable()"
+  [class.is-dragging]="dragging() !== null"
+  [attr.aria-label]="label()"
+  role="img"
+  (wheel)="onWheel($event)"
+  (pointerdown)="onPointerDown($event)"
+  (pointermove)="onPointerMove($event)"
+  (pointerup)="onPointerUp($event)"
+  (pointercancel)="onPointerUp($event)"
+  (dblclick)="onDoubleClick()"
+>
+  <img
+    #image
+    class="image"
+    alt=""
+    draggable="false"
+    [src]="src()"
+    [style.transform]="transform()"
+    (load)="onLoad()"
+  />
+</div>
+
+<div class="controls" role="toolbar" aria-label="Zoom">
+  <ui-icon-button icon="zoom-out" label="Zoom out" (action)="step(-1)" />
+  <ui-icon-button icon="zoom-in" label="Zoom in" (action)="step(1)" />
+  <span class="zoom-label" aria-hidden="true">{{ zoomLabel() }}</span>
+  <ui-icon-button
+    icon="zoom-actual"
+    label="Actual size (100%)"
+    [active]="isFit('actual')"
+    (action)="fit('actual')"
+  />
+  <ui-icon-button
+    icon="arrows-minimize"
+    label="Fit whole image"
+    [active]="isFit('contain')"
+    (action)="fit('contain')"
+  />
+  <ui-icon-button
+    icon="arrows-maximize"
+    label="Fill the frame"
+    [active]="isFit('cover')"
+    (action)="fit('cover')"
+  />
+</div>

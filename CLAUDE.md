@@ -59,7 +59,10 @@ body, hands focus to that panel's content once it has rendered; `PanelFocusFeatu
 that request and `UiPanelGroup` answers it. Row clicks only ever
 open — collapsing is the twisty's job (or `←` on the focused row). Double-clicking a file opens
 it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
-into a `UiDocumentModel`, and the library only renders what it is handed.
+into a `UiDocumentModel`, and the library only renders what it is handed. An image becomes an
+object URL the feature owns and revokes, shown by `UiImageView` — contain by default, five
+icon controls, wheel zoom anchored under the pointer, drag to pan, double click back to
+contain (§7.3.1).
 
 Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
 `/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details

@@ -19,12 +19,18 @@ export interface UiTab {
 export interface UiDocumentModel {
   /** Path shown in the viewer's status line, e.g. `docs/prd/001.md`. */
   readonly path: string;
-  /** `markdown` renders `html`; `text` renders `text` verbatim. */
-  readonly kind: 'markdown' | 'text';
+  /** `markdown` renders `html`, `text` renders `text`, `image` renders `src`. */
+  readonly kind: 'markdown' | 'text' | 'image';
   /** Sanitised HTML, already rendered by the app. Only for `kind: 'markdown'`. */
   readonly html?: string;
   /** Raw file text. Only for `kind: 'text'`. */
   readonly text?: string;
+  /**
+   * Where the image bytes are, as a URL the browser can load — in practice an
+   * object URL the application made and owns. Only for `kind: 'image'`; the
+   * library never fetches it and never revokes it.
+   */
+  readonly src?: string;
   /** Right-hand status hint, e.g. `'2.4 KB · UTF-8'`. */
   readonly meta?: string;
 }

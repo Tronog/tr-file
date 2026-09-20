@@ -57,7 +57,12 @@ export type UiIconName =
   | 'play'
   | 'window-min'
   | 'window-max'
-  | 'window-restore';
+  | 'window-restore'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'zoom-actual'
+  | 'arrows-minimize'
+  | 'arrows-maximize';
 
 /** Icon sizes used across the workbench (16px is VS Code's list/tab size). */
 export type UiIconSize = 'sm' | 'md' | 'lg' | 'xl';

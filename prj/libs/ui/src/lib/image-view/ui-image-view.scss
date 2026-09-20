@@ -1,0 +1,88 @@
+@use 'mixins' as *;
+
+:host {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/*
+  The image is drawn at its natural size and transformed, so nothing here
+  scrolls: `contain`, `cover` and a wheel zoom are all one `scale`, and panning
+  is a `translate`. `overflow: hidden` is what makes the frame a viewport.
+*/
+.viewport {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  /* A checkerboard, so a transparent PNG reads as transparent rather than as
+     part of the editor background. */
+  background-color: var(--vsc-editor-bg);
+  background-image:
+    linear-gradient(45deg, var(--vsc-hover-bg) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--vsc-hover-bg) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--vsc-hover-bg) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--vsc-hover-bg) 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+
+  &.is-pannable {
+    cursor: grab;
+  }
+
+  &.is-dragging {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.image {
+  /* The transform does the sizing; these keep the browser from doing any. */
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  /* Crisp at 100% and above, smooth when shrunk — the usual viewer bargain. */
+  image-rendering: auto;
+  user-select: none;
+}
+
+/* Floating over the image rather than stealing height from it, as every
+   picture viewer does; it fades back when the pointer is elsewhere. */
+.controls {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  padding: 4px 6px;
+  transform: translateX(-50%);
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: var(--vsc-radius-lg);
+  background: var(--vsc-titlebar-bg);
+  opacity: 0.75;
+  transition: opacity 120ms ease;
+
+  &:hover,
+  &:focus-within {
+    opacity: 1;
+  }
+}
+
+.zoom-label {
+  min-width: 48px;
+  padding: 0 4px;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}

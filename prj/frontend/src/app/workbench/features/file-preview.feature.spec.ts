@@ -21,6 +21,8 @@ const ROOT_ENTRIES = [
   fsEntry('main.ts', { size: 240 }),
   fsEntry('logo.png', { size: 4096 }),
   fsEntry('huge.txt', { size: 5 * 1024 * 1024 }),
+  fsEntry('archive.zip', { size: 4096 }),
+  fsEntry('poster.jpg', { size: 64 * 1024 * 1024 }),
 ];
 
 describe('FilePreviewFeature', () => {
@@ -85,18 +87,106 @@ describe('FilePreviewFeature', () => {
     });
   });
 
+  /** PRD 001, §7.3.1 — images are previewed rather than refused. */
+  describe('images', () => {
+    /** URL.createObjectURL does not exist in jsdom; record what it is given. */
+    let made: string[];
+    let revoked: string[];
+
+    beforeEach(() => {
+      made = [];
+      revoked = [];
+      URL.createObjectURL = (blob: Blob | MediaSource) => {
+        const url = `blob:image/${made.length}/${(blob as Blob).size}`;
+        made.push(url);
+        return url;
+      };
+      URL.revokeObjectURL = (url: string) => void revoked.push(url);
+    });
+
+    /** Fetches an image and answers both requests it makes. */
+    const openImage = async (path: string, bytes = 'PNGDATA'): Promise<void> => {
+      workbench.filePreviewFt.open(path);
+      http.expectOne(detailsUrl(path)).flush(fsEnvelope(fsDetails(path)));
+      http.expectOne(downloadUrl(path)).flush(new Blob([bytes], { type: 'image/png' }));
+      await settled();
+    };
+
+    it('hands the bytes to the viewer as an object URL', async () => {
+      await start();
+      await openImage('logo.png');
+
+      expect(workbench.filePreviewFt.noticeFor('logo.png')).toBeUndefined();
+      expect(workbench.filePreviewFt.documentFor('logo.png')).toMatchObject({
+        path: 'logo.png',
+        kind: 'image',
+        src: made[0],
+      });
+    });
+
+    it('names the size and the format on the status line', async () => {
+      await start();
+      await openImage('logo.png');
+
+      expect(workbench.filePreviewFt.documentFor('logo.png')?.meta).toBe('7 B · PNG');
+    });
+
+    /** An `<img>` cannot run script, so an SVG is as inert here as a PNG. */
+    it('previews an SVG too', async () => {
+      await start();
+      workbench.filePreviewFt.open('docs/diagram.svg');
+      http.expectOne(detailsUrl('docs/diagram.svg')).flush(fsEnvelope(fsDetails('docs/diagram.svg')));
+      http
+        .expectOne(downloadUrl('docs/diagram.svg'))
+        .flush(new Blob(['<svg/>'], { type: 'image/svg+xml' }));
+      await settled();
+
+      expect(workbench.filePreviewFt.documentFor('docs/diagram.svg')).toMatchObject({
+        kind: 'image',
+      });
+    });
+
+    /** Images get their own, far larger budget than text does. */
+    it('refuses one past the image limit without fetching it', async () => {
+      await start();
+
+      workbench.filePreviewFt.open('poster.jpg');
+      http.expectOne(detailsUrl('poster.jpg')).flush(fsEnvelope(fsDetails('poster.jpg')));
+      await settled();
+
+      http.expectNone(downloadUrl('poster.jpg'));
+      expect(workbench.filePreviewFt.noticeFor('poster.jpg')).toMatchObject({
+        title: 'Image is too large to preview',
+      });
+    });
+
+    /** The feature made the URL, so the feature is the only one who can free it. */
+    it('revokes the previous URL when the image is reloaded', async () => {
+      await start();
+      await openImage('logo.png');
+      expect(revoked).toEqual([]);
+
+      workbench.filePreviewFt.reload('logo.png');
+      http.expectOne(downloadUrl('logo.png')).flush(new Blob(['PNGDATA2'], { type: 'image/png' }));
+      await settled();
+
+      expect(revoked).toEqual([made[0]]);
+      expect(workbench.filePreviewFt.documentFor('logo.png')?.src).toBe(made[1]);
+    });
+  });
+
   describe('files that are not shown', () => {
     it('refuses a known binary extension without fetching it', async () => {
       await start();
 
-      workbench.filePreviewFt.open('logo.png');
-      http.expectOne(detailsUrl('logo.png')).flush(fsEnvelope(fsDetails('logo.png')));
+      workbench.filePreviewFt.open('archive.zip');
+      http.expectOne(detailsUrl('archive.zip')).flush(fsEnvelope(fsDetails('archive.zip')));
       await settled();
 
       // No download was requested at all.
-      http.expectNone(downloadUrl('logo.png'));
-      expect(workbench.filePreviewFt.documentFor('logo.png')).toBeUndefined();
-      expect(workbench.filePreviewFt.noticeFor('logo.png')).toMatchObject({
+      http.expectNone(downloadUrl('archive.zip'));
+      expect(workbench.filePreviewFt.documentFor('archive.zip')).toBeUndefined();
+      expect(workbench.filePreviewFt.noticeFor('archive.zip')).toMatchObject({
         title: 'Binary file not shown',
       });
     });

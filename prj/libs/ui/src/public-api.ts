@@ -48,6 +48,8 @@ export { UiTabBar } from './lib/tabs/ui-tab-bar';
 export { UiFileList } from './lib/file-list/ui-file-list';
 export { UiIconView } from './lib/icon-view/ui-icon-view';
 export { UiDocumentView } from './lib/document-view/ui-document-view';
+export { UiImageView } from './lib/image-view/ui-image-view';
+export type { UiImageZoom } from './lib/image-view/ui-image-view';
 export { UiPanelGroup } from './lib/panel-group/ui-panel-group';
 export { UiPanelGrid } from './lib/panel-grid/ui-panel-grid';
 

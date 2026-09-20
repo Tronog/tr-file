@@ -57,7 +57,7 @@ structural helpers. No component hardcodes a colour.
 | Shell | `UiWorkbench`, `UiTitleBar`, `UiActivityBar`, `UiStatusBar` |
 | Sidebars | `UiSidebar`, `UiPane`, `UiTree` |
 | Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList` |
-| Editor | `UiPanelGrid`, `UiPanelGroup`, `UiTabBar`, `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView` |
+| Editor | `UiPanelGrid`, `UiPanelGroup`, `UiTabBar`, `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView` |
 | Bottom panel | `UiBottomPanel`, `UiTransferList` |
 | Controls | `UiIconButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
 | Icons | `UiIcon`, `UiIconSprite` |
@@ -213,8 +213,22 @@ sanitised HTML — **the application renders the markdown, not this library**,
 which keeps the parser (and its dependency) out of the component library — and
 the view supplies only the typography and the `[innerHTML]` binding, which
 Angular's default sanitiser scrubs on the way in. A `text` document is printed
-verbatim in a monospace block. Nothing in it is editable, and the only
-focusable element is the scroll container itself.
+verbatim in a monospace block, and an `image` document is handed to
+`UiImageView`. Nothing in it is editable, and the only focusable element is the
+scroll container — or, for an image, the viewport.
+
+`UiImageView` is the picture half of that preview (PRD 001, §7.3.1). One model
+drives all five controls: the image is drawn at its natural size and
+transformed, so `contain`, `cover` and `100%` are three ways of computing one
+`scale`, the wheel and the `+`/`-` buttons set it directly, and panning is a
+`translate`. Wheeling or dragging switches to a free zoom, which is why the fit
+buttons stay meaningful rather than becoming a mode the viewer is stuck in; a
+double click returns to `contain`. Two details are deliberate: a wheel zoom is
+anchored under the pointer, so zooming into a corner works instead of
+recentring, and the pan is clamped on the way *out*, so a hard drag can never
+park the picture off-screen and an image smaller than the frame simply stays
+centred. Like the rest of the viewer it fetches nothing — `src` is a URL the
+application made, owns and revokes.
 
 Two inputs exist for the asynchronous world the workbench now lives in:
 `UiTreeNode.busy` turns a row's twisty into a spinner while its contents are
