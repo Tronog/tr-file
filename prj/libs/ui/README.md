@@ -183,6 +183,15 @@ just as well over a document or an empty placeholder — neither of which has a
 keyboard of its own — and both views let an `Alt` chord bubble untouched so it
 arrives exactly once.
 
+An **empty folder** is the case that makes all of this hold together. Its
+placeholder contains nothing focusable, so the body carries `tabindex="-1"` and
+takes focus itself when it has nothing else to offer; without that the keyboard
+would fall out of the panel and every one of its keys would reach nothing — a
+keyboard user could walk into an empty folder and not get out. For the same
+reason the group answers `Backspace` and `F5` when the body *itself* has focus,
+and only then: whenever there is a row or a tile to stand on, those keys belong
+to the view that owns it.
+
 Two rules are worth stating outright. **Selection follows focus**: arrowing
 onto an entry emits `select`, so the details sidebar tracks the keyboard the
 same way it tracks the mouse. And **the views move focus but decide nothing**:

@@ -178,6 +178,54 @@ describe('UiPanelGroup body focus', () => {
     });
   });
 
+  /**
+   * PRD 001, §6.3.1 (empty folders). A placeholder has nothing focusable in
+   * it, so the body itself takes focus — otherwise the keyboard is left
+   * outside the panel and its own keys reach nothing.
+   */
+  describe('an empty folder', () => {
+    const body = (): HTMLElement => fixture.nativeElement.querySelector('.group-body');
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('group', {
+        ...GROUP,
+        rows: [],
+        empty: { icon: 'folder-open', title: 'This folder is empty' },
+      } satisfies UiPanelGroupModel);
+      fixture.detectChanges();
+    });
+
+    it('still takes focus, on the body itself', () => {
+      ask(1);
+
+      expect(document.activeElement).toBe(body());
+    });
+
+    it('reports a press on it, and the press ends with the body focused', () => {
+      let presses = 0;
+      fixture.componentInstance.bodyPress.subscribe(() => (presses += 1));
+
+      body().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      fixture.detectChanges();
+      ask(1);
+
+      expect(presses).toBe(1);
+      expect(document.activeElement).toBe(body());
+    });
+
+    /** The fallback must not count as the tab stop a loading body will grow. */
+    it('gives the first row back once one arrives', () => {
+      fixture.componentRef.setInput('group', { ...GROUP, rows: [], loading: true });
+      ask(1);
+      expect(document.activeElement).toBe(body());
+
+      fixture.componentRef.setInput('group', GROUP);
+      fixture.detectChanges();
+
+      expect(document.activeElement).toBe(focusedRow());
+    });
+  });
+
   it('puts focus on the body tab stop when the token changes', () => {
     ask(1);
 

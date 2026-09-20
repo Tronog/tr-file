@@ -177,6 +177,27 @@ describe('PanelHistoryFeature', () => {
     expect(pathOf()).toBe('docs');
   });
 
+  /**
+   * The failure this section really had: an empty folder has nothing to focus,
+   * so the keyboard fell out of the panel and the *next* `Alt`+`←` reached
+   * nothing. The body keeps focus now, but the trail has to be right too.
+   */
+  it('walks in and out of an empty folder', async () => {
+    await start();
+    await goTo('docs');
+    // An empty listing is still a stop on the trail.
+    await goTo('docs/empty', []);
+
+    expect(history().entriesOf(groupId())).toEqual(['', 'docs', 'docs/empty']);
+
+    await walk('back');
+    expect(pathOf()).toBe('docs');
+    await walk('forward');
+    expect(pathOf()).toBe('docs/empty');
+    await walk('back');
+    expect(pathOf()).toBe('docs');
+  });
+
   describe('with two panels', () => {
     /**
      * The point of keeping a trail per panel: two panels are two places

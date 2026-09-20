@@ -35,9 +35,10 @@ export class PanelKeyboardFeature {
 
     switch (key.command) {
       case 'open':
+        // `openEntry` keeps the focus itself, since a double click has to do
+        // exactly the same thing.
         if (key.entryId !== null) {
           groups.openEntry(groupId, key.entryId);
-          this.keepFocusInBody(groupId);
         }
         break;
 

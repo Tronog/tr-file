@@ -51,7 +51,9 @@ workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as 
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
 since two panels are two places someone is working. Any key that changes the folder also
 re-asks for body focus, or the rows it was standing on are gone and the keyboard is left
-outside the panel.
+outside the panel — and that includes opening a folder by double click. An empty folder
+has nothing focusable in it, so `.group-body` carries `tabindex="-1"` and takes focus
+itself; otherwise a keyboard user could walk into one and not get out.
 Choosing a tab (a click, not an arrow-key rove), or pressing the blank space of a panel
 body, hands focus to that panel's content once it has rendered; `PanelFocusFeature` owns
 that request and `UiPanelGroup` answers it. Row clicks only ever

@@ -202,11 +202,21 @@ export class UiPanelGroup {
   /**
    * Focuses the body's single tab stop — the focused row, the focused tile or
    * the document's scroll container, whichever the body is currently showing.
-   * Reports whether there was one: an empty or still-loading body has none.
+   *
+   * A body with nothing in it still takes focus, on the container itself:
+   * an empty folder shows a placeholder with no focusable element at all, and
+   * leaving the keyboard outside the panel would strand it there — the panel's
+   * own keys (`Alt`+`←`/`→`, `Backspace`) would reach nothing, so a keyboard
+   * user could enter an empty folder and not get out again.
+   *
+   * Reports whether a *real* tab stop was found, which is not the same thing:
+   * a body that is still loading gets the fallback now and the first row when
+   * it arrives.
    */
   private moveFocusIntoBody(): boolean {
-    const target = this.bodyElement().nativeElement.querySelector<HTMLElement>('[tabindex="0"]');
-    target?.focus();
+    const body = this.bodyElement().nativeElement;
+    const target = body.querySelector<HTMLElement>('[tabindex="0"]');
+    (target ?? body).focus();
     return target !== null;
   }
 
@@ -268,16 +278,42 @@ export class UiPanelGroup {
    * work just as well when the body is a document, or the empty-state
    * placeholder, neither of which has a keyboard of its own. Both views let an
    * `Alt` chord bubble untouched so it arrives here exactly once.
+   *
+   * `Backspace` and `F5` are handled here *only* when the body itself has
+   * focus, which is the empty-folder case: without it, a keyboard user who
+   * walked into an empty folder would have no way to walk back out of it.
+   * Whenever there is a row or a tile to stand on, those keys belong to the
+   * view that owns it.
    */
   protected onBodyKeydown(event: KeyboardEvent): void {
-    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    if (event.ctrlKey || event.metaKey || event.shiftKey) {
       return;
     }
 
-    if (event.key === 'ArrowLeft') {
-      this.command.emit({ command: 'back', entryId: null });
-    } else if (event.key === 'ArrowRight') {
-      this.command.emit({ command: 'forward', entryId: null });
+    if (event.altKey) {
+      if (event.key === 'ArrowLeft') {
+        this.command.emit({ command: 'back', entryId: null });
+      } else if (event.key === 'ArrowRight') {
+        this.command.emit({ command: 'forward', entryId: null });
+      } else {
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
+
+    // Only when the body itself has focus, which happens when it has nothing
+    // to give focus to: an empty folder. The list and the grid own these keys
+    // whenever there is a row or a tile to stand on, and handling them here as
+    // well would run them twice.
+    if (event.target !== this.bodyElement().nativeElement) {
+      return;
+    }
+
+    if (event.key === 'Backspace') {
+      this.command.emit({ command: 'up', entryId: null });
+    } else if (event.key === 'F5') {
+      this.command.emit({ command: 'refresh', entryId: null });
     } else {
       return;
     }
@@ -295,12 +331,20 @@ export class UiPanelGroup {
    */
   protected onBodyPointerDown(event: PointerEvent): void {
     const target = event.target;
-    if (
-      target instanceof Element &&
-      target.closest('button, a, input, textarea, select, [tabindex], [contenteditable]')
-    ) {
+    if (!(target instanceof Element)) {
       return;
     }
+
+    // The body carries `tabindex="-1"` so it can hold focus when it has
+    // nothing else to offer, so a match on the body itself is not a match:
+    // pressing it *is* pressing the empty area.
+    const focusable = target.closest(
+      'button, a, input, textarea, select, [tabindex], [contenteditable]',
+    );
+    if (focusable !== null && focusable !== this.bodyElement().nativeElement) {
+      return;
+    }
+
     this.bodyPress.emit();
   }
 

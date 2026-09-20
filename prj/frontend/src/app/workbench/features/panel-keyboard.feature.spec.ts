@@ -131,6 +131,18 @@ describe('PanelKeyboardFeature', () => {
   describe('keeping the keyboard in the panel', () => {
     const token = (): number => workbench.panelFocusFt.token(groupId());
 
+    /** Double click and `Enter` are the same gesture; both keep the keyboard. */
+    it('asks for focus when an entry is opened by pointer too', async () => {
+      await start();
+      const before = token();
+
+      workbench.editorGroupsFt.openEntry(groupId(), 'docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      expect(token()).toBeGreaterThan(before);
+    });
+
     it('asks the body to take focus again after a key changed the folder', async () => {
       await start();
       const before = token();

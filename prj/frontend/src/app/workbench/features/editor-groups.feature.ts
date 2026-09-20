@@ -155,6 +155,10 @@ export class EditorGroupsFeature {
     }
     if (entry.type === 'directory') {
       this.navigateTo(groupId, entry.path, entry.name);
+      // The listing that had focus is gone, so without this the keyboard falls
+      // out of the panel and the next `Alt`+`←` reaches nothing — whether the
+      // entry was opened by double click or by `Enter`.
+      this.parent.panelFocusFt.focusBody(groupId);
       return;
     }
     this.focus(groupId);

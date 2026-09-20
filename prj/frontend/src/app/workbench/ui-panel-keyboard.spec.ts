@@ -332,6 +332,39 @@ describe('UiPanelGroup history keys', () => {
     expect(commands).toEqual([{ command: 'back', entryId: null }]);
   });
 
+  /**
+   * An empty folder gives focus to the body itself, and a keyboard user has to
+   * be able to walk back out of it (PRD 001, §6.2.1 with §6.3.1).
+   */
+  it('answers Backspace and F5 when the body itself has focus', () => {
+    const body = fixture.nativeElement.querySelector('.group-body') as HTMLElement;
+    body.dispatchEvent(keydown('Backspace'));
+    body.dispatchEvent(keydown('F5'));
+    fixture.detectChanges();
+
+    expect(commands).toEqual([
+      { command: 'up', entryId: null },
+      { command: 'refresh', entryId: null },
+    ]);
+  });
+
+  /**
+   * The list owns those keys whenever there is a row to stand on. Each must
+   * therefore arrive exactly once — from the list, carrying its entry — and
+   * not a second time from the group.
+   */
+  it('leaves Backspace and F5 to the row that has focus', () => {
+    const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
+    row.dispatchEvent(keydown('Backspace'));
+    row.dispatchEvent(keydown('F5'));
+    fixture.detectChanges();
+
+    expect(commands).toEqual([
+      { command: 'up', entryId: 'alpha.ts' },
+      { command: 'refresh', entryId: 'alpha.ts' },
+    ]);
+  });
+
   /** A bare arrow belongs to the rows; a fuller chord is the OS's or nobody's. */
   it('claims nothing else', () => {
     press('ArrowLeft');
