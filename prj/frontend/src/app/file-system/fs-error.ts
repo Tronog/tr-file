@@ -94,7 +94,24 @@ export class FsError extends Error {
     );
   }
 
-  /** Normalises anything thrown by the HTTP layer into an `FsError`. */
+  /**
+   * Rebuilds an `FsError` from the desktop bridge's flattened failure
+   * (PRD 001, §8.1).
+   *
+   * The backend sends `status` across the channel for exactly this reason: an
+   * `FsError` from the bridge is indistinguishable from one raised by HTTP, so
+   * no caller has to ask which transport it is standing on.
+   */
+  static fromBridge(failure: {
+    code: string;
+    message: string;
+    status: number;
+    details?: unknown;
+  }): FsError {
+    return new FsError(failure.message, failure.status, failure.code, failure.details);
+  }
+
+  /** Normalises anything thrown by a transport into an `FsError`. */
   static from(error: unknown): FsError {
     if (error instanceof FsError) {
       return error;

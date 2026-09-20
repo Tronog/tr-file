@@ -211,6 +211,9 @@ describe('DetailsFeature', () => {
       }) as typeof document.createElement);
 
       workbench.detailsFt.runAction('download');
+      // The transport resolves the URL, so the anchor is clicked a microtask
+      // later; see `TransfersFeature.download` (PRD 001, §8.1).
+      await settled();
 
       // A download is a browser transfer, not an `HttpClient` request.
       expect(hrefs).toEqual([downloadUrl('docs/notes.md')]);

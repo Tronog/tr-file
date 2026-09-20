@@ -23,6 +23,37 @@ pnpm typecheck  # runtime sources + test sources
 | `LOG_LEVEL` | `debug` / `info` in production | Log verbosity |
 | `NODE_ENV` | `development` | Environment |
 
+## The bridge — the same API without HTTP (PRD 001, §8.1)
+
+`App` also exposes `bridge`, a `FileSystemBridge` over the **same**
+`FilesService` the routes use — same path resolver, same root confinement,
+same upload ceiling. It is what the Electron shell calls instead of talking to
+itself over a socket (`prj/desktop`); a server deployment never touches it.
+
+```ts
+const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
+// { data: … }  or  { error: { code, message, status, details? } }
+```
+
+| Command | Fields | Answers with |
+| --- | --- | --- |
+| `list` | `path` | the listing `GET /api/fs/list` serves |
+| `details` | `path` | the entry `GET /api/fs/details` serves |
+| `read` | `path`, `maxBytes?` | `{ name, size, mimeType, content: Uint8Array }` |
+| `upload` | `path`, `filename`, `content`, `overwrite` | the stored file's details |
+
+Two rules follow from the channel it is reached through. Requests **are
+untrusted** — they come from a renderer, so every field is validated exactly as
+a query string would be, and a malformed one is the same `BAD_REQUEST`.
+Failures are **returned, not thrown** — an `Error` loses its type, its code and
+usually its message crossing a structured clone, so a failure is flattened into
+the HTTP error envelope plus the `status` it would have had. That is what lets
+the frontend raise one `FsError` for either transport.
+
+`read` is the one place the bridge is *stricter* than HTTP: an in-process
+caller gets the whole file as one buffer, so `maxBytes` is refused before
+anything is read rather than after.
+
 ## `/api/fs` — file-system access (PRD 001, §7)
 
 Paths are **root-relative POSIX, no leading slash**; an omitted or empty `path`

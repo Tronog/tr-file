@@ -64,17 +64,27 @@ and the initial layout.
 # Backend
 Refer to `docs/ai/EXPRESS.md`. The file-system API lives at `/api/fs`
 (listing, details, download, upload) — see `prj/backend/README.md` for the
-endpoint reference, the error codes and the `FILES_ROOT` confinement rules. Its
-frontend client is `prj/frontend/src/app/file-system/`.
+endpoint reference, the error codes and the `FILES_ROOT` confinement rules. The same
+API is reachable without HTTP through `App.bridge`, for the desktop shell. Its
+frontend client is `prj/frontend/src/app/file-system/`, where `FsHttpService` and
+`FsBridgeService` are the two transports behind one `FsTransport`.
 
 # Desktop
 `prj/desktop` is the Electron app that runs the whole stack in one process — see
 `prj/desktop/README.md`. It does not spawn the backend: `DesktopStack` mounts
 `new App(...)` from `@tr-file/backend` as middleware beside `express.static` over the
 frontend build, on a loopback port the OS picks, and the window loads that. It is
-therefore what `docker/nginx/default.conf` is in production. Only `main.ts` and
-`main-window.ts` import `electron`, so `pnpm --filter @tr-file/desktop test` boots the
-real stack over HTTP with no desktop session.
+therefore what `docker/nginx/default.conf` is in production. `pnpm --filter
+@tr-file/desktop test` boots the real stack over HTTP with no desktop session, because
+`DesktopConfig` and `DesktopStack` import no `electron`.
+
+Since Section 8.1 the desktop loads the *bundle* over that server and nothing else:
+data goes straight to the backend. `App.bridge` (`prj/backend/src/modules/bridge`) runs
+the same commands against the same `FilesService` as the HTTP routes, `FsBridgeChannel`
+plus a sandboxed preload carry them over IPC, and `FsBridgeService` is the frontend
+transport that speaks them. `FileSystemService` picks a transport once — bridge if the
+preload is there, HTTP otherwise — so no feature, component or error path below it
+knows which one it has.
 
 # Docker
 Refer to `docs/ai/DOCKER.md`. Two Compose environments live at the workspace root:

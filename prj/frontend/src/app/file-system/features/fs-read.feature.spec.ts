@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { FileSystemService } from '../file-system.service';
+import { FsHttpService } from '../fs-http.service';
 import type { FsDetails, FsDirectoryListing } from '../file-system.model';
 import { FsError } from '../fs-error';
 
@@ -50,6 +51,7 @@ const DETAILS: FsDetails = {
 
 describe('FsReadFeature', () => {
   let fs: FileSystemService;
+  let httpFs: FsHttpService;
   let http: HttpTestingController;
 
   beforeEach(() => {
@@ -57,6 +59,9 @@ describe('FsReadFeature', () => {
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
     fs = TestBed.inject(FileSystemService);
+    // The reactive readers moved onto the HTTP transport with §8.1 — an
+    // `httpResource` cannot exist on a transport that speaks no HTTP.
+    httpFs = TestBed.inject(FsHttpService);
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -172,7 +177,7 @@ describe('FsReadFeature', () => {
   describe('listResource()', () => {
     it('issues no request while the path signal is undefined', () => {
       const path = signal<string | undefined>(undefined);
-      fs.readFt.listResource(path);
+      httpFs.listResource(path);
       TestBed.tick();
 
       http.expectNone(() => true);
@@ -180,7 +185,7 @@ describe('FsReadFeature', () => {
 
     it('requests the right URL once the path signal has a value', () => {
       const path = signal<string | undefined>(undefined);
-      fs.readFt.listResource(path);
+      httpFs.listResource(path);
       TestBed.tick();
 
       path.set('docs');
@@ -195,7 +200,7 @@ describe('FsReadFeature', () => {
   describe('detailsResource()', () => {
     it('issues no request while the path signal is undefined', () => {
       const path = signal<string | undefined>(undefined);
-      fs.readFt.detailsResource(path);
+      httpFs.detailsResource(path);
       TestBed.tick();
 
       http.expectNone(() => true);
@@ -203,7 +208,7 @@ describe('FsReadFeature', () => {
 
     it('requests the right URL once the path signal has a value', () => {
       const path = signal<string | undefined>('docs/prd/001.md');
-      fs.readFt.detailsResource(path);
+      httpFs.detailsResource(path);
       TestBed.tick();
 
       const request = http.expectOne((candidate) => candidate.url.startsWith('/api/fs/details'));

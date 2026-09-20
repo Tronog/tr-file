@@ -2,6 +2,7 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import { join } from 'node:path';
 
 import { App } from '@tr-file/backend/app';
+import type { FileSystemBridge } from '@tr-file/backend/bridge';
 import { AppConfig } from '@tr-file/backend/config';
 import { Logger } from '@tr-file/backend/core';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
@@ -29,6 +30,7 @@ const VERSION = process.env['npm_package_version'] ?? '0.1.0';
 export class DesktopStack {
   private server: HttpServer | null = null;
   private url: URL | null = null;
+  private api: App | null = null;
 
   private readonly logger: Logger;
 
@@ -39,6 +41,26 @@ export class DesktopStack {
     this.logger =
       logger ??
       Logger.create(config.development ? 'debug' : 'info', { service: 'tr-file-desktop' });
+  }
+
+  /** The logger the shell and everything it wires up should report through. */
+  get log(): Logger {
+    return this.logger;
+  }
+
+  /**
+   * The backend, reachable without HTTP (PRD 001, §8.1).
+   *
+   * The desktop's renderer uses this instead of the API the same process is
+   * serving a few lines above — same `FilesService`, one structured clone
+   * instead of a round trip through the loopback stack. The static half of the
+   * server stays: the bundle still has to be loaded from somewhere.
+   */
+  get bridge(): FileSystemBridge {
+    if (this.api === null) {
+      throw new Error('The desktop stack has not been started.');
+    }
+    return this.api.bridge;
   }
 
   /** The address the window should load. Only valid once `start` has resolved. */
@@ -72,6 +94,7 @@ export class DesktopStack {
 
     const port = await this.listen(server);
     this.server = server;
+    this.api = api;
     this.url = new URL(`http://${this.config.host}:${port}/`);
 
     this.logger.info('desktop stack listening', {
@@ -92,6 +115,7 @@ export class DesktopStack {
 
     this.server = null;
     this.url = null;
+    this.api = null;
 
     await new Promise<void>((resolve) => {
       server.close(() => resolve());

@@ -2,6 +2,7 @@ import { HttpEventType, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { FileSystemService } from '../file-system.service';
+import { FsHttpService } from '../fs-http.service';
 import type { FsDetails } from '../file-system.model';
 import { FsError } from '../fs-error';
 
@@ -35,6 +36,7 @@ const file = () => new File(['hello world'], 'notes.txt', { type: 'text/plain' }
 
 describe('FsTransferFeature', () => {
   let fs: FileSystemService;
+  let httpFs: FsHttpService;
   let http: HttpTestingController;
 
   beforeEach(() => {
@@ -42,22 +44,30 @@ describe('FsTransferFeature', () => {
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
     fs = TestBed.inject(FileSystemService);
+    // The URL builders belong to the HTTP transport itself since §8.1; the
+    // feature above it no longer knows that URLs exist.
+    httpFs = TestBed.inject(FsHttpService);
     http = TestBed.inject(HttpTestingController);
+  });
+
+  it('chooses the HTTP transport when no desktop bridge is present', () => {
+    expect(fs.transport.kind).toBe('http');
+    expect(fs.transport).toBe(httpFs);
   });
 
   afterEach(() => http.verify());
 
   describe('downloadUrl()', () => {
     it('composes the download URL off the base path', () => {
-      expect(fs.transferFt.downloadUrl('docs/prd/001.md')).toBe('/api/fs/download?path=docs/prd/001.md');
+      expect(httpFs.downloadUrl('docs/prd/001.md')).toBe('/api/fs/download?path=docs/prd/001.md');
     });
 
     it('encodes the path exactly once', () => {
-      expect(fs.transferFt.downloadUrl('my docs/a&b')).toBe('/api/fs/download?path=my%20docs/a%26b');
+      expect(httpFs.downloadUrl('my docs/a&b')).toBe('/api/fs/download?path=my%20docs/a%26b');
     });
 
     it('addresses the root with an empty path', () => {
-      expect(fs.transferFt.downloadUrl('')).toBe('/api/fs/download?path=');
+      expect(httpFs.downloadUrl('')).toBe('/api/fs/download?path=');
     });
   });
 

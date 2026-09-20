@@ -1,13 +1,26 @@
+import { fileURLToPath } from 'node:url';
+
 import { BrowserWindow, shell } from 'electron';
+
+/**
+ * The compiled preload, beside this file. CommonJS (`.cjs`) because a
+ * sandboxed preload has to be, while the rest of the shell is ESM.
+ */
+const PRELOAD = fileURLToPath(new URL('./preload.cjs', import.meta.url));
 
 /**
  * The application window, and the rules about what may happen inside it.
  *
- * The renderer is the ordinary Angular app served over loopback HTTP, so it
- * needs nothing from Node: no preload, no `nodeIntegration`, context isolation
- * and the sandbox both on. That is not belt and braces — this app hands a web
- * page a view of the user's home directory, so the page gets a browser's
- * powers and not one more.
+ * The renderer is the ordinary Angular app, so it gets a browser's powers and
+ * not one more: no `nodeIntegration`, context isolation and the sandbox both
+ * on. That is not belt and braces — this app hands a web page a view of the
+ * user's home directory.
+ *
+ * The one thing it is given is the preload of PRD 001 §8.1, which puts a
+ * single `invoke` function on `window` so the app can reach the backend
+ * without HTTP. That function can name exactly one channel and carries no file
+ * handles, no paths and no Node; the main process validates every command that
+ * arrives through it.
  *
  * Navigation is pinned to the stack's own origin. Anything else — a link in a
  * previewed markdown file, a `window.open` — is handed to the real browser,
@@ -44,6 +57,7 @@ export class MainWindow {
       show: false,
       autoHideMenuBar: true,
       webPreferences: {
+        preload: PRELOAD,
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,

@@ -184,7 +184,7 @@ describe('TransfersFeature', () => {
   });
 
   describe('download()', () => {
-    it('hands the browser a download link and tracks nothing', () => {
+    it('hands the browser a download link and tracks nothing', async () => {
       const hrefs: (string | null)[] = [];
       const create = document.createElement.bind(document);
       vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
@@ -196,6 +196,9 @@ describe('TransfersFeature', () => {
       }) as typeof document.createElement);
 
       workbench.transfersFt.download('docs/notes.txt', 'notes.txt');
+      // The URL is resolved through the transport since §8.1, so the anchor
+      // is clicked a microtask later even though HTTP knows it immediately.
+      await settled();
 
       expect(hrefs).toEqual([downloadUrl('docs/notes.txt')]);
       expect(rows()).toEqual([]);

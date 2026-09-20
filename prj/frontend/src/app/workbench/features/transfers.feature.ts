@@ -27,9 +27,11 @@ interface TransferRecord {
  * has to be polled. A finished upload refreshes the directory it landed in,
  * which is what makes the new file appear in every panel showing that folder.
  *
- * Downloads are deliberately not tracked: the backend answers with
+ * Downloads are deliberately not tracked: over HTTP the backend answers with
  * `Content-Disposition: attachment`, so handing the URL to the browser lets it
- * stream the file to disk without pulling it through memory first.
+ * stream the file to disk without pulling it through memory first. (The
+ * desktop transport has no such endpoint and does read the bytes first; see
+ * `download` below.)
  */
 export class TransfersFeature {
   private readonly records: WritableSignal<readonly TransferRecord[]>;
@@ -59,15 +61,36 @@ export class TransfersFeature {
     }
   }
 
-  /** Hands the download URL to the browser, which streams it to disk. */
+  /**
+   * Hands a URL to the browser, which streams the file to disk.
+   *
+   * Fire and forget, as it has always been, but asynchronous underneath since
+   * §8.1: over HTTP the URL is the download endpoint and is known at once,
+   * while on the desktop there is no endpoint at all — the bytes come across
+   * the bridge and are wrapped in an object URL, which is then revoked.
+   */
   download(path: string, name: string): void {
-    const anchor = document.createElement('a');
-    anchor.href = this.parent.fileSystem.transferFt.downloadUrl(path);
-    anchor.download = name;
-    anchor.rel = 'noopener';
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
+    void this.saveToDisk(path, name).catch((error: unknown) => {
+      // The panel has no row shape for a download, so there is nowhere to show
+      // this yet; it is logged rather than swallowed. Over HTTP it cannot
+      // happen — only the desktop transport reads the file before saving it.
+      console.error(`Could not download ${path}:`, FsError.from(error).message);
+    });
+  }
+
+  private async saveToDisk(path: string, name: string): Promise<void> {
+    const target = await this.parent.fileSystem.transferFt.saveUrl(path);
+    try {
+      const anchor = document.createElement('a');
+      anchor.href = target.url;
+      anchor.download = name;
+      anchor.rel = 'noopener';
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+    } finally {
+      target.release();
+    }
   }
 
   cancel(id: string): void {

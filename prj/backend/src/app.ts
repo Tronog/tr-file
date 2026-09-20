@@ -8,6 +8,7 @@ import {
   RequestLoggerMiddleware,
   type RouteModule,
 } from './core/index.js';
+import { FileSystemBridge } from './modules/bridge/index.js';
 import { FilePathResolver, FilesRoutes, FilesService } from './modules/files/index.js';
 import { HealthRoutes, HealthService } from './modules/health/index.js';
 
@@ -18,11 +19,32 @@ import { HealthRoutes, HealthService } from './modules/health/index.js';
 export class App {
   readonly instance: Express;
 
+  /**
+   * The same file-system API, reachable without HTTP (PRD 001, §8.1).
+   *
+   * Built here rather than by the caller so it can only ever sit on the
+   * `FilesService` the routes use: one root, one resolver, one upload ceiling.
+   * A server deployment simply never touches it; the desktop shell hands it to
+   * its IPC channel instead of talking to itself over a socket.
+   */
+  readonly bridge: FileSystemBridge;
+
+  private readonly filesService: FilesService;
+  private readonly filesLogger: Logger;
+
   constructor(
     private readonly config: AppConfig,
     private readonly logger: Logger,
     private readonly version: string,
   ) {
+    this.filesLogger = this.logger.child({ module: 'files' });
+    this.filesService = new FilesService(
+      new FilePathResolver(this.config.filesRoot),
+      this.filesLogger,
+      this.config.uploadMaxBytes,
+    );
+    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger);
+
     this.instance = express();
     this.configure();
     this.mountModules(this.createModules());
@@ -39,15 +61,12 @@ export class App {
   }
 
   private createModules(): readonly RouteModule[] {
-    const filesLogger = this.logger.child({ module: 'files' });
-    const filesService = new FilesService(
-      new FilePathResolver(this.config.filesRoot),
-      filesLogger,
-      this.config.uploadMaxBytes,
-    );
     const healthService = new HealthService(this.version, this.config.nodeEnv);
 
-    return [new HealthRoutes(healthService), new FilesRoutes(filesService, filesLogger)];
+    return [
+      new HealthRoutes(healthService),
+      new FilesRoutes(this.filesService, this.filesLogger),
+    ];
   }
 
   private mountModules(modules: readonly RouteModule[]): void {

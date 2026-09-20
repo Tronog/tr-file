@@ -2,6 +2,7 @@ import { app, dialog } from 'electron';
 
 import { DesktopConfig } from './desktop.config.js';
 import { DesktopStack } from './desktop.stack.js';
+import { FsBridgeChannel } from './fs-bridge.channel.js';
 import { MainWindow } from './main-window.js';
 
 /**
@@ -25,6 +26,7 @@ class DesktopApplication {
   private readonly stack = new DesktopStack(this.config);
 
   private window: MainWindow | null = null;
+  private channel: FsBridgeChannel | null = null;
 
   /**
    * Starts the app, unless another copy already owns the lock — in which case
@@ -57,7 +59,13 @@ class DesktopApplication {
 
   private async start(): Promise<void> {
     try {
-      await this.stack.start();
+      const url = await this.stack.start();
+
+      // Before the window, not after: the bundle may ask for a listing on its
+      // very first frame, and a command that arrives with no handler rejects.
+      this.channel = new FsBridgeChannel(this.stack.bridge, url.origin, this.stack.log);
+      this.channel.register();
+
       await this.openWindow();
     } catch (error: unknown) {
       this.fail(error);
@@ -80,6 +88,7 @@ class DesktopApplication {
    */
   private shutDown(event: Electron.Event): void {
     event.preventDefault();
+    this.channel?.dispose();
     void this.stack
       .stop()
       .catch(() => undefined)
