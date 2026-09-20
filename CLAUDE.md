@@ -47,7 +47,10 @@ Clicking a folder in the explorer shows it in the *active* panel; that link live
 Inside a panel body the library components move focus (arrows, `Home`/`End`, page keys,
 type-to-find, selection following focus) and report the keys that mean something to the
 workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as a `UiPanelKey`;
-`PanelKeyboardFeature` is the one place those bindings are decided. `Alt`+`←`/`→` walks
+`PanelKeyboardFeature` is the one place those bindings are decided. `Ctrl`+`T` (split)
+and `Ctrl`+`W` (close the focused tab) are bound on the group's host instead, and emit
+the same outputs the tab bar's buttons do; the desktop shell installs its own accelerator
+table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
 since two panels are two places someone is working. Any key that changes the folder also
 re-asks for body focus, or the rows it was standing on are gone and the keyboard is left
@@ -59,10 +62,13 @@ body, hands focus to that panel's content once it has rendered; `PanelFocusFeatu
 that request and `UiPanelGroup` answers it. Row clicks only ever
 open — collapsing is the twisty's job (or `←` on the focused row). Double-clicking a file opens
 it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
-into a `UiDocumentModel`, and the library only renders what it is handed. An image becomes an
-object URL the feature owns and revokes, shown by `UiImageView` — contain by default, five
+into a `UiDocumentModel`, and the library only renders what it is handed. An image is read by
+`ImageSourceService` (`prj/frontend/src/app/file-system/`), one cache of object URLs keyed
+by path that owns their lifetime, and drawn by `UiImageView` — contain by default, five
 icon controls, wheel zoom anchored under the pointer, drag to pan, double click back to
-contain (§7.3.1).
+contain (§7.3.1). The viewer's model lives in `UiImageViewService`, provided per component.
+Selecting an image also shows it on the details card, fitted `contain` and non-interactive
+(§9); the panel and the sidebar read from the same cache, so a file is fetched once.
 
 Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
 `/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details

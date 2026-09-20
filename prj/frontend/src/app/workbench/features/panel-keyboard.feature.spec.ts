@@ -194,6 +194,66 @@ describe('PanelKeyboardFeature', () => {
     });
   });
 
+  /** PRD 001, §6.2.2 — the panel-level chords, as the app answers them. */
+  describe('split and close', () => {
+    it('splits into a second panel beside the first, and focuses it', async () => {
+      await start();
+      const first = groupId();
+
+      // What `Ctrl`+`T` emits: the same action as the tab bar's split button.
+      workbench.editorGroupsFt.runAction(first, 'split-right');
+      await settled();
+
+      const second = groupId();
+      expect(second).not.toBe(first);
+      expect(workbench.editorGroupsFt.pathOf(second)).toBe(workbench.editorGroupsFt.pathOf(first));
+      // The keyboard goes with the new panel rather than staying behind.
+      expect(workbench.panelFocusFt.token(second)).toBeGreaterThan(0);
+    });
+
+    it('closes the focused tab and leaves the other panel alone', async () => {
+      await start();
+      const first = groupId();
+      workbench.editorGroupsFt.runAction(first, 'split-right');
+      const second = groupId();
+      const tabId = workbench.editorGroupsFt.group(second)?.tabs[0]?.id ?? '';
+
+      workbench.editorGroupsFt.closeTab(second, tabId);
+      await settled();
+
+      expect(workbench.editorGroupsFt.group(second)).toBeUndefined();
+      expect(workbench.editorGroupsFt.group(first)).toBeDefined();
+    });
+
+    /** Closing the tab someone stood in must not drop focus out of the app. */
+    it('hands the keyboard to whatever is left showing', async () => {
+      await start();
+      const first = groupId();
+      workbench.editorGroupsFt.runAction(first, 'split-right');
+      const second = groupId();
+      const before = workbench.panelFocusFt.token(first);
+
+      workbench.editorGroupsFt.closeTab(second, workbench.editorGroupsFt.group(second)?.tabs[0]?.id ?? '');
+      await settled();
+
+      expect(groupId()).toBe(first);
+      expect(workbench.panelFocusFt.token(first)).toBeGreaterThan(before);
+    });
+
+    /** Closing the last tab anywhere still leaves somewhere to work. */
+    it('leaves one empty panel when the last tab goes', async () => {
+      await start();
+      const only = groupId();
+
+      workbench.editorGroupsFt.closeTab(only, workbench.editorGroupsFt.group(only)?.tabs[0]?.id ?? '');
+      await settled();
+
+      const remaining = workbench.editorGroupsFt.group(groupId());
+      expect(remaining?.tabs).toEqual([]);
+      expect(remaining?.empty).toBeDefined();
+    });
+  });
+
   it('runs against the group the key was pressed in, not the active one', async () => {
     await start();
     const first = groupId();

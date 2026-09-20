@@ -340,10 +340,14 @@ export class EditorGroupsFeature {
       this.groups.update((groups) =>
         groups.map((candidate) => (candidate.id === groupId ? this.withTabs(candidate, tabs) : candidate)),
       );
-      return;
+    } else {
+      this.removeGroup(groupId);
     }
 
-    this.removeGroup(groupId);
+    // Whatever is left showing gets the keyboard: closing the tab someone was
+    // standing in otherwise drops focus out of the workbench entirely. The
+    // active group may have changed, so it is read back rather than assumed.
+    this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
   }
 
   moveTab(groupId: string, move: UiTabMove): void {
@@ -478,6 +482,9 @@ export class EditorGroupsFeature {
     this.groups.update((groups) => [...groups, this.cloneGroup(group, newGroupId, [copy])]);
     this.parent.panelLayoutFt.insertBeside(groupId, newGroupId, zone);
     this.parent.activeGroupId.set(newGroupId);
+    // The new panel is where the work continues, so the keyboard goes with it
+    // — otherwise `Ctrl`+`T` leaves focus behind in the panel it split.
+    this.parent.panelFocusFt.focusBody(newGroupId);
   }
 
   /* -- group bookkeeping -------------------------------------------------- */

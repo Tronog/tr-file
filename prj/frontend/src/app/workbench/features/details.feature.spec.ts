@@ -39,6 +39,112 @@ describe('DetailsFeature', () => {
   const valueOf = (label: string): string | undefined =>
     workbench.detailsFt.properties().find((property) => property.label === label)?.value;
 
+  /** PRD 001, §9 — a selected image shows itself, not its type icon. */
+  describe('the image preview', () => {
+    let made: string[];
+    let revoked: string[];
+
+    beforeEach(() => {
+      made = [];
+      revoked = [];
+      // jsdom has neither; record what the service is given.
+      URL.createObjectURL = (blob: Blob | MediaSource) => {
+        const url = `blob:preview/${made.length}/${(blob as Blob).size}`;
+        made.push(url);
+        return url;
+      };
+      URL.revokeObjectURL = (url: string) => void revoked.push(url);
+    });
+
+    /** Selects an image and answers the details and the picture. */
+    const selectImage = async (path: string): Promise<void> => {
+      workbench.select(path);
+      http.expectOne(detailsUrl(path)).flush(fsEnvelope(fsDetails(path)));
+      http.expectOne(downloadUrl(path)).flush(new Blob(['PNGDATA'], { type: 'image/png' }));
+      await settled();
+    };
+
+    it('shows the file itself on the preview card', async () => {
+      await selectImage('logo.png');
+
+      expect(workbench.detailsFt.preview()).toMatchObject({
+        title: 'logo.png',
+        imageSrc: made[0],
+      });
+    });
+
+    /** Anything that is not a picture keeps its type icon and asks for nothing. */
+    it('leaves a text file alone', async () => {
+      await selectAndFlush('README.md');
+
+      expect(workbench.detailsFt.preview()?.imageSrc).toBeUndefined();
+      http.expectNone(downloadUrl('README.md'));
+    });
+
+    it('leaves a directory alone', async () => {
+      workbench.select('docs');
+      http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDirectoryDetails('docs')));
+      await settled();
+
+      expect(workbench.detailsFt.preview()?.imageSrc).toBeUndefined();
+    });
+
+    /** Until the bytes arrive there is nothing to draw but the icon. */
+    it('shows the icon while the picture is still coming', async () => {
+      workbench.select('logo.png');
+      http.expectOne(detailsUrl('logo.png')).flush(fsEnvelope(fsDetails('logo.png')));
+      await settled();
+
+      expect(workbench.detailsFt.preview()?.imageSrc).toBeUndefined();
+      expect(workbench.detailsFt.preview()?.icon).toBeDefined();
+
+      http.expectOne(downloadUrl('logo.png')).flush(new Blob(['PNGDATA'], { type: 'image/png' }));
+      await settled();
+
+      expect(workbench.detailsFt.preview()?.imageSrc).toBe(made[0]);
+    });
+
+    /** A failed read is not an error the sidebar shows; the icon simply stays. */
+    it('keeps the icon when the picture cannot be read', async () => {
+      workbench.select('logo.png');
+      http.expectOne(detailsUrl('logo.png')).flush(fsEnvelope(fsDetails('logo.png')));
+      http
+        .expectOne(downloadUrl('logo.png'))
+        .flush(new Blob([JSON.stringify(fsErrorBody('NOT_FOUND', 'Gone'))]), {
+          status: 404,
+          statusText: 'Not Found',
+        });
+      await settled();
+
+      expect(workbench.detailsFt.preview()?.imageSrc).toBeUndefined();
+      expect(workbench.detailsFt.hasDetails()).toBe(true);
+    });
+
+    /** One cache: the panel and the sidebar do not fetch the same file twice. */
+    it('reuses the picture the panel already read', async () => {
+      await selectImage('logo.png');
+
+      workbench.filePreviewFt.load('logo.png');
+      await settled();
+
+      // `load` finds it cached; only a `reload` would ask again.
+      http.expectNone(downloadUrl('logo.png'));
+      expect(workbench.images.urlFor('logo.png')).toBe(made[0]);
+    });
+
+    it('replaces the URL it holds when the picture is refreshed', async () => {
+      await selectImage('logo.png');
+
+      workbench.detailsFt.runAction('refresh');
+      http.expectOne(detailsUrl('logo.png')).flush(fsEnvelope(fsDetails('logo.png')));
+      http.expectOne(downloadUrl('logo.png')).flush(new Blob(['NEWER'], { type: 'image/png' }));
+      await settled();
+
+      expect(revoked).toEqual([made[0]]);
+      expect(workbench.detailsFt.preview()?.imageSrc).toBe(made[1]);
+    });
+  });
+
   it('asks for the selected entry once and reports while it is in flight', async () => {
     workbench.select('README.md');
     const request = http.expectOne(detailsUrl('README.md'));

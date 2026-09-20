@@ -365,6 +365,74 @@ describe('UiPanelGroup history keys', () => {
     ]);
   });
 
+  /**
+   * PRD 001, §6.2.2. Bound on the group rather than the body, so they answer
+   * with focus anywhere in the panel — and they emit exactly what the tab
+   * bar's own buttons emit, so the two paths cannot drift.
+   */
+  describe('Ctrl+T and Ctrl+W', () => {
+    let actions: string[];
+    let closed: string[];
+
+    beforeEach(() => {
+      actions = [];
+      closed = [];
+      fixture.componentInstance.actionSelect.subscribe((id) => actions.push(id));
+      fixture.componentInstance.tabClose.subscribe((id) => closed.push(id));
+    });
+
+    const chord = (key: string, target: Element, modifiers: KeyboardEventInit = { ctrlKey: true }) => {
+      const event = keydown(key, modifiers);
+      target.dispatchEvent(event);
+      fixture.detectChanges();
+      return event;
+    };
+
+    it('splits the panel on Ctrl+T', () => {
+      const event = chord('t', fixture.nativeElement.querySelector('.group-body'));
+
+      expect(actions).toEqual(['split-right']);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('closes the focused tab on Ctrl+W', () => {
+      const event = chord('w', fixture.nativeElement.querySelector('.group-body'));
+
+      // GROUP's only tab is the active one.
+      expect(closed).toEqual(['tab-root']);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    /** Focus may be on a tab rather than in the body; the chord still answers. */
+    it('answers from the tab bar too', () => {
+      chord('t', fixture.nativeElement.querySelector('.tab-main'));
+      chord('w', fixture.nativeElement.querySelector('.tab-main'));
+
+      expect(actions).toEqual(['split-right']);
+      expect(closed).toEqual(['tab-root']);
+    });
+
+    it('has nothing to close in a group with no tabs', () => {
+      fixture.componentRef.setInput('group', { ...GROUP, tabs: [], rows: [] } satisfies UiPanelGroupModel);
+      fixture.detectChanges();
+
+      const event = chord('w', fixture.nativeElement.querySelector('.group-body'));
+
+      expect(closed).toEqual([]);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    /** A fuller chord is the OS's, and a bare letter is type-to-find. */
+    it('claims neither a bare letter nor a wider chord', () => {
+      chord('t', fixture.nativeElement.querySelector('.group-body'), {});
+      chord('w', fixture.nativeElement.querySelector('.group-body'), { ctrlKey: true, shiftKey: true });
+      chord('t', fixture.nativeElement.querySelector('.group-body'), { ctrlKey: true, altKey: true });
+
+      expect(actions).toEqual([]);
+      expect(closed).toEqual([]);
+    });
+  });
+
   /** A bare arrow belongs to the rows; a fuller chord is the OS's or nobody's. */
   it('claims nothing else', () => {
     press('ArrowLeft');

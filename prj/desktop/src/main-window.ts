@@ -87,6 +87,16 @@ export class MainWindow {
 
     await window.loadURL(this.url.href);
 
+    // `ready-to-show` above is the earliest moment the window can appear
+    // without flashing an empty frame — but it is not guaranteed to fire, and
+    // this frameless window on Linux never does. A window nobody can see is
+    // the worst possible failure, so a resolved `loadURL` shows it regardless:
+    // the page is loaded by then, so there is nothing left to flash. `show` is
+    // idempotent, so whichever happens first wins and the other does nothing.
+    if (!window.isDestroyed()) {
+      window.show();
+    }
+
     if (this.devTools) {
       window.webContents.openDevTools({ mode: 'detach' });
     }

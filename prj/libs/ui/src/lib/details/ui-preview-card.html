@@ -1,5 +1,9 @@
-<div class="preview-thumb">
-  <ui-icon size="xl" [name]="preview().icon" [tint]="preview().tint" />
+<div class="preview-thumb" [class.is-image]="!!preview().imageSrc">
+  @if (preview().imageSrc; as src) {
+    <ui-image-view [src]="src" [label]="preview().title" [interactive]="false" />
+  } @else {
+    <ui-icon size="xl" [name]="preview().icon" [tint]="preview().tint" />
+  }
 </div>
 
 <div class="preview-name">{{ preview().title }}</div>

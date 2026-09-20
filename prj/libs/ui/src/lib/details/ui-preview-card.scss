@@ -19,6 +19,18 @@
   background: var(--vsc-editor-bg);
 }
 
+/* The viewer fills the square and clips to it, so a portrait and a landscape
+   photograph both read as the same thumbnail. */
+.preview-thumb.is-image {
+  overflow: hidden;
+  padding: 0;
+
+  ui-image-view {
+    width: 100%;
+    height: 100%;
+  }
+}
+
 .preview-name {
   font-size: var(--vsc-font-size);
   color: var(--vsc-fg-bright);

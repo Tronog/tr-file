@@ -1,6 +1,7 @@
 import { computed } from '@angular/core';
 import type { UiActionListItem, UiPermissions, UiPreview, UiProperty } from '@tr-file/ui';
 import type { FsDetails } from '../../file-system/file-system.model';
+import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import type { WorkbenchService } from '../workbench.service';
 
 /**
@@ -32,11 +33,16 @@ export class DetailsFeature {
     }
     const files = this.parent.fileViewModel;
     const size = details.type === 'directory' ? this.entriesLabel(details) : files.formatBytes(details.size);
+    // Read, never fetched: the picture is asked for by `load` below, because a
+    // `computed` that started a request would write signals during change
+    // detection. Until it arrives the card shows the file-type icon.
+    const imageSrc = this.parent.images.urlFor(details.path);
     return {
       title: details.name || this.parent.mockWorkbench.workspaceName,
       subtitle: `${files.typeLabel(details)} · ${size}`,
       icon: files.icon(details),
       tint: files.tint(details),
+      ...(imageSrc ? { imageSrc } : {}),
     };
   });
 
@@ -94,9 +100,35 @@ export class DetailsFeature {
     return actions;
   });
 
-  /** Fetches the details of whatever is selected; called on every selection. */
+  /**
+   * Fetches what the sidebar shows about a path; called on every selection.
+   *
+   * An image is also read as a picture, so the card can show the file itself
+   * rather than its type icon (PRD 001, §9). The cache is shared with the
+   * panel's viewer, so selecting a file that is already open costs nothing.
+   */
   load(path: string): void {
     this.parent.fsDataFt.ensureDetails(path);
+    if (this.wantsPicture(path)) {
+      void this.parent.images.load(path);
+    }
+  }
+
+  /**
+   * Whether the sidebar should read the file itself.
+   *
+   * A thumbnail is 96 pixels square, so pulling a huge image across for one is
+   * not worth it — and the size is known from the listing the selection came
+   * from, before a single byte is asked for. An entry no listing describes is
+   * still attempted: the transport caps what it can, and the service checks
+   * what arrives.
+   */
+  private wantsPicture(path: string): boolean {
+    if (!this.parent.images.isImage(path)) {
+      return false;
+    }
+    const entry = this.parent.fsDataFt.entryAt(path);
+    return entry === undefined || entry.size <= MAX_IMAGE_BYTES;
   }
 
   runAction(actionId: string): void {
@@ -120,6 +152,9 @@ export class DetailsFeature {
         break;
       case 'refresh':
         this.parent.fsDataFt.reloadDetails(details.path);
+        if (this.wantsPicture(details.path)) {
+          void this.parent.images.reload(details.path);
+        }
         break;
       default:
         break;

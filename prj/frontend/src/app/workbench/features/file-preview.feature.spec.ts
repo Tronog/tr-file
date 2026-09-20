@@ -128,7 +128,9 @@ describe('FilePreviewFeature', () => {
       await start();
       await openImage('logo.png');
 
-      expect(workbench.filePreviewFt.documentFor('logo.png')?.meta).toBe('7 B · PNG');
+      // The listing's size, not the blob's: the same source the text preview's
+      // status line uses, so the two never disagree about one file.
+      expect(workbench.filePreviewFt.documentFor('logo.png')?.meta).toBe('4.0 KB · PNG');
     });
 
     /** An `<img>` cannot run script, so an SVG is as inert here as a PNG. */

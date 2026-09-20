@@ -99,6 +99,7 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
   host: {
     '[class.is-active]': 'active()',
     '(pointerdown)': 'focusRequest.emit()',
+    '(keydown)': 'onGroupKeydown($event)',
   },
 })
 export class UiPanelGroup {
@@ -285,6 +286,42 @@ export class UiPanelGroup {
    * Whenever there is a row or a tile to stand on, those keys belong to the
    * view that owns it.
    */
+  /**
+   * The chords that belong to the panel as a whole (PRD 001, §6.2.2).
+   *
+   * Bound on the host rather than the body, so they work with focus anywhere
+   * in the group — a row, a tile, the document, or a tab in the bar. Neither
+   * is a new capability: they emit exactly what the tab bar's split button and
+   * its close button emit, which is why the application needs no new wiring
+   * and the two paths can never drift apart.
+   */
+  protected onGroupKeydown(event: KeyboardEvent): void {
+    if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+      return;
+    }
+
+    switch (event.key.toLowerCase()) {
+      case 't':
+        this.actionSelect.emit('split-right');
+        break;
+      case 'w': {
+        // The focused tab is the active one; a group with none has nothing to
+        // close, and must not silently close somebody else's tab.
+        const group = this.group();
+        const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
+        if (!active) {
+          return;
+        }
+        this.tabClose.emit(active.id);
+        break;
+      }
+      default:
+        return;
+    }
+
+    event.preventDefault();
+  }
+
   protected onBodyKeydown(event: KeyboardEvent): void {
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
       return;

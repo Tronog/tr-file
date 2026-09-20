@@ -45,6 +45,12 @@
   }
 }
 
+/* A thumbnail sits inside whatever box it is given (the details card's 96px
+   square), rather than claiming a panel's worth of space. */
+:host(.is-static) .viewport {
+  background-image: none;
+}
+
 .image {
   /* The transform does the sizing; these keep the browser from doing any. */
   max-width: none;

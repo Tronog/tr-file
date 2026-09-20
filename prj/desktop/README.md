@@ -138,6 +138,7 @@ those three cases (browser, macOS, everywhere else) are decided.
 | `src/main-window.ts` | The window, and the rules about what may happen in it |
 | `src/fs-bridge.channel.ts` | The IPC channel: who may ask, and nothing else |
 | `src/window-controls.channel.ts` | The four verbs a page may use on its own window |
+| `src/app-menu.ts` | The accelerator table; deliberately without `Ctrl`+`W` |
 | `src/preload.cts` | The two small objects the renderer is given |
 
 Only `main.ts`, `main-window.ts`, `fs-bridge.channel.ts` and the preload import
@@ -161,6 +162,27 @@ opens in the real browser, where the user can see the address bar.
 The server binds `127.0.0.1` on an OS-assigned port, so nothing on the network
 can reach the file system it exposes, and two copies of the app can never
 collide over a port. A single-instance lock means there is only ever one anyway.
+
+## The application menu
+
+`installAppMenu` replaces the menu Electron would otherwise install. The window
+is frameless and carries its own menu bar in the page, so nothing native is
+ever drawn — a menu is also an accelerator table, and that is the only reason
+this one exists. The default table binds **Close** to `Ctrl`+`W`, which since
+§6.2.2 closes the focused *tab*; an accelerator that closed the whole window
+instead would be a spectacular way to lose someone's work, so the chord is
+simply not bound. Reload, the inspector (`Ctrl`+`Shift`+`I`), full screen and
+quit are kept.
+
+## Showing the window
+
+`MainWindow` creates the window with `show: false` so an empty frame never
+flashes, and shows it once `loadURL` has resolved — *not* only on
+`ready-to-show`. That event is the conventional cue, but it is not guaranteed,
+and this frameless window on Linux never emits it: the app came up with no
+visible window at all, which went unnoticed only because opening the dev tools
+happened to show it. A window nobody can see is the worst failure this shell
+has, so it does not depend on an event that may not arrive.
 
 ## Running inside a container
 

@@ -28,9 +28,15 @@ export class FsTransferFeature {
     return this.parent.transport.saveUrl(path);
   }
 
-  /** Fetches a file's bytes, for in-app use (a preview, an editor buffer). */
-  async download(path: string): Promise<Blob> {
-    return this.parent.transport.read(path);
+  /**
+   * Fetches a file's bytes, for in-app use (a preview, an editor buffer).
+   *
+   * `maxBytes` is passed straight down: a transport that can refuse an
+   * oversized file *before* reading it does, and one that cannot ignores it.
+   * The caller checks what it got either way.
+   */
+  async download(path: string, maxBytes?: number): Promise<Blob> {
+    return this.parent.transport.read(path, maxBytes);
   }
 
   /**

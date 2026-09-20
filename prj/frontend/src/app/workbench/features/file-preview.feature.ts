@@ -1,28 +1,12 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { Marked } from 'marked';
 import type { UiDocumentModel, UiEmptyStateModel } from '@tr-file/ui';
+import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
 
 /** Files past this size are not previewed; the user downloads them instead. */
 const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
-
-/**
- * Images get a far larger budget than text (PRD 001, §7.3.1): a photograph is
- * routinely several megabytes, and the viewer hands the bytes straight to the
- * browser rather than walking them.
- */
-const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
-
-/**
- * Extensions the browser can decode in an `<img>`.
- *
- * SVG is included: an `<img>` is the one context where it cannot run script,
- * so it is as inert here as a PNG.
- */
-const IMAGE_EXTENSIONS = new Set([
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'svg',
-]);
 
 /** Extensions rendered as markdown rather than as plain text. */
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mkd']);
@@ -47,11 +31,6 @@ interface PreviewState {
   readonly document?: UiDocumentModel;
   /** Why the file is not shown: too large, binary, or the request failed. */
   readonly notice?: UiEmptyStateModel;
-  /**
-   * An object URL this feature made for an image, and must therefore revoke
-   * when the preview is replaced — nobody else can.
-   */
-  readonly objectUrl?: string;
 }
 
 /**
@@ -64,10 +43,10 @@ interface PreviewState {
  * through Angular's sanitizer at the binding, so a file that contains a script
  * tag is inert.
  *
- * An image is the one kind whose bytes are not transformed: they are wrapped
- * in an object URL and handed to `UiImageView`, which zooms and pans them
- * (PRD 001, §7.3.1). That URL is this feature's to revoke, since nothing else
- * knows it exists.
+ * An image is the one kind whose bytes are not transformed: `ImageSourceService`
+ * turns them into a URL an `<img>` can load and owns its lifetime, because the
+ * details sidebar draws the same picture from the same cache (§7.3.1, §9).
+ * This feature only asks for it and reports what came back.
  *
  * Nothing about a preview is editable — the PRD asks for read-only, and there
  * is no write endpoint to be tempted by.
@@ -127,17 +106,17 @@ export class FilePreviewFeature {
     if (this.pending.has(path) || this.previews().has(path)) {
       return;
     }
-    void this.fetch(path);
+    void this.fetch(path, false);
   }
 
   /** Re-reads a file that is already open (the group's Refresh action). */
   reload(path: string): void {
     if (!this.pending.has(path)) {
-      void this.fetch(path);
+      void this.fetch(path, true);
     }
   }
 
-  private async fetch(path: string): Promise<void> {
+  private async fetch(path: string, force: boolean): Promise<void> {
     this.pending.add(path);
     this.patch(path, { status: 'loading' });
 
@@ -149,8 +128,8 @@ export class FilePreviewFeature {
     }
 
     try {
-      if (IMAGE_EXTENSIONS.has(this.extension(path))) {
-        this.patch(path, await this.renderImage(path));
+      if (this.parent.images.isImage(path)) {
+        this.patch(path, await this.renderImage(path, force));
       } else {
         const text = await this.parent.fileSystem.transferFt.readText(path, MAX_PREVIEW_BYTES);
         this.patch(path, this.render(path, text));
@@ -204,49 +183,52 @@ export class FilePreviewFeature {
   }
 
   /**
-   * Fetches an image and wraps its bytes in a URL the browser can load.
+   * Asks the shared cache for the picture, and turns whatever came back into a
+   * document or a notice.
    *
-   * The size cap is checked here rather than only in `refuse`, because a file
-   * the listing has never described still has to be stopped before its bytes
-   * are held in memory twice.
+   * `load` takes whatever the cache already has — the details sidebar may well
+   * have read this very file already (§9) — while a Refresh insists on going
+   * back to disk.
    */
-  private async renderImage(path: string): Promise<PreviewState> {
-    const blob = await this.parent.fileSystem.transferFt.download(path);
-    if (blob.size > MAX_IMAGE_BYTES) {
+  private async renderImage(path: string, force: boolean): Promise<PreviewState> {
+    const images = this.parent.images;
+    await (force ? images.reload(path) : images.load(path));
+
+    const url = images.urlFor(path);
+    if (url === undefined) {
+      const failure = images.errorFor(path);
       return {
-        status: 'refused',
+        status: failure?.code === 'PAYLOAD_TOO_LARGE' ? 'refused' : 'error',
         notice: {
-          icon: 'file',
-          title: 'Image is too large to preview',
-          hint: `${this.parent.fileViewModel.formatBytes(blob.size)} — download it instead.`,
+          icon: failure?.code === 'PAYLOAD_TOO_LARGE' ? 'file' : 'alert-triangle',
+          title:
+            failure?.code === 'PAYLOAD_TOO_LARGE'
+              ? 'Image is too large to preview'
+              : 'Could not open this file',
+          hint: failure?.message ?? 'The image could not be read.',
         },
       };
     }
 
-    const objectUrl = URL.createObjectURL(blob);
-    const meta = this.imageMetaFor(path, blob);
-    return {
-      status: 'ready',
-      objectUrl,
-      document: { path, kind: 'image', src: objectUrl, ...(meta ? { meta } : {}) },
-    };
+    const meta = this.imageMetaFor(path);
+    return { status: 'ready', document: { path, kind: 'image', src: url, ...(meta ? { meta } : {}) } };
   }
 
   /** `'2.4 MB · PNG'`; the pixel size is only known once the viewer loads it. */
-  private imageMetaFor(path: string, blob: Blob): string {
-    const size = this.parent.fileViewModel.formatBytes(blob.size);
+  private imageMetaFor(path: string): string {
+    const entry = this.parent.fsDataFt.entryAt(path);
+    const size = entry ? this.parent.fileViewModel.formatBytes(entry.size) : '';
     const extension = this.extension(path).toUpperCase();
-    return extension === '' ? size : `${size} · ${extension}`;
+    return [size, extension].filter(Boolean).join(' · ');
   }
 
   /** Reasons a file is refused before a single byte is fetched. */
   private refuse(path: string): UiEmptyStateModel | undefined {
     const entry = this.parent.fsDataFt.entryAt(path);
-    const extension = this.extension(path);
 
     // Images are previewable, and their own budget is far larger, so they are
     // answered before the binary deny-list gets a chance to refuse them.
-    if (IMAGE_EXTENSIONS.has(extension)) {
+    if (this.parent.images.isImage(path)) {
       return entry && entry.size > MAX_IMAGE_BYTES
         ? {
             icon: 'file',
@@ -284,19 +266,7 @@ export class FilePreviewFeature {
     return parts.length > 0 ? parts.join(' · ') : undefined;
   }
 
-  /**
-   * Replaces a preview, releasing the object URL the previous one held.
-   *
-   * Only on replacement: a preview that stays open keeps its URL, because the
-   * viewer is still pointing at it. Closing a tab does not evict the cache —
-   * the same file may be open in another group — so a session that views many
-   * images keeps their URLs until it ends.
-   */
   private patch(path: string, state: PreviewState): void {
-    const previous = this.previews().get(path)?.objectUrl;
-    if (previous !== undefined && previous !== state.objectUrl) {
-      URL.revokeObjectURL(previous);
-    }
     this.previews.update((cache) => new Map(cache).set(path, state));
   }
 

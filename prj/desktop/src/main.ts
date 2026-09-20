@@ -1,5 +1,6 @@
 import { app, dialog } from 'electron';
 
+import { installAppMenu } from './app-menu.js';
 import { DesktopConfig } from './desktop.config.js';
 import { DesktopStack } from './desktop.stack.js';
 import { FsBridgeChannel } from './fs-bridge.channel.js';
@@ -61,6 +62,10 @@ class DesktopApplication {
 
   private async start(): Promise<void> {
     try {
+      // Before the window: the default menu it would otherwise inherit binds
+      // `Ctrl`+`W` to closing the window, which is the tab's chord now.
+      installAppMenu();
+
       const url = await this.stack.start();
 
       // Before the window, not after: the bundle may ask for a listing on its

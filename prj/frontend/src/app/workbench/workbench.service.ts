@@ -1,6 +1,7 @@
 import { inject, Service, signal } from '@angular/core';
 import { DesktopWindowService } from '../desktop/desktop-window.service';
 import { FileSystemService } from '../file-system/file-system.service';
+import { ImageSourceService } from '../file-system/image-source.service';
 import { BottomPanelFeature } from './features/bottom-panel.feature';
 import { ChromeFeature } from './features/chrome.feature';
 import { DetailsFeature } from './features/details.feature';
@@ -39,6 +40,12 @@ export class WorkbenchService {
    * where the tab supplies its own decorations.
    */
   readonly desktopWindow = inject(DesktopWindowService);
+
+  /**
+   * Pictures the browser can draw, cached by path — read by the panel's viewer
+   * and by the details sidebar, so the same image is fetched once.
+   */
+  readonly images = inject(ImageSourceService);
 
   /**
    * Seed for the parts of the workbench no backend owns yet — the menus, the

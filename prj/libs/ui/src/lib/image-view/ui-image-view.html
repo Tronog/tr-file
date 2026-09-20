@@ -1,15 +1,16 @@
 <!--
-  The viewport is the tab stop: it is the scroll-and-pan surface, and a panel
-  asked to focus its body (PRD 001, §6.3) needs something here to focus.
+  The viewport is the tab stop: it is the pan surface, and a panel asked to
+  focus its body (PRD 001, §6.3) needs something here to focus. A static
+  thumbnail (§9) is a picture rather than a control, so it takes no focus.
 -->
 <div
   #viewport
   class="viewport"
-  tabindex="0"
-  [class.is-pannable]="pannable()"
+  role="img"
+  [attr.tabindex]="interactive() ? 0 : null"
+  [class.is-pannable]="interactive() && view.pannable()"
   [class.is-dragging]="dragging() !== null"
   [attr.aria-label]="label()"
-  role="img"
   (wheel)="onWheel($event)"
   (pointerdown)="onPointerDown($event)"
   (pointermove)="onPointerMove($event)"
@@ -23,31 +24,33 @@
     alt=""
     draggable="false"
     [src]="src()"
-    [style.transform]="transform()"
+    [style.transform]="view.transform()"
     (load)="onLoad()"
   />
 </div>
 
-<div class="controls" role="toolbar" aria-label="Zoom">
-  <ui-icon-button icon="zoom-out" label="Zoom out" (action)="step(-1)" />
-  <ui-icon-button icon="zoom-in" label="Zoom in" (action)="step(1)" />
-  <span class="zoom-label" aria-hidden="true">{{ zoomLabel() }}</span>
-  <ui-icon-button
-    icon="zoom-actual"
-    label="Actual size (100%)"
-    [active]="isFit('actual')"
-    (action)="fit('actual')"
-  />
-  <ui-icon-button
-    icon="arrows-minimize"
-    label="Fit whole image"
-    [active]="isFit('contain')"
-    (action)="fit('contain')"
-  />
-  <ui-icon-button
-    icon="arrows-maximize"
-    label="Fill the frame"
-    [active]="isFit('cover')"
-    (action)="fit('cover')"
-  />
-</div>
+@if (interactive()) {
+  <div class="controls" role="toolbar" aria-label="Zoom">
+    <ui-icon-button icon="zoom-out" label="Zoom out" (action)="view.step(-1)" />
+    <ui-icon-button icon="zoom-in" label="Zoom in" (action)="view.step(1)" />
+    <span class="zoom-label" aria-hidden="true">{{ view.zoomLabel() }}</span>
+    <ui-icon-button
+      icon="zoom-actual"
+      label="Actual size (100%)"
+      [active]="view.isFit('actual')"
+      (action)="view.fit('actual')"
+    />
+    <ui-icon-button
+      icon="arrows-minimize"
+      label="Fit whole image"
+      [active]="view.isFit('contain')"
+      (action)="view.fit('contain')"
+    />
+    <ui-icon-button
+      icon="arrows-maximize"
+      label="Fill the frame"
+      [active]="view.isFit('cover')"
+      (action)="view.fit('cover')"
+    />
+  </div>
+}

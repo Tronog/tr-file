@@ -127,7 +127,8 @@ entry would maximize the window.
 | Drag a tab inside its bar | Reorders it, with a 2px insertion bar showing the landing spot |
 | Drag a tab onto another bar or a group's centre | Moves it into that group |
 | Drag a tab onto a group's edge (outer 25%) | Divides that group; the tab lands in the new half |
-| Split right / Split down | Copies the active tab into a new group beside this one |
+| Split right / Split down, or `Ctrl`+`T` | Copies the active tab into a new group beside this one |
+| `Ctrl`+`W` | Closes the panel's focused tab; the group goes with its last one |
 | Maximize | Renders one group alone; the button becomes Restore |
 | Press a group's empty body | Emits `bodyPress`; the app focuses the group and its content |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
@@ -183,6 +184,13 @@ just as well over a document or an empty placeholder — neither of which has a
 keyboard of its own — and both views let an `Alt` chord bubble untouched so it
 arrives exactly once.
 
+Two chords belong to the panel as a whole rather than to what is selected in
+it (PRD 001, §6.2.2): `Ctrl`+`T` splits it and `Ctrl`+`W` closes its focused
+tab. They are bound on the group's host, so they answer with focus anywhere
+inside — a row, a tile, the document, or a tab in the bar — and they emit
+exactly what the tab bar's split and close buttons emit, so the pointer and
+the keyboard cannot drift apart.
+
 An **empty folder** is the case that makes all of this hold together. Its
 placeholder contains nothing focusable, so the body carries `tabindex="-1"` and
 takes focus itself when it has nothing else to offer; without that the keyboard
@@ -217,8 +225,15 @@ verbatim in a monospace block, and an `image` document is handed to
 `UiImageView`. Nothing in it is editable, and the only focusable element is the
 scroll container — or, for an image, the viewport.
 
-`UiImageView` is the picture half of that preview (PRD 001, §7.3.1). One model
-drives all five controls: the image is drawn at its natural size and
+`UiImageView` is the picture half of that preview (PRD 001, §7.3.1). It is
+deliberately thin: what the viewer *is* — the scale, the pan, every fit and the
+arithmetic that holds a point still under the pointer — lives in
+`UiImageViewService`, which the component provides one of. That is the only
+service in a library of otherwise presentational components, and it earns its
+place by being **component-scoped**: two images open in two panels zoom
+independently, and nothing outside a viewer can reach another's state.
+
+One model drives all five controls: the image is drawn at its natural size and
 transformed, so `contain`, `cover` and `100%` are three ways of computing one
 `scale`, the wheel and the `+`/`-` buttons set it directly, and panning is a
 `translate`. Wheeling or dragging switches to a free zoom, which is why the fit
@@ -229,6 +244,12 @@ recentring, and the pan is clamped on the way *out*, so a hard drag can never
 park the picture off-screen and an image smaller than the frame simply stays
 centred. Like the rest of the viewer it fetches nothing — `src` is a URL the
 application made, owns and revokes.
+
+`interactive: false` is the difference between the viewer in a panel and the
+thumbnail in the details sidebar (§9): it drops the controls, the gestures and
+the tab stop, leaving the default `contain` fit. A thumbnail is a picture, not
+something to operate. `UiPreviewCard` uses exactly that when the selected entry
+has an `imageSrc`, so a selected image shows itself in place of its type icon.
 
 Two inputs exist for the asynchronous world the workbench now lives in:
 `UiTreeNode.busy` turns a row's twisty into a spinner while its contents are

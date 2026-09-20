@@ -49,4 +49,10 @@ export interface UiPreview {
   readonly subtitle: string;
   readonly icon: UiIconName;
   readonly tint?: UiIconTint;
+  /**
+   * A URL for the entry's own picture, shown in place of the type icon
+   * (PRD 001, §9). The application makes it, owns it and revokes it; the card
+   * only draws it.
+   */
+  readonly imageSrc?: string;
 }
