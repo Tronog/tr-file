@@ -166,6 +166,19 @@ describe('UiFileList keyboard', () => {
     expect(commands).toEqual([]);
   });
 
+  /**
+   * `Ctrl`+`PageDown` switches tabs (§6.2.4). The table pages its rows on a
+   * bare `PageDown`, so it must not do both on its way past.
+   */
+  it('leaves a Ctrl chord to the panel', () => {
+    const event = keydown('PageDown', { ctrlKey: true });
+    rows()[0]?.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(selected).toEqual([]);
+  });
+
   it('travels a page at a time with PageDown and PageUp', () => {
     // jsdom measures nothing, so the fallback page of ten overshoots the list
     // and clamps — which is the behaviour a short listing should have anyway.
@@ -431,6 +444,82 @@ describe('UiPanelGroup panel keys', () => {
 
       expect(actions).toEqual(['split-right']);
       expect(closed).toEqual(['tab-root']);
+    });
+
+    /** PRD 001, §6.2.4 — switching tabs without the pointer. */
+    describe('Ctrl+PageUp and Ctrl+PageDown', () => {
+      const TWO_TABS: UiPanelGroupModel = {
+        ...GROUP,
+        tabs: [
+          { id: 'tab-root', label: 'tr-file', icon: 'folder', active: true },
+          { id: 'tab-docs', label: 'docs', icon: 'folder' },
+        ],
+      };
+
+      let selected: string[];
+      let chosen: string[];
+
+      beforeEach(() => {
+        fixture.componentRef.setInput('group', TWO_TABS);
+        fixture.detectChanges();
+        selected = [];
+        chosen = [];
+        fixture.componentInstance.tabSelect.subscribe((id) => selected.push(id));
+        fixture.componentInstance.tabActivate.subscribe((id) => chosen.push(id));
+      });
+
+      const body = (): Element => fixture.nativeElement.querySelector('.group-body');
+
+      /**
+       * The same pair a click emits, so the keyboard lands focus in the new
+       * tab's content just as the pointer would (§6.3).
+       */
+      it('moves to the next tab, as if it had been clicked', () => {
+        const event = chord('PageDown', body());
+
+        expect(selected).toEqual(['tab-docs']);
+        expect(chosen).toEqual(['tab-docs']);
+        expect(event.defaultPrevented).toBe(true);
+      });
+
+      it('moves to the previous tab', () => {
+        fixture.componentRef.setInput('group', {
+          ...TWO_TABS,
+          tabs: [
+            { id: 'tab-root', label: 'tr-file', icon: 'folder' },
+            { id: 'tab-docs', label: 'docs', icon: 'folder', active: true },
+          ],
+        } satisfies UiPanelGroupModel);
+        fixture.detectChanges();
+
+        chord('PageUp', body());
+
+        expect(selected).toEqual(['tab-root']);
+      });
+
+      /** Wrapping keeps the chord useful at either end of the bar. */
+      it('wraps around both ends', () => {
+        chord('PageUp', body());
+
+        expect(selected).toEqual(['tab-docs']);
+      });
+
+      it('answers from the tab bar too', () => {
+        chord('PageDown', fixture.nativeElement.querySelector('.tab-main'));
+
+        expect(selected).toEqual(['tab-docs']);
+      });
+
+      /** One tab is nowhere to go, so the chord is left to whatever else wants it. */
+      it('claims nothing in a group with a single tab', () => {
+        fixture.componentRef.setInput('group', GROUP);
+        fixture.detectChanges();
+
+        const event = chord('PageDown', body());
+
+        expect(selected).toEqual([]);
+        expect(event.defaultPrevented).toBe(false);
+      });
     });
 
     it('has nothing to close in a group with no tabs', () => {

@@ -130,6 +130,7 @@ entry would maximize the window.
 | Drag a tab onto a group's edge (outer 25%) | Divides that group; the tab lands in the new half |
 | Split right / Split down, or `Ctrl`+`T` | Copies the active tab into a new group beside this one |
 | `Ctrl`+`W` | Closes the panel's focused tab; the group goes with its last one |
+| `Ctrl`+`PageUp` / `Ctrl`+`PageDown` | Moves to the previous / next tab, wrapping at either end |
 | Maximize, or double-click a tab | Renders one group alone; the button becomes Restore |
 | Press a group's empty body | Emits `bodyPress`; the app focuses the group and its content |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
@@ -187,12 +188,19 @@ just as well over a document or an empty placeholder — neither of which has a
 keyboard of its own — and both views let an `Alt` chord bubble untouched so it
 arrives exactly once.
 
-Two chords belong to the panel as a whole rather than to what is selected in
-it (PRD 001, §6.2.2): `Ctrl`+`T` splits it and `Ctrl`+`W` closes its focused
-tab. They are bound on the group's host, so they answer with focus anywhere
-inside — a row, a tile, the document, or a tab in the bar — and they emit
-exactly what the tab bar's split and close buttons emit, so the pointer and
-the keyboard cannot drift apart.
+Some chords belong to the panel as a whole rather than to what is selected in
+it: `Ctrl`+`T` splits it, `Ctrl`+`W` closes its focused tab (PRD 001, §6.2.2)
+and `Ctrl`+`PageUp`/`PageDown` moves between its tabs, wrapping at either end
+(§6.2.4). They are bound on the group's host, so they answer with focus
+anywhere inside — a row, a tile, the document, or a tab in the bar — and each
+emits exactly what the equivalent pointer gesture emits: the split and close
+buttons, or a click on the neighbouring tab. The pointer and the keyboard
+cannot drift apart, and switching by keyboard lands focus in the new tab's
+content just as clicking would.
+
+Both body views therefore let an `Alt` *or* `Ctrl` chord bubble untouched. The
+list pages its rows on a bare `PageDown`, so without that it would page **and**
+switch tabs on the same key.
 
 An **empty folder** is the case that makes all of this hold together. Its
 placeholder contains nothing focusable, so the body carries `tabindex="-1"` and

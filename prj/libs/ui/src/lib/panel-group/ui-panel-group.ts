@@ -297,10 +297,12 @@ export class UiPanelGroup {
    * The chords that belong to the panel as a whole (PRD 001, §6.2.2).
    *
    * Bound on the host rather than the body, so they work with focus anywhere
-   * in the group — a row, a tile, the document, or a tab in the bar. Neither
-   * is a new capability: they emit exactly what the tab bar's split button and
-   * its close button emit, which is why the application needs no new wiring
-   * and the two paths can never drift apart.
+   * in the group — a row, a tile, the document, or a tab in the bar. None is a
+   * new capability: `Ctrl`+`T` and `Ctrl`+`W` emit exactly what the tab bar's
+   * split and close buttons emit, and `Ctrl`+`PageUp`/`PageDown` (§6.2.4)
+   * emits what clicking the neighbouring tab emits. That is why the
+   * application needs no new wiring, and why the pointer and the keyboard can
+   * never drift apart.
    */
   protected onGroupKeydown(event: KeyboardEvent): void {
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
@@ -323,10 +325,51 @@ export class UiPanelGroup {
         break;
       }
       default:
-        return;
+        // `event.key`, not the letter cases above: the page keys have names.
+        if (event.key === 'PageDown') {
+          if (!this.switchTab(1)) {
+            return;
+          }
+        } else if (event.key === 'PageUp') {
+          if (!this.switchTab(-1)) {
+            return;
+          }
+        } else {
+          return;
+        }
+        break;
     }
 
     event.preventDefault();
+  }
+
+  /**
+   * Moves to the tab `step` along, wrapping at either end (PRD 001, §6.2.4).
+   *
+   * Reported as the same pair a click on that tab emits — select it, then
+   * choose it — so switching by keyboard lands focus in the new tab's content
+   * exactly as clicking would. Without that, focus would be left on an element
+   * belonging to the tab that just went away.
+   *
+   * Returns whether there was anywhere to go: a group with one tab or none
+   * must not claim the chord.
+   */
+  private switchTab(step: 1 | -1): boolean {
+    const tabs = this.group().tabs;
+    if (tabs.length < 2) {
+      return false;
+    }
+
+    const current = tabs.findIndex((tab) => tab.active);
+    const from = current === -1 ? 0 : current;
+    const next = tabs[(from + step + tabs.length) % tabs.length];
+    if (!next) {
+      return false;
+    }
+
+    this.tabSelect.emit(next.id);
+    this.tabActivate.emit(next.id);
+    return true;
   }
 
   protected onBodyKeydown(event: KeyboardEvent): void {

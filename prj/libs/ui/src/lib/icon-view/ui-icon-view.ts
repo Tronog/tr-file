@@ -80,9 +80,10 @@ export class UiIconView {
       return;
     }
 
-    // `Alt`+`←`/`→` is the panel's history, not a step between tiles; let it
-    // bubble to `UiPanelGroup` (PRD 001, §6.2.1).
-    if (event.altKey) {
+    // An `Alt` or `Ctrl` chord is the panel's, not a step between tiles: its
+    // history and `Up`, and switching tabs (PRD 001, §6.2.1, §6.2.3, §6.2.4).
+    // Let it bubble to `UiPanelGroup` untouched.
+    if (event.altKey || event.ctrlKey || event.metaKey) {
       return;
     }
 

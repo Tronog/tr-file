@@ -75,9 +75,11 @@ export class UiFileList {
       return;
     }
 
-    // `Alt` belongs to the panel, not to the table: `Alt`+`←`/`→` is its
-    // history (PRD 001, §6.2.1), and `UiPanelGroup` is listening for it.
-    if (event.altKey) {
+    // `Alt` and `Ctrl` belong to the panel, not to the table: its history and
+    // its `Up` (PRD 001, §6.2.1, §6.2.3), and switching tabs with
+    // `Ctrl`+`PageUp`/`PageDown` (§6.2.4). `UiPanelGroup` listens for them, so
+    // a chord must not also move the cursor here on its way past.
+    if (event.altKey || event.ctrlKey || event.metaKey) {
       return;
     }
 
