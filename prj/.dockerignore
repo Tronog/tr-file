@@ -1,0 +1,11 @@
+# Build context is this workspace root; keep it small and reproducible.
+**/node_modules
+**/dist
+**/.angular
+**/*.tsbuildinfo
+**/*.log
+**/.env
+**/.env.*
+.git
+.vscode
+.DS_Store

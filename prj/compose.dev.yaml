@@ -1,0 +1,52 @@
+# Development environment — sources bind-mounted, every port published directly.
+#   pnpm docker:dev        (up --build)
+#   pnpm docker:dev:down   (down -v)
+name: tr-file-dev
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: development
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 3000
+      FILES_ROOT: /data
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - backend_root_modules:/app/node_modules
+      - backend_modules:/app/backend/node_modules
+      - files_data:/data
+    working_dir: /app/backend
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: development
+    environment:
+      NODE_ENV: development
+    ports:
+      - "4200:4200"
+    volumes:
+      - .:/app
+      - frontend_root_modules:/app/node_modules
+      - frontend_modules:/app/frontend/node_modules
+      - frontend_angular_cache:/app/frontend/.angular
+    working_dir: /app/frontend
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend_root_modules:
+  backend_modules:
+  frontend_root_modules:
+  frontend_modules:
+  frontend_angular_cache:
+  files_data:

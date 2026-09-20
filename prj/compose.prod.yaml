@@ -1,0 +1,37 @@
+# Production environment — only nginx is published, the backend stays internal.
+#   pnpm docker:prod        (up --build -d)
+#   pnpm docker:prod:down   (down -v)
+name: tr-file-prod
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      FILES_ROOT: /data
+    expose:
+      - "3000"
+    volumes:
+      - files_data:/data
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: production
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  files_data:
