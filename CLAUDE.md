@@ -48,8 +48,9 @@ Inside a panel body the library components move focus (arrows, `Home`/`End`, pag
 type-to-find, selection following focus) and report the keys that mean something to the
 workbench — `Enter`, `Space`, `Backspace`, `F5` — as a `UiPanelKey`; `PanelKeyboardFeature`
 is the one place those bindings are decided.
-Choosing a tab (a click, not an arrow-key rove) hands focus to that tab's content once it
-has rendered; `PanelFocusFeature` owns that request and `UiPanelGroup` answers it. Row clicks only ever
+Choosing a tab (a click, not an arrow-key rove), or pressing the blank space of a panel
+body, hands focus to that panel's content once it has rendered; `PanelFocusFeature` owns
+that request and `UiPanelGroup` answers it. Row clicks only ever
 open — collapsing is the twisty's job (or `←` on the focused row). Double-clicking a file opens
 it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
 into a `UiDocumentModel`, and the library only renders what it is handed.

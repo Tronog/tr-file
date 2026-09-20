@@ -4,8 +4,9 @@ import { UiPanelGroup, UiTabBar } from '@tr-file/ui';
 import type { UiFileRow, UiPanelGroupModel, UiTab } from '@tr-file/ui';
 
 /**
- * PRD 001, Section 6.3 — choosing a tab puts the keyboard in that tab's
- * content, once the content is there to be put in.
+ * PRD 001, §6.3 and §6.3.1 — choosing a panel puts the keyboard in its
+ * content, once the content is there to be put in. A panel is chosen by its
+ * tab, or by a press on the empty space of its body.
  */
 
 const TABS: readonly UiTab[] = [
@@ -97,6 +98,84 @@ describe('UiPanelGroup body focus', () => {
 
   it('leaves focus alone until it is asked', () => {
     expect(document.activeElement).not.toBe(focusedRow());
+  });
+
+  /**
+   * PRD 001, §6.3.1. A press on the body's blank space means "work here", but
+   * nothing under the pointer takes focus, so the component has to say so.
+   */
+  describe('pressing the body (§6.3.1)', () => {
+    let presses: number;
+
+    beforeEach(() => {
+      presses = 0;
+      fixture.componentInstance.bodyPress.subscribe(() => (presses += 1));
+    });
+
+    const press = (target: Element): void => {
+      target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      fixture.detectChanges();
+    };
+
+    it('is reported when it lands on the body itself', () => {
+      press(fixture.nativeElement.querySelector('.group-body'));
+
+      expect(presses).toBe(1);
+    });
+
+    it('is reported from the scroll area below the last row', () => {
+      press(fixture.nativeElement.querySelector('.group-scroll'));
+
+      expect(presses).toBe(1);
+    });
+
+    /** The row is about to take focus itself; asking again would fight it. */
+    it('is ignored when it lands on a row', () => {
+      press(focusedRow());
+
+      expect(presses).toBe(0);
+    });
+
+    it('is ignored when it lands inside a row', () => {
+      press(focusedRow().querySelector('td') as Element);
+
+      expect(presses).toBe(0);
+    });
+
+    it('is reported over an empty-state placeholder, which focuses nothing', () => {
+      fixture.componentRef.setInput('group', {
+        ...GROUP,
+        rows: [],
+        empty: { icon: 'folder-open', title: 'This folder is empty' },
+      } satisfies UiPanelGroupModel);
+      fixture.detectChanges();
+
+      press(fixture.nativeElement.querySelector('ui-empty-state') as Element);
+
+      expect(presses).toBe(1);
+    });
+
+    /** The article is the document's tab stop; a click focuses it natively. */
+    it('is ignored over an open document', () => {
+      fixture.componentRef.setInput('group', {
+        ...GROUP,
+        rows: [],
+        document: { path: 'docs/README.md', kind: 'text', text: 'hello' },
+      } satisfies UiPanelGroupModel);
+      fixture.detectChanges();
+
+      press(fixture.nativeElement.querySelector('article.doc') as Element);
+
+      expect(presses).toBe(0);
+    });
+
+    it('ends with focus on the body tab stop, once the app answers', () => {
+      press(fixture.nativeElement.querySelector('.group-body'));
+      // What `(bodyPress)="panelFocus.focusBody(groupId)"` does in the app.
+      ask(1);
+
+      expect(document.activeElement).toBe(focusedRow());
+    });
   });
 
   it('puts focus on the body tab stop when the token changes', () => {

@@ -2,14 +2,21 @@ import { signal } from '@angular/core';
 import type { WorkbenchService } from '../workbench.service';
 
 /**
- * Where focus goes when a panel changes what it shows (PRD 001, Section 6.3).
+ * Where focus goes when a panel is chosen (PRD 001, §6.3 and §6.3.1).
  *
- * Choosing a tab is a request to *work in* that tab, so once its content is on
- * screen the keyboard should already be in it: no `Tab`, `Tab`, `Tab` from the
- * tab bar down to the first row. Only a deliberate choice counts — `UiTabBar`
- * emits `activate` for a click (and for the `Enter`/`Space` the browser turns
- * into one) but not for the arrows that rove across the bar, or a keyboard
- * user could never reach the tab after next.
+ * Two gestures mean "I want to work in this panel", and both end here.
+ * Choosing a tab is one: once its content is on screen the keyboard should
+ * already be in it, with no `Tab`, `Tab`, `Tab` from the tab bar down to the
+ * first row. Clicking the body's blank space is the other — the panel becomes
+ * active either way, but a press that lands on nothing would otherwise leave
+ * the keyboard wherever it was, in a panel the user has just left.
+ *
+ * Only a deliberate choice counts. `UiTabBar` emits `activate` for a click
+ * (and for the `Enter`/`Space` the browser turns into one) but not for the
+ * arrows that rove across the bar, or a keyboard user could never reach the
+ * tab after next; `UiPanelGroup` emits `bodyPress` only for a press that
+ * landed on nothing focusable, or it would drag focus off the very row that
+ * was clicked.
  *
  * Moving focus is the component's job, since only it knows which element the
  * body currently offers, so this feature does not touch the DOM. It keeps one
@@ -32,8 +39,8 @@ export class PanelFocusFeature {
   }
 
   /**
-   * A tab was chosen in `groupId`: make that group the active one and ask its
-   * body to take focus as soon as it has rendered.
+   * `groupId` was chosen — by its tab, or by a press on its empty space. Make
+   * it the active group and ask its body to take focus once it has rendered.
    */
   focusBody(groupId: string): void {
     this.parent.editorGroupsFt.focus(groupId);

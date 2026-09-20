@@ -129,6 +129,7 @@ entry would maximize the window.
 | Drag a tab onto a group's edge (outer 25%) | Divides that group; the tab lands in the new half |
 | Split right / Split down | Copies the active tab into a new group beside this one |
 | Maximize | Renders one group alone; the button becomes Restore |
+| Press a group's empty body | Emits `bodyPress`; the app focuses the group and its content |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
 | Drag a sash / focus it and press arrows | Resizes the two regions it divides |
 | Drag the title bar's empty space | Moves a frameless desktop window; double-click maximizes |
@@ -145,7 +146,10 @@ somewhere to drop a tab.
 
 Choosing a tab means wanting to work in it, so once its content has rendered
 the body takes focus — no `Tab`, `Tab`, `Tab` down from the tab bar (PRD 001,
-Section 6.3). `UiTabBar` separates the two things a tab bar reports: a click
+§6.3). Pressing the body's blank space means the same thing (§6.3.1), and
+`bodyPress` reports it — but only when the press landed on nothing focusable,
+since a row, a tile or the document's scroll container is already about to take
+focus and asking again would drag it off what was actually clicked. `UiTabBar` separates the two things a tab bar reports: a click
 (or the `Enter`/`Space` the browser turns into one) emits `select` **and**
 `activate`, while the arrow keys emit only `select`. If roving counted as
 choosing, focus would leave the bar on the first arrow and the tab after next

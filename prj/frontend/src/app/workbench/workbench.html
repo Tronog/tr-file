@@ -95,6 +95,7 @@
               (focusRequest)="groups.focus(groupId)"
               (tabSelect)="groups.selectTab(groupId, $event)"
               (tabActivate)="panelFocus.focusBody(groupId)"
+              (bodyPress)="panelFocus.focusBody(groupId)"
               (tabClose)="groups.closeTab(groupId, $event)"
               (tabMove)="groups.moveTab(groupId, $event)"
               (tabDrop)="groups.applyReorder($event)"

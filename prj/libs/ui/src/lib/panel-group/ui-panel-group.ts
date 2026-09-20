@@ -123,6 +123,14 @@ export class UiPanelGroup {
    */
   readonly tabActivate = output<string>();
 
+  /**
+   * A press landed on the body's blank space — below the last row, beside the
+   * tiles, on the "no folder opened" placeholder (PRD 001, §6.3.1). Nothing
+   * there takes focus on its own, so the press would otherwise leave the panel
+   * active but empty-handed; the application answers by bumping `focusBody`.
+   */
+  readonly bodyPress = output<void>();
+
   readonly tabClose = output<string>();
   readonly actionSelect = output<string>();
   readonly breadcrumbSelect = output<string>();
@@ -249,6 +257,25 @@ export class UiPanelGroup {
 
   protected onViewChange(value: string): void {
     this.viewChange.emit(value === 'grid' ? 'grid' : 'list');
+  }
+
+  /**
+   * Reports a press only when it landed on the body itself.
+   *
+   * Anything focusable under the pointer — a row, a tile, the document's
+   * scroll container, a button — is already about to take focus, and asking
+   * for the body's tab stop as well would drag focus off whatever was
+   * actually clicked.
+   */
+  protected onBodyPointerDown(event: PointerEvent): void {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest('button, a, input, textarea, select, [tabindex], [contenteditable]')
+    ) {
+      return;
+    }
+    this.bodyPress.emit();
   }
 
   protected onBodyDragOver(event: DragEvent): void {

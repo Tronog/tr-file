@@ -59,6 +59,7 @@
 <div
   #body
   class="group-body"
+  (pointerdown)="onBodyPointerDown($event)"
   (dragover)="onBodyDragOver($event)"
   (dragleave)="onBodyDragLeave($event)"
   (drop)="onBodyDrop($event)"
