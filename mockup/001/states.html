@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark" data-bs-theme-base="neutral">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tr-file — panel states (mockup)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.5.1/dist/css/tabler.min.css" />
+  <link rel="stylesheet" href="vscode-ui.css" />
+</head>
+<body class="vsc">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <defs>
+    <g id="s" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></g>
+  </defs>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 6l6 6l-6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></symbol>
+  <symbol id="i-chevrons-up" viewBox="0 0 24 24"><path d="M7 11l5 -5l5 5"/><path d="M7 17l5 -5l5 5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"/></symbol>
+  <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M5 19l2.757 -7.351a1 1 0 0 1 .936 -.649h12.307a1 1 0 0 1 .986 1.164l-.996 5.211a2 2 0 0 1 -1.964 1.625h-14.026a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/></symbol>
+  <symbol id="i-file-plus" viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><path d="M12 11l0 6"/><path d="M9 14l6 0"/></symbol>
+  <symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M12 19h-7a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v3"/><path d="M16 19h6"/><path d="M19 16v6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12l14 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></symbol>
+  <symbol id="i-git-branch" viewBox="0 0 24 24"><path d="M7 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M7 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M7 8l0 8"/><path d="M9 18h6a2 2 0 0 0 2 -2v-5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13 -8z"/></symbol>
+  <symbol id="i-layout-grid" viewBox="0 0 24 24"><path d="M4 4h6v6h-6z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6h-6z"/><path d="M14 14h6v6h-6z"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"/></symbol>
+  <symbol id="i-columns" viewBox="0 0 24 24"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M12 4l0 16"/></symbol>
+  <symbol id="i-rows" viewBox="0 0 24 24"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M4 12l16 0"/></symbol>
+  <symbol id="i-sidebar-left" viewBox="0 0 24 24"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M9 4l0 16"/></symbol>
+  <symbol id="i-sidebar-right" viewBox="0 0 24 24"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M15 4l0 16"/></symbol>
+  <symbol id="i-panel-bottom" viewBox="0 0 24 24"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M4 15l16 0"/></symbol>
+  <symbol id="i-maximize" viewBox="0 0 24 24"><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="M4 6l7 0"/><path d="M4 12l7 0"/><path d="M4 18l9 0"/><path d="M15 9l3 -3l3 3"/><path d="M18 6l0 12"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M5 7l5 5l-5 5"/><path d="M12 19l7 0"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></symbol>
+  <symbol id="i-alert-circle" viewBox="0 0 24 24"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 8v4"/><path d="M12 16l.01 0"/></symbol>
+  <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16l.01 0"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 7v5l3 3"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><path d="M12 6m-8 0a8 3 0 1 0 16 0a8 3 0 1 0 -16 0"/><path d="M4 6v6a8 3 0 0 0 16 0v-6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"/><path d="M4.012 16.737a2 2 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"/></symbol>
+  <symbol id="i-cut" viewBox="0 0 24 24"><path d="M8 8m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M8 16m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M19.5 5.5l-9.5 9.5"/><path d="M10.5 9.5l9 9.5"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/><path d="M11 13l9 -9"/><path d="M15 4h5v5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.766 -3.198 3.602 -3.769c1.837 -.57 3.865 -.116 5.32 1.19c1.454 1.306 1.937 3.216 1.266 5.009h.394c1.7 0 3.078 1.462 3.078 3.267c0 1.804 -1.378 3.268 -3.078 3.268h-10.582"/></symbol>
+  <symbol id="i-desktop" viewBox="0 0 24 24"><path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1z"/><path d="M7 20h10"/><path d="M9 16v4"/><path d="M15 16v4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 9l5 -5l5 5"/><path d="M12 4l0 12"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 5l0 14"/><path d="M16 9l-4 -4"/><path d="M8 9l4 -4"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M19.933 13.041a8 8 0 1 1 -9.925 -8.788c3.899 -1 7.935 1.007 9.425 4.747"/><path d="M20 4v5h-5"/></symbol>
+  <symbol id="i-window-min" viewBox="0 0 24 24"><path d="M5 12l14 0"/></symbol>
+  <symbol id="i-window-max" viewBox="0 0 24 24"><path d="M5 5h14v14h-14z"/></symbol>
+</svg>
+
+<div class="mk-page">
+  <h1>Panel states — movable, groupable, divisible, resizable</h1>
+  <p>
+    Static renderings of every drag/resize state the workbench needs. Yellow labels are
+    mockup annotations and never ship. Interaction behaviour is out of scope for PRD&nbsp;001,
+    §&nbsp;Section&nbsp;1 — these are the visual targets it must hit.
+  </p>
+
+  <h2>1 &middot; Dropping a tab on a group</h2>
+  <div class="mk-grid2">
+
+    <!-- split right -->
+    <div class="mk-stage">
+      <section class="vsc-group is-active" style="height:100%">
+        <div class="vsc-tabbar">
+          <div class="vsc-tabs">
+            <div class="vsc-tab is-active"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">prj</span><span class="vsc-tab-close"><svg class="icon"><use href="#i-x"/></svg></span></div>
+            <div class="vsc-tab"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">docs</span><span class="vsc-tab-close"><svg class="icon"><use href="#i-x"/></svg></span></div>
+          </div>
+        </div>
+        <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">file list&hellip;</div>
+        <div class="vsc-dropzone vsc-dropzone--right"></div>
+        <div class="vsc-drag-ghost" style="right:60px;top:110px">
+          <svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg> assets
+        </div>
+      </section>
+      <span class="mk-note" style="right:8px;top:44px">Right half highlighted &rarr; split into a new group</span>
+    </div>
+
+    <!-- join group -->
+    <div class="mk-stage">
+      <section class="vsc-group is-active" style="height:100%">
+        <div class="vsc-tabbar">
+          <div class="vsc-tabs">
+            <div class="vsc-tab is-active"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">prj</span><span class="vsc-tab-close"><svg class="icon"><use href="#i-x"/></svg></span></div>
+          </div>
+        </div>
+        <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">file list&hellip;</div>
+        <div class="vsc-dropzone vsc-dropzone--center"></div>
+        <div class="vsc-drag-ghost" style="left:140px;top:150px">
+          <svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg> assets
+        </div>
+      </section>
+      <span class="mk-note" style="left:8px;top:44px">Whole body highlighted &rarr; join this group as a tab</span>
+    </div>
+
+    <!-- split down -->
+    <div class="mk-stage">
+      <section class="vsc-group" style="height:100%">
+        <div class="vsc-tabbar">
+          <div class="vsc-tabs">
+            <div class="vsc-tab is-active"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">docs</span><span class="vsc-tab-close"><svg class="icon"><use href="#i-x"/></svg></span></div>
+          </div>
+        </div>
+        <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">file list&hellip;</div>
+        <div class="vsc-dropzone vsc-dropzone--bottom"></div>
+        <div class="vsc-drag-ghost" style="left:110px;top:250px">
+          <svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg> 001.md
+        </div>
+      </section>
+      <span class="mk-note" style="left:8px;bottom:8px">Bottom half highlighted &rarr; split down</span>
+    </div>
+
+    <!-- reorder within tab bar -->
+    <div class="mk-stage">
+      <section class="vsc-group is-active" style="height:100%">
+        <div class="vsc-tabbar" style="position:relative">
+          <div class="vsc-tabs">
+            <div class="vsc-tab is-active"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">prj</span><span class="vsc-tab-close"><svg class="icon"><use href="#i-x"/></svg></span></div>
+            <div class="vsc-tab" style="opacity:.4"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">docs</span><span class="vsc-tab-close"><svg class="icon"><use href="#i-x"/></svg></span></div>
+            <div class="vsc-tab"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">libs</span><span class="vsc-tab-close"><svg class="icon"><use href="#i-x"/></svg></span></div>
+          </div>
+          <div class="vsc-dropzone vsc-dropzone--tab" style="left:72px"></div>
+        </div>
+        <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">file list&hellip;</div>
+        <div class="vsc-drag-ghost" style="left:56px;top:48px">
+          <svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg> libs
+        </div>
+      </section>
+      <span class="mk-note" style="left:8px;top:90px">Insertion bar &rarr; reorder inside the same group; source tab dims to 40%</span>
+    </div>
+  </div>
+
+  <h2>2 &middot; Resizing</h2>
+  <div class="mk-grid2">
+    <div class="mk-stage">
+      <div class="vsc-grid vsc-grid--cols" style="height:100%">
+        <section class="vsc-group" style="height:100%">
+          <div class="vsc-tabbar"><div class="vsc-tabs"><div class="vsc-tab is-active"><span class="vsc-tab-label">prj</span></div></div></div>
+          <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">left group</div>
+        </section>
+        <div class="vsc-sash is-active"></div>
+        <section class="vsc-group" style="height:100%">
+          <div class="vsc-tabbar"><div class="vsc-tabs"><div class="vsc-tab is-active"><span class="vsc-tab-label">docs</span></div></div></div>
+          <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">right group</div>
+        </section>
+      </div>
+      <span class="mk-note" style="left:50%;top:8px;transform:translateX(-50%)">Sash: 4&nbsp;px hit area, accent fill while dragging, <code>col-resize</code></span>
+    </div>
+
+    <div class="mk-stage">
+      <div class="vsc-grid vsc-grid--rows" style="height:100%">
+        <section class="vsc-group" style="height:100%">
+          <div class="vsc-tabbar"><div class="vsc-tabs"><div class="vsc-tab is-active"><span class="vsc-tab-label">docs</span></div></div></div>
+          <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">top group</div>
+        </section>
+        <div class="vsc-sash vsc-sash--h is-active"></div>
+        <section class="vsc-group" style="height:100%">
+          <div class="vsc-tabbar"><div class="vsc-tabs"><div class="vsc-tab is-active"><span class="vsc-tab-label">assets</span></div></div></div>
+          <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">bottom group</div>
+        </section>
+      </div>
+      <span class="mk-note" style="left:8px;top:8px">Horizontal sash, <code>row-resize</code></span>
+    </div>
+  </div>
+
+  <h2>3 &middot; Context menu and empty group</h2>
+  <div class="mk-grid2">
+    <div class="mk-stage" style="height:400px">
+      <section class="vsc-group is-active" style="height:100%">
+        <div class="vsc-tabbar"><div class="vsc-tabs"><div class="vsc-tab is-active"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">prd</span></div></div></div>
+        <div class="vsc-group-body">
+          <table class="vsc-filelist">
+            <tbody>
+              <tr><td class="vsc-col-name"><span class="vsc-name-cell"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg> 001.md</span></td></tr>
+              <tr class="is-selected is-focused"><td class="vsc-col-name"><span class="vsc-name-cell"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg> 002.md</span></td></tr>
+              <tr><td class="vsc-col-name"><span class="vsc-name-cell"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg> NOTES.md</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="vsc-contextmenu" style="left:120px;top:40px">
+          <div class="vsc-menu-row">Open <span class="k">Enter</span></div>
+          <div class="vsc-menu-row">Open to the Side <span class="k">Ctrl+Enter</span></div>
+          <div class="vsc-menu-row">Open in Terminal</div>
+          <div class="vsc-menu-sep"></div>
+          <div class="vsc-menu-row">Cut <span class="k">Ctrl+X</span></div>
+          <div class="vsc-menu-row is-active">Copy <span class="k">Ctrl+C</span></div>
+          <div class="vsc-menu-row is-disabled">Paste <span class="k">Ctrl+V</span></div>
+          <div class="vsc-menu-sep"></div>
+          <div class="vsc-menu-row">Rename&hellip; <span class="k">F2</span></div>
+          <div class="vsc-menu-row">Delete <span class="k">Del</span></div>
+          <div class="vsc-menu-sep"></div>
+          <div class="vsc-menu-row">Copy Path <span class="k">Shift+Alt+C</span></div>
+          <div class="vsc-menu-row">Properties <span class="k">Alt+Enter</span></div>
+        </div>
+      </section>
+      <span class="mk-note" style="right:8px;top:8px">Right-click menu: 24&nbsp;px rows, accent hover, keybinding column</span>
+    </div>
+
+    <div class="mk-stage" style="height:400px">
+      <section class="vsc-group" style="height:100%">
+        <div class="vsc-tabbar">
+          <div class="vsc-tabs"></div>
+          <div class="vsc-tabbar-actions">
+            <span class="vsc-icon-btn"><svg class="icon"><use href="#i-columns"/></svg></span>
+            <span class="vsc-icon-btn"><svg class="icon"><use href="#i-dots"/></svg></span>
+          </div>
+        </div>
+        <div class="vsc-empty">
+          <svg class="icon" style="width:40px;height:40px;stroke-width:1.2"><use href="#i-folder-open"/></svg>
+          <span>Open a folder to browse it here</span>
+          <span><kbd>Ctrl</kbd> <kbd>O</kbd> &nbsp;or drop a folder onto this group</span>
+        </div>
+      </section>
+      <span class="mk-note" style="left:8px;top:8px">Last tab moved away &rarr; empty group keeps its slot until dismissed</span>
+    </div>
+  </div>
+
+  <h2>4 &middot; Dragging files out of the tree</h2>
+  <div class="mk-grid2">
+    <div class="mk-stage">
+      <div style="display:grid;grid-template-columns:200px 4px 1fr;height:100%">
+        <aside class="vsc-sidebar vsc-sidebar--left">
+          <div class="vsc-pane-body">
+            <div class="vsc-tree">
+              <div class="vsc-tree-row"><span class="vsc-indent"></span><svg class="icon vsc-twisty"><use href="#i-chevron-down"/></svg><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder-open"/></svg><span class="vsc-file-name">prd</span></div>
+              <div class="vsc-tree-row is-selected"><span class="vsc-indent"><i class="on"></i></span><svg class="icon vsc-twisty vsc-twisty--hidden"></svg><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg><span class="vsc-file-name">001.md</span></div>
+              <div class="vsc-tree-row is-selected"><span class="vsc-indent"><i class="on"></i></span><svg class="icon vsc-twisty vsc-twisty--hidden"></svg><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg><span class="vsc-file-name">002.md</span></div>
+            </div>
+          </div>
+        </aside>
+        <div class="vsc-sash"></div>
+        <section class="vsc-group" style="height:100%">
+          <div class="vsc-tabbar"><div class="vsc-tabs"><div class="vsc-tab is-active"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">backend</span></div></div></div>
+          <div class="vsc-group-body" style="padding:10px 12px;color:var(--vsc-fg-dim);font-size:12px">drop target</div>
+          <div class="vsc-dropzone vsc-dropzone--center"></div>
+          <div class="vsc-drag-ghost" style="left:80px;top:150px">
+            <svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg> 2 items
+          </div>
+        </section>
+      </div>
+      <span class="mk-note" style="right:8px;top:8px">Multi-select drag &rarr; ghost shows the item count</span>
+    </div>
+
+    <div class="mk-stage">
+      <section class="vsc-group is-active" style="height:100%">
+        <div class="vsc-tabbar">
+          <div class="vsc-tabs">
+            <div class="vsc-tab is-active"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg><span class="vsc-tab-label">backend</span></div>
+          </div>
+          <div class="vsc-tabbar-actions"><span class="vsc-icon-btn"><svg class="icon"><use href="#i-maximize"/></svg></span></div>
+        </div>
+        <div class="vsc-group-body">
+          <table class="vsc-filelist">
+            <tbody>
+              <tr><td class="vsc-col-name"><span class="vsc-name-cell"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg> src</span></td></tr>
+              <tr style="outline:1px dashed var(--vsc-accent);outline-offset:-1px;background:rgba(0,120,212,.18)">
+                <td class="vsc-col-name"><span class="vsc-name-cell"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-folder)"><use href="#i-folder"/></svg> dist</span></td></tr>
+              <tr><td class="vsc-col-name"><span class="vsc-name-cell"><svg class="icon vsc-file-icon" style="color:var(--vsc-ic-json)"><use href="#i-file"/></svg> package.json</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="vsc-drag-ghost" style="left:130px;top:110px">
+          <svg class="icon vsc-file-icon" style="color:var(--vsc-ic-md)"><use href="#i-file"/></svg> 001.md
+        </div>
+      </section>
+      <span class="mk-note" style="right:8px;bottom:8px">Hovering a folder row &rarr; dashed accent outline = move into that folder</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>
