@@ -96,6 +96,37 @@ not a curve** — the bytes cross in one hand-off, and a fake progress bar would
 be worse than none. And a **download has no URL**, so the bytes are fetched and
 wrapped in an object URL, which is why `FsSaveUrl` carries a `release()`.
 
+## No window decorations (PRD 001, §8.2)
+
+The window has no frame: the Angular title bar *is* the title bar, drag region
+and window buttons included, the way VS Code does it.
+
+```
+MainWindow  frame: false            (Windows, Linux)
+            titleBarStyle: hidden…  (macOS — the traffic lights stay)
+                 │
+                 └── ipc 'tr-file:window' ── WindowControlsChannel ── the sender's own window
+```
+
+`WindowControlsChannel` is the entire vocabulary a page is given over its own
+window: `state`, `minimize`, `toggleMaximize`, `close`. No arguments, and each
+one answers with the resulting state, so the button that was just pressed is
+already showing the right icon. Like `FsBridgeChannel` it checks the sender's
+origin, and it acts on `BrowserWindow.fromWebContents(event.sender)` — the
+window the command came from, never one it holds a reference to.
+
+State is also **pushed**, because a window can be maximized without any button
+being pressed: a snap gesture, a keyboard shortcut, a drag to the top of the
+screen. `MainWindow` forwards `maximize`, `unmaximize` and the two full-screen
+events, and the maximize button becomes Restore either way.
+
+macOS is the exception, and deliberately so. `hiddenInset` hides the bar but
+keeps the traffic lights, which the platform insists on drawing itself and for
+which nothing convincing can be substituted — so there the app draws no
+buttons of its own, leaves a gap for them, and lets the platform handle the
+title-bar double-click too. `WindowControlsFeature` in the frontend is where
+those three cases (browser, macOS, everywhere else) are decided.
+
 ## Layout
 
 | File | Role |
@@ -105,7 +136,8 @@ wrapped in an object URL, which is why `FsSaveUrl` carries a `release()`.
 | `src/desktop.stack.ts` | The server: backend + bundle + fallback |
 | `src/main-window.ts` | The window, and the rules about what may happen in it |
 | `src/fs-bridge.channel.ts` | The IPC channel: who may ask, and nothing else |
-| `src/preload.cts` | The single function the renderer is given |
+| `src/window-controls.channel.ts` | The four verbs a page may use on its own window |
+| `src/preload.cts` | The two small objects the renderer is given |
 
 Only `main.ts`, `main-window.ts`, `fs-bridge.channel.ts` and the preload import
 `electron`. Everything Electron knows

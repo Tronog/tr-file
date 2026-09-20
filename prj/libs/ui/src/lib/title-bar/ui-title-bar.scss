@@ -11,6 +11,24 @@
   border-bottom: 1px solid var(--vsc-border);
 }
 
+/*
+  A frameless window (PRD 001, §8.2) has no bar of its own to drag, so this one
+  becomes it. Everything a pointer can actually use is put back — a drag region
+  swallows clicks, so a button inside one stops working unless it opts out.
+*/
+:host(.is-draggable) {
+  -webkit-app-region: drag;
+  app-region: drag;
+
+  button,
+  input,
+  a,
+  .window-controls {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+}
+
 .menu {
   display: flex;
   gap: 2px;
@@ -103,6 +121,47 @@ kbd {
   gap: 2px;
   align-items: center;
   justify-content: flex-end;
+}
+
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  /* Flush to the window corner: the bar's own 8px padding would otherwise
+     leave a dead strip the close button should have covered. */
+  margin: 0 -8px 0 4px;
+}
+
+.window-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--vsc-fg);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+  }
+
+  /* The close button, and only it, turns red — as every desktop does. */
+  &.is-danger:hover {
+    background: #c42b1c;
+    color: #ffffff;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  ui-icon {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .chrome-btn {

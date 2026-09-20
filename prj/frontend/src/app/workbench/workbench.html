@@ -5,6 +5,7 @@
 @let groups = workbench.editorGroupsFt;
 @let panelKeys = workbench.panelKeyboardFt;
 @let panelFocus = workbench.panelFocusFt;
+@let windowControls = workbench.windowControlsFt;
 @let details = workbench.detailsFt;
 @let panel = workbench.bottomPanelFt;
 @let panes = workbench.sidebarPanesFt;
@@ -29,6 +30,11 @@
     [commandLabel]="chrome.commandLabel"
     [commandKeys]="chrome.commandKeys"
     [actions]="chrome.titleBarActions"
+    [windowControls]="windowControls.controls()"
+    [draggable]="windowControls.draggable()"
+    [leadingInset]="windowControls.leadingInset()"
+    (windowControlSelect)="windowControls.run($event)"
+    (dragAreaDoubleClick)="windowControls.toggleFromDragArea()"
   />
 
   <ui-activity-bar

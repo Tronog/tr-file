@@ -40,4 +40,24 @@
       <ui-icon [name]="action.icon" />
     </button>
   }
+
+  @if (windowControls().length) {
+    <!-- Its own group, flush to the corner: these buttons belong to the
+         window, not to the application, and VS Code sets them apart the same
+         way. The group is a toolbar so a screen reader announces it as one. -->
+    <div class="window-controls" role="toolbar" aria-label="Window">
+      @for (control of windowControls(); track control.id) {
+        <button
+          type="button"
+          class="window-btn"
+          [class.is-danger]="control.danger"
+          [attr.title]="control.label"
+          [attr.aria-label]="control.label"
+          (click)="windowControlSelect.emit(control.id)"
+        >
+          <ui-icon [name]="control.icon" />
+        </button>
+      }
+    </div>
+  }
 </div>

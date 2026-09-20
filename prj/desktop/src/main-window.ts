@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 
 import { BrowserWindow, shell } from 'electron';
 
+import { WINDOW_STATE_EVENT, WindowControlsChannel } from './window-controls.channel.js';
+
 /**
  * The compiled preload, beside this file. CommonJS (`.cjs`) because a
  * sandboxed preload has to be, while the rest of the shell is ESM.
@@ -25,6 +27,13 @@ const PRELOAD = fileURLToPath(new URL('./preload.cjs', import.meta.url));
  * Navigation is pinned to the stack's own origin. Anything else — a link in a
  * previewed markdown file, a `window.open` — is handed to the real browser,
  * where the user can see the address bar.
+ *
+ * Since §8.2 the window has no frame of its own: the Angular title bar is the
+ * title bar, drag region and window buttons included. macOS is the exception —
+ * `hiddenInset` keeps its traffic lights, which the platform insists on
+ * drawing itself, and the app leaves room for them instead of drawing its own.
+ * Whichever way, the window's state is pushed to the page whenever it changes,
+ * because the OS can maximise a window without anyone clicking a button.
  */
 export class MainWindow {
   private window: BrowserWindow | null = null;
@@ -51,6 +60,7 @@ export class MainWindow {
       minWidth: 800,
       minHeight: 560,
       title: 'tr-file',
+      ...MainWindow.frameOptions(),
       // Painted before the first frame, so the workbench's dark chrome does
       // not flash white while the bundle loads.
       backgroundColor: '#1f1f1f',
@@ -72,6 +82,7 @@ export class MainWindow {
     window.on('closed', () => {
       this.window = null;
     });
+    this.publishState(window);
 
     await window.loadURL(this.url.href);
 
@@ -88,6 +99,41 @@ export class MainWindow {
       this.window.restore();
     }
     this.window.focus();
+  }
+
+  /**
+   * How the window is framed.
+   *
+   * `frame: false` everywhere but macOS, where `hiddenInset` hides the bar and
+   * keeps the traffic lights: there is no way to draw a convincing substitute
+   * for them, so the platform keeps that job and the page leaves a gap.
+   */
+  private static frameOptions(): Electron.BrowserWindowConstructorOptions {
+    return process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' }
+      : { frame: false };
+  }
+
+  /**
+   * Tells the page what the window is doing.
+   *
+   * Not optional: a window can be maximised by a snap gesture, a keyboard
+   * shortcut or the OS itself, and the maximise button has to show Restore
+   * afterwards whether or not it was the thing that was clicked.
+   */
+  private publishState(window: BrowserWindow): void {
+    const publish = (): void => {
+      if (!window.isDestroyed()) {
+        window.webContents.send(WINDOW_STATE_EVENT, WindowControlsChannel.stateOf(window));
+      }
+    };
+
+    // Listed one by one: the overloads of `on` are per event name, so a loop
+    // over a union does not type-check.
+    window.on('maximize', publish);
+    window.on('unmaximize', publish);
+    window.on('enter-full-screen', publish);
+    window.on('leave-full-screen', publish);
   }
 
   /** Keeps the renderer on the stack's origin, and popups out of the app. */

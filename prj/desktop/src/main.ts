@@ -4,6 +4,7 @@ import { DesktopConfig } from './desktop.config.js';
 import { DesktopStack } from './desktop.stack.js';
 import { FsBridgeChannel } from './fs-bridge.channel.js';
 import { MainWindow } from './main-window.js';
+import { WindowControlsChannel } from './window-controls.channel.js';
 
 /**
  * The desktop entry point: the Electron half of PRD 001, Section 8.
@@ -27,6 +28,7 @@ class DesktopApplication {
 
   private window: MainWindow | null = null;
   private channel: FsBridgeChannel | null = null;
+  private windowChannel: WindowControlsChannel | null = null;
 
   /**
    * Starts the app, unless another copy already owns the lock — in which case
@@ -66,6 +68,11 @@ class DesktopApplication {
       this.channel = new FsBridgeChannel(this.stack.bridge, url.origin, this.stack.log);
       this.channel.register();
 
+      // The window draws its own buttons now (§8.2), so the channel that acts
+      // on them has to exist before the first frame asks for its state.
+      this.windowChannel = new WindowControlsChannel(url.origin, this.stack.log);
+      this.windowChannel.register();
+
       await this.openWindow();
     } catch (error: unknown) {
       this.fail(error);
@@ -89,6 +96,7 @@ class DesktopApplication {
   private shutDown(event: Electron.Event): void {
     event.preventDefault();
     this.channel?.dispose();
+    this.windowChannel?.dispose();
     void this.stack
       .stop()
       .catch(() => undefined)

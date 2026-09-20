@@ -97,6 +97,27 @@ a compile error rather than an empty box.
    group without a pointer is the one gesture still missing; it wants a command
    palette more than another shortcut.
 
+## The title bar as window decoration
+
+`UiTitleBar` doubles as the decoration of a window that has none (PRD 001,
+§8.2), the way VS Code's does. Three inputs turn it into one, and all three are
+*data* rather than behaviour, because a web page cannot move a window — only
+the desktop shell can, and only it knows there is one:
+
+| Input | What it does |
+| --- | --- |
+| `windowControls` | The buttons at the bar's end. Empty in a browser, where the tab has its own |
+| `draggable` | Makes the bar's empty space the region the OS moves the window by |
+| `leadingInset` | Blank space for buttons the *platform* draws over the bar, i.e. macOS's traffic lights |
+
+A drag region swallows clicks, so `is-draggable` puts every button, input and
+link back with `app-region: no-drag` — without that, the menu bar would simply
+stop working. The buttons are their own `role="toolbar"` group, flush to the
+corner and 46px wide like every desktop's, and only the one marked `danger`
+turns red. A double-click is reported through `dragAreaDoubleClick`, but only
+when it landed on the bar itself: without that guard, double-clicking a menu
+entry would maximize the window.
+
 ## Panel interactions
 
 | Gesture | Result |
@@ -110,6 +131,8 @@ a compile error rather than an empty box.
 | Maximize | Renders one group alone; the button becomes Restore |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
 | Drag a sash / focus it and press arrows | Resizes the two regions it divides |
+| Drag the title bar's empty space | Moves a frameless desktop window; double-click maximizes |
+| Click a window button | Emits `windowControlSelect`; the shell minimizes, maximizes or closes |
 | Click a tree row / press `Enter` | Emits `activate`; the twisty and `←`/`→` emit `toggle` |
 | Arrow around a panel body | Moves focus *and* the selection; the details sidebar follows |
 | `Enter` / `Space` / `Backspace` / `F5` in a body | Emitted as a `UiPanelKey`; the app decides what each means |

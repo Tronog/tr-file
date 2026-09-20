@@ -1,4 +1,5 @@
 import { inject, Service, signal } from '@angular/core';
+import { DesktopWindowService } from '../desktop/desktop-window.service';
 import { FileSystemService } from '../file-system/file-system.service';
 import { BottomPanelFeature } from './features/bottom-panel.feature';
 import { ChromeFeature } from './features/chrome.feature';
@@ -14,6 +15,7 @@ import { PanelKeyboardFeature } from './features/panel-keyboard.feature';
 import { PanelLayoutFeature } from './features/panel-layout.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
 import { TransfersFeature } from './features/transfers.feature';
+import { WindowControlsFeature } from './features/window-controls.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
 
@@ -30,6 +32,12 @@ import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.servic
 export class WorkbenchService {
   /** The backend file system: every listing, detail, download and upload. */
   readonly fileSystem = inject(FileSystemService);
+
+  /**
+   * The application's own window, when there is one. Absent in a browser,
+   * where the tab supplies its own decorations.
+   */
+  readonly desktopWindow = inject(DesktopWindowService);
 
   /**
    * Seed for the parts of the workbench no backend owns yet — the menus, the
@@ -85,6 +93,8 @@ export class WorkbenchService {
   readonly bottomPanelFt = new BottomPanelFeature(this);
   readonly sidebarPanesFt = new SidebarPanesFeature(this);
   readonly resizeFt = new WorkbenchResizeFeature(this);
+  /** The frameless window's own buttons and drag region. */
+  readonly windowControlsFt = new WindowControlsFeature(this);
 
   /* -- cross-feature operations ------------------------------------------ */
 
@@ -94,6 +104,7 @@ export class WorkbenchService {
    * nothing on its own.
    */
   start(): void {
+    this.windowControlsFt.start();
     this.explorerFt.start();
     this.editorGroupsFt.start();
     this.detailsFt.load(this.selectedEntryId());

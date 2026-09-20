@@ -7,6 +7,24 @@ export interface UiMenuBarItem {
   readonly open?: boolean;
 }
 
+/**
+ * One of the window buttons drawn at the end of the title bar
+ * (PRD 001, §8.2).
+ *
+ * Separate from `UiIconAction` because these are not application actions: they
+ * sit in their own group at the very end of the bar, they are taller and
+ * squarer than a chrome button, and the last of them turns red on hover. The
+ * library draws them and reports the click; only the desktop shell can
+ * actually minimise a window.
+ */
+export interface UiWindowControl {
+  readonly id: string;
+  readonly label: string;
+  readonly icon: UiIconName;
+  /** Renders the red hover of a close button. */
+  readonly danger?: boolean;
+}
+
 /** An icon button in the activity bar. */
 export interface UiActivityItem {
   readonly id: string;

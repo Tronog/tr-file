@@ -86,6 +86,12 @@ transport that speaks them. `FileSystemService` picks a transport once — bridg
 preload is there, HTTP otherwise — so no feature, component or error path below it
 knows which one it has.
 
+Section 8.2 took the window's frame away: `UiTitleBar` is the title bar, with the drag
+region and the window buttons in it. `WindowControlsChannel` plus the preload give the
+page four verbs over its own window, `DesktopWindowService` is the frontend seam, and
+`WindowControlsFeature` decides what the bar shows — nothing in a browser, no buttons
+but a gap on macOS (the traffic lights stay), all three everywhere else.
+
 # Docker
 Refer to `docs/ai/DOCKER.md`. Two Compose environments live at the workspace root:
 `prj/compose.dev.yaml` (ports exposed directly) and `prj/compose.prod.yaml` (behind nginx).
