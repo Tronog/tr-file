@@ -1,0 +1,92 @@
+@use 'mixins' as *;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--vsc-border);
+  background: var(--vsc-panel-bg);
+}
+
+.panel-tabbar {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  align-items: center;
+  height: 35px;
+  padding: 0 8px;
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.panel-tab {
+  position: relative;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 35px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--vsc-fg-muted);
+  font: inherit;
+  font-size: var(--vsc-font-size-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--vsc-fg);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &.is-active {
+    color: var(--vsc-fg-bright);
+  }
+
+  /* the active tab is underlined by a bright 1px rule, inset to the label */
+  &.is-active::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    bottom: 0;
+    left: 8px;
+    height: 1px;
+    background: var(--vsc-fg-bright);
+  }
+}
+
+.panel-count {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--vsc-input-bg);
+  color: var(--vsc-fg);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.panel-body {
+  @include scrollable;
+
+  flex: 1;
+  padding: 4px 12px 10px;
+}

@@ -32,7 +32,12 @@
             "styles": [
               "src/styles.scss"
             ],
-            "outputPath": "dist/frontend"
+            "outputPath": "dist/frontend",
+            "stylePreprocessorOptions": {
+              "includePaths": [
+                "../libs/ui/src/styles"
+              ]
+            }
           },
           "configurations": {
             "production": {

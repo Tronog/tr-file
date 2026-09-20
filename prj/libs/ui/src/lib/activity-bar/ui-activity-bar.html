@@ -1,0 +1,35 @@
+@for (item of items(); track item.id) {
+  <button
+    type="button"
+    class="activity-btn"
+    [class.is-active]="item.active"
+    [attr.aria-pressed]="item.active ?? false"
+    [attr.title]="item.label"
+    [attr.aria-label]="item.badge ? item.label + ' (' + item.badge + ')' : item.label"
+    (click)="select.emit(item.id)"
+  >
+    <ui-icon [name]="item.icon" size="lg" />
+    @if (item.badge) {
+      <span class="activity-badge" aria-hidden="true">{{ item.badge }}</span>
+    }
+  </button>
+}
+
+<span class="activity-spacer"></span>
+
+@for (item of bottomItems(); track item.id) {
+  <button
+    type="button"
+    class="activity-btn"
+    [class.is-active]="item.active"
+    [attr.aria-pressed]="item.active ?? false"
+    [attr.title]="item.label"
+    [attr.aria-label]="item.badge ? item.label + ' (' + item.badge + ')' : item.label"
+    (click)="select.emit(item.id)"
+  >
+    <ui-icon [name]="item.icon" size="lg" />
+    @if (item.badge) {
+      <span class="activity-badge" aria-hidden="true">{{ item.badge }}</span>
+    }
+  </button>
+}

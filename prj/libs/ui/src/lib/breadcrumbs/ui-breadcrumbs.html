@@ -1,0 +1,19 @@
+<nav [attr.aria-label]="label()">
+  <ol class="crumbs">
+    @for (item of items(); track item.id; let last = $last) {
+      <li class="crumb-item">
+        <button type="button" class="crumb" (click)="select.emit(item.id)">
+          @if (item.icon; as icon) {
+            <ui-icon [name]="icon" />
+          }
+          <span class="crumb-label">{{ item.label }}</span>
+        </button>
+        @if (!last) {
+          <span class="crumb-sep" aria-hidden="true">
+            <ui-icon name="chevron-right" />
+          </span>
+        }
+      </li>
+    }
+  </ol>
+</nav>

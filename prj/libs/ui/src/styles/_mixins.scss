@@ -1,0 +1,47 @@
+/* Shared SCSS helpers. Colours always come from `_tokens.scss` CSS variables;
+   these mixins only cover repeated structural patterns. */
+
+/* A row in a list/tree: fixed height, no wrapping, hover + selection states. */
+@mixin list-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--vsc-row-height);
+  white-space: nowrap;
+  color: var(--vsc-fg);
+}
+
+/* VS Code's focus ring: an inset 1px outline in the accent colour. */
+@mixin focus-ring {
+  outline: 1px solid var(--vsc-focus-border);
+  outline-offset: -1px;
+}
+
+/* Square, borderless icon button used in toolbars, pane headers and tab bars. */
+@mixin icon-button($size: 20px) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: $size;
+  height: $size;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--vsc-fg);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+/* Scroll container that keeps the thin, overlay-style VS Code scrollbars. */
+@mixin scrollable {
+  min-height: 0;
+  overflow: auto;
+}

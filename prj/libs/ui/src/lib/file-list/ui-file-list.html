@@ -1,0 +1,60 @@
+<table class="filelist">
+  <caption class="visually-hidden">{{ label() }}</caption>
+  <thead>
+    <tr>
+      @for (column of columns(); track column.key; let first = $first) {
+        <th
+          scope="col"
+          [class.is-sorted]="!!column.sort"
+          [class.col-name]="first"
+          [class.align-end]="column.align === 'end'"
+          [style.width]="column.width"
+          [attr.aria-sort]="ariaSort(column)"
+        >
+          {{ column.label }}
+          @if (column.sort) {
+            <ui-icon class="sort-icon" [name]="sortIcon(column)" />
+          }
+        </th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (row of rows(); track row.id) {
+      <tr
+        [class.is-selected]="row.selected"
+        [class.is-inactive-selected]="row.inactiveSelected"
+        [class.is-focused]="row.focused"
+        [attr.aria-selected]="row.selected || row.inactiveSelected ? 'true' : 'false'"
+        [attr.tabindex]="row.id === focusId() ? 0 : -1"
+        (click)="select.emit(row.id)"
+        (dblclick)="activate.emit(row.id)"
+        (keydown)="onKeydown($event, row.id)"
+      >
+        @for (column of columns(); track column.key; let first = $first) {
+          <td
+            [class.col-name]="first"
+            [class.col-value]="!first"
+            [class.align-end]="column.align === 'end'"
+          >
+            @if (first) {
+              <span class="name-cell">
+                <ui-icon [name]="row.icon" [tint]="row.tint" />
+                <span
+                  class="name"
+                  [class.deco-modified]="row.decoration === 'modified'"
+                  [class.deco-untracked]="row.decoration === 'untracked'"
+                  [class.deco-ignored]="row.decoration === 'ignored'"
+                  [class.deco-conflict]="row.decoration === 'conflict'"
+                  >{{ row.name }}</span
+                >
+              </span>
+            } @else {
+              {{ row.cells[column.key] }}
+            }
+          </td>
+        }
+      </tr>
+    }
+  </tbody>
+</table>

@@ -1,0 +1,23 @@
+<div class="sidebar-title">
+  <span class="title-text">{{ title() }}</span>
+
+  @if (actions().length) {
+    <span class="title-actions">
+      @for (action of actions(); track action.id) {
+        <button
+          type="button"
+          class="icon-btn"
+          [class.is-active]="action.active"
+          [disabled]="action.disabled ?? false"
+          [attr.title]="action.label"
+          [attr.aria-label]="action.label"
+          (click)="actionSelect.emit(action.id)"
+        >
+          <ui-icon [name]="action.icon" />
+        </button>
+      }
+    </span>
+  }
+</div>
+
+<ng-content />

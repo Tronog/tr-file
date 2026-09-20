@@ -25,6 +25,7 @@ prj/
 ├── backend/
 ├── frontend/
 └── libs/
+    └── ui/               # @tr-file/ui — workbench component library
 ```
 
 Use pnpm (via `corepack enable pnpm`). Run `pnpm install` from `prj/`.
@@ -33,6 +34,12 @@ Use pnpm (via `corepack enable pnpm`). Run `pnpm install` from `prj/`.
 Refer to `docs/ai/ANGULAR.md` for architecture (component / component service / feature classes).
 Refer to `docs/ai/VSCODE-UI.md` for all Tabler UI markup, layouts and classes — use it instead of
 fetching the Tabler docs.
+
+The workbench UI lives in `prj/libs/ui` (`@tr-file/ui`), a zoneless, signal-based component
+library ported from `mockup/001/`; see `prj/libs/ui/README.md`, including why that library does
+not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin `WorkbenchService`
+holding shared state, feature classes holding the rest, and `MockData*` services holding all data
+until the backend serves it.
 
 # Backend
 Refer to `docs/ai/EXPRESS.md`.

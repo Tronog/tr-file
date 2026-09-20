@@ -1,0 +1,32 @@
+<table class="perm-grid">
+  <caption class="visually-hidden">Permissions, mode {{ permissions().mode }}</caption>
+
+  <thead>
+    <tr>
+      <th scope="col" class="mode">
+        <span class="visually-hidden">Principal, mode </span>{{ permissions().mode }}
+      </th>
+      <th scope="col" class="h">Read</th>
+      <th scope="col" class="h">Write</th>
+      <th scope="col" class="h">Execute</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    @for (row of rows(); track row.principal) {
+      <tr>
+        <th scope="row" class="h">{{ row.principal }}</th>
+
+        @for (cell of row.cells; track cell.permission) {
+          <td>
+            <span class="check" [class.is-on]="cell.on" role="img" [attr.aria-label]="cell.description">
+              @if (cell.on) {
+                <ui-icon name="check" />
+              }
+            </span>
+          </td>
+        }
+      </tr>
+    }
+  </tbody>
+</table>

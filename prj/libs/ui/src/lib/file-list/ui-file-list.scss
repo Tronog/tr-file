@@ -1,0 +1,135 @@
+@use 'mixins' as *;
+
+/* Screen-reader-only text. `clip-path` keeps the node focusable and measurable,
+   which `display: none` would not. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.filelist {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--vsc-font-size);
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 24px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--vsc-border);
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg-muted);
+  font-weight: 400;
+  font-size: var(--vsc-font-size-xs);
+  text-align: left;
+  white-space: nowrap;
+
+  &.is-sorted {
+    color: var(--vsc-fg-bright);
+  }
+
+  &.align-end {
+    text-align: right;
+  }
+}
+
+ui-icon.sort-icon {
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+}
+
+td {
+  height: var(--vsc-row-height);
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+td.col-name,
+th.col-name {
+  width: 100%;
+}
+
+td.col-value {
+  color: var(--vsc-fg-muted);
+}
+
+td.align-end {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+tbody tr {
+  &:hover {
+    background: var(--vsc-list-hover);
+  }
+
+  &.is-selected {
+    background: var(--vsc-list-active);
+
+    td {
+      color: var(--vsc-fg-bright);
+    }
+  }
+
+  &.is-inactive-selected {
+    background: var(--vsc-list-inactive);
+  }
+
+  &.is-focused {
+    @include focus-ring;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.name-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* git decorations — colour only, as in VS Code's explorer */
+.deco-modified {
+  color: var(--vsc-git-modified);
+}
+
+.deco-untracked {
+  color: var(--vsc-git-untracked);
+}
+
+.deco-ignored {
+  color: var(--vsc-git-ignored);
+}
+
+.deco-conflict {
+  color: var(--vsc-git-conflict);
+}
+
+/* The dimmed selection background lifts the floor for contrast, so cell values
+   in an unfocused group's selected row step up from the muted grey. */
+tr.is-inactive-selected .col-value {
+  color: var(--vsc-fg);
+}

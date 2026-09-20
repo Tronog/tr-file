@@ -1,0 +1,50 @@
+@use 'mixins' as *;
+
+:host {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  height: 22px;
+  min-width: 160px;
+  padding: 0 8px;
+  border: 1px solid var(--vsc-input-border);
+  border-radius: var(--vsc-radius);
+  background: var(--vsc-input-bg);
+  color: var(--vsc-fg-dim);
+  font-size: var(--vsc-font-size-sm);
+}
+
+:host(.is-focused),
+:host(:focus-within) {
+  border-color: var(--vsc-focus-border);
+}
+
+:host > ui-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.field {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--vsc-fg);
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+
+  &::placeholder {
+    color: var(--vsc-fg-dim);
+  }
+
+  /* the field already sits in a bordered box; a second ring would double it */
+  &:focus {
+    outline: none;
+  }
+
+  &::-webkit-search-cancel-button {
+    appearance: none;
+  }
+}

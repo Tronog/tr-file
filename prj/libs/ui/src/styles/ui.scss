@@ -1,0 +1,71 @@
+/* ---------------------------------------------------------------------------
+   @tr-file/ui — global stylesheet.
+
+   The consuming app imports this once (see frontend/src/styles.scss). It holds
+   only what cannot live in a component: design tokens, the document reset and
+   scrollbar styling. Everything else is scoped to its component.
+--------------------------------------------------------------------------- */
+
+@use 'tokens';
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg);
+  font-family: var(--vsc-font);
+  font-size: var(--vsc-font-size);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+
+  /* The workbench is chrome, not a document: text selection would only get in
+     the way of click-to-select rows. Inputs re-enable it below. */
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+}
+
+button {
+  font: inherit;
+}
+
+/* VS Code style overlay scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4f4f4f transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #4f4f4f;
+  border: 2px solid transparent;
+  background-clip: content-box;
+
+  &:hover {
+    background: #6b6b6b;
+    background-clip: content-box;
+  }
+}
+
+/* Keyboard users must always see focus, even on custom chrome. */
+:focus-visible {
+  outline: 1px solid var(--vsc-focus-border);
+  outline-offset: -1px;
+}

@@ -1,0 +1,30 @@
+@use 'mixins' as *;
+
+:host {
+  display: inline-flex;
+  flex: none;
+}
+
+.btn {
+  @include icon-button(20px);
+}
+
+:host(.size-md) .btn {
+  @include icon-button(30px);
+
+  height: 26px;
+}
+
+:host(.is-active) .btn {
+  background: var(--vsc-hover-bg);
+  color: var(--vsc-fg-bright);
+}
+
+.btn:disabled {
+  color: var(--vsc-fg-dim);
+  cursor: default;
+
+  &:hover {
+    background: transparent;
+  }
+}

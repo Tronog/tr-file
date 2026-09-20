@@ -21,6 +21,9 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
+# Workspace libraries are part of the install graph, so their manifests must be
+# present for `--frozen-lockfile` to resolve.
+COPY libs/ui/package.json ./libs/ui/
 
 # lmdb / msgpackr-extract have no musl prebuild and there is no compiler in the
 # image; pnpm demotes those optional install scripts to warnings. Expected.
@@ -32,6 +35,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS development
 WORKDIR /app
 COPY tsconfig.base.json ./
+COPY libs ./libs
 COPY frontend ./frontend
 WORKDIR /app/frontend
 EXPOSE 4200
@@ -43,6 +47,8 @@ CMD ["pnpm", "exec", "ng", "serve", "--host", "0.0.0.0", "--port", "4200", "--pr
 FROM deps AS build
 WORKDIR /app
 COPY tsconfig.base.json ./
+# @tr-file/ui ships TypeScript source and is compiled by this build.
+COPY libs ./libs
 COPY frontend ./frontend
 RUN pnpm --filter frontend build
 # output: /app/frontend/dist/frontend/browser

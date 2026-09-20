@@ -1,0 +1,134 @@
+@let chrome = workbench.chromeFt;
+@let explorer = workbench.explorerFt;
+@let groups = workbench.editorGroupsFt;
+@let details = workbench.detailsFt;
+@let panel = workbench.bottomPanelFt;
+@let panes = workbench.sidebarPanesFt;
+
+<ui-workbench [leftWidth]="workbench.leftSidebarWidth()" [rightWidth]="workbench.rightSidebarWidth()">
+  <h1 uiSlot="title" class="app-heading">tr-file</h1>
+
+  <ui-title-bar
+    uiSlot="title"
+    [menuItems]="chrome.menuItems"
+    [commandLabel]="chrome.commandLabel"
+    [commandKeys]="chrome.commandKeys"
+    [actions]="chrome.titleBarActions"
+  />
+
+  <ui-activity-bar
+    uiSlot="activity"
+    [items]="chrome.activityItems"
+    [bottomItems]="chrome.activityBottomItems"
+  />
+
+  <!-- left sidebar: the directory tree -->
+  <ui-sidebar uiSlot="left" title="Explorer" side="left" [actions]="chrome.sidebarMoreActions">
+    <ui-pane
+      title="Places"
+      [expanded]="panes.isExpanded('places')"
+      (toggle)="panes.toggle('places')"
+    />
+
+    <ui-pane
+      [title]="explorer.title"
+      [expanded]="panes.isExpanded('explorer-tree')"
+      [actions]="explorer.actions"
+      [grow]="true"
+      (toggle)="panes.toggle('explorer-tree')"
+    >
+      <ui-tree
+        [nodes]="explorer.nodes()"
+        [label]="explorer.title + ' directory tree'"
+        (toggle)="explorer.toggle($event)"
+        (activate)="explorer.activate($event)"
+      />
+    </ui-pane>
+
+    <ui-pane title="Outline" [expanded]="panes.isExpanded('outline')" (toggle)="panes.toggle('outline')" />
+    <ui-pane title="Timeline" [expanded]="panes.isExpanded('timeline')" (toggle)="panes.toggle('timeline')" />
+  </ui-sidebar>
+
+  <!-- centre: the split panel grid above the bottom panel -->
+  <div uiSlot="center" class="editor-area">
+    <div class="editor-grid">
+      <ui-panel-grid [node]="groups.grid">
+        <ng-template #leaf let-groupId>
+          @if (groups.group(groupId); as group) {
+            <ui-panel-group
+              [group]="group"
+              [active]="groups.isActive(groupId)"
+              (tabSelect)="groups.focus(groupId)"
+              (viewChange)="groups.setView(groupId, $event)"
+              (rowSelect)="groups.selectEntry(groupId, $event)"
+              (itemSelect)="groups.selectEntry(groupId, $event)"
+            />
+          }
+        </ng-template>
+      </ui-panel-grid>
+    </div>
+
+    <ui-sash orientation="horizontal" label="Resize bottom panel" />
+
+    <ui-bottom-panel
+      class="bottom-panel"
+      label="Workbench panel"
+      [style.height.px]="workbench.bottomPanelHeight()"
+      [tabs]="panel.tabs()"
+      [actions]="panel.actions"
+      (select)="panel.select($event)"
+    >
+      @if (panel.transfersVisible()) {
+        <ui-transfer-list [transfers]="panel.transfers()" />
+      }
+    </ui-bottom-panel>
+  </div>
+
+  <!-- right sidebar: details of the selected entry -->
+  <ui-sidebar uiSlot="right" title="Details" side="right" [actions]="chrome.sidebarMoreActions">
+    @if (details.preview(); as preview) {
+      <ui-preview-card [preview]="preview" />
+    }
+
+    <ui-pane
+      title="Properties"
+      [expanded]="panes.isExpanded('properties')"
+      (toggle)="panes.toggle('properties')"
+    >
+      <ui-property-list [properties]="details.properties()" />
+    </ui-pane>
+
+    @if (details.permissions(); as permissions) {
+      <ui-pane
+        title="Permissions"
+        [expanded]="panes.isExpanded('permissions')"
+        (toggle)="panes.toggle('permissions')"
+      >
+        <ui-permission-grid [permissions]="permissions" />
+      </ui-pane>
+    }
+
+    <ui-pane title="Tags" [expanded]="panes.isExpanded('tags')" (toggle)="panes.toggle('tags')">
+      <ui-chip-list [chips]="details.tags()" />
+    </ui-pane>
+
+    <ui-pane title="Git" [expanded]="panes.isExpanded('git')" (toggle)="panes.toggle('git')">
+      <ui-property-list [properties]="details.git()" />
+    </ui-pane>
+
+    <ui-pane
+      title="Open with"
+      [expanded]="panes.isExpanded('open-with')"
+      [grow]="true"
+      (toggle)="panes.toggle('open-with')"
+    >
+      <ui-action-list [items]="details.openWith" />
+    </ui-pane>
+  </ui-sidebar>
+
+  <ui-status-bar
+    uiSlot="status"
+    [leadingItems]="chrome.statusLeadingItems"
+    [trailingItems]="chrome.statusTrailingItems()"
+  />
+</ui-workbench>

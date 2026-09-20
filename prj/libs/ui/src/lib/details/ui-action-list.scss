@@ -1,0 +1,48 @@
+@use 'mixins' as *;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 8px;
+}
+
+.openwith-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 26px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+  color: var(--vsc-fg);
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-list-hover);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  ui-icon {
+    color: var(--vsc-fg-muted);
+  }
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag {
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--vsc-fg-dim);
+  font-size: var(--vsc-font-size-xs);
+}

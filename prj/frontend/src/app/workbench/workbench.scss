@@ -1,0 +1,37 @@
+:host {
+  display: contents;
+}
+
+/* The workbench chrome has nowhere to show a page heading, but the document
+   still needs one — it exists for assistive tech only, inside the banner. */
+.app-heading {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The centre column: the split grid takes the free space, the bottom panel
+   keeps the height the workbench state holds. */
+.editor-area {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-editor-bg);
+}
+
+.editor-grid {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bottom-panel {
+  flex: none;
+}

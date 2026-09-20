@@ -1,0 +1,41 @@
+@use 'mixins' as *;
+
+:host {
+  position: relative;
+  flex: none;
+  background: transparent;
+}
+
+:host(.is-vertical) {
+  width: var(--vsc-sash-size);
+  cursor: col-resize;
+}
+
+:host(.is-horizontal) {
+  height: var(--vsc-sash-size);
+  cursor: row-resize;
+}
+
+:host::after {
+  position: absolute;
+  background: transparent;
+  content: '';
+  inset: 0;
+  transition: background 0.1s linear;
+}
+
+:host(:hover)::after,
+:host(.is-active)::after,
+:host(:focus-visible)::after {
+  background: var(--vsc-sash-hover);
+}
+
+:host(:focus-visible) {
+  @include focus-ring;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host::after {
+    transition: none;
+  }
+}

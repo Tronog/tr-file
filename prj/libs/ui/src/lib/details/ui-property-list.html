@@ -1,0 +1,15 @@
+<dl class="props">
+  @for (property of properties(); track $index) {
+    <div class="prop">
+      <dt>{{ property.label }}</dt>
+      <dd
+        [class.is-mono]="property.mono"
+        [class.tone-modified]="property.tone === 'modified'"
+        [class.tone-untracked]="property.tone === 'untracked'"
+        [class.tone-conflict]="property.tone === 'conflict'"
+      >
+        {{ property.value }}
+      </dd>
+    </div>
+  }
+</dl>

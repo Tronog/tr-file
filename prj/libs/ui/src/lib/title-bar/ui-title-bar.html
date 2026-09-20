@@ -1,0 +1,43 @@
+<nav class="menu">
+  <ui-icon class="menu-logo" [name]="brandIcon()" />
+
+  @for (item of menuItems(); track item.id) {
+    <button
+      type="button"
+      class="menu-item"
+      [class.is-open]="item.open"
+      [attr.aria-expanded]="item.open ?? false"
+      (click)="menuSelect.emit(item.id)"
+    >
+      {{ item.label }}
+    </button>
+  }
+</nav>
+
+@if (commandLabel()) {
+  <button type="button" class="command-center" (click)="commandSelect.emit()">
+    <ui-icon name="search" />
+    <span class="command-label">{{ commandLabel() }}</span>
+    @for (key of commandKeys(); track key) {
+      <kbd>{{ key }}</kbd>
+    }
+  </button>
+} @else {
+  <span class="command-placeholder"></span>
+}
+
+<div class="titlebar-right">
+  @for (action of actions(); track action.id) {
+    <button
+      type="button"
+      class="chrome-btn"
+      [class.is-active]="action.active"
+      [disabled]="action.disabled ?? false"
+      [attr.title]="action.label"
+      [attr.aria-label]="action.label"
+      (click)="actionSelect.emit(action.id)"
+    >
+      <ui-icon [name]="action.icon" />
+    </button>
+  }
+</div>

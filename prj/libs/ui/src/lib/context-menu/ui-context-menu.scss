@@ -1,0 +1,80 @@
+@use 'mixins' as *;
+
+:host {
+  position: absolute;
+  z-index: 40;
+  display: block;
+  min-width: 240px;
+  padding: 4px;
+  border: 1px solid var(--vsc-menu-border);
+  border-radius: 5px;
+  background: var(--vsc-menu-bg);
+  box-shadow: var(--vsc-shadow);
+  font-size: var(--vsc-font-size);
+}
+
+.menu-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--vsc-radius);
+  background: transparent;
+  color: var(--vsc-fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-list-hover);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &.is-active {
+    background: var(--vsc-accent);
+    color: var(--vsc-accent-fg);
+  }
+
+  &.is-disabled {
+    color: var(--vsc-fg-dim);
+    cursor: default;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+}
+
+.menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--vsc-fg-dim);
+  font-size: var(--vsc-font-size-xs);
+}
+
+.is-active .k {
+  color: var(--vsc-accent-fg);
+  opacity: 0.75;
+}
+
+.is-disabled .k {
+  color: var(--vsc-fg-dim);
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--vsc-border-strong);
+}

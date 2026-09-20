@@ -1,0 +1,6 @@
+@for (chip of chips(); track chip.id) {
+  <span class="chip">
+    <span class="dot" [style.background]="chip.color ?? 'var(--vsc-fg-dim)'"></span>
+    {{ chip.label }}
+  </span>
+}

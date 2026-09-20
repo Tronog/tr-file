@@ -23,6 +23,8 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
+# Workspace libraries are in the install graph; --frozen-lockfile needs them.
+COPY libs/ui/package.json libs/ui/package.json
 RUN pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
@@ -32,6 +34,8 @@ FROM base AS prod-deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
+# Workspace libraries are in the install graph; --frozen-lockfile needs them.
+COPY libs/ui/package.json libs/ui/package.json
 RUN pnpm install --frozen-lockfile --prod --filter "@tr-file/backend..."
 
 # ---------------------------------------------------------------------------

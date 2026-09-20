@@ -1,0 +1,38 @@
+<div class="panel-tabbar">
+  <div class="panel-tabs" role="tablist" [attr.aria-label]="label()">
+    @for (tab of tabs(); track tab.id) {
+      <button
+        type="button"
+        class="panel-tab"
+        role="tab"
+        [class.is-active]="tab.active"
+        [attr.aria-selected]="tab.active ? 'true' : 'false'"
+        [attr.tabindex]="tab.id === focusId() ? 0 : -1"
+        (click)="select.emit(tab.id)"
+      >
+        {{ tab.label }}
+        @if (tab.count !== undefined) {
+          <span class="panel-count">{{ tab.count }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  @if (actions().length) {
+    <div class="panel-actions">
+      @for (item of actions(); track item.id) {
+        <ui-icon-button
+          [icon]="item.icon"
+          [label]="item.label"
+          [active]="!!item.active"
+          [disabled]="!!item.disabled"
+          (action)="actionSelect.emit(item.id)"
+        />
+      }
+    </div>
+  }
+</div>
+
+<div class="panel-body">
+  <ng-content />
+</div>

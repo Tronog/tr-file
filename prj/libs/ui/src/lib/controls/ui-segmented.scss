@@ -1,0 +1,44 @@
+@use 'mixins' as *;
+
+:host {
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: 5px;
+}
+
+.seg-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--vsc-fg-muted);
+  cursor: pointer;
+
+  &:not(:last-child) {
+    border-right: 1px solid var(--vsc-border-strong);
+  }
+
+  &:hover {
+    color: var(--vsc-fg);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &.is-active {
+    background: var(--vsc-hover-bg);
+    color: var(--vsc-fg-bright);
+  }
+
+  ui-icon {
+    width: 14px;
+    height: 14px;
+  }
+}

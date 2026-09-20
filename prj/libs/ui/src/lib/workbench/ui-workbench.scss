@@ -1,0 +1,71 @@
+@use 'mixins' as *;
+
+:host {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--vsc-font);
+  font-size: var(--vsc-font-size);
+  line-height: 1.4;
+  color: var(--vsc-fg);
+  background: var(--vsc-editor-bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.titlebar-slot,
+.statusbar-slot {
+  display: block;
+  min-width: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: row;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-editor-bg);
+}
+
+.activity-slot {
+  display: flex;
+  flex: none;
+  min-height: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-sidebar-bg);
+}
+
+.sidebar-left {
+  border-right: 1px solid var(--vsc-border);
+}
+
+.sidebar-right {
+  border-left: 1px solid var(--vsc-border);
+}
+
+.center {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-editor-bg);
+}
+
+/* The sash owns its own width; it must never be flexed away by the centre. */
+.body > ui-sash {
+  flex: none;
+}
+
+/* Slots are always projected; a hidden region only loses its box. */
+.is-hidden {
+  display: none;
+}

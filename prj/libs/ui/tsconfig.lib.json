@@ -1,0 +1,10 @@
+/* Type-check-only config. The library ships TypeScript source: it is compiled by
+   the consuming application's `ng build` (path-mapped in frontend/tsconfig.json),
+   so there is no separate emit step and no ng-packagr in the loop. */
+{
+  "extends": "../../frontend/tsconfig.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

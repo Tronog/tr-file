@@ -1,0 +1,32 @@
+<ng-template #renderNode let-node>
+  @switch (node.kind) {
+    @case ('split') {
+      <div class="split" [class.is-column]="node.direction === 'column'">
+        @for (child of node.children; track $index) {
+          <div class="cell" [style.flex]="flexOf(child)">
+            <ng-container
+              [ngTemplateOutlet]="renderNode"
+              [ngTemplateOutletContext]="{ $implicit: child }"
+            />
+          </div>
+          @if (!$last) {
+            <ui-sash
+              [orientation]="node.direction === 'row' ? 'vertical' : 'horizontal'"
+              label="Resize panels"
+            />
+          }
+        }
+      </div>
+    }
+    @case ('leaf') {
+      @if (template(); as leaf) {
+        <ng-container
+          [ngTemplateOutlet]="leaf"
+          [ngTemplateOutletContext]="{ $implicit: node.groupId }"
+        />
+      }
+    }
+  }
+</ng-template>
+
+<ng-container [ngTemplateOutlet]="renderNode" [ngTemplateOutletContext]="{ $implicit: node() }" />

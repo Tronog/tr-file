@@ -1,0 +1,39 @@
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 24px;
+  color: var(--vsc-fg-dim);
+  font-size: var(--vsc-font-size-sm);
+  text-align: center;
+}
+
+.title,
+.hint,
+.keys {
+  margin: 0;
+}
+
+.title {
+  color: var(--vsc-fg-muted);
+}
+
+.keys {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: 3px;
+  background: var(--vsc-hover-bg);
+  color: var(--vsc-fg-muted);
+  font-family: inherit;
+  font-size: var(--vsc-font-size-xs);
+}

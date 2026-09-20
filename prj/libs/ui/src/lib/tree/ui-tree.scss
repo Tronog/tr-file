@@ -1,0 +1,141 @@
+@use 'mixins' as *;
+
+:host {
+  display: block;
+  min-height: 0;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-row {
+  @include list-row;
+
+  position: relative;
+  width: 100%;
+  padding: 0 12px 0 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--vsc-font-size);
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-list-hover);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &.is-selected {
+    background: var(--vsc-list-active);
+  }
+
+  &.is-focused {
+    background: var(--vsc-list-active);
+
+    @include focus-ring;
+  }
+
+  &.is-cut {
+    opacity: 0.5;
+  }
+}
+
+/* git decorations tint the label and the right-hand meta hint */
+.deco-modified .file-name,
+.deco-modified .file-meta {
+  color: var(--vsc-git-modified);
+}
+
+.deco-untracked .file-name,
+.deco-untracked .file-meta {
+  color: var(--vsc-git-untracked);
+}
+
+.deco-ignored .file-name,
+.deco-ignored .file-meta {
+  color: var(--vsc-git-ignored);
+}
+
+.deco-conflict .file-name,
+.deco-conflict .file-meta {
+  color: var(--vsc-git-conflict);
+}
+
+/* one 8px cell per ancestor level; `on` draws that level's guide line */
+.indent {
+  display: inline-flex;
+  flex: none;
+  align-self: stretch;
+
+  i {
+    display: block;
+    width: 8px;
+    height: 100%;
+    border-left: 1px solid transparent;
+  }
+
+  i.on {
+    border-left-color: var(--vsc-border-strong);
+  }
+}
+
+.is-selected .indent i.on,
+.is-focused .indent i.on {
+  border-left-color: var(--vsc-fg-dim);
+}
+
+.twisty {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--vsc-fg);
+
+  &.is-hidden {
+    visibility: hidden;
+  }
+}
+
+.file-icon {
+  flex: none;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-meta {
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--vsc-fg-dim);
+  font-size: var(--vsc-font-size-xs);
+}
+
+/* On the selection background the dim greys drop below 4.5:1, so selected rows
+   brighten their secondary text instead of dimming it. */
+.tree-row.is-selected,
+.tree-row.is-focused {
+  .file-meta {
+    color: var(--vsc-fg-bright);
+  }
+}
+
+/* VS Code draws cut entries at 50% opacity, which fails AA; 70% keeps the
+   "pending move" reading and clears the contrast minimum. The meta hint starts
+   from the dim grey, so it is promoted a step to survive the blend. */
+.tree-row.is-cut {
+  opacity: 0.7;
+
+  .file-meta {
+    color: var(--vsc-fg);
+  }
+}

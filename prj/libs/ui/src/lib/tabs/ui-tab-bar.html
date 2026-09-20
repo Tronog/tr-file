@@ -1,0 +1,53 @@
+<div class="tabs" role="tablist" [attr.aria-label]="label()">
+  @for (tab of tabs(); track tab.id) {
+    <div
+      class="tab"
+      role="presentation"
+      [class.is-active]="tab.active"
+      [class.is-preview]="tab.preview"
+      [class.is-pinned]="tab.pinned"
+    >
+      <button
+        type="button"
+        class="tab-main"
+        role="tab"
+        [attr.aria-selected]="tab.active ? 'true' : 'false'"
+        [attr.tabindex]="tab.id === focusId() ? 0 : -1"
+        [attr.title]="tab.label"
+        (click)="select.emit(tab.id)"
+      >
+        <ui-icon [name]="tab.icon" [tint]="tab.tint" />
+        <span class="tab-label">{{ tab.label }}</span>
+      </button>
+
+      @if (tab.dirty) {
+        <span class="tab-dirty" [attr.title]="'Unsaved changes'" aria-hidden="true"></span>
+      } @else {
+        <button
+          type="button"
+          class="tab-close"
+          tabindex="-1"
+          aria-hidden="true"
+          [attr.title]="'Close ' + tab.label"
+          (click)="onClose($event, tab.id)"
+        >
+          <ui-icon name="x" />
+        </button>
+      }
+    </div>
+  }
+</div>
+
+@if (actions().length) {
+  <div class="tabbar-actions">
+    @for (item of actions(); track item.id) {
+      <ui-icon-button
+        [icon]="item.icon"
+        [label]="item.label"
+        [active]="!!item.active"
+        [disabled]="!!item.disabled"
+        (action)="actionSelect.emit(item.id)"
+      />
+    }
+  </div>
+}

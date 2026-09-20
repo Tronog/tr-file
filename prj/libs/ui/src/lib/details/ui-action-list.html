@@ -1,0 +1,10 @@
+@for (item of items(); track item.id) {
+  <button type="button" class="openwith-row" (click)="select.emit(item.id)">
+    <ui-icon [name]="item.icon" />
+    <span class="label">{{ item.label }}</span>
+
+    @if (item.tag) {
+      <span class="tag">{{ item.tag }}</span>
+    }
+  </button>
+}

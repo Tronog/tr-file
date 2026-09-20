@@ -1,0 +1,138 @@
+@use 'mixins' as *;
+
+:host {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 600px) 1fr;
+  gap: 8px;
+  align-items: center;
+  height: var(--vsc-titlebar-height);
+  padding: 0 8px;
+  background: var(--vsc-titlebar-bg);
+  border-bottom: 1px solid var(--vsc-border);
+}
+
+.menu {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+}
+
+ui-icon.menu-logo {
+  width: 18px;
+  height: 18px;
+  margin: 0 6px 0 2px;
+  color: var(--vsc-accent);
+}
+
+.menu-item {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--vsc-radius);
+  background: transparent;
+  color: var(--vsc-fg);
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover,
+  &.is-open {
+    background: var(--vsc-hover-bg);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.command-center {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: var(--vsc-radius-lg);
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg-muted);
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--vsc-fg);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  ui-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.command-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+kbd {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: 3px;
+  background: var(--vsc-hover-bg);
+  color: var(--vsc-fg-dim);
+  font-family: inherit;
+  font-size: 10px;
+
+  /* The keys read as one hint, so only the first is pushed away from the text. */
+  & + kbd {
+    margin-left: 2px;
+  }
+}
+
+.titlebar-right {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.chrome-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--vsc-fg);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--vsc-hover-bg);
+  }
+
+  &.is-active {
+    color: var(--vsc-fg-bright);
+    background: var(--vsc-hover-bg);
+  }
+
+  &:disabled {
+    color: var(--vsc-fg-dim);
+    cursor: default;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}

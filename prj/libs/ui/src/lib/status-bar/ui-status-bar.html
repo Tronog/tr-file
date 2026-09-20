@@ -1,0 +1,43 @@
+@for (item of leadingItems(); track item.id) {
+  <button
+    type="button"
+    class="status-item"
+    [class.is-accent]="item.accent"
+    [attr.title]="item.title ?? item.label"
+    [attr.aria-label]="item.label"
+    (click)="select.emit(item.id)"
+  >
+    @if (item.icon) {
+      <ui-icon [name]="item.icon" />
+    }
+    @if (item.label) {
+      <span class="status-label">{{ item.label }}</span>
+    }
+    @if (item.trailingIcon) {
+      <ui-icon [name]="item.trailingIcon" />
+    }
+  </button>
+}
+
+<span class="status-spacer"></span>
+
+@for (item of trailingItems(); track item.id) {
+  <button
+    type="button"
+    class="status-item"
+    [class.is-accent]="item.accent"
+    [attr.title]="item.title ?? item.label"
+    [attr.aria-label]="item.label"
+    (click)="select.emit(item.id)"
+  >
+    @if (item.icon) {
+      <ui-icon [name]="item.icon" />
+    }
+    @if (item.label) {
+      <span class="status-label">{{ item.label }}</span>
+    }
+    @if (item.trailingIcon) {
+      <ui-icon [name]="item.trailingIcon" />
+    }
+  </button>
+}

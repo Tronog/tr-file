@@ -1,0 +1,76 @@
+@use 'mixins' as *;
+
+:host {
+  display: block;
+  flex: none;
+  background: var(--vsc-editor-bg);
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  overflow: hidden;
+}
+
+.crumbs {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crumb-item {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+}
+
+.crumb {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vsc-fg-muted);
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+    color: var(--vsc-fg-bright);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  ui-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.crumb-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumb-sep {
+  display: inline-flex;
+  color: var(--vsc-fg-dim);
+
+  ui-icon {
+    width: 14px;
+    height: 14px;
+  }
+}

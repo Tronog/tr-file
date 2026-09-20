@@ -19,7 +19,12 @@
     /* inherited from the base and kept: strict, noImplicitOverride,
        noImplicitReturns, noFallthroughCasesInSwitch, noUnusedLocals,
        noUnusedParameters, exactOptionalPropertyTypes, skipLibCheck, sourceMap */
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    /* The UI component library is consumed as source and compiled by this
+       app's build — no ng-packagr step, one type-check across both. */
+    "paths": {
+      "@tr-file/ui": ["../libs/ui/src/public-api.ts"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

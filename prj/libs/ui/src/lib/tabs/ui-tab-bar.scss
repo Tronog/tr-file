@@ -1,0 +1,116 @@
+@use 'mixins' as *;
+
+:host {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  height: var(--vsc-tabbar-height);
+  border-bottom: 1px solid var(--vsc-border);
+  background: var(--vsc-tabbar-bg);
+}
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  max-width: 220px;
+  padding: 0 10px;
+  border-right: 1px solid var(--vsc-border);
+  background: var(--vsc-tab-inactive-bg);
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size);
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--vsc-tab-active-bg);
+  }
+}
+
+.tab.is-active {
+  background: var(--vsc-tab-active-bg);
+  color: var(--vsc-fg-bright);
+}
+
+/* the active tab wears the accent rule only inside the focused group */
+:host(.is-group-active) .tab.is-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--vsc-accent);
+}
+
+.tab.is-pinned {
+  max-width: 120px;
+}
+
+.tab.is-preview .tab-label {
+  font-style: italic;
+}
+
+.tab-main {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  @include icon-button(20px);
+
+  margin-right: -4px;
+  color: var(--vsc-fg-muted);
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+    color: var(--vsc-fg-bright);
+  }
+
+  ui-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.tab-dirty {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--vsc-fg);
+}
+
+.tabbar-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 8px;
+}

@@ -1,0 +1,71 @@
+<ui-tab-bar
+  [tabs]="group().tabs"
+  [actions]="group().actions"
+  [groupActive]="active()"
+  (select)="tabSelect.emit($event)"
+  (close)="tabClose.emit($event)"
+  (actionSelect)="actionSelect.emit($event)"
+/>
+
+@if (group().breadcrumbs.length) {
+  <ui-breadcrumbs
+    [items]="group().breadcrumbs"
+    [label]="breadcrumbLabel()"
+    (select)="breadcrumbSelect.emit($event)"
+  />
+}
+
+@if (showToolbar()) {
+  <div class="toolbar">
+    @for (item of group().toolbarActions; track item.id) {
+      <ui-icon-button
+        [icon]="item.icon"
+        [label]="item.label"
+        [active]="!!item.active"
+        [disabled]="!!item.disabled"
+        (action)="toolbarAction.emit(item.id)"
+      />
+    }
+
+    @if (group().showViewSwitch) {
+      <ui-segmented
+        [options]="viewOptions"
+        label="View mode"
+        [value]="group().view"
+        (valueChange)="onViewChange($event)"
+      />
+    }
+
+    @if (group().searchPlaceholder; as placeholder) {
+      <ui-search-field [placeholder]="placeholder" label="Filter files" />
+    }
+
+    @if (group().summary; as summary) {
+      <span class="summary">{{ summary }}</span>
+    }
+  </div>
+}
+
+<div class="group-body">
+  @if (group().empty; as empty) {
+    <ui-empty-state [state]="empty" />
+  } @else {
+    @switch (group().view) {
+      @case ('list') {
+        <ui-file-list
+          [columns]="group().columns"
+          [rows]="group().rows"
+          (select)="rowSelect.emit($event)"
+          (activate)="rowActivate.emit($event)"
+        />
+      }
+      @case ('grid') {
+        <ui-icon-view
+          [items]="group().items"
+          (select)="itemSelect.emit($event)"
+          (activate)="itemActivate.emit($event)"
+        />
+      }
+    }
+  }
+</div>

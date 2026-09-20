@@ -1,8 +1,6 @@
-/* Global styles. Intentionally minimal: a blank white page for now. */
-html,
-body {
-  margin: 0;
-  padding: 0;
-  min-height: 100%;
-  background-color: #fff;
-}
+/* Global styles.
+
+   The workbench skin (design tokens, document reset, scrollbars) comes from the
+   UI component library. `ui` resolves through the build's
+   `stylePreprocessorOptions.includePaths` (see angular.json). */
+@use 'ui';

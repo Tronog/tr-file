@@ -1,0 +1,70 @@
+@use 'mixins' as *;
+
+:host {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  width: var(--vsc-activitybar-width);
+  min-height: 0;
+  background: var(--vsc-activitybar-bg);
+  border-right: 1px solid var(--vsc-border);
+}
+
+.activity-btn {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--vsc-fg-muted);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--vsc-fg-bright);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &.is-active {
+    color: var(--vsc-fg-bright);
+
+    /* VS Code's 2px indicator bar on the leading edge of the active view. */
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 2px;
+      background: var(--vsc-fg-bright);
+    }
+  }
+}
+
+.activity-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--vsc-badge-bg);
+  color: var(--vsc-accent-fg);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+.activity-spacer {
+  flex: 1;
+}

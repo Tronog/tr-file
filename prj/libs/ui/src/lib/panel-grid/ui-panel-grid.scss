@@ -1,0 +1,23 @@
+:host {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+
+  &.is-column {
+    flex-direction: column;
+  }
+}
+
+.cell {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}

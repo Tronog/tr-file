@@ -1,0 +1,44 @@
+:host {
+  display: block;
+}
+
+.props {
+  margin: 0;
+  padding: 6px 0;
+}
+
+.prop {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  padding: 3px 14px;
+  font-size: var(--vsc-font-size-sm);
+}
+
+dt {
+  color: var(--vsc-fg-muted);
+  font-weight: 400;
+}
+
+dd {
+  margin: 0;
+  color: var(--vsc-fg);
+  overflow-wrap: anywhere;
+
+  &.is-mono {
+    font-family: var(--vsc-font-mono);
+    font-size: var(--vsc-font-size-xs);
+  }
+
+  &.tone-modified {
+    color: var(--vsc-git-modified);
+  }
+
+  &.tone-untracked {
+    color: var(--vsc-git-untracked);
+  }
+
+  &.tone-conflict {
+    color: var(--vsc-git-conflict);
+  }
+}

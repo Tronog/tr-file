@@ -1,0 +1,19 @@
+@for (item of items(); track item.id) {
+  @if (item.separatorBefore) {
+    <div class="menu-sep" role="separator"></div>
+  }
+  <button
+    type="button"
+    class="menu-row"
+    role="menuitem"
+    [class.is-active]="item.active"
+    [class.is-disabled]="item.disabled"
+    [attr.aria-disabled]="item.disabled ? 'true' : null"
+    (click)="onSelect(item)"
+  >
+    <span class="menu-label">{{ item.label }}</span>
+    @if (item.keybinding; as keybinding) {
+      <span class="k">{{ keybinding }}</span>
+    }
+  </button>
+}

@@ -1,0 +1,31 @@
+<ui-icon-sprite />
+
+<div class="titlebar-slot" role="banner">
+  <ng-content select="[uiSlot=title]" />
+</div>
+
+<div class="body">
+  <div class="activity-slot" role="navigation" aria-label="Activity bar">
+    <ng-content select="[uiSlot=activity]" />
+  </div>
+
+  <div class="sidebar sidebar-left" [class.is-hidden]="!leftVisible()" [style.width.px]="leftWidth()">
+    <ng-content select="[uiSlot=left]" />
+  </div>
+
+  <ui-sash orientation="vertical" label="Resize left sidebar" [class.is-hidden]="!leftVisible()" />
+
+  <div class="center" role="main">
+    <ng-content select="[uiSlot=center]" />
+  </div>
+
+  <ui-sash orientation="vertical" label="Resize right sidebar" [class.is-hidden]="!rightVisible()" />
+
+  <div class="sidebar sidebar-right" [class.is-hidden]="!rightVisible()" [style.width.px]="rightWidth()">
+    <ng-content select="[uiSlot=right]" />
+  </div>
+</div>
+
+<div class="statusbar-slot" role="contentinfo">
+  <ng-content select="[uiSlot=status]" />
+</div>

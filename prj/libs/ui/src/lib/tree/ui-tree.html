@@ -1,0 +1,44 @@
+<div class="tree" role="tree" [attr.aria-label]="label()">
+  @for (node of nodes(); track node.id) {
+    <button
+      type="button"
+      role="treeitem"
+      class="tree-row"
+      [class.is-selected]="node.selected"
+      [class.is-focused]="node.focused"
+      [class.is-cut]="node.cut"
+      [class.deco-modified]="node.decoration === 'modified'"
+      [class.deco-untracked]="node.decoration === 'untracked'"
+      [class.deco-ignored]="node.decoration === 'ignored'"
+      [class.deco-conflict]="node.decoration === 'conflict'"
+      [attr.aria-level]="node.depth + 1"
+      [attr.aria-selected]="node.selected ?? false"
+      [attr.aria-expanded]="node.expandable ? (node.expanded ?? false) : null"
+      [attr.tabindex]="node.id === tabStopId() ? 0 : -1"
+      (click)="activate.emit(node.id)"
+    >
+      <span class="indent" aria-hidden="true">
+        @for (guide of node.guides; track $index) {
+          <i [class.on]="guide"></i>
+        }
+      </span>
+
+      <span
+        class="twisty"
+        [class.is-hidden]="!node.expandable"
+        aria-hidden="true"
+        (click)="onTwisty($event, node)"
+      >
+        <ui-icon [name]="node.expanded ? 'chevron-down' : 'chevron-right'" />
+      </span>
+
+      <ui-icon class="file-icon" [name]="node.icon" [tint]="node.tint" />
+
+      <span class="file-name">{{ node.label }}</span>
+
+      @if (node.meta) {
+        <span class="file-meta">{{ node.meta }}</span>
+      }
+    </button>
+  }
+</div>

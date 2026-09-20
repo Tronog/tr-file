@@ -1,0 +1,91 @@
+@use 'mixins' as *;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+:host(.is-grow) {
+  flex: 1;
+  min-height: 0;
+
+  .pane-body {
+    @include scrollable;
+  }
+}
+
+.pane-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: var(--vsc-pane-header-height);
+  padding-right: 12px;
+  border-top: 1px solid var(--vsc-border);
+
+  &:hover {
+    background: var(--vsc-editor-bg);
+  }
+}
+
+.pane-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 0 0 4px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--vsc-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--vsc-fg);
+  cursor: default;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.twisty {
+  flex: none;
+  color: var(--vsc-fg);
+}
+
+.pane-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pane-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.icon-btn {
+  @include icon-button;
+
+  &.is-active {
+    color: var(--vsc-fg-bright);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+    background: transparent;
+  }
+}
+
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 6px;
+}

@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  padding: 2px 14px 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  margin: 2px 4px 2px 0;
+  padding: 0 8px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: 10px;
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg);
+  font-size: var(--vsc-font-size-xs);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+}
