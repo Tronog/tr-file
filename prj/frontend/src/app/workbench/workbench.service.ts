@@ -11,6 +11,7 @@ import { FilePreviewFeature } from './features/file-preview.feature';
 import { FileViewModelFeature } from './features/file-view-model.feature';
 import { FsDataFeature } from './features/fs-data.feature';
 import { PanelFocusFeature } from './features/panel-focus.feature';
+import { PanelHistoryFeature } from './features/panel-history.feature';
 import { PanelKeyboardFeature } from './features/panel-keyboard.feature';
 import { PanelLayoutFeature } from './features/panel-layout.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
@@ -88,6 +89,8 @@ export class WorkbenchService {
   readonly panelKeyboardFt = new PanelKeyboardFeature(this);
   /** Sends focus into a panel body once a chosen tab has rendered. */
   readonly panelFocusFt = new PanelFocusFeature(this);
+  /** Each panel's own trail of folders, walked with `Alt`+`←`/`→`. */
+  readonly panelHistoryFt = new PanelHistoryFeature(this);
   /** Links the two: constructed after the explorer and the groups it drives. */
   readonly explorerNavFt = new ExplorerNavigationFeature(this);
   readonly bottomPanelFt = new BottomPanelFeature(this);

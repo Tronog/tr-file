@@ -123,6 +123,65 @@ describe('PanelKeyboardFeature', () => {
     expect(crumbs()).toBe('tr-file');
   });
 
+  /**
+   * A panel that lands somewhere new renders different rows, so the element
+   * that had focus is gone and the browser drops focus to `<body>` — outside
+   * the panel, where the next key reaches nothing (PRD 001, §6.2.1).
+   */
+  describe('keeping the keyboard in the panel', () => {
+    const token = (): number => workbench.panelFocusFt.token(groupId());
+
+    it('asks the body to take focus again after a key changed the folder', async () => {
+      await start();
+      const before = token();
+
+      workbench.panelKeyboardFt.run(groupId(), { command: 'open', entryId: 'docs' });
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      expect(token()).toBeGreaterThan(before);
+    });
+
+    /** Every folder here is already cached, so no request is expected. */
+    it('does so for up, back and forward as well', async () => {
+      await start();
+      await openDocs();
+
+      workbench.panelKeyboardFt.run(groupId(), { command: 'up', entryId: null });
+      await settled();
+      const afterUp = token();
+      expect(afterUp).toBeGreaterThan(0);
+      expect(crumbs()).toBe('tr-file');
+
+      // Up is a navigation like any other, so the trail is now ['', 'docs', '']
+      // and Back returns to the folder Up was pressed in.
+      workbench.panelKeyboardFt.run(groupId(), { command: 'back', entryId: null });
+      await settled();
+      const afterBack = token();
+      expect(afterBack).toBeGreaterThan(afterUp);
+      expect(crumbs()).toBe('tr-file/docs');
+
+      workbench.panelKeyboardFt.run(groupId(), { command: 'forward', entryId: null });
+      await settled();
+      expect(token()).toBeGreaterThan(afterBack);
+      expect(crumbs()).toBe('tr-file');
+    });
+
+    /** Neither changes the folder, so the rows keep their identity. */
+    it('leaves focus alone for select and refresh', async () => {
+      await start();
+      const before = token();
+
+      workbench.panelKeyboardFt.run(groupId(), { command: 'select', entryId: 'README.md' });
+      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+      workbench.panelKeyboardFt.run(groupId(), { command: 'refresh', entryId: null });
+      http.expectOne(listUrl('')).flush(fsEnvelope(fsListing('', ROOT_ENTRIES)));
+      await settled();
+
+      expect(token()).toBe(before);
+    });
+  });
+
   it('runs against the group the key was pressed in, not the active one', async () => {
     await start();
     const first = groupId();

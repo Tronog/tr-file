@@ -260,6 +260,32 @@ export class UiPanelGroup {
   }
 
   /**
+   * The panel's own keys, wherever focus sits inside its body.
+   *
+   * `Alt`+`←`/`→` walks the folders this panel has visited (PRD 001, §6.2.1).
+   * It is handled here rather than in the list and the grid because it is
+   * about the *panel*, not about what is selected in it — and because it must
+   * work just as well when the body is a document, or the empty-state
+   * placeholder, neither of which has a keyboard of its own. Both views let an
+   * `Alt` chord bubble untouched so it arrives here exactly once.
+   */
+  protected onBodyKeydown(event: KeyboardEvent): void {
+    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      this.command.emit({ command: 'back', entryId: null });
+    } else if (event.key === 'ArrowRight') {
+      this.command.emit({ command: 'forward', entryId: null });
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  /**
    * Reports a press only when it landed on the body itself.
    *
    * Anything focusable under the pointer — a row, a tile, the document's

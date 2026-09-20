@@ -15,7 +15,10 @@ import type { WorkbenchService } from '../workbench.service';
  * That also keeps the bindings honest about their reach: `open` and `select`
  * are the same operations a double click and a click perform, `up` is the
  * toolbar's Up button, and `F5` is its Refresh — a keyboard user gets at the
- * panel's existing verbs rather than a parallel set of their own.
+ * panel's existing verbs rather than a parallel set of their own. `back` and
+ * `forward` are the exception, and the reason `PanelHistoryFeature` exists:
+ * `Alt`+`←`/`→` is the only way to walk a panel's trail, since nothing in the
+ * chrome offers it yet.
  */
 export class PanelKeyboardFeature {
   constructor(private readonly parent: WorkbenchService) {}
@@ -34,6 +37,7 @@ export class PanelKeyboardFeature {
       case 'open':
         if (key.entryId !== null) {
           groups.openEntry(groupId, key.entryId);
+          this.keepFocusInBody(groupId);
         }
         break;
 
@@ -45,11 +49,40 @@ export class PanelKeyboardFeature {
 
       case 'up':
         groups.navigateUp(groupId);
+        this.keepFocusInBody(groupId);
         break;
 
       case 'refresh':
         groups.runToolbarAction(groupId, 'refresh');
         break;
+
+      case 'back':
+        this.parent.panelHistoryFt.back(groupId);
+        this.keepFocusInBody(groupId);
+        break;
+
+      case 'forward':
+        this.parent.panelHistoryFt.forward(groupId);
+        this.keepFocusInBody(groupId);
+        break;
     }
+  }
+
+  /**
+   * Puts the keyboard back in the body after a key changed what the panel is
+   * showing.
+   *
+   * Not a nicety. A panel that lands somewhere new renders a different set of
+   * rows, so the element that had focus is gone and the browser drops focus to
+   * `<body>` — outside the panel, where the next `Alt`+`←` reaches nothing and
+   * a keyboard user is simply stranded. Re-uses the §6.3 request, which waits
+   * for a listing that is still loading, so the focus lands on the first row
+   * of the new folder whenever it arrives.
+   *
+   * `select` and `refresh` are left out on purpose: neither changes the
+   * folder, so the rows keep their identity and focus never moves.
+   */
+  private keepFocusInBody(groupId: string): void {
+    this.parent.panelFocusFt.focusBody(groupId);
   }
 }

@@ -98,6 +98,9 @@ export class EditorGroupsFeature {
   /** Loads whatever the restored groups are showing. */
   start(): void {
     for (const group of this.groups()) {
+      // The folder a panel opens on is the first stop on its trail (§6.2.1),
+      // or its very first Back would have nowhere to return to.
+      this.parent.panelHistoryFt.record(group.id, group.path);
       this.loadGroupContent(group);
     }
   }
@@ -279,6 +282,7 @@ export class EditorGroupsFeature {
         candidate.id === groupId ? this.withTabs(candidate, tabs, tab.id) : candidate,
       ),
     );
+    this.parent.panelHistoryFt.record(groupId, path);
     this.parent.fsDataFt.ensureListing(path);
     this.focus(groupId);
   }
@@ -301,6 +305,9 @@ export class EditorGroupsFeature {
         return { ...group, tabs, path, selection: [] };
       }),
     );
+    // Every folder a panel lands on goes on its trail; a move the trail itself
+    // caused lands where the cursor already points, so it records nothing.
+    this.parent.panelHistoryFt.record(groupId, path);
     this.parent.fsDataFt.ensureListing(path);
     this.focus(groupId);
   }
@@ -488,10 +495,12 @@ export class EditorGroupsFeature {
   }
 
   private removeGroup(groupId: string): void {
+    this.parent.panelHistoryFt.forget(groupId);
     const remaining = this.groups().filter((group) => group.id !== groupId);
 
     if (remaining.length === 0) {
       const empty = this.emptyGroup(this.createGroupId());
+      this.parent.panelHistoryFt.record(empty.id, empty.path);
       this.groups.set([empty]);
       this.parent.panelLayoutFt.reset(empty.id);
       this.parent.activeGroupId.set(empty.id);
@@ -588,7 +597,11 @@ export class EditorGroupsFeature {
 
   /** A new group that inherits its neighbour's view configuration. */
   private cloneGroup(source: PanelGroupState, id: string, tabs: readonly PanelTabState[]): PanelGroupState {
-    return this.withTabs({ ...source, id, selection: [], tabs: [] }, tabs);
+    const group = this.withTabs({ ...source, id, selection: [], tabs: [] }, tabs);
+    // A panel born from a split starts its own trail where it was born, not
+    // with its neighbour's — they are two places to work from now on.
+    this.parent.panelHistoryFt.record(id, group.path);
+    return group;
   }
 
   private emptyGroup(id: string): PanelGroupState {

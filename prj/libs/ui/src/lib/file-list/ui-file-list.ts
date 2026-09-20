@@ -75,6 +75,12 @@ export class UiFileList {
       return;
     }
 
+    // `Alt` belongs to the panel, not to the table: `Alt`+`←`/`→` is its
+    // history (PRD 001, §6.2.1), and `UiPanelGroup` is listening for it.
+    if (event.altKey) {
+      return;
+    }
+
     switch (event.key) {
       case 'ArrowDown':
         this.focusRow(index + 1);

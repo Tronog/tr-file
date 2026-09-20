@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiFileList, UiIconView } from '@tr-file/ui';
-import type { UiFileColumn, UiFileRow, UiIconViewItem, UiPanelKey } from '@tr-file/ui';
+import { UiFileList, UiIconView, UiPanelGroup } from '@tr-file/ui';
+import type {
+  UiFileColumn,
+  UiFileRow,
+  UiIconViewItem,
+  UiPanelGroupModel,
+  UiPanelKey,
+} from '@tr-file/ui';
 
 /**
  * PRD 001, Section 6.2 — the keyboard a panel body answers to once focus is
@@ -33,8 +39,8 @@ const ITEMS: readonly UiIconViewItem[] = NAMES.map((name, index) => ({
 }));
 
 /** A bubbling, cancellable `keydown`, the way the browser delivers one. */
-function keydown(key: string): KeyboardEvent {
-  return new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+function keydown(key: string, modifiers: KeyboardEventInit = {}): KeyboardEvent {
+  return new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...modifiers });
 }
 
 describe('UiFileList keyboard', () => {
@@ -149,6 +155,17 @@ describe('UiFileList keyboard', () => {
     expect(modified.defaultPrevented).toBe(false);
   });
 
+  /** `Alt`+`←`/`→` is the panel's history; the table must not swallow it. */
+  it('leaves an Alt chord to the panel', () => {
+    const event = keydown('ArrowDown', { altKey: true });
+    rows()[0]?.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(selected).toEqual([]);
+    expect(commands).toEqual([]);
+  });
+
   it('travels a page at a time with PageDown and PageUp', () => {
     // jsdom measures nothing, so the fallback page of ten overshoots the list
     // and clamps — which is the behaviour a short listing should have anyway.
@@ -237,9 +254,91 @@ describe('UiIconView keyboard', () => {
     expect(press(0, ' ').defaultPrevented).toBe(true);
   });
 
+  /** The horizontal arrows step tiles — unless `Alt` makes them the panel's. */
+  it('leaves an Alt chord to the panel', () => {
+    const event = keydown('ArrowLeft', { altKey: true });
+    tiles()[2]?.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(selected).toEqual([]);
+  });
+
   it('jumps to a label as it is typed', () => {
     press(0, 'z');
 
     expect(document.activeElement).toBe(tiles()[4]);
+  });
+});
+
+/**
+ * PRD 001, §6.2.1 — the panel's own history keys. Handled by the group rather
+ * than by either body view, so they work over a listing, a grid, a document
+ * and an empty placeholder alike.
+ */
+describe('UiPanelGroup history keys', () => {
+  let fixture: ComponentFixture<UiPanelGroup>;
+  let commands: UiPanelKey[];
+
+  const GROUP: UiPanelGroupModel = {
+    id: 'group-root',
+    tabs: [{ id: 'tab-root', label: 'tr-file', icon: 'folder', tint: 'folder', active: true }],
+    actions: [],
+    breadcrumbs: [],
+    view: 'list',
+    toolbarActions: [],
+    columns: COLUMNS,
+    rows: ROWS,
+    items: [],
+  };
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [UiPanelGroup] }).compileComponents();
+    fixture = TestBed.createComponent(UiPanelGroup);
+    fixture.componentRef.setInput('group', GROUP);
+    fixture.detectChanges();
+
+    commands = [];
+    fixture.componentInstance.command.subscribe((key) => commands.push(key));
+  });
+
+  const press = (key: string, modifiers: KeyboardEventInit = {}): KeyboardEvent => {
+    const event = keydown(key, modifiers);
+    fixture.nativeElement.querySelector('.group-body').dispatchEvent(event);
+    fixture.detectChanges();
+    return event;
+  };
+
+  it('reports Alt+Left as back and Alt+Right as forward', () => {
+    expect(press('ArrowLeft', { altKey: true }).defaultPrevented).toBe(true);
+    expect(press('ArrowRight', { altKey: true }).defaultPrevented).toBe(true);
+
+    expect(commands).toEqual([
+      { command: 'back', entryId: null },
+      { command: 'forward', entryId: null },
+    ]);
+  });
+
+  it('answers from a document body too, which has no keyboard of its own', () => {
+    fixture.componentRef.setInput('group', {
+      ...GROUP,
+      rows: [],
+      document: { path: 'docs/README.md', kind: 'text', text: 'hello' },
+    } satisfies UiPanelGroupModel);
+    fixture.detectChanges();
+
+    press('ArrowLeft', { altKey: true });
+
+    expect(commands).toEqual([{ command: 'back', entryId: null }]);
+  });
+
+  /** A bare arrow belongs to the rows; a fuller chord is the OS's or nobody's. */
+  it('claims nothing else', () => {
+    press('ArrowLeft');
+    press('ArrowRight', { altKey: true, shiftKey: true });
+    press('ArrowUp', { altKey: true });
+    press('a', { altKey: true });
+
+    expect(commands).toEqual([]);
   });
 });

@@ -46,8 +46,12 @@ Clicking a folder in the explorer shows it in the *active* panel; that link live
 `ExplorerNavigationFeature` so neither side has to know about the other.
 Inside a panel body the library components move focus (arrows, `Home`/`End`, page keys,
 type-to-find, selection following focus) and report the keys that mean something to the
-workbench — `Enter`, `Space`, `Backspace`, `F5` — as a `UiPanelKey`; `PanelKeyboardFeature`
-is the one place those bindings are decided.
+workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as a `UiPanelKey`;
+`PanelKeyboardFeature` is the one place those bindings are decided. `Alt`+`←`/`→` walks
+`PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
+since two panels are two places someone is working. Any key that changes the folder also
+re-asks for body focus, or the rows it was standing on are gone and the keyboard is left
+outside the panel.
 Choosing a tab (a click, not an arrow-key rove), or pressing the blank space of a panel
 body, hands focus to that panel's content once it has rendered; `PanelFocusFeature` owns
 that request and `UiPanelGroup` answers it. Row clicks only ever

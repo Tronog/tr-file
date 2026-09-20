@@ -80,6 +80,12 @@ export class UiIconView {
       return;
     }
 
+    // `Alt`+`←`/`→` is the panel's history, not a step between tiles; let it
+    // bubble to `UiPanelGroup` (PRD 001, §6.2.1).
+    if (event.altKey) {
+      return;
+    }
+
     const columns = this.columns();
 
     switch (event.key) {
