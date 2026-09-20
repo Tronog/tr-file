@@ -14,6 +14,7 @@ import { UI_TAB_MIME } from '../models';
 import type {
   UiDropZone,
   UiPanelGroupModel,
+  UiPanelKey,
   UiPanelView,
   UiTabDragData,
   UiTabDrop,
@@ -107,6 +108,9 @@ export class UiPanelGroup {
   readonly rowActivate = output<string>();
   readonly itemSelect = output<string>();
   readonly itemActivate = output<string>();
+
+  /** A key pressed inside the body whose meaning is the application's. */
+  readonly command = output<UiPanelKey>();
 
   /** A tab was dropped on this group's tab bar. */
   readonly tabDrop = output<UiTabReorder>();

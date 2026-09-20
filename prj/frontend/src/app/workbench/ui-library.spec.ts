@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
 import { UiDocumentView, UiFileList, UiTree } from '@tr-file/ui';
-import type { UiDocumentModel, UiFileColumn, UiFileRow, UiTreeNode } from '@tr-file/ui';
+import type {
+  UiDocumentModel,
+  UiFileColumn,
+  UiFileRow,
+  UiPanelKey,
+  UiTreeNode,
+} from '@tr-file/ui';
 
 const TREE_NODES: readonly UiTreeNode[] = [
   { id: 'prj', label: 'prj', depth: 0, icon: 'folder-open', tint: 'folder', expandable: true, expanded: true, guides: [] },
@@ -343,13 +349,12 @@ describe('UiFileList', () => {
     expect(activated).toEqual(['c.json']);
   });
 
-  it('emits activate when Enter is pressed on a row', () => {
-    const activated: string[] = [];
-    fixture.componentInstance.activate.subscribe((id) => activated.push(id));
+  it('reports Enter as an open command rather than acting on it', () => {
+    const commands: UiPanelKey[] = [];
+    fixture.componentInstance.command.subscribe((key) => commands.push(key));
 
     bodyRows()[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    bodyRows()[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
 
-    expect(activated).toEqual(['b.md']);
+    expect(commands).toEqual([{ command: 'open', entryId: 'b.md' }]);
   });
 });

@@ -3,6 +3,7 @@
 @let explorerNav = workbench.explorerNavFt;
 @let preview = workbench.filePreviewFt;
 @let groups = workbench.editorGroupsFt;
+@let panelKeys = workbench.panelKeyboardFt;
 @let details = workbench.detailsFt;
 @let panel = workbench.bottomPanelFt;
 @let panes = workbench.sidebarPanesFt;
@@ -98,6 +99,7 @@
               (rowActivate)="groups.openEntry(groupId, $event)"
               (itemSelect)="groups.selectEntry(groupId, $event)"
               (itemActivate)="groups.openEntry(groupId, $event)"
+              (command)="panelKeys.run(groupId, $event)"
             />
           }
         </ng-template>

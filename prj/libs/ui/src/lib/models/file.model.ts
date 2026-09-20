@@ -62,6 +62,8 @@ export interface UiIconViewItem {
   readonly icon: UiIconName;
   readonly tint?: UiIconTint;
   readonly selected?: boolean;
+  /** The one tile that owns keyboard focus; drives the roving tabindex. */
+  readonly focused?: boolean;
 }
 
 /** One segment of the path bar above a panel body. */

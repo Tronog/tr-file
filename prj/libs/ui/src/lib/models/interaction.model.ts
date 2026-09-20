@@ -45,6 +45,23 @@ export interface UiTabMove {
   readonly direction: -1 | 1;
 }
 
+/**
+ * A key pressed inside a panel body whose meaning belongs to the application.
+ *
+ * Moving focus stays with the component: it is DOM work, and a roving
+ * tabindex can only be rolled where the elements are. Everything that changes
+ * what the workbench *shows* leaves as one of these instead, so a panel's key
+ * bindings are decided in one place rather than spread across a template.
+ */
+export type UiPanelCommand = 'open' | 'select' | 'up' | 'refresh';
+
+/** One `UiPanelCommand`, with the entry focus sat on when the key was hit. */
+export interface UiPanelKey {
+  readonly command: UiPanelCommand;
+  /** `null` when the body lists nothing — `up` and `refresh` still apply. */
+  readonly entryId: string | null;
+}
+
 /** Where a sash drag is in its lifecycle. */
 export type UiSashPhase = 'start' | 'move' | 'end';
 

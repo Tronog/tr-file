@@ -111,10 +111,32 @@ a compile error rather than an empty box.
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
 | Drag a sash / focus it and press arrows | Resizes the two regions it divides |
 | Click a tree row / press `Enter` | Emits `activate`; the twisty and `←`/`→` emit `toggle` |
+| Arrow around a panel body | Moves focus *and* the selection; the details sidebar follows |
+| `Enter` / `Space` / `Backspace` / `F5` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
 | Double-click a file (group gets a `document`) | The body becomes a read-only `UiDocumentView`: markdown or text, path and `Read-only` on a status line, no view switch |
 
 Closing the last group anywhere leaves a single empty group, so there is always
 somewhere to drop a tab.
+
+### Inside a panel body
+
+The two directory views answer to the keyboard a file manager trains people to
+expect (PRD 001, Section 6.2). `UiFileList` moves with `↑`/`↓`, `Home`/`End`
+and `PageUp`/`PageDown`; `UiIconView` adds `←`/`→` for one tile and uses the
+vertical arrows for a whole *visual row*, whose width it measures off the
+rendered tiles because `auto-fill` — not the component — decides how many fit.
+Typing letters jumps to a name in both: a prefix while the keystrokes keep
+coming, and a single letter pressed repeatedly cycles through the entries
+sharing it.
+
+Two rules are worth stating outright. **Selection follows focus**: arrowing
+onto an entry emits `select`, so the details sidebar tracks the keyboard the
+same way it tracks the mouse. And **the views move focus but decide nothing**:
+`Enter`, `Space`, `Backspace` and `F5` leave as a `UiPanelKey`
+(`open` / `select` / `up` / `refresh`) for the application to interpret — in
+the app that is `PanelKeyboardFeature`, which is the whole answer to "what does
+this key do in a panel". Focus movement stays in the component because a
+roving tabindex can only be rolled where the elements are.
 
 `UiTree` follows the ARIA tree keyboard pattern — `↑`/`↓`, `Home`/`End` move
 between rows, `→` opens a directory (or steps into an open one) and `←` closes

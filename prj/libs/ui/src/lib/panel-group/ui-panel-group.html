@@ -77,6 +77,7 @@
               [rows]="group().rows"
               (select)="rowSelect.emit($event)"
               (activate)="rowActivate.emit($event)"
+              (command)="command.emit($event)"
             />
           }
           @case ('grid') {
@@ -84,6 +85,7 @@
               [items]="group().items"
               (select)="itemSelect.emit($event)"
               (activate)="itemActivate.emit($event)"
+              (command)="command.emit($event)"
             />
           }
         }

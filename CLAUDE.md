@@ -41,7 +41,11 @@ not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin
 holding shared state, plus feature classes holding everything else.
 
 Clicking a folder in the explorer shows it in the *active* panel; that link lives in
-`ExplorerNavigationFeature` so neither side has to know about the other. Row clicks only ever
+`ExplorerNavigationFeature` so neither side has to know about the other.
+Inside a panel body the library components move focus (arrows, `Home`/`End`, page keys,
+type-to-find, selection following focus) and report the keys that mean something to the
+workbench — `Enter`, `Space`, `Backspace`, `F5` — as a `UiPanelKey`; `PanelKeyboardFeature`
+is the one place those bindings are decided. Row clicks only ever
 open — collapsing is the twisty's job (or `←` on the focused row). Double-clicking a file opens
 it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
 into a `UiDocumentModel`, and the library only renders what it is handed.

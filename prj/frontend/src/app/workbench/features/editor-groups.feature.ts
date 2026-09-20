@@ -158,6 +158,14 @@ export class EditorGroupsFeature {
     this.parent.filePreviewFt.open(entry.path);
   }
 
+  /**
+   * `Backspace` inside a panel body: the same journey as the toolbar's Up
+   * button, which is the one traditional file managers bind it to.
+   */
+  navigateUp(groupId: string): void {
+    this.runToolbarAction(groupId, 'up');
+  }
+
   /* -- toolbar ----------------------------------------------------------- */
 
   runToolbarAction(groupId: string, actionId: string): void {
@@ -617,7 +625,7 @@ export class EditorGroupsFeature {
       ...(state?.status === 'loading' ? { loading: true } : {}),
       columns: COLUMNS,
       rows: entries.map((entry) => this.row(entry, group, active)),
-      items: entries.map((entry) => this.item(entry, group)),
+      items: entries.map((entry) => this.item(entry, group, active)),
       ...(hasTabs && state?.status === 'ready' ? { summary: this.summary(entries.length) } : {}),
       ...this.placeholder(group, state, entries.length),
     };
@@ -742,7 +750,7 @@ export class EditorGroupsFeature {
     };
   }
 
-  private item(entry: FsEntry, group: PanelGroupState): UiIconViewItem {
+  private item(entry: FsEntry, group: PanelGroupState, active: boolean): UiIconViewItem {
     const files = this.parent.fileViewModel;
     return {
       id: entry.path,
@@ -750,6 +758,7 @@ export class EditorGroupsFeature {
       icon: files.icon(entry),
       tint: files.tint(entry),
       ...(group.selection.includes(entry.path) ? { selected: true } : {}),
+      ...(active && group.focusedEntryId === entry.path ? { focused: true } : {}),
     };
   }
 }

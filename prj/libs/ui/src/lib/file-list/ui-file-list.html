@@ -20,16 +20,18 @@
     </tr>
   </thead>
   <tbody>
-    @for (row of rows(); track row.id) {
+    @for (row of rows(); track row.id; let index = $index) {
       <tr
+        #rowElement
         [class.is-selected]="row.selected"
         [class.is-inactive-selected]="row.inactiveSelected"
         [class.is-focused]="row.focused"
         [attr.aria-selected]="row.selected || row.inactiveSelected ? 'true' : 'false'"
         [attr.tabindex]="row.id === focusId() ? 0 : -1"
+        [attr.aria-keyshortcuts]="keyShortcuts"
         (click)="select.emit(row.id)"
         (dblclick)="activate.emit(row.id)"
-        (keydown)="onKeydown($event, row.id)"
+        (keydown)="onKeydown($event, index)"
       >
         @for (column of columns(); track column.key; let first = $first) {
           <td
