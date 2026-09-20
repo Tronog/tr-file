@@ -1,18 +1,13 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
 import type { UiIconAction, UiPanelTab, UiTransfer } from '@tr-file/ui';
-import type { MockTransfer } from '../mock-data/mock-data.model';
 import type { WorkbenchService } from '../workbench.service';
 
-/** Direction → icon and colour, matching the mockup's transfer rows. */
-const DIRECTION_STYLE = {
-  upload: { icon: 'upload', color: 'var(--vsc-git-untracked)' },
-  download: { icon: 'download', color: 'var(--vsc-accent)' },
-  copy: { icon: 'copy', color: 'var(--vsc-git-modified)' },
-} as const;
-
 /**
- * The bottom panel (Problems / Output / Terminal / Transfers) and the transfer
- * rows it shows.
+ * The bottom panel: the Transfers list and the Problems list.
+ *
+ * Both are views over live state — uploads from `TransfersFeature`, failed
+ * requests from the file-system cache — so the counts in the tab bar are
+ * always the real ones.
  */
 export class BottomPanelFeature {
   private readonly activeTabId: WritableSignal<string>;
@@ -20,39 +15,57 @@ export class BottomPanelFeature {
   readonly actions: readonly UiIconAction[];
 
   constructor(private readonly parent: WorkbenchService) {
-    this.activeTabId = signal(parent.mockWorkbench.panelTabs.find((tab) => tab.active)?.id ?? 'transfers');
-    this.actions = parent.mockWorkbench.panelActions;
+    this.activeTabId = signal('transfers');
+    this.actions = [
+      { id: 'clear', label: 'Clear finished transfers', icon: 'trash' },
+      { id: 'close', label: 'Close panel', icon: 'x' },
+    ];
   }
 
   readonly tabs = computed<readonly UiPanelTab[]>(() => {
     const activeId = this.activeTabId();
-    return this.parent.mockWorkbench.panelTabs.map((tab) => ({
-      id: tab.id,
-      label: tab.label,
-      ...(tab.count === undefined ? {} : { count: tab.count }),
-      ...(tab.id === activeId ? { active: true } : {}),
-    }));
+    const problems = this.parent.fsDataFt.errors().length;
+    const transfers = this.parent.transfersFt.rows().length;
+    return [
+      {
+        id: 'transfers',
+        label: 'Transfers',
+        ...(transfers > 0 ? { count: transfers } : {}),
+        ...(activeId === 'transfers' ? { active: true } : {}),
+      },
+      {
+        id: 'problems',
+        label: 'Problems',
+        ...(problems > 0 ? { count: problems } : {}),
+        ...(activeId === 'problems' ? { active: true } : {}),
+      },
+    ];
   });
 
   readonly transfersVisible = computed(() => this.activeTabId() === 'transfers');
+  readonly problemsVisible = computed(() => this.activeTabId() === 'problems');
 
-  readonly transfers = computed<readonly UiTransfer[]>(() =>
-    this.parent.mockTransfers.transfers.map((transfer) => this.toViewModel(transfer)),
+  readonly transfers = computed<readonly UiTransfer[]>(() => this.parent.transfersFt.rows());
+
+  /** Failed listings, rendered as rows the Problems tab can show. */
+  readonly problems = computed(() =>
+    this.parent.fsDataFt.errors().map((failure) => ({
+      id: failure.path,
+      path: failure.path === '' ? '/' : failure.path,
+      message: failure.error.message,
+    })),
   );
+
+  /** Nothing to show yet — the panel says so rather than looking broken. */
+  readonly transfersEmpty = computed(() => this.parent.transfersFt.rows().length === 0);
 
   select(id: string): void {
     this.activeTabId.set(id);
   }
 
-  private toViewModel(transfer: MockTransfer): UiTransfer {
-    const style = DIRECTION_STYLE[transfer.direction];
-    return {
-      id: transfer.id,
-      name: transfer.name,
-      icon: style.icon,
-      iconColor: style.color,
-      progress: transfer.progress,
-      statusLabel: transfer.statusLabel,
-    };
+  runAction(actionId: string): void {
+    if (actionId === 'clear') {
+      this.parent.transfersFt.clearFinished();
+    }
   }
 }

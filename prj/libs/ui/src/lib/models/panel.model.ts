@@ -41,6 +41,11 @@ export interface UiPanelGroupModel {
   readonly summary?: string;
   /** Rendered instead of a body when the group holds no tabs. */
   readonly empty?: UiEmptyStateModel;
+  /**
+   * The group's listing is being fetched — an indeterminate 2px bar appears
+   * under the tab bar. The rail is reserved either way, so it never shifts.
+   */
+  readonly loading?: boolean;
 }
 
 /** Placeholder shown by a group with nothing open. */

@@ -1,83 +1,255 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import type { UiTreeNode } from '@tr-file/ui';
+import {
+  detailsUrl,
+  fsDetails,
+  fsDirectory,
+  fsEntry,
+  fsEnvelope,
+  fsErrorBody,
+  fsListing,
+  listUrl,
+  settled,
+} from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
+
+/** What `/api/fs/list?path=` answers with in these tests. */
+const ROOT_ENTRIES = [
+  fsDirectory('docs'),
+  fsDirectory('prj'),
+  fsEntry('README.md', { size: 3482 }),
+  fsEntry('.gitignore', { size: 120 }),
+];
+
+const DOCS_ENTRIES = [fsDirectory('docs/prd'), fsEntry('docs/NOTES.md', { size: 2048 })];
 
 describe('ExplorerFeature', () => {
   let workbench: WorkbenchService;
+  let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
     workbench = TestBed.inject(WorkbenchService);
+    http = TestBed.inject(HttpTestingController);
   });
 
-  const ids = () => workbench.explorerFt.nodes().map((node) => node.id);
-  const row = (id: string) => workbench.explorerFt.nodes().find((node) => node.id === id);
+  afterEach(() => http.verify());
+
+  const ids = (): readonly string[] => workbench.explorerFt.nodes().map((node) => node.id);
+  const row = (id: string): UiTreeNode | undefined =>
+    workbench.explorerFt.nodes().find((node) => node.id === id);
+
+  /** Starts the explorer only (the editor groups would list the root too). */
+  const startExplorer = async (entries = ROOT_ENTRIES): Promise<void> => {
+    workbench.explorerFt.start();
+    http.expectOne(listUrl('')).flush(fsEnvelope(fsListing('', entries)));
+    await settled();
+  };
 
   it('names the pane after the workspace and exposes the header actions', () => {
-    expect(workbench.explorerFt.title).toBe(workbench.mockFileSystem.workspaceName);
+    expect(workbench.explorerFt.title).toBe(workbench.mockWorkbench.workspaceName);
     expect(workbench.explorerFt.actions).toBe(workbench.mockWorkbench.explorerActions);
   });
 
-  it('flattens only the children of expanded directories', () => {
-    const expanded = new Set(workbench.mockWorkbench.layout.expandedPaths);
-    expect(expanded.has('prj/frontend')).toBe(true);
-    expect(expanded.has('prj/backend')).toBe(false);
+  describe('start()', () => {
+    it('loads the root and renders its entries', async () => {
+      expect(workbench.explorerFt.nodes()).toEqual([]);
 
-    // `prj` is expanded, so its children are rows…
-    expect(ids()).toContain('prj/frontend');
-    // …and `prj/frontend` is expanded too, so its children are rows…
-    expect(ids()).toContain('prj/frontend/package.json');
-    // …while the collapsed `prj/backend` contributes no children.
-    expect(ids()).toContain('prj/backend');
-    expect(ids()).not.toContain('prj/backend/src');
+      workbench.explorerFt.start();
+
+      expect(workbench.explorerFt.loading()).toBe(true);
+      http.expectOne(listUrl('')).flush(fsEnvelope(fsListing('', ROOT_ENTRIES)));
+      await settled();
+
+      expect(workbench.explorerFt.loading()).toBe(false);
+      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+    });
+
+    it('asks for the root once, however often it is called', async () => {
+      await startExplorer();
+
+      workbench.explorerFt.start();
+
+      http.expectNone(listUrl(''));
+    });
+
+    it('surfaces a failed root listing as the pane message', async () => {
+      workbench.explorerFt.start();
+      http
+        .expectOne(listUrl(''))
+        .flush(fsErrorBody('FORBIDDEN', 'Outside the root'), { status: 403, statusText: 'Forbidden' });
+      await settled();
+
+      expect(workbench.explorerFt.error()).toBe('Outside the root');
+      expect(workbench.explorerFt.nodes()).toEqual([]);
+    });
   });
 
-  it('keeps rows in depth-first order with the depth of their level', () => {
-    const rendered = ids();
-    expect(rendered[0]).toBe('prj');
-    expect(rendered.indexOf('prj/frontend/package.json')).toBeGreaterThan(rendered.indexOf('prj/frontend'));
-    expect(rendered.indexOf('docs')).toBeGreaterThan(rendered.indexOf('prj/frontend/package.json'));
+  describe('toggle()', () => {
+    it('fetches a directory the first time it is expanded', async () => {
+      await startExplorer();
 
-    expect(row('prj')?.depth).toBe(0);
-    expect(row('prj/frontend')?.depth).toBe(1);
-    expect(row('prj/frontend/package.json')?.depth).toBe(2);
+      workbench.explorerFt.toggle('docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      expect(row('docs')?.expanded).toBe(true);
+      expect(ids()).toEqual(['docs', 'docs/prd', 'docs/NOTES.md', 'prj', 'README.md']);
+    });
+
+    it('collapses on the second toggle without fetching again', async () => {
+      await startExplorer();
+      workbench.explorerFt.toggle('docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      workbench.explorerFt.toggle('docs');
+
+      expect(row('docs')?.expanded).toBe(false);
+      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+
+      // Re-expanding is served from the cache.
+      workbench.explorerFt.toggle('docs');
+
+      http.expectNone(listUrl('docs'));
+      expect(ids()).toContain('docs/NOTES.md');
+    });
+
+    it('marks the row busy while its children are loading', async () => {
+      await startExplorer();
+
+      workbench.explorerFt.toggle('docs');
+
+      expect(row('docs')?.busy).toBe(true);
+
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      expect(row('docs')?.busy).toBeUndefined();
+      expect(row('prj')?.busy).toBeUndefined();
+    });
+
+    it('marks a directory that would not open as unreadable', async () => {
+      await startExplorer();
+
+      workbench.explorerFt.toggle('prj');
+      http
+        .expectOne(listUrl('prj'))
+        .flush(fsErrorBody('FORBIDDEN', 'Permission denied'), { status: 403, statusText: 'Forbidden' });
+      await settled();
+
+      expect(row('prj')?.meta).toBe('unreadable');
+      expect(row('prj')?.busy).toBeUndefined();
+    });
   });
 
-  it('draws one indent guide per ancestor level', () => {
-    expect(row('prj')?.guides).toEqual([]);
-    expect(row('prj/frontend')?.guides).toEqual([true]);
-    expect(row('prj/frontend/package.json')?.guides).toEqual([true, true]);
+  describe('flattened rows', () => {
+    beforeEach(async () => {
+      await startExplorer();
+      workbench.explorerFt.toggle('docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+    });
+
+    it('contains only the children of expanded directories', () => {
+      expect(ids()).toEqual(['docs', 'docs/prd', 'docs/NOTES.md', 'prj', 'README.md']);
+      // `docs/prd` and `prj` are collapsed, so neither was listed at all.
+      http.expectNone(listUrl('docs/prd'));
+      http.expectNone(listUrl('prj'));
+    });
+
+    it('carries the depth and one indent guide per ancestor level', () => {
+      expect(row('docs')).toMatchObject({ depth: 0, guides: [] });
+      expect(row('docs/NOTES.md')).toMatchObject({ depth: 1, guides: [true] });
+    });
+
+    it('describes directories as expandable and files as leaves', () => {
+      expect(row('docs')).toMatchObject({ expandable: true, expanded: true, icon: 'folder-open', tint: 'folder' });
+      expect(row('docs/prd')).toMatchObject({ expandable: true, expanded: false, icon: 'folder' });
+      expect(row('README.md')).toMatchObject({ expandable: false, icon: 'file', tint: 'md' });
+      expect(row('README.md')?.expanded).toBeUndefined();
+      // Only files over 1 KB carry a size hint; directories carry none.
+      expect(row('README.md')?.meta).toBe('3.4 KB');
+      expect(row('docs')?.meta).toBeUndefined();
+    });
+
+    it('decorates hidden entries as ignored once they are shown', () => {
+      expect(ids()).not.toContain('.gitignore');
+
+      workbench.showHidden.set(true);
+
+      expect(ids()).toContain('.gitignore');
+      expect(row('.gitignore')?.decoration).toBe('ignored');
+      expect(row('README.md')?.decoration).toBeUndefined();
+    });
   });
 
-  it('marks expandable rows and carries the view-model decoration through', () => {
-    expect(row('prj')).toMatchObject({ expandable: true, expanded: true, icon: 'folder-open', tint: 'folder' });
-    expect(row('prj/backend')).toMatchObject({ expandable: true, expanded: false, icon: 'folder', meta: '12 items' });
-    expect(row('prj/frontend/package.json')).toMatchObject({ expandable: false, icon: 'file', tint: 'json', meta: 'M' });
-    expect(row('prj/frontend/package.json')?.expanded).toBeUndefined();
+  describe('activate()', () => {
+    it('selects a file without expanding anything', async () => {
+      await startExplorer();
+
+      workbench.explorerFt.activate('README.md');
+      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+      await settled();
+
+      expect(workbench.selectedEntryId()).toBe('README.md');
+      expect(row('README.md')).toMatchObject({ selected: true, focused: true });
+      expect(row('docs')?.selected).toBe(false);
+      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+    });
+
+    it('selects a directory and expands it, which lists it', async () => {
+      await startExplorer();
+
+      workbench.explorerFt.activate('docs');
+
+      http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDetails('docs', { type: 'directory' })));
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      expect(workbench.selectedEntryId()).toBe('docs');
+      expect(row('docs')).toMatchObject({ selected: true, expanded: true });
+      expect(ids()).toContain('docs/NOTES.md');
+    });
   });
 
-  it('expands a collapsed directory and collapses it again', () => {
-    workbench.explorerFt.toggle('prj/backend');
-    expect(row('prj/backend')?.expanded).toBe(true);
-    expect(ids()).toContain('prj/backend/src');
-    expect(row('prj/backend')?.meta).toBeUndefined();
+  describe('runAction()', () => {
+    it('refresh re-reads every expanded directory', async () => {
+      await startExplorer();
+      workbench.explorerFt.toggle('docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
 
-    workbench.explorerFt.toggle('prj/backend');
-    expect(row('prj/backend')?.expanded).toBe(false);
-    expect(ids()).not.toContain('prj/backend/src');
-  });
+      workbench.explorerFt.runAction('refresh');
 
-  it('drops the whole subtree when an ancestor collapses', () => {
-    workbench.explorerFt.toggle('prj');
-    expect(ids()).toEqual(['prj', 'docs', 'docs/ai', 'docs/prd', 'docs/prd/001.md', 'docs/prd/002.md', 'docs/NOTES.md', 'README.md', '.gitignore']);
-  });
+      expect(http.match(listUrl(''))).toHaveLength(1);
+      expect(http.match(listUrl('docs'))).toHaveLength(1);
+      await settled();
+    });
 
-  it('activate() updates the shared selection, which re-marks the rows', () => {
-    expect(row('README.md')?.selected).toBe(false);
+    it('collapse closes everything but the root', async () => {
+      await startExplorer();
+      workbench.explorerFt.toggle('docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
 
-    workbench.explorerFt.activate('README.md');
+      workbench.explorerFt.runAction('collapse');
 
-    expect(workbench.selectedEntryId()).toBe('README.md');
-    expect(row('README.md')).toMatchObject({ selected: true, focused: true });
-    expect(row('docs/prd/001.md')?.selected).toBe(false);
+      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+      expect(row('docs')?.expanded).toBe(false);
+    });
+
+    it('ignores an action it does not know', async () => {
+      await startExplorer();
+
+      workbench.explorerFt.runAction('new-file');
+
+      http.expectNone(() => true);
+      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+    });
   });
 });

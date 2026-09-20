@@ -29,7 +29,7 @@
 
   <ui-activity-bar
     uiSlot="activity"
-    [items]="chrome.activityItems"
+    [items]="chrome.activityItems()"
     [bottomItems]="chrome.activityBottomItems"
   />
 
@@ -47,13 +47,20 @@
       [actions]="explorer.actions"
       [grow]="true"
       (toggle)="panes.toggle('explorer-tree')"
+      (actionSelect)="explorer.runAction($event)"
     >
-      <ui-tree
-        [nodes]="explorer.nodes()"
-        [label]="explorer.title + ' directory tree'"
-        (toggle)="explorer.toggle($event)"
-        (activate)="explorer.activate($event)"
-      />
+      @if (explorer.error(); as message) {
+        <p class="sidebar-note" role="alert">{{ message }}</p>
+      } @else if (explorer.loading()) {
+        <p class="sidebar-note">Loading…</p>
+      } @else {
+        <ui-tree
+          [nodes]="explorer.nodes()"
+          [label]="explorer.title + ' directory tree'"
+          (toggle)="explorer.toggle($event)"
+          (activate)="explorer.activate($event)"
+        />
+      }
     </ui-pane>
 
     <ui-pane title="Outline" [expanded]="panes.isExpanded('outline')" (toggle)="panes.toggle('outline')" />
@@ -79,6 +86,7 @@
               (tabMove)="groups.moveTab(groupId, $event)"
               (tabDrop)="groups.applyReorder($event)"
               (zoneDrop)="groups.applyZoneDrop($event)"
+              (fileDrop)="groups.uploadInto(groupId, $event)"
               (actionSelect)="groups.runAction(groupId, $event)"
               (toolbarAction)="groups.runToolbarAction(groupId, $event)"
               (breadcrumbSelect)="groups.openBreadcrumb(groupId, $event)"
@@ -109,58 +117,92 @@
       [tabs]="panel.tabs()"
       [actions]="panel.actions"
       (select)="panel.select($event)"
+      (actionSelect)="panel.runAction($event)"
     >
       @if (panel.transfersVisible()) {
-        <ui-transfer-list [transfers]="panel.transfers()" />
+        @if (panel.transfersEmpty()) {
+          <p class="panel-note">
+            No transfers yet — drop files onto a panel, or use its upload button.
+          </p>
+        } @else {
+          <ui-transfer-list [transfers]="panel.transfers()" />
+        }
+      }
+
+      @if (panel.problemsVisible()) {
+        @if (panel.problems().length === 0) {
+          <p class="panel-note">No problems. Every folder opened cleanly.</p>
+        } @else {
+          <ul class="problem-list">
+            @for (problem of panel.problems(); track problem.id) {
+              <li class="problem">
+                <span class="problem-path">{{ problem.path }}</span>
+                <span class="problem-message">{{ problem.message }}</span>
+              </li>
+            }
+          </ul>
+        }
       }
     </ui-bottom-panel>
   </div>
 
   <!-- right sidebar: details of the selected entry -->
   <ui-sidebar uiSlot="right" title="Details" side="right" [actions]="chrome.sidebarMoreActions">
+    @if (details.error(); as message) {
+      <p class="sidebar-note" role="alert">{{ message }}</p>
+    } @else if (details.loading() && !details.hasDetails()) {
+      <p class="sidebar-note">Loading details…</p>
+    }
+
     @if (details.preview(); as preview) {
       <ui-preview-card [preview]="preview" />
     }
 
-    <ui-pane
-      title="Properties"
-      [expanded]="panes.isExpanded('properties')"
-      (toggle)="panes.toggle('properties')"
-    >
-      <ui-property-list [properties]="details.properties()" />
-    </ui-pane>
-
-    @if (details.permissions(); as permissions) {
+    @if (details.hasDetails()) {
       <ui-pane
-        title="Permissions"
-        [expanded]="panes.isExpanded('permissions')"
-        (toggle)="panes.toggle('permissions')"
+        title="Properties"
+        [expanded]="panes.isExpanded('properties')"
+        (toggle)="panes.toggle('properties')"
       >
-        <ui-permission-grid [permissions]="permissions" />
+        <ui-property-list [properties]="details.properties()" />
+      </ui-pane>
+
+      @if (details.permissions(); as permissions) {
+        <ui-pane
+          title="Permissions"
+          [expanded]="panes.isExpanded('permissions')"
+          (toggle)="panes.toggle('permissions')"
+        >
+          <ui-permission-grid [permissions]="permissions" />
+        </ui-pane>
+      }
+
+      <ui-pane
+        title="Actions"
+        [expanded]="panes.isExpanded('open-with')"
+        [grow]="true"
+        (toggle)="panes.toggle('open-with')"
+      >
+        <ui-action-list [items]="details.actions()" (select)="details.runAction($event)" />
       </ui-pane>
     }
-
-    <ui-pane title="Tags" [expanded]="panes.isExpanded('tags')" (toggle)="panes.toggle('tags')">
-      <ui-chip-list [chips]="details.tags()" />
-    </ui-pane>
-
-    <ui-pane title="Git" [expanded]="panes.isExpanded('git')" (toggle)="panes.toggle('git')">
-      <ui-property-list [properties]="details.git()" />
-    </ui-pane>
-
-    <ui-pane
-      title="Open with"
-      [expanded]="panes.isExpanded('open-with')"
-      [grow]="true"
-      (toggle)="panes.toggle('open-with')"
-    >
-      <ui-action-list [items]="details.openWith" />
-    </ui-pane>
   </ui-sidebar>
 
   <ui-status-bar
     uiSlot="status"
-    [leadingItems]="chrome.statusLeadingItems"
+    [leadingItems]="chrome.statusLeadingItems()"
     [trailingItems]="chrome.statusTrailingItems()"
+    (select)="chrome.runStatusAction($event)"
   />
 </ui-workbench>
+
+<!-- The file picker a group's upload button opens; never visible. -->
+<input
+  #filePicker
+  class="file-picker"
+  type="file"
+  multiple
+  tabindex="-1"
+  aria-hidden="true"
+  (change)="onFilesChosen($event)"
+/>

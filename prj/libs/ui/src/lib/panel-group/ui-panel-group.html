@@ -10,6 +10,12 @@
   (tabMove)="tabMove.emit($event)"
 />
 
+<div class="loading-rail">
+  @if (group().loading) {
+    <ui-progress [value]="null" [label]="loadingLabel()" />
+  }
+</div>
+
 @if (group().breadcrumbs.length) {
   <ui-breadcrumbs
     [items]="group().breadcrumbs"
@@ -81,5 +87,14 @@
 
   @if (dropZone(); as zone) {
     <div class="dropzone dropzone--{{ zone }}" aria-hidden="true"></div>
+  }
+
+  @if (fileDragging()) {
+    <div class="filedrop" aria-hidden="true">
+      <span class="filedrop-label">
+        <ui-icon name="upload" />
+        Drop files to upload
+      </span>
+    </div>
   }
 </div>

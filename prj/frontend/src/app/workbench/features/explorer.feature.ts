@@ -1,87 +1,135 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
 import type { UiIconAction, UiTreeNode } from '@tr-file/ui';
-import type { MockFileNode } from '../mock-data/mock-data.model';
+import type { FsEntry } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
 
+/** The workspace root, which the backend addresses as the empty path. */
+const ROOT = '';
+
 /**
- * The left sidebar's directory tree.
+ * The left sidebar's directory tree, backed by `/api/fs/list`.
  *
- * Owns which directories are expanded and flattens the nested mock tree into
- * the one-row-per-node list `ui-tree` renders. Flattening here (rather than
- * inside the component) keeps the component render-only and leaves the door
- * open for virtual scrolling over a large directory later.
+ * Expansion drives fetching: a directory is listed the first time it is opened
+ * and then served from the shared cache, so a folder already open in a panel
+ * costs nothing here. The flattening happens in this class rather than in the
+ * component, which keeps `ui-tree` render-only and leaves room for virtual
+ * scrolling over a large directory later.
  */
 export class ExplorerFeature {
-  /**
-   * Eager state is assigned in the constructor, not in field initializers:
-   * with native class fields those run before `parent` is assigned.
-   */
   private readonly expandedPaths: WritableSignal<ReadonlySet<string>>;
 
   readonly title: string;
   readonly actions: readonly UiIconAction[];
 
   constructor(private readonly parent: WorkbenchService) {
-    this.expandedPaths = signal<ReadonlySet<string>>(new Set(parent.mockWorkbench.layout.expandedPaths));
-    this.title = parent.mockFileSystem.workspaceName;
+    this.expandedPaths = signal<ReadonlySet<string>>(new Set([ROOT]));
+    this.title = parent.mockWorkbench.workspaceName;
     this.actions = parent.mockWorkbench.explorerActions;
   }
 
   /** Flat, depth-ordered rows for `ui-tree`. */
   readonly nodes = computed<readonly UiTreeNode[]>(() => {
-    const expanded = this.expandedPaths();
-    const selectedId = this.parent.selectedEntryId();
     const rows: UiTreeNode[] = [];
-
-    const walk = (nodes: readonly MockFileNode[], depth: number): void => {
-      for (const node of nodes) {
-        const isExpanded = expanded.has(node.id);
-        rows.push(this.toRow(node, depth, isExpanded, selectedId));
-        if (node.children && isExpanded) {
-          walk(node.children, depth + 1);
-        }
-      }
-    };
-
-    walk(this.parent.mockFileSystem.tree, 0);
+    this.collect(ROOT, 0, rows);
     return rows;
   });
 
-  /** Expands or collapses one directory. */
-  toggle(id: string): void {
-    this.expandedPaths.update((paths) => {
-      const next = new Set(paths);
-      if (!next.delete(id)) {
-        next.add(id);
+  /** True while the root listing has not arrived yet. */
+  readonly loading = computed(() => this.parent.fsDataFt.listingState(ROOT)?.status === 'loading');
+
+  /** The message to show instead of a tree when the root cannot be read. */
+  readonly error = computed(() => this.parent.fsDataFt.listingState(ROOT)?.error?.message);
+
+  /** Loads the root; called once the workbench is up. */
+  start(): void {
+    this.parent.fsDataFt.ensureListing(ROOT);
+  }
+
+  /** Expands or collapses a directory, fetching it the first time. */
+  toggle(path: string): void {
+    const expanded = this.expandedPaths();
+    if (expanded.has(path)) {
+      this.expandedPaths.update((paths) => {
+        const next = new Set(paths);
+        next.delete(path);
+        return next;
+      });
+      return;
+    }
+
+    this.expandedPaths.update((paths) => new Set(paths).add(path));
+    this.parent.fsDataFt.ensureListing(path);
+  }
+
+  /**
+   * Clicking a row selects it — and a directory also opens, so a single click
+   * both describes the entry on the right and reveals its contents.
+   */
+  activate(path: string): void {
+    this.parent.select(path);
+    const entry = this.entryOf(path);
+    if (entry?.type === 'directory') {
+      this.toggle(path);
+    }
+  }
+
+  /** Re-reads every directory currently on screen (the Refresh action). */
+  refresh(): void {
+    for (const path of this.expandedPaths()) {
+      this.parent.fsDataFt.reloadListing(path);
+    }
+  }
+
+  /** Collapses everything but the root. */
+  collapseAll(): void {
+    this.expandedPaths.set(new Set([ROOT]));
+  }
+
+  runAction(actionId: string): void {
+    if (actionId === 'refresh') {
+      this.refresh();
+    } else if (actionId === 'collapse') {
+      this.collapseAll();
+    }
+  }
+
+  private collect(path: string, depth: number, rows: UiTreeNode[]): void {
+    for (const entry of this.parent.fsDataFt.entries(path)) {
+      const expanded = this.expandedPaths().has(entry.path);
+      rows.push(this.toRow(entry, depth, expanded));
+      if (entry.type === 'directory' && expanded) {
+        this.collect(entry.path, depth + 1, rows);
       }
-      return next;
-    });
+    }
   }
 
-  /** Selects a row; the details sidebar follows the workbench-wide selection. */
-  activate(id: string): void {
-    this.parent.selectedEntryId.set(id);
-  }
-
-  private toRow(node: MockFileNode, depth: number, expanded: boolean, selectedId: string): UiTreeNode {
+  private toRow(entry: FsEntry, depth: number, expanded: boolean): UiTreeNode {
     const files = this.parent.fileViewModel;
-    const expandable = node.kind === 'directory';
-    const meta = files.treeMeta(node, expanded);
+    const expandable = entry.type === 'directory';
+    const state = expandable ? this.parent.fsDataFt.listingState(entry.path) : undefined;
+    const selected = entry.path === this.parent.selectedEntryId();
+    const meta = state?.status === 'error' ? 'unreadable' : files.treeMeta(entry);
+
     return {
-      id: node.id,
-      label: node.name,
+      id: entry.path,
+      label: entry.name,
       depth,
-      icon: files.icon(node, expanded),
-      tint: files.tint(node),
+      icon: files.icon(entry, expanded),
+      tint: files.tint(entry),
       expandable,
       ...(expandable ? { expanded } : {}),
-      selected: node.id === selectedId,
-      focused: node.id === selectedId,
-      ...(node.cut ? { cut: true } : {}),
-      ...(node.decoration ? { decoration: node.decoration } : {}),
+      ...(expanded && state?.status === 'loading' ? { busy: true } : {}),
+      selected,
+      focused: selected,
+      ...(entry.hidden ? { decoration: 'ignored' as const } : {}),
       ...(meta === undefined ? {} : { meta }),
       // One guide per ancestor level, all drawn — VS Code's indent guides.
       guides: Array.from({ length: depth }, () => true),
     };
+  }
+
+  private entryOf(path: string): FsEntry | undefined {
+    const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ROOT;
+    return this.parent.fsDataFt.entries(parent).find((entry) => entry.path === path);
   }
 }

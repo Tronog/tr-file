@@ -21,6 +21,18 @@
   background: var(--vsc-editor-bg);
 }
 
+/* The 2px rail under the tab bar is reserved whether or not the group is
+   loading, so the bar appearing and disappearing never shifts the rows. */
+.loading-rail {
+  flex: none;
+  height: 2px;
+
+  ui-progress {
+    height: 2px;
+    border-radius: 0;
+  }
+}
+
 .summary {
   margin-left: auto;
   color: var(--vsc-fg-dim);
@@ -72,4 +84,29 @@
 .dropzone--bottom {
   inset: auto 0 0 0;
   height: 50%;
+}
+
+/* file-upload overlay: same accent tint as the tab drop zone, but it covers the
+   whole body and names the gesture. Decorative and inert, like the drop zone. */
+.filedrop {
+  position: absolute;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--vsc-accent);
+  background: rgb(0 120 212 / 18%);
+  inset: 0;
+  pointer-events: none;
+}
+
+.filedrop-label {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg-bright);
+  font-size: var(--vsc-font-size);
 }

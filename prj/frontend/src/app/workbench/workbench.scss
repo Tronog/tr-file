@@ -35,3 +35,54 @@
 .bottom-panel {
   flex: none;
 }
+
+/* A short message where a tree or a details list would otherwise be. */
+.sidebar-note {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+}
+
+.panel-note {
+  margin: 0;
+  padding: 6px 2px;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+}
+
+/* Failed listings, as shown by the panel's Problems tab. */
+.problem-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.problem {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 3px 2px;
+  font-size: var(--vsc-font-size-sm);
+}
+
+.problem-path {
+  flex: none;
+  min-width: 140px;
+  color: var(--vsc-fg);
+  font-family: var(--vsc-font-mono);
+  font-size: var(--vsc-font-size-xs);
+}
+
+.problem-message {
+  color: var(--vsc-git-conflict);
+}
+
+/* The upload picker is driven from code; it must never be seen or focused. */
+.file-picker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

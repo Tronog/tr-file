@@ -14,6 +14,7 @@
       [attr.aria-level]="node.depth + 1"
       [attr.aria-selected]="node.selected ?? false"
       [attr.aria-expanded]="node.expandable ? (node.expanded ?? false) : null"
+      [attr.aria-busy]="node.busy ? 'true' : null"
       [attr.tabindex]="node.id === tabStopId() ? 0 : -1"
       (click)="activate.emit(node.id)"
     >
@@ -25,11 +26,15 @@
 
       <span
         class="twisty"
-        [class.is-hidden]="!node.expandable"
+        [class.is-hidden]="!node.expandable && !node.busy"
         aria-hidden="true"
         (click)="onTwisty($event, node)"
       >
-        <ui-icon [name]="node.expanded ? 'chevron-down' : 'chevron-right'" />
+        @if (node.busy) {
+          <i class="spinner"></i>
+        } @else {
+          <ui-icon [name]="node.expanded ? 'chevron-down' : 'chevron-right'" />
+        }
       </span>
 
       <ui-icon class="file-icon" [name]="node.icon" [tint]="node.tint" />

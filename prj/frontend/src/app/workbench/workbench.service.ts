@@ -1,15 +1,16 @@
 import { inject, Service, signal } from '@angular/core';
+import { FileSystemService } from '../file-system/file-system.service';
 import { BottomPanelFeature } from './features/bottom-panel.feature';
 import { ChromeFeature } from './features/chrome.feature';
 import { DetailsFeature } from './features/details.feature';
 import { EditorGroupsFeature } from './features/editor-groups.feature';
 import { ExplorerFeature } from './features/explorer.feature';
+import { FileViewModelFeature } from './features/file-view-model.feature';
+import { FsDataFeature } from './features/fs-data.feature';
 import { PanelLayoutFeature } from './features/panel-layout.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
+import { TransfersFeature } from './features/transfers.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
-import { FileViewModelFeature } from './features/file-view-model.feature';
-import { MockDataFileSystemService } from './mock-data/mock-data-file-system.service';
-import { MockDataTransfersService } from './mock-data/mock-data-transfers.service';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
 
 /**
@@ -18,15 +19,19 @@ import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.servic
  * Deliberately thin, per `docs/ai/ANGULAR.md`: it holds the handful of signals
  * more than one feature needs — the shared selection, the active group, the
  * sizes of the resizable regions — and owns one instance of each feature class.
- * Everything else (flattening the tree, building panel view models, formatting)
- * lives in those features; the component only renders what they expose.
+ * Everything else (fetching, flattening the tree, building panel view models,
+ * formatting) lives in those features; the component only renders them.
  */
 @Service()
 export class WorkbenchService {
-  /** Mock data sources. Swapping these for backend-backed ones is the plan. */
-  readonly mockFileSystem = inject(MockDataFileSystemService);
+  /** The backend file system: every listing, detail, download and upload. */
+  readonly fileSystem = inject(FileSystemService);
+
+  /**
+   * Seed for the parts of the workbench no backend owns yet — the menus, the
+   * activity bar and the layout the session starts with.
+   */
   readonly mockWorkbench = inject(MockDataWorkbenchService);
-  readonly mockTransfers = inject(MockDataTransfersService);
 
   /* -- common state ------------------------------------------------------ */
 
@@ -36,15 +41,29 @@ export class WorkbenchService {
   /** The focused panel group: only its tabs and selection render as active. */
   readonly activeGroupId = signal(this.mockWorkbench.layout.activeGroupId);
 
+  /** Dot-files are hidden until the status bar says otherwise. */
+  readonly showHidden = signal(false);
+
   readonly leftSidebarWidth = signal(this.mockWorkbench.layout.leftSidebarWidth);
   readonly rightSidebarWidth = signal(this.mockWorkbench.layout.rightSidebarWidth);
   readonly bottomPanelHeight = signal(this.mockWorkbench.layout.bottomPanelHeight);
+
+  /**
+   * Set when a group asks for the file picker; the component watches this and
+   * opens its hidden `<input type="file">`. A signal rather than a method call
+   * because only the component can legally touch that element.
+   */
+  readonly uploadRequest = signal<{ readonly groupId: string; readonly path: string } | null>(null);
 
   /* -- features ---------------------------------------------------------- */
 
   /** Shared formatting; constructed first because other features use it. */
   readonly fileViewModel = new FileViewModelFeature();
 
+  /** The cache every view reads from; constructed before its readers. */
+  readonly fsDataFt = new FsDataFeature(this);
+
+  readonly transfersFt = new TransfersFeature(this);
   readonly chromeFt = new ChromeFeature(this);
   /** Owns the split tree; constructed before the feature that mutates it. */
   readonly panelLayoutFt = new PanelLayoutFeature(this);
@@ -54,4 +73,42 @@ export class WorkbenchService {
   readonly bottomPanelFt = new BottomPanelFeature(this);
   readonly sidebarPanesFt = new SidebarPanesFeature(this);
   readonly resizeFt = new WorkbenchResizeFeature(this);
+
+  /* -- cross-feature operations ------------------------------------------ */
+
+  /**
+   * Loads what the workbench starts with. Called once by the component rather
+   * than from the constructor, so creating the service in a test fetches
+   * nothing on its own.
+   */
+  start(): void {
+    this.explorerFt.start();
+    this.editorGroupsFt.start();
+    this.detailsFt.load(this.selectedEntryId());
+  }
+
+  /** Selects an entry anywhere in the workbench and describes it on the right. */
+  select(path: string): void {
+    this.selectedEntryId.set(path);
+    this.detailsFt.load(path);
+  }
+
+  /** Points the active group at a directory — used by the details actions. */
+  openInActiveGroup(path: string, label: string): void {
+    this.editorGroupsFt.navigateTo(this.activeGroupId(), path, label);
+  }
+
+  /** Asks the component to open the file picker for a group's directory. */
+  requestUpload(groupId: string, path?: string): void {
+    const directory = path ?? this.editorGroupsFt.pathOf(groupId);
+    if (directory === undefined) {
+      return;
+    }
+    this.uploadRequest.set({ groupId, path: directory });
+  }
+
+  /** Called by the component once the picker has been opened or dismissed. */
+  clearUploadRequest(): void {
+    this.uploadRequest.set(null);
+  }
 }

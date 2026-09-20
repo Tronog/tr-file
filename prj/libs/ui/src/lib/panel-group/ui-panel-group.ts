@@ -5,7 +5,9 @@ import { UiSearchField } from '../controls/ui-search-field';
 import { UiSegmented, type UiSegmentedOption } from '../controls/ui-segmented';
 import { UiEmptyState } from '../empty-state/ui-empty-state';
 import { UiFileList } from '../file-list/ui-file-list';
+import { UiIcon } from '../icon/ui-icon';
 import { UiIconView } from '../icon-view/ui-icon-view';
+import { UiProgress } from '../progress/ui-progress';
 import { UiTabBar } from '../tabs/ui-tab-bar';
 import { UI_TAB_MIME } from '../models';
 import type {
@@ -60,6 +62,11 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
  * is painted as an overlay while the drag lasts and reported as a `UiTabDrop`
  * when it ends. Which zone is lit is transient presentation state; the layout
  * itself is the application's business.
+ *
+ * The body also accepts files dragged in from the desktop: such a drag carries
+ * no tab payload, so it never computes a zone — it lights the whole body and
+ * reports the dropped `File`s through `fileDrop`. Uploading them is, again,
+ * the application's business.
  */
 @Component({
   selector: 'ui-panel-group',
@@ -72,6 +79,8 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
     UiFileList,
     UiIconView,
     UiEmptyState,
+    UiProgress,
+    UiIcon,
   ],
   templateUrl: './ui-panel-group.html',
   styleUrl: './ui-panel-group.scss',
@@ -106,11 +115,17 @@ export class UiPanelGroup {
   /** A tab was dropped over the group's body, in one of its five zones. */
   readonly zoneDrop = output<UiTabDrop>();
 
+  /** OS files were dropped on the group's body. Never emitted empty. */
+  readonly fileDrop = output<readonly File[]>();
+
   /** Any pointer press inside the group asks the application to focus it. */
   readonly focusRequest = output<void>();
 
   /** The zone lit while a tab drag hovers the body, or `null`. */
   protected readonly dropZone = signal<UiDropZone | null>(null);
+
+  /** Whether a file drag from outside the page is hovering the body. */
+  protected readonly fileDragging = signal(false);
 
   protected readonly viewOptions: readonly UiSegmentedOption[] = [
     { id: 'list', label: 'List view', icon: 'list' },
@@ -127,6 +142,14 @@ export class UiPanelGroup {
     return active ? `Path of ${active.label}` : 'Path';
   });
 
+  /** Accessible name of the loading bar, e.g. `Loading Documents`. */
+  protected readonly loadingLabel = computed(() => {
+    const group = this.group();
+    const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
+    const folder = active?.label ?? group.breadcrumbs.at(-1)?.label;
+    return folder ? `Loading ${folder}` : 'Loading';
+  });
+
   protected readonly showToolbar = computed(() => {
     const group = this.group();
     return group.toolbarActions.length > 0 || !!group.showViewSwitch || !!group.searchPlaceholder;
@@ -138,13 +161,25 @@ export class UiPanelGroup {
 
   protected onBodyDragOver(event: DragEvent): void {
     const transfer = event.dataTransfer;
-    if (!transfer || !Array.from(transfer.types).includes(UI_TAB_MIME)) {
+    if (!transfer) {
       return;
     }
 
-    event.preventDefault();
-    transfer.dropEffect = 'move';
-    this.dropZone.set(this.zoneAt(event));
+    const types = Array.from(transfer.types);
+    if (types.includes(UI_TAB_MIME)) {
+      event.preventDefault();
+      transfer.dropEffect = 'move';
+      this.fileDragging.set(false);
+      this.dropZone.set(this.zoneAt(event));
+      return;
+    }
+
+    if (types.includes('Files')) {
+      event.preventDefault();
+      transfer.dropEffect = 'copy';
+      this.dropZone.set(null);
+      this.fileDragging.set(true);
+    }
   }
 
   protected onBodyDragLeave(event: DragEvent): void {
@@ -154,17 +189,31 @@ export class UiPanelGroup {
       return;
     }
 
-    this.dropZone.set(null);
+    this.clearDragState();
   }
 
   protected onBodyDrop(event: DragEvent): void {
     event.preventDefault();
 
-    const zone = this.zoneAt(event);
-    this.dropZone.set(null);
+    const transfer = event.dataTransfer;
+    // Classify from the event itself rather than from what `dragover` saw: a
+    // drop that arrives without a preceding hover is still a file drop.
+    const isFileDrag =
+      this.fileDragging() || (transfer !== null && Array.from(transfer.types).includes('Files'));
+    const zone = isFileDrag ? null : this.zoneAt(event);
+    this.clearDragState();
 
-    const data = readTabDragData(event.dataTransfer);
-    if (!data) {
+    if (isFileDrag) {
+      const files = transfer ? Array.from(transfer.files) : [];
+      if (files.length > 0) {
+        this.fileDrop.emit(files);
+      }
+
+      return;
+    }
+
+    const data = readTabDragData(transfer);
+    if (!data || zone === null) {
       return;
     }
 
@@ -174,6 +223,12 @@ export class UiPanelGroup {
       targetGroupId: this.group().id,
       zone,
     });
+  }
+
+  /** A gesture that left the body or ended clears both overlays. */
+  private clearDragState(): void {
+    this.dropZone.set(null);
+    this.fileDragging.set(false);
   }
 
   /**

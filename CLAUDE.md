@@ -38,8 +38,14 @@ fetching the Tabler docs.
 The workbench UI lives in `prj/libs/ui` (`@tr-file/ui`), a zoneless, signal-based component
 library ported from `mockup/001/`; see `prj/libs/ui/README.md`, including why that library does
 not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin `WorkbenchService`
-holding shared state, feature classes holding the rest, and `MockData*` services holding all data
-until the backend serves it.
+holding shared state, plus feature classes holding everything else.
+
+Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
+`/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details
+sidebar all read from. Fetches are only ever started by an action (expanding a node, opening a
+folder, selecting an entry) — never from a `computed`, which would write signals during change
+detection. What is left of `MockData*` is the shell the session starts with: menus, activity bar
+and the initial layout.
 
 # Backend
 Refer to `docs/ai/EXPRESS.md`. The file-system API lives at `/api/fs`

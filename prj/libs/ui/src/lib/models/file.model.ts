@@ -14,6 +14,8 @@ export interface UiTreeNode {
   /** `false` renders a blank twisty slot so labels stay aligned. */
   readonly expandable: boolean;
   readonly expanded?: boolean;
+  /** Contents are being fetched — the twisty becomes a spinner. */
+  readonly busy?: boolean;
   readonly selected?: boolean;
   /** The one row that owns keyboard focus; renders the accent outline. */
   readonly focused?: boolean;

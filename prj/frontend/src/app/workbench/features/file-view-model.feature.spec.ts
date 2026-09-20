@@ -1,23 +1,16 @@
-import { TestBed } from '@angular/core/testing';
-import type { MockFileNode } from '../mock-data/mock-data.model';
-import { WorkbenchService } from '../workbench.service';
-import type { FileViewModelFeature } from './file-view-model.feature';
-
-function file(name: string, size: number | null = 0, extra: Partial<MockFileNode> = {}): MockFileNode {
-  return { id: name, name, kind: 'file', size, modified: '2026-09-20T13:04:00Z', ...extra };
-}
-
-function directory(name: string, extra: Partial<MockFileNode> = {}): MockFileNode {
-  return { id: name, name, kind: 'directory', size: null, modified: '2026-09-20T13:04:00Z', ...extra };
-}
+import { fsDirectory, fsEntry } from '../testing/fs-fixtures';
+import { FileViewModelFeature } from './file-view-model.feature';
 
 describe('FileViewModelFeature', () => {
   let files: FileViewModelFeature;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    files = TestBed.inject(WorkbenchService).fileViewModel;
+    // The formatter owns no state and talks to nothing, so it needs no TestBed.
+    files = new FileViewModelFeature();
   });
+
+  const file = (name: string, size = 0, modifiedAt = '2026-09-20T13:04:00.000Z') =>
+    fsEntry(name, { size, modifiedAt });
 
   describe('formatBytes', () => {
     it('reports plain bytes below 1 KB', () => {
@@ -43,34 +36,39 @@ describe('FileViewModelFeature', () => {
       expect(files.formatBytes(Math.round(2.5 * 1024 * 1024))).toBe('2.5 MB');
       expect(files.formatBytes(12 * 1024 * 1024)).toBe('12 MB');
     });
+
+    it('switches to GB at 1024 MB', () => {
+      expect(files.formatBytes(1024 ** 3)).toBe('1.0 GB');
+      expect(files.formatBytes(3 * 1024 ** 3)).toBe('3.0 GB');
+    });
   });
 
-  it('renders an em dash for directories, which have no size', () => {
-    expect(files.sizeLabel(directory('prj'))).toBe('—');
-    expect(files.sizeLabel(file('README.md', 3_482))).toBe('3.4 KB');
+  it('renders an em dash for directories, which have no size of their own', () => {
+    expect(files.sizeLabel(fsDirectory('prj'))).toBe('—');
+    expect(files.sizeLabel(file('README.md', 3482))).toBe('3.4 KB');
   });
 
   describe('timestamps', () => {
     it('formats the narrow column from UTC parts, without the year', () => {
-      expect(files.modifiedLabel(file('a.ts', 1, { modified: '2026-09-20T13:04:00Z' }))).toBe('Sep 20, 13:04');
+      expect(files.modifiedLabel(file('a.ts', 1, '2026-09-20T13:04:00.000Z'))).toBe('Sep 20, 13:04');
     });
 
     it('pads hours and minutes', () => {
-      expect(files.modifiedLabel(file('a.ts', 1, { modified: '2026-01-02T03:05:00Z' }))).toBe('Jan 2, 03:05');
+      expect(files.modifiedLabel(file('a.ts', 1, '2026-01-02T03:05:00.000Z'))).toBe('Jan 2, 03:05');
     });
 
     it('includes the year in the details timestamp', () => {
-      expect(files.fullTimestamp('2026-09-20T13:11:00Z')).toBe('Sep 20, 2026 13:11');
+      expect(files.fullTimestamp('2026-09-20T13:11:00.000Z')).toBe('Sep 20, 2026 13:11');
     });
 
     it('reads the instant as UTC, not as host-local time', () => {
-      expect(files.fullTimestamp('2026-12-31T23:59:00Z')).toBe('Dec 31, 2026 23:59');
+      expect(files.fullTimestamp('2026-12-31T23:59:00.000Z')).toBe('Dec 31, 2026 23:59');
     });
   });
 
   describe('tint', () => {
     it('tints directories as folders regardless of their name', () => {
-      expect(files.tint(directory('styles.css'))).toBe('folder');
+      expect(files.tint(fsDirectory('styles.css'))).toBe('folder');
     });
 
     it('maps known extensions, case insensitively', () => {
@@ -94,39 +92,41 @@ describe('FileViewModelFeature', () => {
   });
 
   it('picks the open folder icon only for expanded directories', () => {
-    expect(files.icon(directory('prj'))).toBe('folder');
-    expect(files.icon(directory('prj'), true)).toBe('folder-open');
+    expect(files.icon(fsDirectory('prj'))).toBe('folder');
+    expect(files.icon(fsDirectory('prj'), true)).toBe('folder-open');
     expect(files.icon(file('a.ts'), true)).toBe('file');
   });
 
-  it('labels the type column from the extension', () => {
-    expect(files.typeLabel(directory('prj'))).toBe('Folder');
-    expect(files.typeLabel(file('main.ts'))).toBe('TS');
-    expect(files.typeLabel(file('Makefile'))).toBe('File');
+  describe('typeLabel', () => {
+    it('labels files from their extension', () => {
+      expect(files.typeLabel(file('main.ts'))).toBe('TS');
+      expect(files.typeLabel(file('Makefile'))).toBe('File');
+    });
+
+    it('labels the other entry types the backend reports', () => {
+      expect(files.typeLabel(fsDirectory('prj'))).toBe('Folder');
+      expect(files.typeLabel(fsEntry('link', { type: 'symlink' }))).toBe('Link');
+      expect(files.typeLabel(fsEntry('pipe', { type: 'other' }))).toBe('Special');
+    });
+
+    it('names a bare type through kindLabel', () => {
+      expect(files.kindLabel('directory')).toBe('Folder');
+      expect(files.kindLabel('symlink')).toBe('Link');
+      expect(files.kindLabel('file')).toBe('File');
+    });
   });
 
   describe('treeMeta', () => {
-    it('prefers the git letter over any size or item count', () => {
-      expect(files.treeMeta(file('package.json', 942, { decoration: 'modified' }), false)).toBe('M');
-      expect(files.treeMeta(file('002.md', 612, { decoration: 'untracked' }), false)).toBe('U');
-      expect(files.treeMeta(directory('src', { itemCount: 9, decoration: 'modified' }), true)).toBe('M');
-    });
-
-    it('counts items for collapsed directories, singular at one', () => {
-      expect(files.treeMeta(directory('libs', { itemCount: 1 }), false)).toBe('1 item');
-      expect(files.treeMeta(directory('backend', { itemCount: 12 }), false)).toBe('12 items');
-    });
-
-    it('shows nothing for expanded directories or directories with no count', () => {
-      expect(files.treeMeta(directory('backend', { itemCount: 12 }), true)).toBeUndefined();
-      expect(files.treeMeta(directory('frontend'), false)).toBeUndefined();
-      expect(files.treeMeta(directory('empty', { itemCount: 0 }), false)).toBeUndefined();
-    });
-
     it('shows a file size only once it reaches 1 KB', () => {
-      expect(files.treeMeta(file('package.json', 942), false)).toBeUndefined();
-      expect(files.treeMeta(file('tsconfig.json', 1_204), false)).toBe('1.2 KB');
-      expect(files.treeMeta(directory('prj'), false)).toBeUndefined();
+      expect(files.treeMeta(file('package.json', 942))).toBeUndefined();
+      expect(files.treeMeta(file('tsconfig.json', 1_204))).toBe('1.2 KB');
+    });
+
+    it('shows nothing for a directory, whatever size the backend reports', () => {
+      // A listing does not carry its children's counts, so the tree stays bare
+      // rather than fanning out a request per folder.
+      expect(files.treeMeta(fsDirectory('prj'))).toBeUndefined();
+      expect(files.treeMeta(fsDirectory('prj', { size: 65_536 }))).toBeUndefined();
     });
   });
 });

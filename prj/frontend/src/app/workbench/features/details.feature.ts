@@ -1,59 +1,42 @@
 import { computed } from '@angular/core';
-import type { UiActionListItem, UiChip, UiPermissions, UiPreview, UiProperty } from '@tr-file/ui';
-import type { MockFileDetails } from '../mock-data/mock-data.model';
+import type { UiActionListItem, UiPermissions, UiPreview, UiProperty } from '@tr-file/ui';
+import type { FsDetails } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
 
-/** How a POSIX octal digit maps onto read/write/execute. */
-function triplet(digit: string) {
-  const value = Number.parseInt(digit, 8);
-  return {
-    read: (value & 0b100) !== 0,
-    write: (value & 0b010) !== 0,
-    execute: (value & 0b001) !== 0,
-  };
-}
-
-/** Rows offered by the "Open with" list. Static until real handlers exist. */
-const OPEN_WITH: readonly UiActionListItem[] = [
-  { id: 'preview', label: 'Preview', icon: 'eye', tag: 'default' },
-  { id: 'editor', label: 'Text editor', icon: 'pencil' },
-  { id: 'terminal', label: 'Open in terminal', icon: 'terminal' },
-  { id: 'reveal', label: 'Reveal in system files', icon: 'external' },
-];
-
 /**
- * The right sidebar: everything known about the entry selected anywhere in the
- * workbench.
+ * The right sidebar: everything `/api/fs/details` knows about the entry
+ * selected anywhere in the workbench.
  *
  * Reads the workbench-wide selection, so clicking a row in the tree or in any
- * panel updates the same panel — which is why the selection lives on the
- * service and not in either feature.
+ * panel fills the same panel — which is why the selection lives on the service
+ * and not in either feature.
  */
 export class DetailsFeature {
   constructor(private readonly parent: WorkbenchService) {}
 
-  private readonly entry = computed(() => this.parent.mockFileSystem.find(this.parent.selectedEntryId()));
+  private readonly state = computed(() => this.parent.fsDataFt.detailsState(this.parent.selectedEntryId()));
 
-  private readonly details = computed<MockFileDetails | undefined>(
-    () => this.parent.mockFileSystem.details[this.parent.selectedEntryId()],
-  );
+  private readonly details = computed<FsDetails | undefined>(() => this.state()?.details);
 
-  /** `false` when nothing is selected, or nothing is known about the selection. */
+  readonly loading = computed(() => this.state()?.status === 'loading');
+
+  readonly error = computed(() => this.state()?.error?.message);
+
+  /** `false` when nothing is selected, or nothing is known about it yet. */
   readonly hasDetails = computed(() => this.details() !== undefined);
 
   readonly preview = computed<UiPreview | undefined>(() => {
-    const entry = this.entry();
-    if (!entry) {
+    const details = this.details();
+    if (!details) {
       return undefined;
     }
     const files = this.parent.fileViewModel;
-    const kind = files.typeLabel(entry);
-    const size = entry.size === null ? 'Folder' : files.formatBytes(entry.size);
+    const size = details.type === 'directory' ? this.entriesLabel(details) : files.formatBytes(details.size);
     return {
-      title: entry.name,
-      subtitle: entry.kind === 'directory' ? 'Folder' : `${kind} · ${size}`,
-      icon: files.icon(entry),
-      tint: files.tint(entry),
+      title: details.name || this.parent.mockWorkbench.workspaceName,
+      subtitle: `${files.typeLabel(details)} · ${size}`,
+      icon: files.icon(details),
+      tint: files.tint(details),
     };
   });
 
@@ -63,47 +46,99 @@ export class DetailsFeature {
       return [];
     }
     const files = this.parent.fileViewModel;
-    return [
-      { label: 'Location', value: details.location },
-      { label: 'Size', value: `${details.sizeBytes.toLocaleString('en-US')} bytes (${files.formatBytes(details.sizeBytes)})` },
-      { label: 'On disk', value: files.formatBytes(details.sizeOnDiskBytes) },
-      { label: 'Created', value: files.fullTimestamp(details.created) },
-      { label: 'Modified', value: files.fullTimestamp(details.modified) },
-      { label: 'Accessed', value: files.fullTimestamp(details.accessed) },
-      { label: 'Owner', value: `${details.owner} : ${details.group}` },
+    const properties: UiProperty[] = [
+      { label: 'Location', value: this.locationOf(details), mono: true },
+      { label: 'Size', value: `${details.size.toLocaleString('en-US')} bytes (${files.formatBytes(details.size)})` },
+      { label: 'On disk', value: files.formatBytes(details.sizeOnDisk) },
+      { label: 'Created', value: files.fullTimestamp(details.createdAt) },
+      { label: 'Modified', value: files.fullTimestamp(details.modifiedAt) },
+      { label: 'Accessed', value: files.fullTimestamp(details.accessedAt) },
+      { label: 'Owner', value: `${details.uid} : ${details.gid}` },
       { label: 'Inode', value: `${details.inode}` },
-      { label: 'Checksum', value: details.checksum, mono: true },
     ];
+
+    if (details.type === 'directory') {
+      properties.push({ label: 'Entries', value: this.entriesLabel(details) });
+    }
+    if (details.mimeType) {
+      properties.push({ label: 'Media type', value: details.mimeType, mono: true });
+    }
+    if (details.symlinkTarget) {
+      properties.push({ label: 'Links to', value: details.symlinkTarget, mono: true });
+    }
+
+    return properties;
   });
 
   readonly permissions = computed<UiPermissions | undefined>(() => {
     const details = this.details();
-    if (!details) {
-      return undefined;
-    }
-    // Accept both `'0644'` and `'644'`: take the last three digits.
-    const [owner = '0', group = '0', others = '0'] = details.mode.slice(-3).split('');
-    return {
-      owner: triplet(owner),
-      group: triplet(group),
-      others: triplet(others),
-      mode: details.mode,
-    };
+    return details ? { ...details.permissions, mode: details.mode } : undefined;
   });
 
-  readonly tags = computed<readonly UiChip[]>(() => this.details()?.tags ?? []);
-
-  readonly git = computed<readonly UiProperty[]>(() => {
-    const info = this.details()?.git;
-    if (!info) {
+  /** What can be done with the selected entry, right now. */
+  readonly actions = computed<readonly UiActionListItem[]>(() => {
+    const details = this.details();
+    if (!details) {
       return [];
     }
-    return [
-      { label: 'Status', value: info.status, ...(info.decoration === 'modified' ? { tone: 'modified' as const } : {}) },
-      { label: 'Branch', value: info.branch },
-      { label: 'Last commit', value: info.lastCommit },
-    ];
+    const actions: UiActionListItem[] = [];
+    if (details.type === 'file') {
+      actions.push({ id: 'download', label: 'Download', icon: 'download', tag: 'file' });
+    }
+    if (details.type === 'directory') {
+      actions.push({ id: 'open', label: 'Open in this panel', icon: 'folder-open' });
+      actions.push({ id: 'upload', label: 'Upload files here', icon: 'upload' });
+    }
+    actions.push({ id: 'copy-path', label: 'Copy path', icon: 'copy' });
+    actions.push({ id: 'refresh', label: 'Refresh details', icon: 'refresh' });
+    return actions;
   });
 
-  readonly openWith: readonly UiActionListItem[] = OPEN_WITH;
+  /** Fetches the details of whatever is selected; called on every selection. */
+  load(path: string): void {
+    this.parent.fsDataFt.ensureDetails(path);
+  }
+
+  runAction(actionId: string): void {
+    const details = this.details();
+    if (!details) {
+      return;
+    }
+
+    switch (actionId) {
+      case 'download':
+        this.parent.transfersFt.download(details.path, details.name);
+        break;
+      case 'open':
+        this.parent.openInActiveGroup(details.path, details.name);
+        break;
+      case 'upload':
+        this.parent.requestUpload(this.parent.activeGroupId(), details.path);
+        break;
+      case 'copy-path':
+        void navigator.clipboard?.writeText(details.path);
+        break;
+      case 'refresh':
+        this.parent.fsDataFt.reloadDetails(details.path);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** `'docs/prd'` → the parent directory, or the workspace root. */
+  private locationOf(details: FsDetails): string {
+    if (details.parent === null) {
+      return '/';
+    }
+    return details.parent === '' ? '/' : `/${details.parent}`;
+  }
+
+  private entriesLabel(details: FsDetails): string {
+    const count = details.entryCount;
+    if (count === null) {
+      return 'unreadable';
+    }
+    return `${count} ${count === 1 ? 'item' : 'items'}`;
+  }
 }

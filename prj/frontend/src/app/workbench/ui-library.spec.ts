@@ -112,6 +112,20 @@ describe('UiTree', () => {
     expect(activated).toEqual(['prj/backend']);
   });
 
+  it('announces a node whose children are still loading, and spins its twisty', () => {
+    fixture.componentRef.setInput('nodes', [
+      { ...(TREE_NODES[0] as UiTreeNode), busy: true },
+      ...TREE_NODES.slice(1),
+    ]);
+    fixture.detectChanges();
+
+    expect(rows().map((row) => row.getAttribute('aria-busy'))).toEqual(['true', null, null]);
+    expect(rows()[0].querySelector('.twisty .spinner')).not.toBeNull();
+    // The chevron gives way to the spinner while the listing is in flight.
+    expect(rows()[0].querySelector('.twisty ui-icon')).toBeNull();
+    expect(rows()[1].querySelector('.twisty .spinner')).toBeNull();
+  });
+
   it('emits toggle — and not activate — when the twisty is clicked', () => {
     const activated: string[] = [];
     const toggled: string[] = [];

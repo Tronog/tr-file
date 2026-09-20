@@ -12,22 +12,37 @@ import type {
   UiTabMove,
   UiTabReorder,
 } from '@tr-file/ui';
-import type { MockFileNode, MockPanelGroup, MockPanelTab } from '../mock-data/mock-data.model';
+import type { FsEntry } from '../../file-system/file-system.model';
+import type { FsListingState } from './fs-data.feature';
+import type { PanelGroupState, PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
 
-/** Column definitions the list view can show, keyed by the mock's column ids. */
-const COLUMNS: Readonly<Record<string, UiFileColumn>> = {
-  size: { key: 'size', label: 'Size', width: '90px', align: 'end' },
-  type: { key: 'type', label: 'Type', width: '110px' },
-  modified: { key: 'modified', label: 'Modified', width: '150px' },
-};
+/** Columns of the list view; the backend supplies every value. */
+const COLUMNS: readonly UiFileColumn[] = [
+  { key: 'name', label: 'Name', sort: 'asc' },
+  { key: 'size', label: 'Size', width: '90px', align: 'end' },
+  { key: 'type', label: 'Type', width: '110px' },
+  { key: 'modified', label: 'Modified', width: '150px' },
+];
 
-/** Shown by a group that has no tabs left. */
-const EMPTY_STATE = {
+/** Toolbar of every group: navigate, re-read, send files. */
+const TOOLBAR: readonly UiIconAction[] = [
+  { id: 'up', label: 'Up one level', icon: 'arrow-up' },
+  { id: 'refresh', label: 'Refresh listing', icon: 'refresh' },
+  { id: 'upload', label: 'Upload files', icon: 'upload' },
+];
+
+const NO_TABS = {
   icon: 'folder-open',
   title: 'Open a folder to browse it here',
   hint: 'or drag a tab onto this group',
   keys: ['Ctrl', 'O'],
+} as const;
+
+const EMPTY_FOLDER = {
+  icon: 'folder-open',
+  title: 'This folder is empty',
+  hint: 'Drop files here to upload them',
 } as const;
 
 /**
@@ -35,12 +50,12 @@ const EMPTY_STATE = {
  * operation that rearranges them.
  *
  * Groups and tabs live here; the shape of the split layout lives in
- * `PanelLayoutFeature`. Tab moves touch both — a tab leaving the last slot of a
- * group takes the group out of the layout with it — so all of those operations
- * are driven from this class and the layout feature stays a pure tree.
+ * `PanelLayoutFeature`, and the directory contents come from the shared
+ * `FsDataFeature` cache. A group only ever *reads* that cache while rendering —
+ * fetches are started by the actions below, never by a computed.
  */
 export class EditorGroupsFeature {
-  private readonly groups: WritableSignal<readonly MockPanelGroup[]>;
+  private readonly groups: WritableSignal<readonly PanelGroupState[]>;
 
   /** Feeds `createGroupId`; group ids must stay unique for the layout tree. */
   private groupSeq = 0;
@@ -64,18 +79,28 @@ export class EditorGroupsFeature {
     return this.groupsById()[id];
   }
 
+  /** Directory a group is listing — where its uploads land. */
+  pathOf(id: string): string | undefined {
+    return this.groups().find((group) => group.id === id)?.path;
+  }
+
   isActive(id: string): boolean {
     return this.parent.activeGroupId() === id;
   }
 
-  /** Focusing a group also moves the workbench-wide "active group" marker. */
+  /** Loads the directories the restored groups are showing. */
+  start(): void {
+    for (const group of this.groups()) {
+      this.parent.fsDataFt.ensureListing(group.path);
+    }
+  }
+
   focus(id: string): void {
     if (this.parent.activeGroupId() !== id) {
       this.parent.activeGroupId.set(id);
     }
   }
 
-  /** Switches one group between the list and grid views. */
   setView(id: string, view: UiPanelView): void {
     this.groups.update((groups) => groups.map((group) => (group.id === id ? { ...group, view } : group)));
   }
@@ -88,23 +113,94 @@ export class EditorGroupsFeature {
       ),
     );
     this.focus(groupId);
-    this.parent.selectedEntryId.set(entryId);
+    this.parent.select(entryId);
+  }
+
+  /**
+   * Opens an entry: a directory re-points the group at it, a file is handed to
+   * the browser as a download — the closest thing to "opening" it that a file
+   * manager without a viewer can honestly do.
+   */
+  openEntry(groupId: string, entryId: string): void {
+    const entry = this.entryIn(groupId, entryId);
+    if (!entry) {
+      return;
+    }
+    if (entry.type === 'directory') {
+      this.navigateTo(groupId, entry.path, entry.name);
+      return;
+    }
+    this.parent.transfersFt.download(entry.path, entry.name);
+  }
+
+  /* -- toolbar ----------------------------------------------------------- */
+
+  runToolbarAction(groupId: string, actionId: string): void {
+    const group = this.find(groupId);
+    if (!group) {
+      return;
+    }
+
+    switch (actionId) {
+      case 'up': {
+        if (group.path === '') {
+          return;
+        }
+        const parentPath = group.path.includes('/') ? group.path.slice(0, group.path.lastIndexOf('/')) : '';
+        this.navigateTo(groupId, parentPath, this.labelFor(parentPath));
+        break;
+      }
+      case 'refresh':
+        this.parent.fsDataFt.reloadListing(group.path);
+        break;
+      case 'upload':
+        this.parent.requestUpload(groupId);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** Clicking a path segment walks the group back up to it. */
+  openBreadcrumb(groupId: string, crumbId: string): void {
+    if (crumbId === 'root') {
+      this.navigateTo(groupId, '', this.labelFor(''));
+      return;
+    }
+    this.navigateTo(groupId, crumbId, this.labelFor(crumbId));
+  }
+
+  /** Points a group and its active tab at another folder. */
+  navigateTo(groupId: string, path: string, label: string): void {
+    this.groups.update((groups) =>
+      groups.map((group) => {
+        if (group.id !== groupId) {
+          return group;
+        }
+        const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
+        const tabs = active
+          ? group.tabs.map((tab) => (tab.id === active.id ? { ...tab, label, path } : tab))
+          : group.tabs;
+        return { ...group, tabs, path, selection: [] };
+      }),
+    );
+    this.parent.fsDataFt.ensureListing(path);
+    this.focus(groupId);
   }
 
   /* -- tabs -------------------------------------------------------------- */
 
-  /** Activates a tab, which also re-points the group at that tab's folder. */
   selectTab(groupId: string, tabId: string): void {
     this.groups.update((groups) =>
       groups.map((group) => (group.id === groupId ? this.withTabs(group, group.tabs, tabId) : group)),
     );
+    const path = this.find(groupId)?.path;
+    if (path !== undefined) {
+      this.parent.fsDataFt.ensureListing(path);
+    }
     this.focus(groupId);
   }
 
-  /**
-   * Closes a tab. The group goes with its last tab; when the workbench runs out
-   * of groups entirely, one empty group is left behind to drop tabs onto.
-   */
   closeTab(groupId: string, tabId: string): void {
     const group = this.find(groupId);
     if (!group) {
@@ -122,65 +218,6 @@ export class EditorGroupsFeature {
     this.removeGroup(groupId);
   }
 
-  /**
-   * Opens an entry from a panel body: a folder re-points the group (and its
-   * active tab) at that folder, a file is merely selected. This is what makes
-   * a panel a browser rather than a static listing.
-   */
-  openEntry(groupId: string, entryId: string): void {
-    const entry = this.parent.mockFileSystem.find(entryId);
-    if (entry?.kind === 'directory') {
-      this.navigateTo(groupId, entry.id, entry.name);
-      return;
-    }
-    this.selectEntry(groupId, entryId);
-  }
-
-  /** The toolbar's navigation buttons; unknown ids are ignored. */
-  runToolbarAction(groupId: string, actionId: string): void {
-    if (actionId !== 'up') {
-      return;
-    }
-    const group = this.find(groupId);
-    if (!group?.path) {
-      return;
-    }
-    const parentPath = group.path.split('/').slice(0, -1).join('/');
-    if (!parentPath) {
-      return;
-    }
-    const name = parentPath.split('/').at(-1) ?? parentPath;
-    this.navigateTo(groupId, parentPath, name);
-  }
-
-  /** Clicking a path segment walks the group back up to it. */
-  openBreadcrumb(groupId: string, crumbId: string): void {
-    // `root` and the `ws-*` segments sit above the workspace and are inert.
-    if (crumbId === 'root' || crumbId.startsWith('ws-')) {
-      return;
-    }
-    const name = crumbId.split('/').at(-1) ?? crumbId;
-    this.navigateTo(groupId, crumbId, name);
-  }
-
-  /** Points a group and its active tab at another folder. */
-  private navigateTo(groupId: string, path: string, label: string): void {
-    this.groups.update((groups) =>
-      groups.map((group) => {
-        if (group.id !== groupId) {
-          return group;
-        }
-        const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
-        const tabs = active
-          ? group.tabs.map((tab) => (tab.id === active.id ? { ...tab, label, path } : tab))
-          : group.tabs;
-        return { ...group, tabs, path, selection: [] };
-      }),
-    );
-    this.focus(groupId);
-  }
-
-  /** Keyboard reorder: moves a tab one slot along its own bar. */
   moveTab(groupId: string, move: UiTabMove): void {
     const group = this.find(groupId);
     if (!group) {
@@ -260,15 +297,25 @@ export class EditorGroupsFeature {
 
     this.parent.panelLayoutFt.insertBeside(target.id, newGroupId, drop.zone);
     this.parent.activeGroupId.set(newGroupId);
+    this.parent.fsDataFt.ensureListing(tab.path);
 
     if (remaining.length === 0) {
       this.removeGroup(source.id);
     }
   }
 
+  /** Files dropped from the desktop onto a group land in its directory. */
+  uploadInto(groupId: string, files: readonly File[]): void {
+    const group = this.find(groupId);
+    if (!group || files.length === 0) {
+      return;
+    }
+    this.focus(groupId);
+    this.parent.transfersFt.uploadFiles(group.path, files);
+  }
+
   /* -- tab bar actions --------------------------------------------------- */
 
-  /** Runs a tab-bar action: the keyboard-reachable half of drag and drop. */
   runAction(groupId: string, actionId: string): void {
     switch (actionId) {
       case 'split-right':
@@ -299,7 +346,7 @@ export class EditorGroupsFeature {
     }
 
     const newGroupId = this.createGroupId();
-    const copy: MockPanelTab = { ...active, id: `${active.id}-${newGroupId}` };
+    const copy: PanelTabState = { ...active, id: `${active.id}-${newGroupId}` };
     this.groups.update((groups) => [...groups, this.cloneGroup(group, newGroupId, [copy])]);
     this.parent.panelLayoutFt.insertBeside(groupId, newGroupId, zone);
     this.parent.activeGroupId.set(newGroupId);
@@ -307,8 +354,15 @@ export class EditorGroupsFeature {
 
   /* -- group bookkeeping -------------------------------------------------- */
 
-  private find(id: string): MockPanelGroup | undefined {
+  private find(id: string): PanelGroupState | undefined {
     return this.groups().find((group) => group.id === id);
+  }
+
+  private entryIn(groupId: string, entryId: string): FsEntry | undefined {
+    const group = this.find(groupId);
+    return group
+      ? this.parent.fsDataFt.entries(group.path).find((entry) => entry.path === entryId)
+      : undefined;
   }
 
   private createGroupId(): string {
@@ -340,9 +394,9 @@ export class EditorGroupsFeature {
 
   /** Moves a tab from one group to another, pruning the source if it empties. */
   private transfer(
-    source: MockPanelGroup,
-    target: MockPanelGroup,
-    tab: MockPanelTab,
+    source: PanelGroupState,
+    target: PanelGroupState,
+    tab: PanelTabState,
     beforeTabId: string | null,
   ): void {
     const remaining = source.tabs.filter((candidate) => candidate.id !== tab.id);
@@ -360,6 +414,7 @@ export class EditorGroupsFeature {
     );
 
     this.parent.activeGroupId.set(target.id);
+    this.parent.fsDataFt.ensureListing(tab.path);
 
     if (remaining.length === 0) {
       this.removeGroup(source.id);
@@ -367,10 +422,10 @@ export class EditorGroupsFeature {
   }
 
   private insertBefore(
-    tabs: readonly MockPanelTab[],
-    tab: MockPanelTab,
+    tabs: readonly PanelTabState[],
+    tab: PanelTabState,
     beforeTabId: string | null,
-  ): readonly MockPanelTab[] {
+  ): readonly PanelTabState[] {
     const next = [...tabs];
     const at = beforeTabId === null ? -1 : next.findIndex((candidate) => candidate.id === beforeTabId);
     if (at === -1) {
@@ -384,17 +439,16 @@ export class EditorGroupsFeature {
   /**
    * Rewrites a group's tab set: exactly one tab ends up active, and the group
    * follows it to its folder. A group that changed folder drops its selection,
-   * because those entry ids belong to the previous listing.
+   * because those paths belong to the previous listing.
    */
   private withTabs(
-    group: MockPanelGroup,
-    tabs: readonly MockPanelTab[],
+    group: PanelGroupState,
+    tabs: readonly PanelTabState[],
     activeId?: string,
-  ): MockPanelGroup {
-    const active =
-      tabs.find((tab) => tab.id === activeId) ?? tabs.find((tab) => tab.active) ?? tabs[0];
+  ): PanelGroupState {
+    const active = tabs.find((tab) => tab.id === activeId) ?? tabs.find((tab) => tab.active) ?? tabs[0];
     const normalized = tabs.map((tab) => ({ ...tab, active: tab.id === active?.id }));
-    const path = active?.path ?? (tabs.length === 0 ? '' : group.path);
+    const path = active?.path ?? group.path;
     const samePath = path === group.path;
 
     return {
@@ -407,64 +461,85 @@ export class EditorGroupsFeature {
   }
 
   /** A new group that inherits its neighbour's view configuration. */
-  private cloneGroup(source: MockPanelGroup, id: string, tabs: readonly MockPanelTab[]): MockPanelGroup {
+  private cloneGroup(source: PanelGroupState, id: string, tabs: readonly PanelTabState[]): PanelGroupState {
     return this.withTabs({ ...source, id, selection: [], tabs: [] }, tabs);
   }
 
-  private emptyGroup(id: string): MockPanelGroup {
-    return {
-      id,
-      path: '',
-      view: 'list',
-      selection: [],
-      tabs: [],
-      columns: ['size', 'modified'],
-      toolbar: { actions: [], viewSwitch: false, search: false },
-    };
+  private emptyGroup(id: string): PanelGroupState {
+    return { id, path: '', view: 'list', selection: [], tabs: [] };
+  }
+
+  private labelFor(path: string): string {
+    return path === '' ? this.parent.mockWorkbench.workspaceName : (path.split('/').at(-1) ?? path);
   }
 
   /* -- view models -------------------------------------------------------- */
 
-  private toViewModel(group: MockPanelGroup, active: boolean): UiPanelGroupModel {
-    const entries = group.path ? this.parent.mockFileSystem.list(group.path) : [];
-    const empty = group.tabs.length === 0;
+  private toViewModel(group: PanelGroupState, active: boolean): UiPanelGroupModel {
+    const hasTabs = group.tabs.length > 0;
+    const state = hasTabs ? this.parent.fsDataFt.listingState(group.path) : undefined;
+    const entries = hasTabs ? this.parent.fsDataFt.entries(group.path) : [];
+
     return {
       id: group.id,
       tabs: this.tabs(group),
-      actions: this.tabBarActions(group),
-      breadcrumbs: empty ? [] : this.breadcrumbs(group.path),
+      actions: hasTabs ? this.tabBarActions(group) : [],
+      breadcrumbs: hasTabs ? this.breadcrumbs(group.path) : [],
       view: group.view,
-      toolbarActions: empty ? [] : group.toolbar.actions,
-      ...(group.toolbar.viewSwitch && !empty ? { showViewSwitch: true } : {}),
-      ...(group.toolbar.search && !empty ? { searchPlaceholder: 'Filter files…' } : {}),
-      columns: this.columns(group),
+      toolbarActions: hasTabs ? TOOLBAR : [],
+      ...(hasTabs ? { showViewSwitch: true } : {}),
+      ...(state?.status === 'loading' ? { loading: true } : {}),
+      columns: COLUMNS,
       rows: entries.map((entry) => this.row(entry, group, active)),
       items: entries.map((entry) => this.item(entry, group)),
-      ...(group.view === 'grid' && !empty ? { summary: `${entries.length} items` } : {}),
-      ...(empty ? { empty: EMPTY_STATE } : {}),
+      ...(hasTabs && state?.status === 'ready' ? { summary: this.summary(entries.length) } : {}),
+      ...this.placeholder(group, state, entries.length),
     };
   }
 
-  private tabs(group: MockPanelGroup): readonly UiTab[] {
-    const files = this.parent.fileViewModel;
-    return group.tabs.map((tab) => {
-      const node = tab.path ? this.parent.mockFileSystem.find(tab.path) : undefined;
+  /**
+   * What the body shows when there is nothing to list. Returns an empty object
+   * rather than `{ empty: undefined }` so the spread stays compatible with
+   * `exactOptionalPropertyTypes`.
+   */
+  private placeholder(
+    group: PanelGroupState,
+    state: FsListingState | undefined,
+    count: number,
+  ): Pick<UiPanelGroupModel, 'empty'> | Record<string, never> {
+    if (group.tabs.length === 0) {
+      return { empty: NO_TABS };
+    }
+    if (state?.status === 'error') {
       return {
-        id: tab.id,
-        label: tab.label,
-        icon: tab.icon ?? (node ? files.icon(node) : 'folder'),
-        tint: node ? files.tint(node) : this.tintForTab(tab.label),
-        ...(tab.active ? { active: true } : {}),
-        ...(tab.preview ? { preview: true } : {}),
-        ...(tab.dirty ? { dirty: true } : {}),
-      } satisfies UiTab;
-    });
+        empty: {
+          icon: 'alert-triangle',
+          title: 'Could not open this folder',
+          hint: state.error?.message ?? 'The server refused the request.',
+        },
+      };
+    }
+    if (state?.status === 'ready' && count === 0) {
+      return { empty: EMPTY_FOLDER };
+    }
+    return {};
   }
 
-  private tabBarActions(group: MockPanelGroup): readonly UiIconAction[] {
-    if (group.tabs.length === 0) {
-      return [];
-    }
+  private summary(count: number): string {
+    return `${count} ${count === 1 ? 'item' : 'items'}`;
+  }
+
+  private tabs(group: PanelGroupState): readonly UiTab[] {
+    return group.tabs.map((tab) => ({
+      id: tab.id,
+      label: tab.label,
+      icon: 'folder' as const,
+      tint: 'folder' as const,
+      ...(tab.active ? { active: true } : {}),
+    }));
+  }
+
+  private tabBarActions(group: PanelGroupState): readonly UiIconAction[] {
     const maximized = this.parent.panelLayoutFt.isMaximized(group.id);
     return [
       { id: 'split-right', label: 'Split right', icon: 'columns' },
@@ -479,28 +554,23 @@ export class EditorGroupsFeature {
   }
 
   private breadcrumbs(path: string): readonly UiBreadcrumb[] {
-    const root: UiBreadcrumb = { id: 'root', label: 'local', icon: 'desktop' };
-    const workspace = this.parent.mockFileSystem.workspacePath.split('/').filter(Boolean);
+    const root: UiBreadcrumb = {
+      id: 'root',
+      label: this.parent.mockWorkbench.workspaceName,
+      icon: 'desktop',
+    };
     const segments = path.split('/').filter(Boolean);
     return [
       root,
-      ...workspace.map((label, index) => ({ id: `ws-${index}`, label })),
       ...segments.map((label, index) => ({ id: segments.slice(0, index + 1).join('/'), label })),
     ];
   }
 
-  private columns(group: MockPanelGroup): readonly UiFileColumn[] {
-    return [
-      { key: 'name', label: 'Name', sort: 'asc' },
-      ...group.columns.map((key) => COLUMNS[key]).filter((column): column is UiFileColumn => column !== undefined),
-    ];
-  }
-
-  private row(entry: MockFileNode, group: MockPanelGroup, active: boolean): UiFileRow {
+  private row(entry: FsEntry, group: PanelGroupState, active: boolean): UiFileRow {
     const files = this.parent.fileViewModel;
-    const selected = group.selection.includes(entry.id);
+    const selected = group.selection.includes(entry.path);
     return {
-      id: entry.id,
+      id: entry.path,
       name: entry.name,
       icon: files.icon(entry),
       tint: files.tint(entry),
@@ -509,26 +579,21 @@ export class EditorGroupsFeature {
         type: files.typeLabel(entry),
         modified: files.modifiedLabel(entry),
       },
-      ...(entry.decoration ? { decoration: entry.decoration } : {}),
+      ...(entry.hidden ? { decoration: 'ignored' as const } : {}),
       ...(selected && active ? { selected: true } : {}),
       ...(selected && !active ? { inactiveSelected: true } : {}),
-      ...(active && group.focusedEntryId === entry.id ? { focused: true } : {}),
+      ...(active && group.focusedEntryId === entry.path ? { focused: true } : {}),
     };
   }
 
-  private item(entry: MockFileNode, group: MockPanelGroup): UiIconViewItem {
+  private item(entry: FsEntry, group: PanelGroupState): UiIconViewItem {
     const files = this.parent.fileViewModel;
     return {
-      id: entry.id,
+      id: entry.path,
       label: entry.name,
       icon: files.icon(entry),
       tint: files.tint(entry),
-      ...(group.selection.includes(entry.id) ? { selected: true } : {}),
+      ...(group.selection.includes(entry.path) ? { selected: true } : {}),
     };
-  }
-
-  /** Tabs without a path (search results) still deserve a sensible tint. */
-  private tintForTab(label: string) {
-    return label.toLowerCase().includes('result') ? ('generic' as const) : ('folder' as const);
   }
 }

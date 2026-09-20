@@ -108,10 +108,17 @@ a compile error rather than an empty box.
 | Drag a tab onto a group's edge (outer 25%) | Divides that group; the tab lands in the new half |
 | Split right / Split down | Copies the active tab into a new group beside this one |
 | Maximize | Renders one group alone; the button becomes Restore |
+| Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
 | Drag a sash / focus it and press arrows | Resizes the two regions it divides |
 
 Closing the last group anywhere leaves a single empty group, so there is always
 somewhere to drop a tab.
+
+Two inputs exist for the asynchronous world the workbench now lives in:
+`UiTreeNode.busy` turns a row's twisty into a spinner while its contents are
+being fetched, and `UiPanelGroupModel.loading` lights a 2px indeterminate rail
+under the tab bar. Both are pure inputs — the library never knows what is being
+loaded, only that something is.
 
 ## Testing
 

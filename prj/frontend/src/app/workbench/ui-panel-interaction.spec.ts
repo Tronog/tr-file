@@ -1,7 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UI_TAB_MIME, UiSash, UiTabBar } from '@tr-file/ui';
-import type { UiSashResize, UiTab, UiTabMove, UiTabReorder } from '@tr-file/ui';
+import { UI_TAB_MIME, UiPanelGroup, UiSash, UiTabBar } from '@tr-file/ui';
+import type {
+  UiPanelGroupModel,
+  UiSashResize,
+  UiTab,
+  UiTabDrop,
+  UiTabMove,
+  UiTabReorder,
+} from '@tr-file/ui';
 
 const TABS: readonly UiTab[] = [
   { id: 'tab-prj', label: 'prj', icon: 'folder', tint: 'folder', active: true },
@@ -19,8 +26,12 @@ class TestDataTransfer {
   effectAllowed = 'none';
   dropEffect = 'none';
 
+  /** Files carried by a drag from the desktop; empty for a tab drag. */
+  readonly files: File[] = [];
+
   get types(): readonly string[] {
-    return [...this.store.keys()];
+    // A real `DataTransfer` lists `'Files'` among its types when it carries any.
+    return [...this.store.keys(), ...(this.files.length > 0 ? ['Files'] : [])];
   }
 
   setData(format: string, data: string): void {
@@ -266,5 +277,63 @@ describe('UiTabBar', () => {
     strip().dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
 
     expect(closed).toEqual(['tab-prj']);
+  });
+});
+
+describe('UiPanelGroup', () => {
+  let fixture: ComponentFixture<UiPanelGroup>;
+
+  const GROUP: UiPanelGroupModel = {
+    id: 'group-root',
+    tabs: [{ id: 'tab-root', label: 'tr-file', icon: 'folder', tint: 'folder', active: true }],
+    actions: [],
+    breadcrumbs: [{ id: 'root', label: 'tr-file', icon: 'desktop' }],
+    view: 'list',
+    toolbarActions: [],
+    columns: [{ key: 'name', label: 'Name' }],
+    rows: [],
+    items: [],
+  };
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [UiPanelGroup] }).compileComponents();
+    fixture = TestBed.createComponent(UiPanelGroup);
+    fixture.componentRef.setInput('group', GROUP);
+    fixture.detectChanges();
+  });
+
+  const body = (): HTMLElement => fixture.nativeElement.querySelector('.group-body');
+
+  it('reports files dropped on its body, and paints the drop while they hover', () => {
+    const dropped: (readonly File[])[] = [];
+    fixture.componentInstance.fileDrop.subscribe((files) => dropped.push(files));
+    const transfer = new TestDataTransfer();
+    transfer.files.push(new File(['a'], 'a.txt'), new File(['b'], 'b.txt'));
+
+    body().dispatchEvent(dragEvent('dragover', transfer));
+    fixture.detectChanges();
+
+    expect(transfer.dropEffect).toBe('copy');
+    expect(fixture.nativeElement.querySelector('.filedrop')).not.toBeNull();
+
+    body().dispatchEvent(dragEvent('drop', transfer));
+    fixture.detectChanges();
+
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]?.map((file) => file.name)).toEqual(['a.txt', 'b.txt']);
+    // The overlay goes with the gesture.
+    expect(fixture.nativeElement.querySelector('.filedrop')).toBeNull();
+  });
+
+  it('stays quiet for a drop that carries no files at all', () => {
+    const dropped: (readonly File[])[] = [];
+    const zones: UiTabDrop[] = [];
+    fixture.componentInstance.fileDrop.subscribe((files) => dropped.push(files));
+    fixture.componentInstance.zoneDrop.subscribe((drop) => zones.push(drop));
+
+    body().dispatchEvent(dragEvent('drop', new TestDataTransfer()));
+
+    expect(dropped).toEqual([]);
+    expect(zones).toEqual([]);
   });
 });
