@@ -42,7 +42,10 @@ holding shared state, feature classes holding the rest, and `MockData*` services
 until the backend serves it.
 
 # Backend
-Refer to `docs/ai/EXPRESS.md`.
+Refer to `docs/ai/EXPRESS.md`. The file-system API lives at `/api/fs`
+(listing, details, download, upload) — see `prj/backend/README.md` for the
+endpoint reference, the error codes and the `FILES_ROOT` confinement rules. Its
+frontend client is `prj/frontend/src/app/file-system/`.
 
 # Docker
 Refer to `docs/ai/DOCKER.md`. Two Compose environments live at the workspace root:

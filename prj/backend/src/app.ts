@@ -39,13 +39,15 @@ export class App {
   }
 
   private createModules(): readonly RouteModule[] {
+    const filesLogger = this.logger.child({ module: 'files' });
     const filesService = new FilesService(
       new FilePathResolver(this.config.filesRoot),
-      this.logger.child({ module: 'files' }),
+      filesLogger,
+      this.config.uploadMaxBytes,
     );
     const healthService = new HealthService(this.version, this.config.nodeEnv);
 
-    return [new HealthRoutes(healthService), new FilesRoutes(filesService)];
+    return [new HealthRoutes(healthService), new FilesRoutes(filesService, filesLogger)];
   }
 
   private mountModules(modules: readonly RouteModule[]): void {

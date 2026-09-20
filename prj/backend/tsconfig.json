@@ -8,5 +8,7 @@
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules"]
+  /* Tests must not reach dist/: they are type-checked by tsconfig.test.json
+     and executed straight from source by `pnpm test` (tsx). */
+  "exclude": ["dist", "node_modules", "src/**/*.test.ts"]
 }

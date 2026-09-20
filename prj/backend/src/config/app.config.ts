@@ -17,6 +17,8 @@ export class AppConfig {
   readonly logLevel: LogLevel;
   /** Absolute path all file-system operations are confined to. */
   readonly filesRoot: string;
+  /** Hard ceiling, in bytes, for the body of a single uploaded file. */
+  readonly uploadMaxBytes: number;
 
   private constructor(env: NodeJS.ProcessEnv) {
     this.nodeEnv = AppConfig.readEnum<NodeEnv>(
@@ -33,6 +35,7 @@ export class AppConfig {
       this.nodeEnv === 'production' ? 'info' : 'debug',
     );
     this.filesRoot = resolve(env['FILES_ROOT']?.trim() || process.cwd());
+    this.uploadMaxBytes = AppConfig.readByteSize(env['UPLOAD_MAX_BYTES'], 512 * 1024 * 1024);
   }
 
   static fromEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -50,6 +53,17 @@ export class AppConfig {
     const parsed = Number.parseInt(raw, 10);
     if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
       throw new Error(`Invalid PORT value: "${raw}"`);
+    }
+    return parsed;
+  }
+
+  private static readByteSize(raw: string | undefined, fallback: number): number {
+    if (raw === undefined || raw.trim() === '') {
+      return fallback;
+    }
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new Error(`Invalid UPLOAD_MAX_BYTES value: "${raw}"`);
     }
     return parsed;
   }

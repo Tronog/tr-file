@@ -67,6 +67,12 @@ COPY --from=prod-deps --chown=node:node /app/package.json ./package.json
 COPY --from=prod-deps --chown=node:node /app/backend/node_modules ./backend/node_modules
 COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
 COPY --from=build --chown=node:node /app/backend/dist ./backend/dist
+
+# FILES_ROOT is a named volume in compose. Creating it in the image owned by the
+# runtime user makes Docker initialise that volume with the same ownership,
+# which is what lets uploads (PRD 001 §7) write as a non-root process.
+RUN mkdir -p /data && chown node:node /data
+
 USER node
 WORKDIR /app/backend
 EXPOSE 3000

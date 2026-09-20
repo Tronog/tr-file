@@ -63,6 +63,19 @@ export class FilePathResolver {
     return candidate;
   }
 
+  /**
+   * Root-relative POSIX form of an absolute host path, or `null` when that
+   * path lies outside the root. Used for reporting symlink targets without
+   * leaking host paths.
+   */
+  toRootRelative(absolute: string): string | null {
+    const normalised = resolve(absolute);
+    if (normalised !== this.root && !normalised.startsWith(this.root + sep)) {
+      return null;
+    }
+    return FilePathResolver.toPosix(relativePath(this.root, normalised));
+  }
+
   private assertInsideRoot(absolute: string): void {
     if (!isAbsolute(absolute) || (absolute !== this.root && !absolute.startsWith(this.root + sep))) {
       throw HttpError.forbidden('Path escapes the configured files root');

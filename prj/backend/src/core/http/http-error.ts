@@ -25,6 +25,14 @@ export class HttpError extends Error {
     return new HttpError(404, 'NOT_FOUND', message, details);
   }
 
+  static conflict(message: string, details?: unknown): HttpError {
+    return new HttpError(409, 'CONFLICT', message, details);
+  }
+
+  static payloadTooLarge(message: string, details?: unknown): HttpError {
+    return new HttpError(413, 'PAYLOAD_TOO_LARGE', message, details);
+  }
+
   static internal(message = 'Internal Server Error', details?: unknown): HttpError {
     return new HttpError(500, 'INTERNAL_ERROR', message, details);
   }

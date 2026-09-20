@@ -3,6 +3,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
 
@@ -14,5 +15,8 @@ export const appConfig: ApplicationConfig = {
     // stray `provideZoneChangeDetection` creeping back in.
     provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
+    // Deliberately the default XHR backend, not `withFetch()`: Angular's fetch
+    // backend emits no upload-progress events, which FsTransferFeature needs.
+    provideHttpClient(),
   ],
 };
