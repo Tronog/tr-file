@@ -32,6 +32,7 @@
         [attr.tabindex]="tab.id === focusId() ? 0 : -1"
         [attr.title]="tab.label"
         (click)="onActivate(tab.id)"
+        (dblclick)="tabDoubleClick.emit(tab.id)"
       >
         <ui-icon [name]="tab.icon" [tint]="tab.tint" />
         <span class="tab-label">{{ tab.label }}</span>

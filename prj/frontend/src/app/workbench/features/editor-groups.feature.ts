@@ -155,14 +155,17 @@ export class EditorGroupsFeature {
     }
     if (entry.type === 'directory') {
       this.navigateTo(groupId, entry.path, entry.name);
-      // The listing that had focus is gone, so without this the keyboard falls
-      // out of the panel and the next `Alt`+`←` reaches nothing — whether the
-      // entry was opened by double click or by `Enter`.
-      this.parent.panelFocusFt.focusBody(groupId);
-      return;
+    } else {
+      this.focus(groupId);
+      this.parent.filePreviewFt.open(entry.path);
     }
-    this.focus(groupId);
-    this.parent.filePreviewFt.open(entry.path);
+
+    // Either way the listing that had focus is gone — replaced by another
+    // listing, or by the file's viewer — so without this the keyboard falls
+    // out of the panel entirely and its own chords reach nothing: no
+    // `Alt`+`←`, and no `Ctrl`+`W` to close the tab that was just opened.
+    // Whether the entry was opened by double click or by `Enter`.
+    this.parent.panelFocusFt.focusBody(groupId);
   }
 
   /**

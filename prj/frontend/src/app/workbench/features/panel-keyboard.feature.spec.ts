@@ -143,6 +143,23 @@ describe('PanelKeyboardFeature', () => {
       expect(token()).toBeGreaterThan(before);
     });
 
+    /**
+     * Fix 1.1: opening a *file* replaces the listing with the file's viewer,
+     * so the row that had focus is gone — and a preview tab that could not be
+     * closed with `Ctrl`+`W` until the panel was clicked is the symptom.
+     */
+    it('asks for focus when a file is opened, not just a folder', async () => {
+      await start();
+      const before = token();
+
+      workbench.editorGroupsFt.openEntry(groupId(), 'README.md');
+      http.expectOne(downloadUrl('README.md')).flush(new Blob(['# hi'], { type: 'text/markdown' }));
+      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+      await settled();
+
+      expect(token()).toBeGreaterThan(before);
+    });
+
     it('asks the body to take focus again after a key changed the folder', async () => {
       await start();
       const before = token();
@@ -209,6 +226,19 @@ describe('PanelKeyboardFeature', () => {
       expect(workbench.editorGroupsFt.pathOf(second)).toBe(workbench.editorGroupsFt.pathOf(first));
       // The keyboard goes with the new panel rather than staying behind.
       expect(workbench.panelFocusFt.token(second)).toBeGreaterThan(0);
+    });
+
+    /** PRD 001, §6.1.1 — what a double click on a tab is wired to. */
+    it('maximizes and restores the group', async () => {
+      await start();
+      const only = groupId();
+      expect(workbench.panelLayoutFt.isMaximized(only)).toBe(false);
+
+      workbench.editorGroupsFt.runAction(only, 'maximize');
+      expect(workbench.panelLayoutFt.isMaximized(only)).toBe(true);
+
+      workbench.editorGroupsFt.runAction(only, 'maximize');
+      expect(workbench.panelLayoutFt.isMaximized(only)).toBe(false);
     });
 
     it('closes the focused tab and leaves the other panel alone', async () => {

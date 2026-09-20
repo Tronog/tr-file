@@ -95,6 +95,7 @@
               (focusRequest)="groups.focus(groupId)"
               (tabSelect)="groups.selectTab(groupId, $event)"
               (tabActivate)="panelFocus.focusBody(groupId)"
+              (tabDoubleClick)="groups.runAction(groupId, 'maximize')"
               (bodyPress)="panelFocus.focusBody(groupId)"
               (tabClose)="groups.closeTab(groupId, $event)"
               (tabMove)="groups.moveTab(groupId, $event)"

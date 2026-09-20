@@ -124,6 +124,9 @@ export class UiPanelGroup {
    */
   readonly tabActivate = output<string>();
 
+  /** A tab was double-clicked; see `UiTabBar.tabDoubleClick`. */
+  readonly tabDoubleClick = output<string>();
+
   /**
    * A press landed on the body's blank space — below the last row, beside the
    * tiles, on the "no folder opened" placeholder (PRD 001, §6.3.1). Nothing

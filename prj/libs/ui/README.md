@@ -123,13 +123,14 @@ entry would maximize the window.
 | Gesture | Result |
 | --- | --- |
 | Click a tab | Activates it; the group re-points at that folder, takes focus, and focus moves into its body |
+| Double-click a tab | Emits `tabDoubleClick`; the app maximizes or restores that group |
 | Middle-click / close button / `Delete` | Closes the tab; the group goes with its last tab |
 | Drag a tab inside its bar | Reorders it, with a 2px insertion bar showing the landing spot |
 | Drag a tab onto another bar or a group's centre | Moves it into that group |
 | Drag a tab onto a group's edge (outer 25%) | Divides that group; the tab lands in the new half |
 | Split right / Split down, or `Ctrl`+`T` | Copies the active tab into a new group beside this one |
 | `Ctrl`+`W` | Closes the panel's focused tab; the group goes with its last one |
-| Maximize | Renders one group alone; the button becomes Restore |
+| Maximize, or double-click a tab | Renders one group alone; the button becomes Restore |
 | Press a group's empty body | Emits `bodyPress`; the app focuses the group and its content |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
 | Drag a sash / focus it and press arrows | Resizes the two regions it divides |

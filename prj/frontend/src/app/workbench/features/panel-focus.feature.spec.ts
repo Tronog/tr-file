@@ -36,10 +36,20 @@ describe('PanelFocusFeature', () => {
     await settled();
   };
 
-  it('starts every group with no request outstanding', async () => {
+  /**
+   * PRD 001, §10.1 — the listing is where someone starts, so the keyboard
+   * starts there: the first arrow key after launch must go somewhere.
+   */
+  it('asks the panel it opens on to take focus', async () => {
     await start();
 
-    expect(workbench.panelFocusFt.token(workbench.activeGroupId())).toBe(0);
+    expect(workbench.panelFocusFt.token(workbench.activeGroupId())).toBeGreaterThan(0);
+  });
+
+  it('asks no panel it has not opened', async () => {
+    await start();
+
+    expect(workbench.panelFocusFt.token('group-never-made')).toBe(0);
   });
 
   it('bumps the group token on each ask, so asking twice is two asks', async () => {
@@ -71,9 +81,13 @@ describe('PanelFocusFeature', () => {
     workbench.editorGroupsFt.runAction(first, 'split-right');
     const second = workbench.activeGroupId();
 
+    const firstBefore = workbench.panelFocusFt.token(first);
+
     workbench.panelFocusFt.focusBody(second);
 
     expect(workbench.panelFocusFt.token(second)).toBeGreaterThan(0);
-    expect(workbench.panelFocusFt.token(first)).toBe(0);
+    // The panel that was not asked is left exactly where it was — including
+    // the request it got when the app opened.
+    expect(workbench.panelFocusFt.token(first)).toBe(firstBefore);
   });
 });

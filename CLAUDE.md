@@ -57,9 +57,13 @@ re-asks for body focus, or the rows it was standing on are gone and the keyboard
 outside the panel — and that includes opening a folder by double click. An empty folder
 has nothing focusable in it, so `.group-body` carries `tabindex="-1"` and takes focus
 itself; otherwise a keyboard user could walk into one and not get out.
-Choosing a tab (a click, not an arrow-key rove), or pressing the blank space of a panel
-body, hands focus to that panel's content once it has rendered; `PanelFocusFeature` owns
-that request and `UiPanelGroup` answers it. Row clicks only ever
+Double-clicking a tab maximizes or restores its group (§6.1.1) — the bar reports the
+gesture, the app decides what it means. Choosing a tab (a click, not an arrow-key rove),
+or pressing the blank space of a panel body, hands focus to that panel's content once it
+has rendered; `PanelFocusFeature` owns
+that request and `UiPanelGroup` answers it. The workbench asks for it once on start
+(§10.1), after the listing is in flight, so the keyboard is already in the folder content
+when the app opens rather than needing a click first. Row clicks only ever
 open — collapsing is the twisty's job (or `←` on the focused row). Double-clicking a file opens
 it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
 into a `UiDocumentModel`, and the library only renders what it is handed. An image is read by

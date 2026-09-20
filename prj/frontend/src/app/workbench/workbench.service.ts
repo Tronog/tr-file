@@ -118,6 +118,14 @@ export class WorkbenchService {
     this.explorerFt.start();
     this.editorGroupsFt.start();
     this.detailsFt.load(this.selectedEntryId());
+
+    // The folder listing is where someone starts (PRD 001, §10.1), so the
+    // keyboard starts there too — otherwise the first arrow key after launch
+    // goes nowhere and the app has to be clicked before it can be used.
+    // Asked for after the listing has been requested, so the group is already
+    // `loading`: the request then waits for the first row rather than settling
+    // on an empty body.
+    this.panelFocusFt.focusBody(this.activeGroupId());
   }
 
   /** Selects an entry anywhere in the workbench and describes it on the right. */

@@ -59,6 +59,20 @@ describe('UiTabBar activation', () => {
   });
 
   /**
+   * PRD 001, §6.1.1 — a double click on a tab maximizes its group. Reported
+   * rather than acted on: the bar does not know what a group is.
+   */
+  it('reports a double click on a tab, with the tab it landed on', () => {
+    const doubled: string[] = [];
+    fixture.componentInstance.tabDoubleClick.subscribe((id) => doubled.push(id));
+
+    tabs()[1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    fixture.detectChanges();
+
+    expect(doubled).toEqual(['tab-docs']);
+  });
+
+  /**
    * The difference that matters: if roving also counted as choosing, focus
    * would leave the bar on the first arrow and the next tab would be
    * unreachable.

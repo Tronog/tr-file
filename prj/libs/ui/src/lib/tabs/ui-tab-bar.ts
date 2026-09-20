@@ -103,6 +103,13 @@ export class UiTabBar {
    */
   readonly activate = output<string>();
 
+  /**
+   * A tab was double-clicked (PRD 001, §6.1.1). Reported rather than acted on:
+   * a double click is a gesture, and what it means to a tab — maximize here,
+   * pin it in some editors — is the application's to decide.
+   */
+  readonly tabDoubleClick = output<string>();
+
   readonly close = output<string>();
   readonly actionSelect = output<string>();
 
