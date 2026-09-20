@@ -50,8 +50,18 @@ export class DesktopConfig {
   readonly staticRoot: string;
   readonly filesRoot: string;
 
-  /** Opens the dev tools and turns the server's logging up. */
+  /** Turns the server's logging up. Does *not* open the dev tools. */
   readonly development: boolean;
+
+  /**
+   * Whether to open the dev tools with the window.
+   *
+   * Off unless `TR_FILE_DEVTOOLS=1` asks for it, including in a development
+   * checkout: an inspector opening over the app every time it starts is a
+   * nuisance, and the standard shortcut is always there for the times it is
+   * wanted.
+   */
+  readonly devTools: boolean;
 
   private constructor(environment: DesktopEnvironment, paths: DesktopPaths) {
     this.port = DesktopConfig.readPort(environment.env['TR_FILE_PORT']);
@@ -59,6 +69,7 @@ export class DesktopConfig {
     // overrides that in both directions, so a packaged build can be debugged
     // and a checkout can be run as a user would see it.
     this.development = DesktopConfig.readFlag(environment.env['TR_FILE_DEV'], !environment.packaged);
+    this.devTools = DesktopConfig.readFlag(environment.env['TR_FILE_DEVTOOLS'], false);
     this.staticRoot = paths.staticRoot;
     this.filesRoot = paths.filesRoot;
   }

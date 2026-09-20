@@ -40,7 +40,8 @@ export class MainWindow {
 
   constructor(
     private readonly url: URL,
-    private readonly development: boolean,
+    /** Whether to open the dev tools; see `DesktopConfig.devTools`. */
+    private readonly devTools: boolean,
   ) {}
 
   get isOpen(): boolean {
@@ -86,7 +87,7 @@ export class MainWindow {
 
     await window.loadURL(this.url.href);
 
-    if (this.development) {
+    if (this.devTools) {
       window.webContents.openDevTools({ mode: 'detach' });
     }
   }

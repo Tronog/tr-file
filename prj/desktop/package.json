@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "electron .",
-    "dev": "pnpm build && TR_FILE_DEV=1 electron .",
+    "dev": "pnpm build && TR_FILE_DEV=1 TR_FILE_DEVTOOLS=1 electron .",
     "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "clean": "rm -rf dist"

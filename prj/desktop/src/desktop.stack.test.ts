@@ -133,6 +133,24 @@ describe('DesktopConfig', () => {
     assert.equal(config.serverEnv()['PORT'], '0');
   });
 
+  /** An inspector opening over the app on every start is a nuisance. */
+  it('keeps the dev tools shut unless asked, even in a checkout', () => {
+    const plain = DesktopConfig.resolve(environment({ TR_FILE_STATIC_ROOT: staticRoot }));
+    assert.equal(plain.devTools, false);
+    // Debug logging and an open inspector are different requests.
+    assert.equal(plain.development, true);
+
+    const debugging = DesktopConfig.resolve(
+      environment({ TR_FILE_STATIC_ROOT: staticRoot, TR_FILE_DEV: '1' }),
+    );
+    assert.equal(debugging.devTools, false);
+
+    const asked = DesktopConfig.resolve(
+      environment({ TR_FILE_STATIC_ROOT: staticRoot, TR_FILE_DEVTOOLS: '1' }),
+    );
+    assert.equal(asked.devTools, true);
+  });
+
   it('rejects a port that is not one', () => {
     assert.throws(() => DesktopConfig.resolve(environment({ TR_FILE_PORT: 'http' })), /TR_FILE_PORT/);
   });

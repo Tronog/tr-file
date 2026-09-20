@@ -8,7 +8,7 @@ Express API, the built Angular workbench and the window showing it.
 ```bash
 pnpm build      # tsc → dist/ (runtime only; tests are excluded)
 pnpm start      # electron .
-pnpm dev        # build, then run with the dev tools open
+pnpm dev        # build, then run with the dev tools open and debug logging
 pnpm test       # node:test via tsx, straight from src/
 pnpm typecheck  # runtime sources + test sources
 ```
@@ -22,7 +22,8 @@ backend, then the frontend, then this) has to have run at least once.
 | `FILES_ROOT` | the user's home directory | Absolute path all file access is confined to |
 | `TR_FILE_PORT` | `0` (OS picks) | Loopback port; pin it only to debug |
 | `TR_FILE_STATIC_ROOT` | the workspace `ng build` output | Where the Angular bundle is |
-| `TR_FILE_DEV` | `1` unless packaged | Dev tools and debug logging |
+| `TR_FILE_DEV` | `1` unless packaged | Debug logging |
+| `TR_FILE_DEVTOOLS` | off | Open the dev tools with the window |
 
 `HOST` and `PORT` are deliberately *not* read here: the server is configured
 from `DesktopConfig.serverEnv()`, not from the user's shell, so nothing in the

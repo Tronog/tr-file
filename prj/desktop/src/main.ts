@@ -85,7 +85,7 @@ class DesktopApplication {
       return;
     }
 
-    this.window = new MainWindow(this.stack.address, this.config.development);
+    this.window = new MainWindow(this.stack.address, this.config.devTools);
     await this.window.open();
   }
 
