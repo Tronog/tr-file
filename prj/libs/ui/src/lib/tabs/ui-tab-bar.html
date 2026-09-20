@@ -1,17 +1,34 @@
-<div class="tabs" role="tablist" [attr.aria-label]="label()">
+<div
+  #strip
+  class="tabs"
+  role="tablist"
+  [attr.aria-label]="label()"
+  (keydown)="onKeyDown($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
   @for (tab of tabs(); track tab.id) {
     <div
+      #tabElement
       class="tab"
       role="presentation"
+      draggable="true"
       [class.is-active]="tab.active"
       [class.is-preview]="tab.preview"
       [class.is-pinned]="tab.pinned"
+      [class.is-dragging]="tab.id === draggingId()"
+      (dragstart)="onDragStart($event, tab.id)"
+      (dragend)="onDragEnd()"
+      (auxclick)="onAuxClick($event, tab.id)"
     >
       <button
+        #tabButton
         type="button"
         class="tab-main"
         role="tab"
         [attr.aria-selected]="tab.active ? 'true' : 'false'"
+        [attr.aria-keyshortcuts]="keyShortcuts"
         [attr.tabindex]="tab.id === focusId() ? 0 : -1"
         [attr.title]="tab.label"
         (click)="select.emit(tab.id)"
@@ -21,20 +38,25 @@
       </button>
 
       @if (tab.dirty) {
+        <!-- The dot marks unsaved changes and gives way to the close button on
+             hover or focus, so a dirty tab is still closable with the mouse. -->
         <span class="tab-dirty" [attr.title]="'Unsaved changes'" aria-hidden="true"></span>
-      } @else {
-        <button
-          type="button"
-          class="tab-close"
-          tabindex="-1"
-          aria-hidden="true"
-          [attr.title]="'Close ' + tab.label"
-          (click)="onClose($event, tab.id)"
-        >
-          <ui-icon name="x" />
-        </button>
       }
+      <button
+        type="button"
+        class="tab-close"
+        tabindex="-1"
+        aria-hidden="true"
+        [attr.title]="'Close ' + tab.label"
+        (click)="onClose($event, tab.id)"
+      >
+        <ui-icon name="x" />
+      </button>
     </div>
+  }
+
+  @if (marker(); as drop) {
+    <div class="tab-insertion" aria-hidden="true" [style.left.px]="drop.left"></div>
   }
 </div>
 

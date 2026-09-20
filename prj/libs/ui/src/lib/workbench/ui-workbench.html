@@ -13,13 +13,34 @@
     <ng-content select="[uiSlot=left]" />
   </div>
 
-  <ui-sash orientation="vertical" label="Resize left sidebar" [class.is-hidden]="!leftVisible()" />
-
   <div class="center" role="main">
-    <ng-content select="[uiSlot=center]" />
-  </div>
+    <!-- Both sashes overlay the edges of the main region instead of sitting
+         between regions: they resize a boundary either way, and inside a
+         landmark they stay reachable to assistive tech. -->
+    <ui-sash
+      class="edge-sash edge-sash-left"
+      orientation="vertical"
+      label="Resize left sidebar"
+      [class.is-hidden]="!leftVisible()"
+      [value]="leftWidth()"
+      [min]="leftMin()"
+      [max]="leftMax()"
+      (resize)="leftResize.emit($event)"
+    />
 
-  <ui-sash orientation="vertical" label="Resize right sidebar" [class.is-hidden]="!rightVisible()" />
+    <ng-content select="[uiSlot=center]" />
+
+    <ui-sash
+      class="edge-sash edge-sash-right"
+      orientation="vertical"
+      label="Resize right sidebar"
+      [class.is-hidden]="!rightVisible()"
+      [value]="rightWidth()"
+      [min]="rightMin()"
+      [max]="rightMax()"
+      (resize)="rightResize.emit($event)"
+    />
+  </div>
 
   <div class="sidebar sidebar-right" [class.is-hidden]="!rightVisible()" [style.width.px]="rightWidth()">
     <ng-content select="[uiSlot=right]" />

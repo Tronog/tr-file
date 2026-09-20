@@ -4,6 +4,7 @@
   position: relative;
   flex: none;
   background: transparent;
+  touch-action: none;
 }
 
 :host(.is-vertical) {
@@ -16,6 +17,25 @@
   cursor: row-resize;
 }
 
+/*
+ * The grab area: 8px of pointer target centred on the 4px line. It overlaps the
+ * neighbours instead of widening the sash, so nothing in the layout moves.
+ */
+:host::before {
+  position: absolute;
+  z-index: 1;
+  content: '';
+  inset: 0;
+}
+
+:host(.is-vertical)::before {
+  margin-inline: calc((8px - var(--vsc-sash-size)) / -2);
+}
+
+:host(.is-horizontal)::before {
+  margin-block: calc((8px - var(--vsc-sash-size)) / -2);
+}
+
 :host::after {
   position: absolute;
   background: transparent;
@@ -26,6 +46,7 @@
 
 :host(:hover)::after,
 :host(.is-active)::after,
+:host(.is-dragging)::after,
 :host(:focus-visible)::after {
   background: var(--vsc-sash-hover);
 }

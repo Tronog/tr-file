@@ -1,18 +1,22 @@
-<ng-template #renderNode let-node>
+<ng-template #renderNode let-node let-path="path">
   @switch (node.kind) {
     @case ('split') {
-      <div class="split" [class.is-column]="node.direction === 'column'">
+      <div class="split" [class.is-column]="node.direction === 'column'" #splitEl>
         @for (child of node.children; track $index) {
           <div class="cell" [style.flex]="flexOf(child)">
             <ng-container
               [ngTemplateOutlet]="renderNode"
-              [ngTemplateOutletContext]="{ $implicit: child }"
+              [ngTemplateOutletContext]="{ $implicit: child, path: pathTo(path, $index) }"
             />
           </div>
           @if (!$last) {
             <ui-sash
               [orientation]="node.direction === 'row' ? 'vertical' : 'horizontal'"
-              label="Resize panels"
+              label="Resize panel group"
+              [value]="shareOf(node, $index)"
+              [min]="0"
+              [max]="100"
+              (resize)="onResize($event, node, path, $index, splitEl)"
             />
           }
         }
@@ -29,4 +33,15 @@
   }
 </ng-template>
 
-<ng-container [ngTemplateOutlet]="renderNode" [ngTemplateOutletContext]="{ $implicit: node() }" />
+@if (maximizedGroupId(); as maximized) {
+  @if (template(); as leaf) {
+    <div class="cell is-maximized">
+      <ng-container [ngTemplateOutlet]="leaf" [ngTemplateOutletContext]="{ $implicit: maximized }" />
+    </div>
+  }
+} @else {
+  <ng-container
+    [ngTemplateOutlet]="renderNode"
+    [ngTemplateOutletContext]="{ $implicit: node(), path: rootPath }"
+  />
+}

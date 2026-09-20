@@ -4,7 +4,9 @@ import { ChromeFeature } from './features/chrome.feature';
 import { DetailsFeature } from './features/details.feature';
 import { EditorGroupsFeature } from './features/editor-groups.feature';
 import { ExplorerFeature } from './features/explorer.feature';
+import { PanelLayoutFeature } from './features/panel-layout.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
+import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { FileViewModelFeature } from './features/file-view-model.feature';
 import { MockDataFileSystemService } from './mock-data/mock-data-file-system.service';
 import { MockDataTransfersService } from './mock-data/mock-data-transfers.service';
@@ -44,9 +46,12 @@ export class WorkbenchService {
   readonly fileViewModel = new FileViewModelFeature();
 
   readonly chromeFt = new ChromeFeature(this);
+  /** Owns the split tree; constructed before the feature that mutates it. */
+  readonly panelLayoutFt = new PanelLayoutFeature(this);
   readonly explorerFt = new ExplorerFeature(this);
   readonly editorGroupsFt = new EditorGroupsFeature(this);
   readonly detailsFt = new DetailsFeature(this);
   readonly bottomPanelFt = new BottomPanelFeature(this);
   readonly sidebarPanesFt = new SidebarPanesFeature(this);
+  readonly resizeFt = new WorkbenchResizeFeature(this);
 }

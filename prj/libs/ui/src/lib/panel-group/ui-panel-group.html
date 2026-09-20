@@ -1,10 +1,13 @@
 <ui-tab-bar
   [tabs]="group().tabs"
+  [groupId]="group().id"
   [actions]="group().actions"
   [groupActive]="active()"
   (select)="tabSelect.emit($event)"
   (close)="tabClose.emit($event)"
   (actionSelect)="actionSelect.emit($event)"
+  (tabDrop)="tabDrop.emit($event)"
+  (tabMove)="tabMove.emit($event)"
 />
 
 @if (group().breadcrumbs.length) {
@@ -46,26 +49,37 @@
   </div>
 }
 
-<div class="group-body">
-  @if (group().empty; as empty) {
-    <ui-empty-state [state]="empty" />
-  } @else {
-    @switch (group().view) {
-      @case ('list') {
-        <ui-file-list
-          [columns]="group().columns"
-          [rows]="group().rows"
-          (select)="rowSelect.emit($event)"
-          (activate)="rowActivate.emit($event)"
-        />
-      }
-      @case ('grid') {
-        <ui-icon-view
-          [items]="group().items"
-          (select)="itemSelect.emit($event)"
-          (activate)="itemActivate.emit($event)"
-        />
+<div
+  class="group-body"
+  (dragover)="onBodyDragOver($event)"
+  (dragleave)="onBodyDragLeave($event)"
+  (drop)="onBodyDrop($event)"
+>
+  <div class="group-scroll">
+    @if (group().empty; as empty) {
+      <ui-empty-state [state]="empty" />
+    } @else {
+      @switch (group().view) {
+        @case ('list') {
+          <ui-file-list
+            [columns]="group().columns"
+            [rows]="group().rows"
+            (select)="rowSelect.emit($event)"
+            (activate)="rowActivate.emit($event)"
+          />
+        }
+        @case ('grid') {
+          <ui-icon-view
+            [items]="group().items"
+            (select)="itemSelect.emit($event)"
+            (activate)="itemActivate.emit($event)"
+          />
+        }
       }
     }
+  </div>
+
+  @if (dropZone(); as zone) {
+    <div class="dropzone dropzone--{{ zone }}" aria-hidden="true"></div>
   }
 </div>

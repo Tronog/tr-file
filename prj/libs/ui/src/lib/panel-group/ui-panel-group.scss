@@ -28,7 +28,48 @@
 }
 
 .group-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.group-scroll {
   @include scrollable;
 
   flex: 1;
+}
+
+/* drop-zone overlay: purely decorative, so it is aria-hidden and inert */
+.dropzone {
+  position: absolute;
+  z-index: 20;
+  border: 1px solid var(--vsc-accent);
+  background: rgb(0 120 212 / 18%);
+  pointer-events: none;
+}
+
+.dropzone--center {
+  inset: 0;
+}
+
+.dropzone--left {
+  inset: 0 auto 0 0;
+  width: 50%;
+}
+
+.dropzone--right {
+  inset: 0 0 0 auto;
+  width: 50%;
+}
+
+.dropzone--top {
+  inset: 0 0 auto 0;
+  height: 50%;
+}
+
+.dropzone--bottom {
+  inset: auto 0 0 0;
+  height: 50%;
 }

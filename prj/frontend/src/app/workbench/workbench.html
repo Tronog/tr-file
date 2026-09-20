@@ -4,8 +4,19 @@
 @let details = workbench.detailsFt;
 @let panel = workbench.bottomPanelFt;
 @let panes = workbench.sidebarPanesFt;
+@let layout = workbench.panelLayoutFt;
+@let resize = workbench.resizeFt;
 
-<ui-workbench [leftWidth]="workbench.leftSidebarWidth()" [rightWidth]="workbench.rightSidebarWidth()">
+<ui-workbench
+  [leftWidth]="workbench.leftSidebarWidth()"
+  [rightWidth]="workbench.rightSidebarWidth()"
+  [leftMin]="resize.leftBounds.min"
+  [leftMax]="resize.leftBounds.max"
+  [rightMin]="resize.rightBounds.min"
+  [rightMax]="resize.rightBounds.max"
+  (leftResize)="resize.resizeLeftSidebar($event)"
+  (rightResize)="resize.resizeRightSidebar($event)"
+>
   <h1 uiSlot="title" class="app-heading">tr-file</h1>
 
   <ui-title-bar
@@ -52,23 +63,44 @@
   <!-- centre: the split panel grid above the bottom panel -->
   <div uiSlot="center" class="editor-area">
     <div class="editor-grid">
-      <ui-panel-grid [node]="groups.grid">
+      <ui-panel-grid
+        [node]="layout.grid()"
+        [maximizedGroupId]="layout.maximizedGroupId()"
+        (resize)="layout.resize($event)"
+      >
         <ng-template #leaf let-groupId>
           @if (groups.group(groupId); as group) {
             <ui-panel-group
               [group]="group"
               [active]="groups.isActive(groupId)"
-              (tabSelect)="groups.focus(groupId)"
+              (focusRequest)="groups.focus(groupId)"
+              (tabSelect)="groups.selectTab(groupId, $event)"
+              (tabClose)="groups.closeTab(groupId, $event)"
+              (tabMove)="groups.moveTab(groupId, $event)"
+              (tabDrop)="groups.applyReorder($event)"
+              (zoneDrop)="groups.applyZoneDrop($event)"
+              (actionSelect)="groups.runAction(groupId, $event)"
+              (toolbarAction)="groups.runToolbarAction(groupId, $event)"
+              (breadcrumbSelect)="groups.openBreadcrumb(groupId, $event)"
               (viewChange)="groups.setView(groupId, $event)"
               (rowSelect)="groups.selectEntry(groupId, $event)"
+              (rowActivate)="groups.openEntry(groupId, $event)"
               (itemSelect)="groups.selectEntry(groupId, $event)"
+              (itemActivate)="groups.openEntry(groupId, $event)"
             />
           }
         </ng-template>
       </ui-panel-grid>
     </div>
 
-    <ui-sash orientation="horizontal" label="Resize bottom panel" />
+    <ui-sash
+      orientation="horizontal"
+      label="Resize bottom panel"
+      [value]="workbench.bottomPanelHeight()"
+      [min]="80"
+      [max]="720"
+      (resize)="resize.resizeBottomPanel($event)"
+    />
 
     <ui-bottom-panel
       class="bottom-panel"

@@ -52,6 +52,7 @@
 }
 
 .center {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -60,9 +61,21 @@
   background: var(--vsc-editor-bg);
 }
 
-/* The sash owns its own width; it must never be flexed away by the centre. */
-.body > ui-sash {
-  flex: none;
+/* The two region sashes overlay the edges of the centre, the way VS Code's do,
+   so no layout column is spent on them. */
+.edge-sash {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+}
+
+.edge-sash-left {
+  left: calc(var(--vsc-sash-size) / -2);
+}
+
+.edge-sash-right {
+  right: calc(var(--vsc-sash-size) / -2);
 }
 
 /* Slots are always projected; a hidden region only loses its box. */

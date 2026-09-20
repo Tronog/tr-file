@@ -10,12 +10,18 @@ mockup in `mockup/001/` (PRD 001, Section 1).
   outputs. None of them injects a service, fetches anything, or keeps business
   state. Application state lives in `frontend/src/app/workbench` (a thin
   service plus feature classes, per `docs/ai/ANGULAR.md`).
+- **Interactions are reported, not applied.** A sash emits the pixels it
+  travelled; a tab bar emits where a tab was dropped; a group emits which edge
+  received it. None of them moves anything — the feature classes own the layout
+  tree and decide what a gesture means. The only state a component keeps to
+  itself is the transient kind a drag needs (which tab is dragging, where the
+  insertion bar sits, which drop zone is lit), which dies with the gesture.
 - **Zoneless and signal-based.** `input()` / `input.required()` / `output()` /
   `model()` / `computed()`, native control flow, no `@Input`/`@Output`, no
   `@HostBinding`/`@HostListener`, no `NgModule`, no zone.js.
 - **Layout is data.** The editor area is a recursive `UiGridNode` tree rendered
-  by `UiPanelGrid`, not a fixed template — so moving, grouping and dividing
-  panels become transformations of that tree when interactivity lands.
+  by `UiPanelGrid`, not a fixed template, so moving, grouping and dividing
+  panels are transformations of that tree (`PanelLayoutFeature` in the app).
 - **Accessible.** The app scores zero violations on an axe-core run across
   `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `best-practice`.
 
@@ -77,12 +83,35 @@ a compile error rather than an empty box.
    ~3.1:1 on the editor background; `--vsc-fg-dim` and `--vsc-git-ignored` use
    `#949494` instead, which clears WCAG AA. Cut entries render at 70% rather
    than 50% opacity for the same reason.
-3. **Inert affordances are hidden from assistive tech.** Sashes
-   (`role="separator"` with no value and no drag) and tab close buttons are
-   `aria-hidden` with `tabindex="-1"` while interactivity is deferred. Adding
-   drag support means restoring focusability together with `aria-value*`;
-   wiring up close means dropping `aria-hidden` and giving the tab a keyboard
-   path to it.
+3. **Tab close buttons stay out of the tablist's accessible tree.** A focusable
+   button inside `role="tablist"` is an `aria-required-children` violation, so
+   the close button is `aria-hidden` with `tabindex="-1"`. The keyboard path is
+   the tab's own `Delete`, advertised through `aria-keyshortcuts`. A dirty tab
+   shows its dot until hover or focus, then swaps it for the close button, so
+   it is closable either way.
+4. **Drag and drop has keyboard equivalents, not a keyboard drag.** Pointer
+   drags reorder tabs, move them between groups and divide a group at an edge.
+   By keyboard: `Ctrl`+`←`/`→` reorders within a bar, the tab bar's split
+   buttons divide a group, and every sash is a focusable `separator` that
+   arrow keys move in `step` increments. Moving a tab to an *existing* other
+   group without a pointer is the one gesture still missing; it wants a command
+   palette more than another shortcut.
+
+## Panel interactions
+
+| Gesture | Result |
+| --- | --- |
+| Click a tab | Activates it; the group re-points at that folder and takes focus |
+| Middle-click / close button / `Delete` | Closes the tab; the group goes with its last tab |
+| Drag a tab inside its bar | Reorders it, with a 2px insertion bar showing the landing spot |
+| Drag a tab onto another bar or a group's centre | Moves it into that group |
+| Drag a tab onto a group's edge (outer 25%) | Divides that group; the tab lands in the new half |
+| Split right / Split down | Copies the active tab into a new group beside this one |
+| Maximize | Renders one group alone; the button becomes Restore |
+| Drag a sash / focus it and press arrows | Resizes the two regions it divides |
+
+Closing the last group anywhere leaves a single empty group, so there is always
+somewhere to drop a tab.
 
 ## Testing
 

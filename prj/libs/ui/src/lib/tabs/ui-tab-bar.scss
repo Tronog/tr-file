@@ -10,10 +10,22 @@
 }
 
 .tabs {
+  position: relative;
   display: flex;
   align-items: stretch;
   min-width: 0;
   overflow: hidden;
+}
+
+/* the 2px accent bar marking where a dragged tab would be inserted */
+.tab-insertion {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 2px;
+  background: var(--vsc-accent);
+  pointer-events: none;
 }
 
 .tab {
@@ -32,6 +44,10 @@
   &:hover {
     background: var(--vsc-tab-active-bg);
   }
+}
+
+.tab.is-dragging {
+  opacity: 0.4;
 }
 
 .tab.is-active {
@@ -113,4 +129,23 @@
   align-items: center;
   margin-left: auto;
   padding: 0 8px;
+}
+
+/* A dirty tab shows its dot instead of the close button until the pointer or
+   keyboard reaches it — the same swap VS Code does. */
+.tab:has(.tab-dirty) {
+  .tab-close {
+    display: none;
+  }
+
+  &:hover,
+  &:focus-within {
+    .tab-dirty {
+      display: none;
+    }
+
+    .tab-close {
+      display: inline-flex;
+    }
+  }
 }
