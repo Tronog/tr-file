@@ -176,6 +176,44 @@ export class EditorGroupsFeature {
     this.runToolbarAction(groupId, 'up');
   }
 
+  /**
+   * Opens an entry in a new panel beside this one (PRD 001, §6.2.5).
+   *
+   * Unlike the split button, which copies the active tab, the new panel is
+   * created *for* this entry: a folder gets its listing, a file gets its
+   * viewer. The keyboard goes with it, because opening something aside is a
+   * request to work in it.
+   */
+  openEntryAside(groupId: string, entryId: string): void {
+    const group = this.find(groupId);
+    const entry = this.entryIn(groupId, entryId);
+    if (!group || !entry) {
+      return;
+    }
+
+    const newGroupId = this.createGroupId();
+    const directory = entry.type === 'directory';
+    const tab: PanelTabState = {
+      id: `tab-${newGroupId}`,
+      label: entry.name,
+      path: entry.path,
+      kind: directory ? 'folder' : 'file',
+    };
+
+    this.groups.update((groups) => [...groups, this.cloneGroup(group, newGroupId, [tab])]);
+    this.parent.panelLayoutFt.insertBeside(groupId, newGroupId, 'right');
+    this.parent.activeGroupId.set(newGroupId);
+
+    if (directory) {
+      this.parent.fsDataFt.ensureListing(entry.path);
+    } else {
+      this.parent.select(entry.path);
+      this.parent.filePreviewFt.load(entry.path);
+    }
+
+    this.parent.panelFocusFt.focusBody(newGroupId);
+  }
+
   /* -- toolbar ----------------------------------------------------------- */
 
   runToolbarAction(groupId: string, actionId: string): void {
@@ -613,8 +651,12 @@ export class EditorGroupsFeature {
   private cloneGroup(source: PanelGroupState, id: string, tabs: readonly PanelTabState[]): PanelGroupState {
     const group = this.withTabs({ ...source, id, selection: [], tabs: [] }, tabs);
     // A panel born from a split starts its own trail where it was born, not
-    // with its neighbour's — they are two places to work from now on.
-    this.parent.panelHistoryFt.record(id, group.path);
+    // with its neighbour's — they are two places to work from now on. Only a
+    // *folder* is a stop on that trail: Back into a file would ask the panel
+    // to list one.
+    if ((group.tabs.find((tab) => tab.active) ?? group.tabs[0])?.kind !== 'file') {
+      this.parent.panelHistoryFt.record(id, group.path);
+    }
     return group;
   }
 

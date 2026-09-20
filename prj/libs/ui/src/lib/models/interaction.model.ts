@@ -53,13 +53,21 @@ export interface UiTabMove {
  * what the workbench *shows* leaves as one of these instead, so a panel's key
  * bindings are decided in one place rather than spread across a template.
  */
-export type UiPanelCommand = 'open' | 'select' | 'up' | 'refresh' | 'back' | 'forward';
+export type UiPanelCommand =
+  | 'open'
+  | 'open-aside'
+  | 'select'
+  | 'up'
+  | 'refresh'
+  | 'back'
+  | 'forward';
 
 /**
  * One `UiPanelCommand`, with the entry focus sat on when the key was hit.
  *
  * `back` and `forward` carry an entry like the rest, but never use one: they
  * are about where the *panel* has been, not what is selected in it.
+ * `open-aside` opens its entry in a panel that does not exist yet.
  */
 export interface UiPanelKey {
   readonly command: UiPanelCommand;

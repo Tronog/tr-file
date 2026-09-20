@@ -48,8 +48,9 @@ Inside a panel body the library components move focus (arrows, `Home`/`End`, pag
 type-to-find, selection following focus) and report the keys that mean something to the
 workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as a `UiPanelKey`;
 `PanelKeyboardFeature` is the one place those bindings are decided. `Ctrl`+`T` (split),
-`Ctrl`+`W` (close the focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab)
-are bound on the group's host instead, and emit
+`Ctrl`+`W` (close the focused tab), `Ctrl`+`PageUp`/`PageDown` (previous/next tab) and
+`Ctrl`+`Enter` (open the focused entry in a new panel on the right) are bound on the
+group's host instead, and emit
 the same outputs the tab bar's buttons do; the desktop shell installs its own accelerator
 table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,

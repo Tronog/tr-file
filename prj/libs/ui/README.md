@@ -131,6 +131,7 @@ entry would maximize the window.
 | Split right / Split down, or `Ctrl`+`T` | Copies the active tab into a new group beside this one |
 | `Ctrl`+`W` | Closes the panel's focused tab; the group goes with its last one |
 | `Ctrl`+`PageUp` / `Ctrl`+`PageDown` | Moves to the previous / next tab, wrapping at either end |
+| `Ctrl`+`Enter` | Emits `open-aside`; the app opens that entry in a new panel on the right |
 | Maximize, or double-click a tab | Renders one group alone; the button becomes Restore |
 | Press a group's empty body | Emits `bodyPress`; the app focuses the group and its content |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
@@ -197,6 +198,12 @@ emits exactly what the equivalent pointer gesture emits: the split and close
 buttons, or a click on the neighbouring tab. The pointer and the keyboard
 cannot drift apart, and switching by keyboard lands focus in the new tab's
 content just as clicking would.
+
+`Ctrl`+`Enter` is the exception to that symmetry (§6.2.5): opening an entry in
+a panel that does not exist yet has no pointer equivalent, so it leaves as a
+`UiPanelKey` for the application to carry out. The group supplies the entry
+from its own model — the cursor if there is one, the selection otherwise —
+which is what lets one handler serve the listing and the grid alike.
 
 Both body views therefore let an `Alt` *or* `Ctrl` chord bubble untouched. The
 list pages its rows on a bare `PageDown`, so without that it would page **and**

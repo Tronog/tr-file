@@ -446,6 +446,66 @@ describe('UiPanelGroup panel keys', () => {
       expect(closed).toEqual(['tab-root']);
     });
 
+    /** PRD 001, §6.2.5 — open what the cursor is on, in a panel of its own. */
+    describe('Ctrl+Enter', () => {
+      const body = (): Element => fixture.nativeElement.querySelector('.group-body');
+
+      it('reports the entry the listing is standing on', () => {
+        // ROWS marks the first entry focused.
+        const event = chord('Enter', body());
+
+        expect(commands).toEqual([{ command: 'open-aside', entryId: 'alpha.ts' }]);
+        expect(event.defaultPrevented).toBe(true);
+      });
+
+      it('falls back to the selection when nothing has the cursor', () => {
+        fixture.componentRef.setInput('group', {
+          ...GROUP,
+          rows: [
+            { id: 'a.ts', name: 'a.ts', icon: 'file', cells: {} },
+            { id: 'b.md', name: 'b.md', icon: 'file', cells: {}, selected: true },
+          ],
+        } satisfies UiPanelGroupModel);
+        fixture.detectChanges();
+
+        chord('Enter', body());
+
+        expect(commands).toEqual([{ command: 'open-aside', entryId: 'b.md' }]);
+      });
+
+      /** The grid is the other body view, and the same handler serves it. */
+      it('reads the grid when that is what is showing', () => {
+        fixture.componentRef.setInput('group', {
+          ...GROUP,
+          view: 'grid',
+          rows: [],
+          items: [
+            { id: 'one.png', label: 'one.png', icon: 'file' },
+            { id: 'two.png', label: 'two.png', icon: 'file', focused: true },
+          ],
+        } satisfies UiPanelGroupModel);
+        fixture.detectChanges();
+
+        chord('Enter', body());
+
+        expect(commands).toEqual([{ command: 'open-aside', entryId: 'two.png' }]);
+      });
+
+      it('claims nothing when the body has no entries', () => {
+        fixture.componentRef.setInput('group', {
+          ...GROUP,
+          rows: [],
+          empty: { icon: 'folder-open', title: 'This folder is empty' },
+        } satisfies UiPanelGroupModel);
+        fixture.detectChanges();
+
+        const event = chord('Enter', body());
+
+        expect(commands).toEqual([]);
+        expect(event.defaultPrevented).toBe(false);
+      });
+    });
+
     /** PRD 001, §6.2.4 — switching tabs without the pointer. */
     describe('Ctrl+PageUp and Ctrl+PageDown', () => {
       const TWO_TABS: UiPanelGroupModel = {

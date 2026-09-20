@@ -228,6 +228,73 @@ describe('PanelKeyboardFeature', () => {
       expect(workbench.panelFocusFt.token(second)).toBeGreaterThan(0);
     });
 
+    /** PRD 001, §6.2.5 — the entry gets a panel of its own, on the right. */
+    describe('opening aside', () => {
+      it('gives a folder a new panel listing it, and the keyboard with it', async () => {
+        await start();
+        const first = groupId();
+
+        workbench.editorGroupsFt.openEntryAside(first, 'docs');
+        http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+        await settled();
+
+        const second = groupId();
+        expect(second).not.toBe(first);
+        expect(workbench.editorGroupsFt.pathOf(second)).toBe('docs');
+        // The panel it came from is left exactly where it was.
+        expect(workbench.editorGroupsFt.pathOf(first)).toBe('');
+        expect(workbench.panelFocusFt.token(second)).toBeGreaterThan(0);
+      });
+
+      it('gives a file a new panel showing it', async () => {
+        await start();
+        const first = groupId();
+
+        workbench.editorGroupsFt.openEntryAside(first, 'README.md');
+        http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+        http.expectOne(downloadUrl('README.md')).flush(new Blob(['# hi'], { type: 'text/markdown' }));
+        await settled();
+
+        const second = groupId();
+        const group = workbench.editorGroupsFt.group(second);
+        expect(group?.tabs.map((tab) => tab.label)).toEqual(['README.md']);
+        expect(group?.document).toBeDefined();
+      });
+
+      /** A file is not a folder, so it is not a stop on the panel's trail. */
+      it('starts a file panel with no history of its own', async () => {
+        await start();
+
+        workbench.editorGroupsFt.openEntryAside(groupId(), 'README.md');
+        http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+        http.expectOne(downloadUrl('README.md')).flush(new Blob(['# hi'], { type: 'text/markdown' }));
+        await settled();
+
+        expect(workbench.panelHistoryFt.entriesOf(groupId())).toEqual([]);
+      });
+
+      it('ignores an entry this panel has never listed', async () => {
+        await start();
+        const before = groupId();
+
+        workbench.editorGroupsFt.openEntryAside(before, 'nowhere/at/all');
+        await settled();
+
+        expect(groupId()).toBe(before);
+      });
+
+      it('is what Ctrl+Enter is routed to', async () => {
+        await start();
+        const first = groupId();
+
+        workbench.panelKeyboardFt.run(first, { command: 'open-aside', entryId: 'docs' });
+        http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+        await settled();
+
+        expect(workbench.editorGroupsFt.pathOf(groupId())).toBe('docs');
+      });
+    });
+
     /** PRD 001, §6.1.1 — what a double click on a tab is wired to. */
     it('maximizes and restores the group', async () => {
       await start();

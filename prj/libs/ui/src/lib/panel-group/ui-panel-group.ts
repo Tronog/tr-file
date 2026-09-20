@@ -302,7 +302,9 @@ export class UiPanelGroup {
    * split and close buttons emit, and `Ctrl`+`PageUp`/`PageDown` (§6.2.4)
    * emits what clicking the neighbouring tab emits. That is why the
    * application needs no new wiring, and why the pointer and the keyboard can
-   * never drift apart.
+   * never drift apart. `Ctrl`+`Enter` is the exception — opening an entry in a
+   * panel that does not exist yet has no pointer equivalent — so it leaves as
+   * a `UiPanelKey` for the application to carry out (§6.2.5).
    */
   protected onGroupKeydown(event: KeyboardEvent): void {
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
@@ -324,6 +326,16 @@ export class UiPanelGroup {
         this.tabClose.emit(active.id);
         break;
       }
+      case 'enter': {
+        // The group knows which entry has focus from its own model, so one
+        // handler covers the listing and the grid alike (PRD 001, §6.2.5).
+        const entryId = this.focusedEntry();
+        if (entryId === null) {
+          return;
+        }
+        this.command.emit({ command: 'open-aside', entryId });
+        break;
+      }
       default:
         // `event.key`, not the letter cases above: the page keys have names.
         if (event.key === 'PageDown') {
@@ -341,6 +353,21 @@ export class UiPanelGroup {
     }
 
     event.preventDefault();
+  }
+
+  /**
+   * The entry the body is standing on, from whichever view is showing.
+   *
+   * `focused` is the cursor and `selected` the fallback, because a panel that
+   * has only ever been clicked in has a selection but no keyboard cursor yet.
+   */
+  private focusedEntry(): string | null {
+    const group = this.group();
+    const entries: readonly { id: string; focused?: boolean; selected?: boolean }[] =
+      group.view === 'grid' ? group.items : group.rows;
+    const entry = entries.find((candidate) => candidate.focused) ??
+      entries.find((candidate) => candidate.selected);
+    return entry?.id ?? null;
   }
 
   /**

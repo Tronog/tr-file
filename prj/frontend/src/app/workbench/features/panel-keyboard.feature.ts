@@ -18,7 +18,8 @@ import type { WorkbenchService } from '../workbench.service';
  * panel's existing verbs rather than a parallel set of their own. `back` and
  * `forward` are the exception, and the reason `PanelHistoryFeature` exists:
  * `Alt`+`←`/`→` is the only way to walk a panel's trail, since nothing in the
- * chrome offers it yet.
+ * chrome offers it yet — as is `Ctrl`+`Enter`, which opens an entry in a panel
+ * that does not exist until the key is pressed (§6.2.5).
  */
 export class PanelKeyboardFeature {
   constructor(private readonly parent: WorkbenchService) {}
@@ -39,6 +40,14 @@ export class PanelKeyboardFeature {
         // exactly the same thing.
         if (key.entryId !== null) {
           groups.openEntry(groupId, key.entryId);
+        }
+        break;
+
+      case 'open-aside':
+        // No `keepFocusInBody` here: the new panel takes the keyboard, and
+        // asking the old one for it too would drag focus back out of it.
+        if (key.entryId !== null) {
+          groups.openEntryAside(groupId, key.entryId);
         }
         break;
 
