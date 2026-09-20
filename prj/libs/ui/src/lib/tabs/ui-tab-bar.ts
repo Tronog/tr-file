@@ -58,6 +58,10 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
  * does. The close button is a sibling of the tab button rather than a child,
  * because a button may never nest inside another button.
  *
+ * Choosing a tab and roving to one are different events: a click emits
+ * `select` *and* `activate`, while the arrow keys emit only `select`. The
+ * application uses the difference to decide when focus may leave the bar.
+ *
  * The bar is both a drag source and a drop target for tabs. It never reorders
  * anything itself: a drop is reported as a `UiTabReorder` and a `Ctrl+Arrow`
  * as a `UiTabMove`, and the application decides what that means. The only
@@ -89,6 +93,16 @@ export class UiTabBar {
   readonly label = input<string>('Open folders');
 
   readonly select = output<string>();
+
+  /**
+   * A tab was *chosen* — clicked, or `Enter`/`Space`d, which the browser turns
+   * into a click. Distinct from `select`, which the arrow keys also emit as
+   * they rove: focus may follow a deliberate choice out of the bar and into
+   * the group's body, but it must never follow an arrow, or a keyboard user
+   * could never reach the tab after next.
+   */
+  readonly activate = output<string>();
+
   readonly close = output<string>();
   readonly actionSelect = output<string>();
 
@@ -127,6 +141,12 @@ export class UiTabBar {
    * violates `aria-required-children`).
    */
   protected readonly keyShortcuts = 'Delete Control+ArrowLeft Control+ArrowRight';
+
+  /** A click chooses a tab: both a selection and a destination. */
+  protected onActivate(id: string): void {
+    this.select.emit(id);
+    this.activate.emit(id);
+  }
 
   protected onClose(event: Event, id: string): void {
     event.stopPropagation();

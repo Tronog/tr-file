@@ -9,6 +9,7 @@ import { ExplorerNavigationFeature } from './features/explorer-navigation.featur
 import { FilePreviewFeature } from './features/file-preview.feature';
 import { FileViewModelFeature } from './features/file-view-model.feature';
 import { FsDataFeature } from './features/fs-data.feature';
+import { PanelFocusFeature } from './features/panel-focus.feature';
 import { PanelKeyboardFeature } from './features/panel-keyboard.feature';
 import { PanelLayoutFeature } from './features/panel-layout.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
@@ -77,6 +78,8 @@ export class WorkbenchService {
   readonly detailsFt = new DetailsFeature(this);
   /** The panel key map; every binding it runs belongs to the groups above. */
   readonly panelKeyboardFt = new PanelKeyboardFeature(this);
+  /** Sends focus into a panel body once a chosen tab has rendered. */
+  readonly panelFocusFt = new PanelFocusFeature(this);
   /** Links the two: constructed after the explorer and the groups it drives. */
   readonly explorerNavFt = new ExplorerNavigationFeature(this);
   readonly bottomPanelFt = new BottomPanelFeature(this);

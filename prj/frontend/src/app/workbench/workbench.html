@@ -4,6 +4,7 @@
 @let preview = workbench.filePreviewFt;
 @let groups = workbench.editorGroupsFt;
 @let panelKeys = workbench.panelKeyboardFt;
+@let panelFocus = workbench.panelFocusFt;
 @let details = workbench.detailsFt;
 @let panel = workbench.bottomPanelFt;
 @let panes = workbench.sidebarPanesFt;
@@ -84,8 +85,10 @@
             <ui-panel-group
               [group]="group"
               [active]="groups.isActive(groupId)"
+              [focusBody]="panelFocus.token(groupId)"
               (focusRequest)="groups.focus(groupId)"
               (tabSelect)="groups.selectTab(groupId, $event)"
+              (tabActivate)="panelFocus.focusBody(groupId)"
               (tabClose)="groups.closeTab(groupId, $event)"
               (tabMove)="groups.moveTab(groupId, $event)"
               (tabDrop)="groups.applyReorder($event)"

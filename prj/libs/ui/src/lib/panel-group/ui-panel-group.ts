@@ -1,4 +1,13 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import {
+  Component,
+  afterRenderEffect,
+  computed,
+  input,
+  output,
+  signal,
+  viewChild,
+  type ElementRef,
+} from '@angular/core';
 import { UiBreadcrumbs } from '../breadcrumbs/ui-breadcrumbs';
 import { UiIconButton } from '../controls/ui-icon-button';
 import { UiSearchField } from '../controls/ui-search-field';
@@ -98,7 +107,22 @@ export class UiPanelGroup {
   /** Whether this group owns the workbench focus. */
   readonly active = input<boolean>(false);
 
+  /**
+   * A token the application bumps to ask the body to take focus (PRD 001,
+   * Section 6.3). `0` means it has never asked; any change is one request,
+   * which is why it is a number and not a boolean — asking twice for the same
+   * group has to be two asks.
+   */
+  readonly focusBody = input<number>(0);
+
   readonly tabSelect = output<string>();
+
+  /**
+   * A tab was chosen rather than roved past; see `UiTabBar.activate`. The
+   * application answers this by bumping `focusBody`.
+   */
+  readonly tabActivate = output<string>();
+
   readonly tabClose = output<string>();
   readonly actionSelect = output<string>();
   readonly breadcrumbSelect = output<string>();
@@ -132,6 +156,51 @@ export class UiPanelGroup {
 
   /** Whether a file drag from outside the page is hovering the body. */
   protected readonly fileDragging = signal(false);
+
+  private readonly bodyElement = viewChild.required<ElementRef<HTMLElement>>('body');
+
+  /** The last `focusBody` this component has seen; a change is a new request. */
+  private seenFocusToken = 0;
+
+  /** A request that has not found anything to focus yet. */
+  private focusWanted = false;
+
+  constructor() {
+    // After render, not during it: the body has to exist before focus can go
+    // into it, and on a tab switch the *new* tab's body is what must exist.
+    // A request outlives an unsatisfied attempt while the listing is still
+    // loading, so clicking a tab whose folder has not arrived yet still lands
+    // focus on the first row once it does. Anything else settles the request,
+    // or a stale ask would steal focus from wherever the user has since gone.
+    afterRenderEffect(() => {
+      const token = this.focusBody();
+      const loading = !!this.group().loading;
+
+      if (token !== this.seenFocusToken) {
+        this.seenFocusToken = token;
+        this.focusWanted = token > 0;
+      }
+
+      if (!this.focusWanted) {
+        return;
+      }
+
+      if (this.moveFocusIntoBody() || !loading) {
+        this.focusWanted = false;
+      }
+    });
+  }
+
+  /**
+   * Focuses the body's single tab stop — the focused row, the focused tile or
+   * the document's scroll container, whichever the body is currently showing.
+   * Reports whether there was one: an empty or still-loading body has none.
+   */
+  private moveFocusIntoBody(): boolean {
+    const target = this.bodyElement().nativeElement.querySelector<HTMLElement>('[tabindex="0"]');
+    target?.focus();
+    return target !== null;
+  }
 
   protected readonly viewOptions: readonly UiSegmentedOption[] = [
     { id: 'list', label: 'List view', icon: 'list' },

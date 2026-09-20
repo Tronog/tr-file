@@ -4,6 +4,7 @@
   [actions]="group().actions"
   [groupActive]="active()"
   (select)="tabSelect.emit($event)"
+  (activate)="tabActivate.emit($event)"
   (close)="tabClose.emit($event)"
   (actionSelect)="actionSelect.emit($event)"
   (tabDrop)="tabDrop.emit($event)"
@@ -56,6 +57,7 @@
 }
 
 <div
+  #body
   class="group-body"
   (dragover)="onBodyDragOver($event)"
   (dragleave)="onBodyDragLeave($event)"

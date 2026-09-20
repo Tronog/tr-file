@@ -101,7 +101,7 @@ a compile error rather than an empty box.
 
 | Gesture | Result |
 | --- | --- |
-| Click a tab | Activates it; the group re-points at that folder and takes focus |
+| Click a tab | Activates it; the group re-points at that folder, takes focus, and focus moves into its body |
 | Middle-click / close button / `Delete` | Closes the tab; the group goes with its last tab |
 | Drag a tab inside its bar | Reorders it, with a 2px insertion bar showing the landing spot |
 | Drag a tab onto another bar or a group's centre | Moves it into that group |
@@ -117,6 +117,25 @@ a compile error rather than an empty box.
 
 Closing the last group anywhere leaves a single empty group, so there is always
 somewhere to drop a tab.
+
+### Getting into a panel body
+
+Choosing a tab means wanting to work in it, so once its content has rendered
+the body takes focus — no `Tab`, `Tab`, `Tab` down from the tab bar (PRD 001,
+Section 6.3). `UiTabBar` separates the two things a tab bar reports: a click
+(or the `Enter`/`Space` the browser turns into one) emits `select` **and**
+`activate`, while the arrow keys emit only `select`. If roving counted as
+choosing, focus would leave the bar on the first arrow and the tab after next
+would be unreachable.
+
+The application answers `activate` by bumping `UiPanelGroup`'s `focusBody`
+token; the group moves focus after its next render, onto whichever single tab
+stop the body is currently offering — the focused row, the focused tile or the
+document's scroll container. A token rather than a boolean, because asking
+twice for the same group has to be two asks. A request whose body is still
+`loading` survives until the rows arrive, so a tab clicked before its folder
+has been fetched still ends up focused; any other unsatisfied request is spent
+at once, so a stale ask can never steal focus back from the user.
 
 ### Inside a panel body
 
