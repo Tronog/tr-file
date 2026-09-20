@@ -1,10 +1,13 @@
 packages:
   - 'backend'
   - 'frontend'
+  - 'desktop'
   - 'libs/*'
 
 allowBuilds:
   esbuild: true
+  electron: true
   lmdb: true
   '@parcel/watcher': true
   msgpackr-extract: true
+  electron-winstaller: set this to true or false

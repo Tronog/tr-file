@@ -6,6 +6,7 @@ It is a full stack application consisting of
 * docker compose
   * development - ports directly exposed
   * production - behind nginx proxy
+* Electron desktop shell - `prj/desktop`
 * other future libraries - `prj/libs`
 
 # Layout
@@ -24,6 +25,7 @@ prj/
 ├── docker/nginx/default.conf
 ├── backend/
 ├── frontend/
+├── desktop/              # @tr-file/desktop — Electron shell
 └── libs/
     └── ui/               # @tr-file/ui — workbench component library
 ```
@@ -64,6 +66,15 @@ Refer to `docs/ai/EXPRESS.md`. The file-system API lives at `/api/fs`
 (listing, details, download, upload) — see `prj/backend/README.md` for the
 endpoint reference, the error codes and the `FILES_ROOT` confinement rules. Its
 frontend client is `prj/frontend/src/app/file-system/`.
+
+# Desktop
+`prj/desktop` is the Electron app that runs the whole stack in one process — see
+`prj/desktop/README.md`. It does not spawn the backend: `DesktopStack` mounts
+`new App(...)` from `@tr-file/backend` as middleware beside `express.static` over the
+frontend build, on a loopback port the OS picks, and the window loads that. It is
+therefore what `docker/nginx/default.conf` is in production. Only `main.ts` and
+`main-window.ts` import `electron`, so `pnpm --filter @tr-file/desktop test` boots the
+real stack over HTTP with no desktop session.
 
 # Docker
 Refer to `docs/ai/DOCKER.md`. Two Compose environments live at the workspace root:

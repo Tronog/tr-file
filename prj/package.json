@@ -11,6 +11,8 @@
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "desktop": "pnpm --filter @tr-file/desktop start",
+    "desktop:dev": "pnpm --filter @tr-file/desktop dev",
     "docker:dev": "docker compose -f compose.dev.yaml up --build",
     "docker:dev:down": "docker compose -f compose.dev.yaml down -v",
     "docker:prod": "docker compose -f compose.prod.yaml up --build -d",

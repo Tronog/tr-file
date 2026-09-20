@@ -21,13 +21,15 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
-# Workspace libraries are part of the install graph, so their manifests must be
-# present for `--frozen-lockfile` to resolve.
+# Every workspace member's manifest must be present for `--frozen-lockfile` to
+# resolve, even the ones this image never builds.
+COPY desktop/package.json ./desktop/
 COPY libs/ui/package.json ./libs/ui/
 
 # lmdb / msgpackr-extract have no musl prebuild and there is no compiler in the
 # image; pnpm demotes those optional install scripts to warnings. Expected.
-RUN pnpm install --frozen-lockfile
+# Filtered, so the desktop shell's Electron binary (~230 MB) stays out of here.
+RUN pnpm install --frozen-lockfile --filter "frontend..."
 
 # ---------------------------------------------------------------------------
 # development: dev server, sources bind-mounted over /app by compose

@@ -23,9 +23,12 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
-# Workspace libraries are in the install graph; --frozen-lockfile needs them.
+# Every workspace member's manifest must be present for --frozen-lockfile to
+# resolve, even the ones this image never builds.
+COPY desktop/package.json desktop/package.json
 COPY libs/ui/package.json libs/ui/package.json
-RUN pnpm install --frozen-lockfile
+# Filtered, so the desktop shell's Electron binary (~230 MB) stays out of here.
+RUN pnpm install --frozen-lockfile --filter "@tr-file/backend..."
 
 # ---------------------------------------------------------------------------
 # prod-deps — production dependency tree for the backend only
@@ -34,7 +37,7 @@ FROM base AS prod-deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
-# Workspace libraries are in the install graph; --frozen-lockfile needs them.
+COPY desktop/package.json desktop/package.json
 COPY libs/ui/package.json libs/ui/package.json
 RUN pnpm install --frozen-lockfile --prod --filter "@tr-file/backend..."
 

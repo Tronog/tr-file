@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  /* Same rule as the backend: tests are type-checked by tsconfig.test.json and
+     run from source by `pnpm test`, so they never reach dist/. */
+  "exclude": ["dist", "node_modules", "src/**/*.test.ts"]
+}

@@ -45,11 +45,17 @@ Images enable pnpm through Corepack (`corepack enable pnpm`), which honours the
 root `packageManager` pin. Copy the manifests (`package.json`,
 `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and each package's `package.json`)
 and run `pnpm install --frozen-lockfile` *before* copying sources, so a source
-edit does not invalidate the dependency layer.
+edit does not invalidate the dependency layer. **Every** workspace member's
+manifest must be copied, including `desktop/` which no image builds — with one
+missing, `--frozen-lockfile` cannot resolve. The install is then narrowed with
+`--filter "<package>..."` so the desktop shell's Electron binary (~230 MB) never
+reaches these images.
 
-`pnpm-workspace.yaml` carries an `allowBuilds:` map (esbuild, lmdb,
+`pnpm-workspace.yaml` carries an `allowBuilds:` map (esbuild, electron, lmdb,
 `@parcel/watcher`, `msgpackr-extract`); keep it in sync with any new native
-dependency. On the Alpine base the images use, only esbuild (a statically
+dependency. Electron is on it for the desktop shell, which runs on the host and
+never in a container; the filtered installs above keep its download out of the
+images. On the Alpine base the images use, only esbuild (a statically
 linked Go binary) and `@parcel/watcher` (ships a `-musl` prebuild) actually
 resolve. `lmdb` and `msgpackr-extract` publish no musl prebuild and there is no
 compiler in the image, so their install scripts fail — pnpm demotes that to a
