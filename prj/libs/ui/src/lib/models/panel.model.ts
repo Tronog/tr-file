@@ -15,6 +15,20 @@ export interface UiTab {
   readonly pinned?: boolean;
 }
 
+/** A file rendered read-only in a panel, instead of a directory listing. */
+export interface UiDocumentModel {
+  /** Path shown in the viewer's status line, e.g. `docs/prd/001.md`. */
+  readonly path: string;
+  /** `markdown` renders `html`; `text` renders `text` verbatim. */
+  readonly kind: 'markdown' | 'text';
+  /** Sanitised HTML, already rendered by the app. Only for `kind: 'markdown'`. */
+  readonly html?: string;
+  /** Raw file text. Only for `kind: 'text'`. */
+  readonly text?: string;
+  /** Right-hand status hint, e.g. `'2.4 KB · UTF-8'`. */
+  readonly meta?: string;
+}
+
 /** How a group renders its directory contents. */
 export type UiPanelView = 'list' | 'grid';
 
@@ -41,6 +55,11 @@ export interface UiPanelGroupModel {
   readonly summary?: string;
   /** Rendered instead of a body when the group holds no tabs. */
   readonly empty?: UiEmptyStateModel;
+  /**
+   * A file open in this group: rendered instead of a listing when the active
+   * tab is a file. `empty` still wins, since that is the "no tabs" case.
+   */
+  readonly document?: UiDocumentModel;
   /**
    * The group's listing is being fetched — an indeterminate 2px bar appears
    * under the tab bar. The rail is reserved either way, so it never shifts.

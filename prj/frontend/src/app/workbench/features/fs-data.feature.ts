@@ -73,6 +73,19 @@ export class FsDataFeature {
   }
 
   /**
+   * One entry, looked up in its parent's listing. `undefined` when that
+   * directory has not been read yet — the root itself has no entry of its own.
+   */
+  entryAt(path: string): FsEntry | undefined {
+    if (path === '') {
+      return undefined;
+    }
+    const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    const entries = this.listings().get(parentPath)?.listing?.entries ?? [];
+    return entries.find((entry) => entry.path === path);
+  }
+
+  /**
    * Fetches a directory unless it is already cached or in flight.
    *
    * A cached *failure* does not count as cached: asking again — re-expanding

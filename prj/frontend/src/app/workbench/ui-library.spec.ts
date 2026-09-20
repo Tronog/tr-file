@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiFileList, UiTree } from '@tr-file/ui';
-import type { UiFileColumn, UiFileRow, UiTreeNode } from '@tr-file/ui';
+import { UiDocumentView, UiFileList, UiTree } from '@tr-file/ui';
+import type { UiDocumentModel, UiFileColumn, UiFileRow, UiTreeNode } from '@tr-file/ui';
 
 const TREE_NODES: readonly UiTreeNode[] = [
   { id: 'prj', label: 'prj', depth: 0, icon: 'folder-open', tint: 'folder', expandable: true, expanded: true, guides: [] },
@@ -136,6 +136,154 @@ describe('UiTree', () => {
 
     expect(toggled).toEqual(['prj']);
     expect(activated).toEqual([]);
+  });
+});
+
+describe('UiDocumentView', () => {
+  let fixture: ComponentFixture<UiDocumentView>;
+
+  const render = async (document: UiDocumentModel): Promise<void> => {
+    await TestBed.configureTestingModule({ imports: [UiDocumentView] }).compileComponents();
+    fixture = TestBed.createComponent(UiDocumentView);
+    fixture.componentRef.setInput('document', document);
+    fixture.detectChanges();
+  };
+
+  const host = (): HTMLElement => fixture.nativeElement;
+
+  it('renders markdown HTML the app has already produced', async () => {
+    await render({
+      path: 'docs/README.md',
+      kind: 'markdown',
+      html: '<h1>Title</h1><p>Body <code>x</code></p>',
+      meta: '512 B · 31 lines',
+    });
+
+    expect(host().querySelector('.markdown h1')?.textContent).toBe('Title');
+    expect(host().querySelector('.markdown code')?.textContent).toBe('x');
+    expect(host().querySelector('pre')).toBeNull();
+  });
+
+  it('strips anything dangerous out of that HTML', async () => {
+    await render({
+      path: 'evil.md',
+      kind: 'markdown',
+      html: '<p>ok</p><script>window.pwned = true;</script>',
+    });
+
+    // Angular's sanitiser runs on the [innerHTML] binding; the app is not
+    // trusted to have produced safe HTML just because it produced it.
+    expect(host().querySelector('script')).toBeNull();
+    expect(host().textContent).toContain('ok');
+  });
+
+  it('shows plain text verbatim, without rendering it', async () => {
+    await render({ path: 'main.ts', kind: 'text', text: 'const x = 1; // **not bold**' });
+
+    expect(host().querySelector('pre')?.textContent).toBe('const x = 1; // **not bold**');
+    expect(host().querySelector('.markdown')).toBeNull();
+    expect(host().querySelector('strong')).toBeNull();
+  });
+
+  it('names the region after the path and says it is read-only', async () => {
+    await render({ path: 'docs/README.md', kind: 'text', text: 'x', meta: '512 B · 1 line' });
+
+    expect(host().querySelector('article')?.getAttribute('aria-label')).toBe('docs/README.md');
+    expect(host().textContent).toContain('Read-only');
+    expect(host().textContent).toContain('512 B · 1 line');
+    // Nothing in a read-only view may be editable.
+    expect(host().querySelector('input, textarea, [contenteditable]')).toBeNull();
+  });
+});
+
+describe('UiTree keyboard', () => {
+  let fixture: ComponentFixture<UiTree>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [UiTree] }).compileComponents();
+    fixture = TestBed.createComponent(UiTree);
+    fixture.componentRef.setInput('nodes', TREE_NODES);
+    fixture.detectChanges();
+  });
+
+  const rows = (): HTMLElement[] => Array.from(fixture.nativeElement.querySelectorAll('[role="treeitem"]'));
+
+  const press = (index: number, key: string): KeyboardEvent => {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    rows()[index]?.dispatchEvent(event);
+    fixture.detectChanges();
+    return event;
+  };
+
+  /**
+   * The twisty is decorative, so these keys are the only way a keyboard user
+   * can open or close a directory.
+   */
+  it('opens a closed directory with ArrowRight and closes an open one with ArrowLeft', () => {
+    const toggled: string[] = [];
+    fixture.componentInstance.toggle.subscribe((id: string) => toggled.push(id));
+
+    press(1, 'ArrowRight'); // prj/backend is collapsed
+    press(0, 'ArrowLeft'); // prj is expanded
+
+    expect(toggled).toEqual(['prj/backend', 'prj']);
+  });
+
+  it('steps into an open directory with ArrowRight instead of toggling it', () => {
+    const toggled: string[] = [];
+    fixture.componentInstance.toggle.subscribe((id: string) => toggled.push(id));
+
+    press(0, 'ArrowRight'); // prj is already open
+
+    expect(toggled).toEqual([]);
+    expect(document.activeElement).toBe(rows()[1]);
+  });
+
+  it('steps out to the parent with ArrowLeft from a leaf', () => {
+    press(2, 'ArrowLeft');
+
+    expect(document.activeElement).toBe(rows()[0]);
+  });
+
+  it('moves between rows with the arrows, Home and End', () => {
+    press(0, 'ArrowDown');
+    expect(document.activeElement).toBe(rows()[1]);
+
+    press(1, 'ArrowUp');
+    expect(document.activeElement).toBe(rows()[0]);
+
+    press(0, 'End');
+    expect(document.activeElement).toBe(rows()[2]);
+
+    press(2, 'Home');
+    expect(document.activeElement).toBe(rows()[0]);
+  });
+
+  it('emits open on a double click, separately from activate', () => {
+    const activated: string[] = [];
+    const opened: string[] = [];
+    fixture.componentInstance.activate.subscribe((id: string) => activated.push(id));
+    fixture.componentInstance.open.subscribe((id: string) => opened.push(id));
+
+    rows()[2]?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+    expect(opened).toEqual(['prj/package.json']);
+    expect(activated).toEqual([]);
+  });
+
+  it('claims the keys it handles and ignores the rest', () => {
+    expect(press(0, 'ArrowDown').defaultPrevented).toBe(true);
+    expect(press(0, 'a').defaultPrevented).toBe(false);
+  });
+
+  it('does not move past either end', () => {
+    rows()[0]?.focus();
+    press(0, 'ArrowUp');
+    expect(document.activeElement).toBe(rows()[0]);
+
+    rows()[2]?.focus();
+    press(2, 'ArrowDown');
+    expect(document.activeElement).toBe(rows()[2]);
   });
 });
 

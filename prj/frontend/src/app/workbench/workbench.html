@@ -1,5 +1,7 @@
 @let chrome = workbench.chromeFt;
 @let explorer = workbench.explorerFt;
+@let explorerNav = workbench.explorerNavFt;
+@let preview = workbench.filePreviewFt;
 @let groups = workbench.editorGroupsFt;
 @let details = workbench.detailsFt;
 @let panel = workbench.bottomPanelFt;
@@ -58,7 +60,8 @@
           [nodes]="explorer.nodes()"
           [label]="explorer.title + ' directory tree'"
           (toggle)="explorer.toggle($event)"
-          (activate)="explorer.activate($event)"
+          (activate)="explorerNav.open($event)"
+          (open)="preview.openFromExplorer($event)"
         />
       }
     </ui-pane>

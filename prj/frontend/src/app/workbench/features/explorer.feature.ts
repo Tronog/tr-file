@@ -61,16 +61,18 @@ export class ExplorerFeature {
     this.parent.fsDataFt.ensureListing(path);
   }
 
-  /**
-   * Clicking a row selects it — and a directory also opens, so a single click
-   * both describes the entry on the right and reveals its contents.
-   */
-  activate(path: string): void {
-    this.parent.select(path);
-    const entry = this.entryOf(path);
-    if (entry?.type === 'directory') {
-      this.toggle(path);
+  /** Opens a directory without closing one that is already open. */
+  expand(path: string): void {
+    if (this.expandedPaths().has(path)) {
+      return;
     }
+    this.expandedPaths.update((paths) => new Set(paths).add(path));
+    this.parent.fsDataFt.ensureListing(path);
+  }
+
+  /** Whether a directory is currently showing its children. */
+  isExpanded(path: string): boolean {
+    return this.expandedPaths().has(path);
   }
 
   /** Re-reads every directory currently on screen (the Refresh action). */
@@ -128,8 +130,4 @@ export class ExplorerFeature {
     };
   }
 
-  private entryOf(path: string): FsEntry | undefined {
-    const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ROOT;
-    return this.parent.fsDataFt.entries(parent).find((entry) => entry.path === path);
-  }
 }

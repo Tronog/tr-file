@@ -57,7 +57,7 @@ structural helpers. No component hardcodes a colour.
 | Shell | `UiWorkbench`, `UiTitleBar`, `UiActivityBar`, `UiStatusBar` |
 | Sidebars | `UiSidebar`, `UiPane`, `UiTree` |
 | Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList` |
-| Editor | `UiPanelGrid`, `UiPanelGroup`, `UiTabBar`, `UiBreadcrumbs`, `UiFileList`, `UiIconView` |
+| Editor | `UiPanelGrid`, `UiPanelGroup`, `UiTabBar`, `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView` |
 | Bottom panel | `UiBottomPanel`, `UiTransferList` |
 | Controls | `UiIconButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
 | Icons | `UiIcon`, `UiIconSprite` |
@@ -110,9 +110,26 @@ a compile error rather than an empty box.
 | Maximize | Renders one group alone; the button becomes Restore |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
 | Drag a sash / focus it and press arrows | Resizes the two regions it divides |
+| Click a tree row / press `Enter` | Emits `activate`; the twisty and `←`/`→` emit `toggle` |
+| Double-click a file (group gets a `document`) | The body becomes a read-only `UiDocumentView`: markdown or text, path and `Read-only` on a status line, no view switch |
 
 Closing the last group anywhere leaves a single empty group, so there is always
 somewhere to drop a tab.
+
+`UiTree` follows the ARIA tree keyboard pattern — `↑`/`↓`, `Home`/`End` move
+between rows, `→` opens a directory (or steps into an open one) and `←` closes
+it (or steps out to its parent). That is not decoration: the twisty is
+`aria-hidden`, because a focusable button inside a `treeitem` is an AXE
+violation, so these keys are the only way a keyboard user can expand anything.
+
+`UiDocumentView` is the read-only preview a file tab opens (PRD 001, Section
+7.3). It parses nothing: a `markdown` document arrives as finished, already
+sanitised HTML — **the application renders the markdown, not this library**,
+which keeps the parser (and its dependency) out of the component library — and
+the view supplies only the typography and the `[innerHTML]` binding, which
+Angular's default sanitiser scrubs on the way in. A `text` document is printed
+verbatim in a monospace block. Nothing in it is editable, and the only
+focusable element is the scroll container itself.
 
 Two inputs exist for the asynchronous world the workbench now lives in:
 `UiTreeNode.busy` turns a row's twisty into a spinner while its contents are

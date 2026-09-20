@@ -24,7 +24,7 @@ export class MockDataWorkbenchService {
         path: '',
         view: 'list',
         selection: [],
-        tabs: [{ id: 'tab-root', label: 'tr-file', path: '', active: true }],
+        tabs: [{ id: 'tab-root', label: 'tr-file', path: '', kind: 'folder', active: true }],
       },
     ],
     selectedEntryId: '',

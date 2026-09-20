@@ -3,8 +3,6 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import type { UiTreeNode } from '@tr-file/ui';
 import {
-  detailsUrl,
-  fsDetails,
   fsDirectory,
   fsEntry,
   fsEnvelope,
@@ -188,32 +186,30 @@ describe('ExplorerFeature', () => {
     });
   });
 
-  describe('activate()', () => {
-    it('selects a file without expanding anything', async () => {
+  describe('expand()', () => {
+    it('opens a directory and lists it', async () => {
       await startExplorer();
 
-      workbench.explorerFt.activate('README.md');
-      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
-      await settled();
-
-      expect(workbench.selectedEntryId()).toBe('README.md');
-      expect(row('README.md')).toMatchObject({ selected: true, focused: true });
-      expect(row('docs')?.selected).toBe(false);
-      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
-    });
-
-    it('selects a directory and expands it, which lists it', async () => {
-      await startExplorer();
-
-      workbench.explorerFt.activate('docs');
-
-      http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDetails('docs', { type: 'directory' })));
+      workbench.explorerFt.expand('docs');
       http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
       await settled();
 
-      expect(workbench.selectedEntryId()).toBe('docs');
-      expect(row('docs')).toMatchObject({ selected: true, expanded: true });
+      expect(row('docs')?.expanded).toBe(true);
       expect(ids()).toContain('docs/NOTES.md');
+    });
+
+    it('leaves an already open directory open, and asks for nothing', async () => {
+      await startExplorer();
+      workbench.explorerFt.expand('docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      // Row clicks open but never close: that is the twisty's job.
+      workbench.explorerFt.expand('docs');
+      await settled();
+
+      expect(workbench.explorerFt.isExpanded('docs')).toBe(true);
+      expect(row('docs')?.expanded).toBe(true);
     });
   });
 

@@ -53,6 +53,26 @@ export class FsTransferFeature {
   }
 
   /**
+   * Reads a file as text, for showing it rather than saving it.
+   *
+   * Goes through the same download endpoint — there is no separate content
+   * route — and refuses anything past `maxBytes` so a preview can never pull a
+   * gigabyte into memory. The caller decides what that limit is; it knows the
+   * file's size from the listing.
+   */
+  async readText(path: string, maxBytes: number): Promise<string> {
+    const blob = await this.download(path);
+    if (blob.size > maxBytes) {
+      throw new FsError(
+        `File is larger than the ${maxBytes} byte preview limit`,
+        413,
+        'PAYLOAD_TOO_LARGE',
+      );
+    }
+    return blob.text();
+  }
+
+  /**
    * Uploads one file into `directoryPath`.
    *
    * Returns immediately with a handle; the request runs in the background and

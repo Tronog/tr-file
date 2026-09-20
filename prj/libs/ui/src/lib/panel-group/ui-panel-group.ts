@@ -3,6 +3,7 @@ import { UiBreadcrumbs } from '../breadcrumbs/ui-breadcrumbs';
 import { UiIconButton } from '../controls/ui-icon-button';
 import { UiSearchField } from '../controls/ui-search-field';
 import { UiSegmented, type UiSegmentedOption } from '../controls/ui-segmented';
+import { UiDocumentView } from '../document-view/ui-document-view';
 import { UiEmptyState } from '../empty-state/ui-empty-state';
 import { UiFileList } from '../file-list/ui-file-list';
 import { UiIcon } from '../icon/ui-icon';
@@ -79,6 +80,7 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
     UiFileList,
     UiIconView,
     UiEmptyState,
+    UiDocumentView,
     UiProgress,
     UiIcon,
   ],
@@ -150,9 +152,26 @@ export class UiPanelGroup {
     return folder ? `Loading ${folder}` : 'Loading';
   });
 
+  /**
+   * A file is open in this group, so its body is a read-only viewer rather
+   * than a listing. `empty` still wins: a group with no tabs has no document.
+   */
+  protected readonly document = computed(() => {
+    const group = this.group();
+    return group.empty ? undefined : group.document;
+  });
+
+  /**
+   * The list/grid switch is a choice about a directory listing, so a document
+   * hides it — a file has no second view to offer.
+   */
+  protected readonly showViewSwitch = computed(
+    () => !!this.group().showViewSwitch && !this.document(),
+  );
+
   protected readonly showToolbar = computed(() => {
     const group = this.group();
-    return group.toolbarActions.length > 0 || !!group.showViewSwitch || !!group.searchPlaceholder;
+    return group.toolbarActions.length > 0 || this.showViewSwitch() || !!group.searchPlaceholder;
   });
 
   protected onViewChange(value: string): void {

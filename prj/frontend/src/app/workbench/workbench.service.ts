@@ -5,6 +5,8 @@ import { ChromeFeature } from './features/chrome.feature';
 import { DetailsFeature } from './features/details.feature';
 import { EditorGroupsFeature } from './features/editor-groups.feature';
 import { ExplorerFeature } from './features/explorer.feature';
+import { ExplorerNavigationFeature } from './features/explorer-navigation.feature';
+import { FilePreviewFeature } from './features/file-preview.feature';
 import { FileViewModelFeature } from './features/file-view-model.feature';
 import { FsDataFeature } from './features/fs-data.feature';
 import { PanelLayoutFeature } from './features/panel-layout.feature';
@@ -64,12 +66,16 @@ export class WorkbenchService {
   readonly fsDataFt = new FsDataFeature(this);
 
   readonly transfersFt = new TransfersFeature(this);
+  /** Read-only file previews; read by the groups that show them. */
+  readonly filePreviewFt = new FilePreviewFeature(this);
   readonly chromeFt = new ChromeFeature(this);
   /** Owns the split tree; constructed before the feature that mutates it. */
   readonly panelLayoutFt = new PanelLayoutFeature(this);
   readonly explorerFt = new ExplorerFeature(this);
   readonly editorGroupsFt = new EditorGroupsFeature(this);
   readonly detailsFt = new DetailsFeature(this);
+  /** Links the two: constructed after the explorer and the groups it drives. */
+  readonly explorerNavFt = new ExplorerNavigationFeature(this);
   readonly bottomPanelFt = new BottomPanelFeature(this);
   readonly sidebarPanesFt = new SidebarPanesFeature(this);
   readonly resizeFt = new WorkbenchResizeFeature(this);

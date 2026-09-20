@@ -39,6 +39,9 @@
   --vsc-accent-hover: #026ec1;
   --vsc-accent-fg: #ffffff;
   --vsc-focus-border: #0078d4;
+  /* VS Code's `textLink.foreground`. The accent (#0078d4) is a control colour:
+     at ~3.6:1 on the editor background it fails AA as body text. */
+  --vsc-link: #3794ff;
 
   /* lists */
   --vsc-list-hover: #2a2d2e;

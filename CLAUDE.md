@@ -40,6 +40,12 @@ library ported from `mockup/001/`; see `prj/libs/ui/README.md`, including why th
 not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin `WorkbenchService`
 holding shared state, plus feature classes holding everything else.
 
+Clicking a folder in the explorer shows it in the *active* panel; that link lives in
+`ExplorerNavigationFeature` so neither side has to know about the other. Row clicks only ever
+open — collapsing is the twisty's job (or `←` on the focused row). Double-clicking a file opens
+it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
+into a `UiDocumentModel`, and the library only renders what it is handed.
+
 Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
 `/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details
 sidebar all read from. Fetches are only ever started by an action (expanding a node, opening a

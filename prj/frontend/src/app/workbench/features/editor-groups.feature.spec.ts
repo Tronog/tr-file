@@ -155,26 +155,26 @@ describe('EditorGroupsFeature', () => {
       expect(group?.rows.map((row) => row.id)).toEqual(['docs/NOTES.md']);
     });
 
-    it('hands a file to the browser instead of navigating', async () => {
+    it('opens a file in a read-only tab instead of downloading it', async () => {
       await start();
-      const hrefs: (string | null)[] = [];
-      const create = document.createElement.bind(document);
-      vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
-        const element = create(tag);
-        if (tag === 'a') {
-          element.click = () => hrefs.push(element.getAttribute('href'));
-        }
-        return element;
-      }) as typeof document.createElement);
 
       workbench.editorGroupsFt.openEntry('group-root', 'README.md');
 
-      expect(hrefs).toEqual([downloadUrl('README.md')]);
-      // Nothing was navigated: the group still lists the same directory, and
-      // the download is a browser transfer, not an `HttpClient` request.
-      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('');
-      expect(workbench.editorGroupsFt.group('group-root')?.tabs[0]?.label).toBe('tr-file');
-      http.expectNone(() => true);
+      // Selecting it describes it on the right; opening it reads the bytes.
+      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+      http
+        .expectOne(downloadUrl('README.md'))
+        .flush(new Blob(['# Title'], { type: 'text/markdown' }));
+      await settled();
+
+      const group = workbench.editorGroupsFt.group('group-root');
+      expect(group?.tabs.map((tab) => tab.label)).toEqual(['tr-file', 'README.md']);
+      expect(group?.tabs[1]).toMatchObject({ active: true, icon: 'file' });
+      // A file tab lists nothing and offers no list/grid switch.
+      expect(group?.rows).toEqual([]);
+      expect(group?.showViewSwitch).toBeUndefined();
+      expect(group?.document).toMatchObject({ path: 'README.md', kind: 'markdown' });
+      expect(group?.document?.html).toContain('<h1>Title</h1>');
     });
 
     it('ignores an entry the listing does not contain', async () => {

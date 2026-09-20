@@ -1,6 +1,7 @@
-<div class="tree" role="tree" [attr.aria-label]="label()">
+<div class="tree" role="tree" [attr.aria-label]="label()" (keydown)="onKeyDown($event)">
   @for (node of nodes(); track node.id) {
     <button
+      #rowButton
       type="button"
       role="treeitem"
       class="tree-row"
@@ -17,6 +18,7 @@
       [attr.aria-busy]="node.busy ? 'true' : null"
       [attr.tabindex]="node.id === tabStopId() ? 0 : -1"
       (click)="activate.emit(node.id)"
+      (dblclick)="open.emit(node.id)"
     >
       <span class="indent" aria-hidden="true">
         @for (guide of node.guides; track $index) {

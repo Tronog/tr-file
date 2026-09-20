@@ -36,7 +36,7 @@
       />
     }
 
-    @if (group().showViewSwitch) {
+    @if (showViewSwitch()) {
       <ui-segmented
         [options]="viewOptions"
         label="View mode"
@@ -61,29 +61,35 @@
   (dragleave)="onBodyDragLeave($event)"
   (drop)="onBodyDrop($event)"
 >
-  <div class="group-scroll">
-    @if (group().empty; as empty) {
-      <ui-empty-state [state]="empty" />
-    } @else {
-      @switch (group().view) {
-        @case ('list') {
-          <ui-file-list
-            [columns]="group().columns"
-            [rows]="group().rows"
-            (select)="rowSelect.emit($event)"
-            (activate)="rowActivate.emit($event)"
-          />
-        }
-        @case ('grid') {
-          <ui-icon-view
-            [items]="group().items"
-            (select)="itemSelect.emit($event)"
-            (activate)="itemActivate.emit($event)"
-          />
+  @if (document(); as doc) {
+    <!-- A file is open: the viewer owns its own scrolling, because its status
+         line is pinned under the document rather than scrolling with it. -->
+    <ui-document-view [document]="doc" />
+  } @else {
+    <div class="group-scroll">
+      @if (group().empty; as empty) {
+        <ui-empty-state [state]="empty" />
+      } @else {
+        @switch (group().view) {
+          @case ('list') {
+            <ui-file-list
+              [columns]="group().columns"
+              [rows]="group().rows"
+              (select)="rowSelect.emit($event)"
+              (activate)="rowActivate.emit($event)"
+            />
+          }
+          @case ('grid') {
+            <ui-icon-view
+              [items]="group().items"
+              (select)="itemSelect.emit($event)"
+              (activate)="itemActivate.emit($event)"
+            />
+          }
         }
       }
-    }
-  </div>
+    </div>
+  }
 
   @if (dropZone(); as zone) {
     <div class="dropzone dropzone--{{ zone }}" aria-hidden="true"></div>
