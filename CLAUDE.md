@@ -50,7 +50,7 @@ workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as 
 `PanelKeyboardFeature` is the one place those bindings are decided. `Ctrl`+`T` (split)
 and `Ctrl`+`W` (close the focused tab) are bound on the group's host instead, and emit
 the same outputs the tab bar's buttons do; the desktop shell installs its own accelerator
-table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`←`/`→` walks
+table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
 since two panels are two places someone is working. Any key that changes the folder also
 re-asks for body focus, or the rows it was standing on are gone and the keyboard is left

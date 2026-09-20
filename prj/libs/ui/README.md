@@ -140,6 +140,7 @@ entry would maximize the window.
 | Arrow around a panel body | Moves focus *and* the selection; the details sidebar follows |
 | `Enter` / `Space` / `Backspace` / `F5` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
 | `Alt`+`←` / `Alt`+`→` in a body | Emitted as `back` / `forward`; the app walks that panel's own trail |
+| `Alt`+`↑` in a body | Emitted as `up`; the app leaves the folder for its parent |
 | Double-click a file (group gets a `document`) | The body becomes a read-only `UiDocumentView`: markdown or text, path and `Read-only` on a status line, no view switch |
 
 Closing the last group anywhere leaves a single empty group, so there is always
@@ -178,9 +179,10 @@ Typing letters jumps to a name in both: a prefix while the keystrokes keep
 coming, and a single letter pressed repeatedly cycles through the entries
 sharing it.
 
-`UiPanelGroup` adds the one chord that belongs to the *panel* rather than to
-what is selected in it: `Alt`+`←`/`→` walks the folders it has visited (PRD
-001, §6.2.1). It is handled on the body rather than in either view, so it works
+`UiPanelGroup` adds the chords that belong to the *panel* rather than to what
+is selected in it: `Alt`+`←`/`→` walks the folders it has visited (PRD 001,
+§6.2.1) and `Alt`+`↑` leaves the current one for its parent (§6.2.3) — the
+trail and the tree are different journeys, so they are different chords. It is handled on the body rather than in either view, so it works
 just as well over a document or an empty placeholder — neither of which has a
 keyboard of its own — and both views let an `Alt` chord bubble untouched so it
 arrives exactly once.

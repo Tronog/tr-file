@@ -276,7 +276,7 @@ describe('UiIconView keyboard', () => {
  * than by either body view, so they work over a listing, a grid, a document
  * and an empty placeholder alike.
  */
-describe('UiPanelGroup history keys', () => {
+describe('UiPanelGroup panel keys', () => {
   let fixture: ComponentFixture<UiPanelGroup>;
   let commands: UiPanelKey[];
 
@@ -308,6 +308,27 @@ describe('UiPanelGroup history keys', () => {
     fixture.detectChanges();
     return event;
   };
+
+  /** PRD 001, §6.2.3 — the tree, not the trail: up one directory. */
+  it('reports Alt+Up as up a directory', () => {
+    expect(press('ArrowUp', { altKey: true }).defaultPrevented).toBe(true);
+
+    expect(commands).toEqual([{ command: 'up', entryId: null }]);
+  });
+
+  /** An empty folder gives focus to the body; the chord must still answer. */
+  it('reports Alt+Up from an empty body too', () => {
+    fixture.componentRef.setInput('group', {
+      ...GROUP,
+      rows: [],
+      empty: { icon: 'folder-open', title: 'This folder is empty' },
+    } satisfies UiPanelGroupModel);
+    fixture.detectChanges();
+
+    press('ArrowUp', { altKey: true });
+
+    expect(commands).toEqual([{ command: 'up', entryId: null }]);
+  });
 
   it('reports Alt+Left as back and Alt+Right as forward', () => {
     expect(press('ArrowLeft', { altKey: true }).defaultPrevented).toBe(true);
@@ -437,7 +458,7 @@ describe('UiPanelGroup history keys', () => {
   it('claims nothing else', () => {
     press('ArrowLeft');
     press('ArrowRight', { altKey: true, shiftKey: true });
-    press('ArrowUp', { altKey: true });
+    press('ArrowDown', { altKey: true });
     press('a', { altKey: true });
 
     expect(commands).toEqual([]);

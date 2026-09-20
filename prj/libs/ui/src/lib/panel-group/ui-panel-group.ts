@@ -276,18 +276,22 @@ export class UiPanelGroup {
   /**
    * The panel's own keys, wherever focus sits inside its body.
    *
-   * `Alt`+`←`/`→` walks the folders this panel has visited (PRD 001, §6.2.1).
-   * It is handled here rather than in the list and the grid because it is
-   * about the *panel*, not about what is selected in it — and because it must
-   * work just as well when the body is a document, or the empty-state
-   * placeholder, neither of which has a keyboard of its own. Both views let an
-   * `Alt` chord bubble untouched so it arrives here exactly once.
+   * `Alt`+`←`/`→` walks the folders this panel has visited (PRD 001, §6.2.1)
+   * and `Alt`+`↑` leaves the current one for its parent (§6.2.3) — the
+   * *trail* and the *tree* are different journeys, which is why they are
+   * different chords. They are handled here rather than in the list and the
+   * grid because they are about the *panel*, not about what is selected in it
+   * — and because they must work just as well when the body is a document, or
+   * the empty-state placeholder, neither of which has a keyboard of its own.
+   * Both views let an `Alt` chord bubble untouched so it arrives here exactly
+   * once.
    *
    * `Backspace` and `F5` are handled here *only* when the body itself has
    * focus, which is the empty-folder case: without it, a keyboard user who
    * walked into an empty folder would have no way to walk back out of it.
    * Whenever there is a row or a tile to stand on, those keys belong to the
-   * view that owns it.
+   * view that owns it. `Alt`+`↑` needs no such guard, since neither view
+   * claims an `Alt` chord.
    */
   /**
    * The chords that belong to the panel as a whole (PRD 001, §6.2.2).
@@ -335,6 +339,8 @@ export class UiPanelGroup {
         this.command.emit({ command: 'back', entryId: null });
       } else if (event.key === 'ArrowRight') {
         this.command.emit({ command: 'forward', entryId: null });
+      } else if (event.key === 'ArrowUp') {
+        this.command.emit({ command: 'up', entryId: null });
       } else {
         return;
       }
