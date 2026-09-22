@@ -1,0 +1,62 @@
+# Distributables for PRD 001, §8.3: one executable per platform, nothing to
+# install and nothing to unpack beside it.
+#
+# There is no node_modules in here. scripts/bundle.mjs compiles the backend,
+# Express and Busboy into dist/main.cjs, so the only thing the packager has to
+# place is that file, the preload, and the Angular build — which is why `files`
+# is an allowlist rather than a list of exclusions.
+appId: com.tronog.tr-file
+productName: tr-file
+copyright: Copyright © 2026 Ivan Maglica
+
+directories:
+  output: release
+  buildResources: build
+
+# No native modules, therefore nothing to rebuild against Electron's headers —
+# and no reason to let the packager walk the pnpm store looking for some.
+npmRebuild: false
+
+files:
+  - dist/main.cjs
+  - dist/preload.cjs
+  - package.json
+
+# The window loads the bundle over the loopback server (§8), so the Angular
+# build has to be on disk as ordinary files: `app/browser` under the resources
+# directory is exactly where DesktopConfig's PACKAGED_STATIC looks first.
+extraResources:
+  - from: ../frontend/dist/frontend/browser
+    to: app/browser
+    filter:
+      - '**/*'
+
+asar: true
+
+linux:
+  # The package name (`@tr-file/desktop`) cannot be a file name, and this is
+  # also the WM_CLASS the window reports, so it has to match the .desktop entry
+  # or the taskbar shows an unnamed window.
+  executableName: tr-file
+  syncDesktopName: true
+  # AppImage: one file, marked executable, runs on any desktop distro. A .deb
+  # would be an installer, which §8.3 explicitly does not ask for.
+  target:
+    - AppImage
+  category: Utility
+  synopsis: File workbench
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+win:
+  # `portable` is the single-exe target: the app unpacks itself to a temporary
+  # directory and runs. `nsis` would be an installer instead.
+  target:
+    - portable
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+portable:
+  # One running copy at a time is already the rule (main.ts takes a
+  # single-instance lock), so the launcher should reuse the same unpack
+  # directory rather than growing a new one per run.
+  requestExecutionLevel: user
+  unpackDirName: tr-file

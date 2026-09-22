@@ -151,6 +151,37 @@ describe('DesktopConfig', () => {
     assert.equal(asked.devTools, true);
   });
 
+  it('loads the Angular dev server when one is named, in development only', () => {
+    const dev = DesktopConfig.resolve(
+      environment({ TR_FILE_STATIC_ROOT: staticRoot, TR_FILE_DEV_SERVER: 'http://localhost:4200' }),
+    );
+    assert.equal(dev.devServerUrl?.href, 'http://localhost:4200/');
+
+    // A packaged app must not be talked into loading its UI from elsewhere.
+    const shipped = DesktopConfig.resolve(
+      environment({
+        TR_FILE_STATIC_ROOT: staticRoot,
+        TR_FILE_DEV: '0',
+        TR_FILE_DEV_SERVER: 'http://localhost:4200',
+      }),
+    );
+    assert.equal(shipped.devServerUrl, null);
+
+    const plain = DesktopConfig.resolve(environment({ TR_FILE_STATIC_ROOT: staticRoot }));
+    assert.equal(plain.devServerUrl, null);
+  });
+
+  it('rejects a dev server address that is not one', () => {
+    assert.throws(
+      () => DesktopConfig.resolve(environment({ TR_FILE_DEV_SERVER: 'localhost:4200' })),
+      /TR_FILE_DEV_SERVER/,
+    );
+    assert.throws(
+      () => DesktopConfig.resolve(environment({ TR_FILE_DEV_SERVER: 'file:///tmp/app' })),
+      /TR_FILE_DEV_SERVER/,
+    );
+  });
+
   it('rejects a port that is not one', () => {
     assert.throws(() => DesktopConfig.resolve(environment({ TR_FILE_PORT: 'http' })), /TR_FILE_PORT/);
   });
@@ -162,5 +193,22 @@ describe('DesktopConfig', () => {
 
     assert.equal(config.hasStaticRoot, false);
     await assert.rejects(() => new DesktopStack(config, SILENT).start(), /No Angular build/);
+  });
+
+  it('starts without a build when the dev server is serving the UI', async () => {
+    const config = DesktopConfig.resolve(
+      environment({
+        TR_FILE_STATIC_ROOT: join(workspace, 'absent'),
+        TR_FILE_DEV_SERVER: 'http://localhost:4200',
+      }),
+    );
+    const dev = new DesktopStack(config, SILENT);
+
+    try {
+      const url = await dev.start();
+      assert.equal(url.hostname, '127.0.0.1');
+    } finally {
+      await dev.stop();
+    }
   });
 });

@@ -63,7 +63,7 @@ COPY --from=build /app/frontend/dist/frontend/browser /usr/share/nginx/html
 
 # Self-contained fallback config: plain SPA serving with a try_files fallback.
 # compose.prod.yaml is expected to mount/copy prj/docker/nginx/default.conf
-# over this (it adds the /api/ reverse proxy to backend:3000).
+# over this (it adds the /api/ reverse proxy to backend:4310).
 RUN printf '%s\n' \
   'server {' \
   '  listen 80;' \

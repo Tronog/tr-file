@@ -95,11 +95,18 @@ export class ExplorerFeature {
     }
   }
 
+  /**
+   * The tree is a map of the workspace, not a second file list: files show up
+   * in the panels, so only directories are collected here (§9.1.1).
+   */
   private collect(path: string, depth: number, rows: UiTreeNode[]): void {
     for (const entry of this.parent.fsDataFt.entries(path)) {
+      if (entry.type !== 'directory') {
+        continue;
+      }
       const expanded = this.expandedPaths().has(entry.path);
       rows.push(this.toRow(entry, depth, expanded));
-      if (entry.type === 'directory' && expanded) {
+      if (expanded) {
         this.collect(entry.path, depth + 1, rows);
       }
     }

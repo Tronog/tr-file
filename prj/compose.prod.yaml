@@ -12,10 +12,10 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 3000
+      PORT: 4310
       FILES_ROOT: /data
     expose:
-      - "3000"
+      - "4310"
     volumes:
       - files_data:/data
     restart: unless-stopped

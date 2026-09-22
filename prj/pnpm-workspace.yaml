@@ -10,4 +10,7 @@ allowBuilds:
   lmdb: true
   '@parcel/watcher': true
   msgpackr-extract: true
-  electron-winstaller: set this to true or false
+  # electron-builder pulls this in for the Squirrel.Windows target, which we do
+  # not build (§8.3 ships a single portable .exe); its install script is a
+  # download we have no use for.
+  electron-winstaller: false

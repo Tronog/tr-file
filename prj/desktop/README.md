@@ -6,16 +6,29 @@ Express API, the built Angular workbench and the window showing it.
 ## Running it
 
 ```bash
-pnpm build      # tsc → dist/ (runtime only; tests are excluded)
+pnpm build      # type-check, then bundle src/ → dist/main.cjs + dist/preload.cjs
 pnpm start      # electron .
-pnpm dev        # build, then run with the dev tools open and debug logging
+pnpm dev        # build, then run against `ng serve` with the dev tools open
+pnpm dev:static # the same, but showing the built bundle
 pnpm test       # node:test via tsx, straight from src/
 pnpm typecheck  # runtime sources + test sources
+pnpm package    # the distributables of §8.3, into release/
 ```
 
-From the workspace root, `pnpm desktop` and `pnpm desktop:dev` do the same. The
-app serves the **built** frontend, so `pnpm build` at the root (which builds the
-backend, then the frontend, then this) has to have run at least once.
+Two ways to see the frontend, and the difference is worth knowing:
+
+* **`pnpm dev` at the workspace root** runs `ng serve` beside this shell, and
+  the window loads *that* (`TR_FILE_DEV_SERVER`, default `http://localhost:4200`
+  in the script). Saving a component reloads the window — no rebuild, no
+  restart. Data still goes over the bridge: the preload belongs to the window,
+  not to the origin it is showing, so `/api` is not involved either way. The
+  shell waits up to 30s for the dev server and falls back to the built bundle
+  if it never answers.
+* **`pnpm desktop` / `pnpm desktop:dev` at the root** show the **built**
+  frontend, and rebuild it first. That matters because the shell's own
+  `pnpm build` only rebuilds *this* package: run `dev:static` or `start` here
+  with a stale `frontend/dist` and the window shows yesterday's UI. Fix it with
+  `pnpm --filter frontend build` and a reload.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -24,6 +37,7 @@ backend, then the frontend, then this) has to have run at least once.
 | `TR_FILE_STATIC_ROOT` | the workspace `ng build` output | Where the Angular bundle is |
 | `TR_FILE_DEV` | `1` unless packaged | Debug logging |
 | `TR_FILE_DEVTOOLS` | off | Open the dev tools with the window |
+| `TR_FILE_DEV_SERVER` | unset | Angular dev server to load instead of the bundle; ignored unless `TR_FILE_DEV` |
 
 `HOST` and `PORT` are deliberately *not* read here: the server is configured
 from `DesktopConfig.serverEnv()`, not from the user's shell, so nothing in the
@@ -140,6 +154,9 @@ those three cases (browser, macOS, everywhere else) are decided.
 | `src/window-controls.channel.ts` | The four verbs a page may use on its own window |
 | `src/app-menu.ts` | The accelerator table; deliberately without `Ctrl`+`W` |
 | `src/preload.cts` | The two small objects the renderer is given |
+| `scripts/bundle.mjs` | The build: one file for the main process, one for the preload |
+| `electron-builder.yml` | The distributables: one executable per platform |
+| `build/` | Icons the packager reads; not shipped inside the app |
 
 Only `main.ts`, `main-window.ts`, `fs-bridge.channel.ts` and the preload import
 `electron`. Everything Electron knows
@@ -192,11 +209,73 @@ so. Either fix the helper's ownership, or run `electron . --no-sandbox` for that
 session — the flag is deliberately not in the `start` script, since it weakens
 the renderer sandbox for everyone.
 
-## Packaging
+## Distributables (PRD 001, §8.3)
 
-Not set up. `pnpm build` produces the main-process JavaScript and the app runs
-from the workspace; turning that into an installer wants `electron-builder` (or
-Forge), a copy of `frontend/dist/frontend/browser` placed where
-`TR_FILE_STATIC_ROOT`/`PACKAGED_STATIC` expects it, and the backend's runtime
-dependencies bundled out of the pnpm store. `DesktopConfig` already looks in the
-packaged location first, so that is a packaging job rather than a code change.
+One file per platform, nothing to install:
+
+```bash
+pnpm package          # both, from this package
+pnpm package:linux    # release/tr-file-0.1.0-x86_64.AppImage
+pnpm package:win      # release/tr-file-0.1.0-x64.exe
+```
+
+From the workspace root: `pnpm desktop:package`, `…:linux`, `…:win`, which
+build the whole workspace first. Everything lands in `desktop/release/`.
+
+**AppImage** on Linux and **portable `.exe`** on Windows are the two targets
+that *are* a single executable — a `.deb` or an NSIS installer would be a thing
+that installs the app rather than the app itself, which §8.3 does not ask for.
+The Windows executable unpacks itself into a temporary directory and runs from
+there; `unpackDirName` pins that directory so repeated runs reuse it instead of
+leaving one behind per launch.
+
+### Why the main process is bundled
+
+`scripts/bundle.mjs` compiles `src/main.ts` — and with it the backend, Express
+and Busboy — into a single `dist/main.cjs`, and `src/preload.cts` into
+`dist/preload.cjs`. The packaged app therefore contains **no `node_modules` at
+all**:
+
+```
+tr-file.AppImage
+└── resources/
+    ├── app.asar          dist/main.cjs · dist/preload.cjs · package.json
+    └── app/browser/      the Angular build   ← DesktopConfig's PACKAGED_STATIC
+```
+
+This is not an optimisation. A pnpm workspace is a graph of symlinks — half of
+it into `node_modules/.pnpm`, and `@tr-file/backend` into a sibling package —
+and a packager copying that graph produces either a broken tree or a
+duplicated one. Compiling it away means the packager has one file to place, and
+there is nothing left that could resolve differently in a release than it does
+in a checkout.
+
+It follows that **nothing is a runtime dependency**, which is why
+`package.json` declares no `dependencies` at all: the backend and Express are
+`devDependencies`, because by the time the app runs they are part of the
+program rather than something it loads. `npmRebuild: false` says the same thing
+to electron-builder — there are no native modules, so it has nothing to rebuild
+and no reason to go looking through the store for some.
+
+`pnpm start` runs that same bundled file, so a bundling mistake shows up the
+first time anyone starts the app, not the first time someone ships it.
+
+### Cross-building
+
+Both targets are built from Linux, and neither needs Wine: electron-builder
+carries its own NSIS, and stamps the executable's icon and version itself. What
+it cannot do from here is *sign* either one, so both are unsigned — Windows
+will show a SmartScreen warning the first time one is run.
+
+### What the build needs beforehand
+
+The backend's `dist/` (the bundle reaches into it through the `exports` map)
+and the frontend's `ng build` output (which ships beside the app). Both are
+someone else's `pnpm build`, so `scripts/bundle.mjs` checks for them and names
+the command to run rather than failing somewhere inside a bundler.
+
+### Icons
+
+`build/icon.png` and `build/icon.ico` — see `build/README.md`. Without them the
+app would ship with the default Electron icon, which is the one part of a
+distributable a user sees before anything else runs.

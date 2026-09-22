@@ -56,7 +56,7 @@ describe('ExplorerNavigationFeature', () => {
 
       expect(workbench.selectedEntryId()).toBe('docs');
       expect(treeRow('docs')).toMatchObject({ selected: true, expanded: true });
-      expect(workbench.explorerFt.nodes().map((node) => node.id)).toContain('docs/NOTES.md');
+      expect(workbench.explorerFt.nodes().map((node) => node.id)).toContain('docs/prd');
       expect(crumbs()).toBe('tr-file/docs');
       expect(rows()).toEqual(['docs/prd', 'docs/NOTES.md']);
       expect(activeGroup()?.tabs[0]).toMatchObject({ label: 'docs', active: true });
@@ -116,7 +116,8 @@ describe('ExplorerNavigationFeature', () => {
       await settled();
 
       expect(workbench.selectedEntryId()).toBe('README.md');
-      expect(treeRow('README.md')).toMatchObject({ selected: true });
+      // The tree shows folders only (§9.1.1), so the file has no row there.
+      expect(treeRow('README.md')).toBeUndefined();
       // No listing was requested, and the panel still shows the root.
       expect(crumbs()).toBe('tr-file');
       expect(rows()).toEqual(['docs', 'prj', 'README.md']);

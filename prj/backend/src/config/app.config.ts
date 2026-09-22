@@ -27,7 +27,7 @@ export class AppConfig {
       'development',
     );
     this.host = env['HOST']?.trim() || '0.0.0.0';
-    this.port = AppConfig.readPort(env['PORT'], 3000);
+    this.port = AppConfig.readPort(env['PORT'], 4310);
     this.apiPrefix = env['API_PREFIX']?.trim() || '/api';
     this.logLevel = AppConfig.readEnum<LogLevel>(
       env['LOG_LEVEL'],

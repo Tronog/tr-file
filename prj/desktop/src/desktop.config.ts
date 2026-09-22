@@ -63,6 +63,20 @@ export class DesktopConfig {
    */
   readonly devTools: boolean;
 
+  /**
+   * The Angular dev server to load instead of the built bundle, or `null`.
+   *
+   * `pnpm dev` at the workspace root runs `ng serve` beside this shell, and a
+   * window showing a bundle from the last `ng build` is worse than useless
+   * while someone is editing the frontend. `TR_FILE_DEV_SERVER` names that
+   * server; the shell waits for it and falls back to the built bundle if it
+   * never answers, so the window opens either way.
+   *
+   * Only honoured in development: a packaged app must never be talked into
+   * loading its UI from somewhere else by an environment variable.
+   */
+  readonly devServerUrl: URL | null;
+
   private constructor(environment: DesktopEnvironment, paths: DesktopPaths) {
     this.port = DesktopConfig.readPort(environment.env['TR_FILE_PORT']);
     // An unpackaged app is by definition someone working on it; `TR_FILE_DEV`
@@ -72,6 +86,9 @@ export class DesktopConfig {
     this.devTools = DesktopConfig.readFlag(environment.env['TR_FILE_DEVTOOLS'], false);
     this.staticRoot = paths.staticRoot;
     this.filesRoot = paths.filesRoot;
+    this.devServerUrl = this.development
+      ? DesktopConfig.readDevServer(environment.env['TR_FILE_DEV_SERVER'])
+      : null;
   }
 
   static resolve(environment: DesktopEnvironment): DesktopConfig {
@@ -130,6 +147,29 @@ export class DesktopConfig {
     }
 
     return resolve(environment.appPath, WORKSPACE_STATIC);
+  }
+
+  /**
+   * `TR_FILE_DEV_SERVER` as a URL. Empty means "no dev server"; anything that
+   * is not an `http(s)` address is a mistake worth failing on, the same way an
+   * impossible `TR_FILE_PORT` is.
+   */
+  private static readDevServer(raw: string | undefined): URL | null {
+    const value = raw?.trim();
+    if (value === undefined || value === '') {
+      return null;
+    }
+
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new Error(`Invalid TR_FILE_DEV_SERVER value: "${raw}"`);
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error(`Invalid TR_FILE_DEV_SERVER value: "${raw}"`);
+    }
+    return url;
   }
 
   private static readFlag(raw: string | undefined, fallback: boolean): boolean {

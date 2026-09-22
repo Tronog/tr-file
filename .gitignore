@@ -1,5 +1,7 @@
 node_modules/
 dist/
+release/
+.docker-home/
 .angular/
 *.log
 .DS_Store

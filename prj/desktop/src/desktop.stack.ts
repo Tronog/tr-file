@@ -82,7 +82,9 @@ export class DesktopStack {
       return this.address;
     }
 
-    if (!this.config.hasStaticRoot) {
+    // With a dev server configured the bundle is somebody else's job, and the
+    // shell decides between the two once it knows whether that server is up.
+    if (!this.config.hasStaticRoot && this.config.devServerUrl === null) {
       throw new Error(
         `No Angular build at ${this.config.staticRoot}. Run \`pnpm --filter frontend build\` first.`,
       );

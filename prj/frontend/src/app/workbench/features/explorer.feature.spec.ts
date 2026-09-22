@@ -17,6 +17,7 @@ import { WorkbenchService } from '../workbench.service';
 const ROOT_ENTRIES = [
   fsDirectory('docs'),
   fsDirectory('prj'),
+  fsDirectory('.cache'),
   fsEntry('README.md', { size: 3482 }),
   fsEntry('.gitignore', { size: 120 }),
 ];
@@ -64,7 +65,8 @@ describe('ExplorerFeature', () => {
       await settled();
 
       expect(workbench.explorerFt.loading()).toBe(false);
-      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+      // Files are the panels' business: the tree carries directories only.
+      expect(ids()).toEqual(['docs', 'prj']);
     });
 
     it('asks for the root once, however often it is called', async () => {
@@ -96,7 +98,7 @@ describe('ExplorerFeature', () => {
       await settled();
 
       expect(row('docs')?.expanded).toBe(true);
-      expect(ids()).toEqual(['docs', 'docs/prd', 'docs/NOTES.md', 'prj', 'README.md']);
+      expect(ids()).toEqual(['docs', 'docs/prd', 'prj']);
     });
 
     it('collapses on the second toggle without fetching again', async () => {
@@ -108,13 +110,13 @@ describe('ExplorerFeature', () => {
       workbench.explorerFt.toggle('docs');
 
       expect(row('docs')?.expanded).toBe(false);
-      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+      expect(ids()).toEqual(['docs', 'prj']);
 
       // Re-expanding is served from the cache.
       workbench.explorerFt.toggle('docs');
 
       http.expectNone(listUrl('docs'));
-      expect(ids()).toContain('docs/NOTES.md');
+      expect(ids()).toContain('docs/prd');
     });
 
     it('marks the row busy while its children are loading', async () => {
@@ -154,7 +156,7 @@ describe('ExplorerFeature', () => {
     });
 
     it('contains only the children of expanded directories', () => {
-      expect(ids()).toEqual(['docs', 'docs/prd', 'docs/NOTES.md', 'prj', 'README.md']);
+      expect(ids()).toEqual(['docs', 'docs/prd', 'prj']);
       // `docs/prd` and `prj` are collapsed, so neither was listed at all.
       http.expectNone(listUrl('docs/prd'));
       http.expectNone(listUrl('prj'));
@@ -162,27 +164,33 @@ describe('ExplorerFeature', () => {
 
     it('carries the depth and one indent guide per ancestor level', () => {
       expect(row('docs')).toMatchObject({ depth: 0, guides: [] });
-      expect(row('docs/NOTES.md')).toMatchObject({ depth: 1, guides: [true] });
+      expect(row('docs/prd')).toMatchObject({ depth: 1, guides: [true] });
     });
 
-    it('describes directories as expandable and files as leaves', () => {
+    it('describes every row as an expandable directory', () => {
       expect(row('docs')).toMatchObject({ expandable: true, expanded: true, icon: 'folder-open', tint: 'folder' });
       expect(row('docs/prd')).toMatchObject({ expandable: true, expanded: false, icon: 'folder' });
-      expect(row('README.md')).toMatchObject({ expandable: false, icon: 'file', tint: 'md' });
-      expect(row('README.md')?.expanded).toBeUndefined();
-      // Only files over 1 KB carry a size hint; directories carry none.
-      expect(row('README.md')?.meta).toBe('3.4 KB');
+      // Directories carry no size hint of their own.
       expect(row('docs')?.meta).toBeUndefined();
     });
 
-    it('decorates hidden entries as ignored once they are shown', () => {
-      expect(ids()).not.toContain('.gitignore');
+    it('leaves files out of the tree, shown or hidden', () => {
+      expect(ids()).not.toContain('README.md');
+      expect(ids()).not.toContain('docs/NOTES.md');
 
       workbench.showHidden.set(true);
 
-      expect(ids()).toContain('.gitignore');
-      expect(row('.gitignore')?.decoration).toBe('ignored');
-      expect(row('README.md')?.decoration).toBeUndefined();
+      expect(ids()).not.toContain('.gitignore');
+    });
+
+    it('decorates hidden directories as ignored once they are shown', () => {
+      expect(ids()).not.toContain('.cache');
+
+      workbench.showHidden.set(true);
+
+      expect(ids()).toContain('.cache');
+      expect(row('.cache')?.decoration).toBe('ignored');
+      expect(row('docs')?.decoration).toBeUndefined();
     });
   });
 
@@ -195,7 +203,7 @@ describe('ExplorerFeature', () => {
       await settled();
 
       expect(row('docs')?.expanded).toBe(true);
-      expect(ids()).toContain('docs/NOTES.md');
+      expect(ids()).toContain('docs/prd');
     });
 
     it('leaves an already open directory open, and asks for nothing', async () => {
@@ -235,7 +243,7 @@ describe('ExplorerFeature', () => {
 
       workbench.explorerFt.runAction('collapse');
 
-      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+      expect(ids()).toEqual(['docs', 'prj']);
       expect(row('docs')?.expanded).toBe(false);
     });
 
@@ -245,7 +253,7 @@ describe('ExplorerFeature', () => {
       workbench.explorerFt.runAction('new-file');
 
       http.expectNone(() => true);
-      expect(ids()).toEqual(['docs', 'prj', 'README.md']);
+      expect(ids()).toEqual(['docs', 'prj']);
     });
   });
 });

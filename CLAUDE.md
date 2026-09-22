@@ -42,8 +42,9 @@ library ported from `mockup/001/`; see `prj/libs/ui/README.md`, including why th
 not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin `WorkbenchService`
 holding shared state, plus feature classes holding everything else.
 
-Clicking a folder in the explorer shows it in the *active* panel; that link lives in
-`ExplorerNavigationFeature` so neither side has to know about the other.
+The explorer tree lists *folders only* (§9.1.1) — it is a map of the workspace, and files
+belong to the panels. Clicking a folder in the explorer shows it in the *active* panel; that
+link lives in `ExplorerNavigationFeature` so neither side has to know about the other.
 Inside a panel body the library components move focus (arrows, `Home`/`End`, page keys,
 type-to-find, selection following focus) and report the keys that mean something to the
 workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as a `UiPanelKey`;
@@ -100,6 +101,12 @@ therefore what `docker/nginx/default.conf` is in production. `pnpm --filter
 @tr-file/desktop test` boots the real stack over HTTP with no desktop session, because
 `DesktopConfig` and `DesktopStack` import no `electron`.
 
+In development the window can load `ng serve` instead of the bundle: `TR_FILE_DEV_SERVER`
+names it, `pnpm dev` at the root sets it, and the shell waits for that server and falls back
+to the built bundle if it never answers. The bridge is unaffected — the preload belongs to
+the window, not to the origin it shows — so only the IPC channels' trusted origin moves,
+which is why `main.ts` decides the page URL before it registers them.
+
 Since Section 8.1 the desktop loads the *bundle* over that server and nothing else:
 data goes straight to the backend. `App.bridge` (`prj/backend/src/modules/bridge`) runs
 the same commands against the same `FilesService` as the HTTP routes, `FsBridgeChannel`
@@ -107,6 +114,12 @@ plus a sandboxed preload carry them over IPC, and `FsBridgeService` is the front
 transport that speaks them. `FileSystemService` picks a transport once — bridge if the
 preload is there, HTTP otherwise — so no feature, component or error path below it
 knows which one it has.
+
+Section 8.3 packages it: `desktop/scripts/bundle.mjs` compiles the main process —
+backend, Express and all — into one `dist/main.cjs`, so the distributable carries no
+`node_modules`, and `electron-builder.yml` turns that into a single file per platform
+(an AppImage, a portable `.exe`). Nothing in `prj/desktop/package.json` is a runtime
+dependency any more, which is why they are all `devDependencies`.
 
 Section 8.2 took the window's frame away: `UiTitleBar` is the title bar, with the drag
 region and the window buttons in it. `WindowControlsChannel` plus the preload give the

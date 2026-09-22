@@ -3,27 +3,35 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/main.js",
+  "main": "dist/main.cjs",
   "description": "Electron shell running the whole tr-file stack in one process",
+  "author": "Ivan Maglica <licence@tronog.com>",
+  "//desktopName": "Read by electron-builder: the .desktop entry it writes, and the WM_CLASS the window reports, have to agree or the taskbar cannot match one to the other.",
+  "desktopName": "tr-file.desktop",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json --noEmit && rm -rf dist && node scripts/bundle.mjs",
     "start": "electron .",
-    "dev": "pnpm build && TR_FILE_DEV=1 TR_FILE_DEVTOOLS=1 electron .",
+    "dev": "pnpm build && TR_FILE_DEV=1 TR_FILE_DEVTOOLS=1 TR_FILE_DEV_SERVER=http://localhost:4200 electron .",
+    "dev:static": "pnpm build && TR_FILE_DEV=1 TR_FILE_DEVTOOLS=1 electron .",
     "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
-    "clean": "rm -rf dist"
+    "package": "pnpm build && electron-builder --linux --win --publish never",
+    "package:linux": "pnpm build && electron-builder --linux --publish never",
+    "package:win": "pnpm build && electron-builder --win --publish never",
+    "clean": "rm -rf dist release"
   },
-  "dependencies": {
-    "@tr-file/backend": "workspace:*",
-    "express": "^5.1.0"
-  },
+  "//devDependencies": "Nothing here is a runtime dependency of the distributable: scripts/bundle.mjs compiles the backend and its Express/Busboy into dist/main.cjs, so the packaged app loads no node_modules at all (PRD 001, §8.3).",
   "devDependencies": {
+    "@tr-file/backend": "workspace:*",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
     "electron": "^44.4.3",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.2",
+    "express": "^5.1.0",
     "frontend": "workspace:*",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2"
