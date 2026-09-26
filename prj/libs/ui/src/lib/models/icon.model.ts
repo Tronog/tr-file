@@ -7,6 +7,7 @@ export type UiIconName =
   | 'chevron-right'
   | 'chevron-down'
   | 'chevrons-up'
+  | 'chevrons-down'
   | 'folder'
   | 'folder-open'
   | 'folder-plus'

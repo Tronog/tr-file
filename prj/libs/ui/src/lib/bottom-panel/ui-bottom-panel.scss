@@ -8,6 +8,13 @@
   background: var(--vsc-panel-bg);
 }
 
+/* Collapsed, the panel is its tab bar: it takes the height of that and no more,
+   whatever height the workbench would otherwise have given it. */
+:host(.is-collapsed) {
+  height: auto;
+  flex: none;
+}
+
 .panel-tabbar {
   display: flex;
   flex: none;

@@ -77,6 +77,12 @@ contain (§7.3.1). The viewer's model lives in `UiImageViewService`, provided pe
 Selecting an image also shows it on the details card, fitted `contain` and non-interactive
 (§9); the panel and the sidebar read from the same cache, so a file is fetched once.
 
+The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
+something happened, and the button VS Code would close it with is the collapse toggle — a
+double chevron pointing the way the panel will move. Choosing a tab, including from the
+activity bar, opens it again; `BottomPanelFeature` owns all of that and `UiBottomPanel` only
+takes a `collapsed` input.
+
 Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
 `/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details
 sidebar all read from. Fetches are only ever started by an action (expanding a node, opening a

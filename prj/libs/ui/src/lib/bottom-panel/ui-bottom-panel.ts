@@ -13,6 +13,7 @@ import type { UiIconAction, UiPanelTab } from '../models';
   imports: [UiIconButton],
   templateUrl: './ui-bottom-panel.html',
   styleUrl: './ui-bottom-panel.scss',
+  host: { '[class.is-collapsed]': 'collapsed()' },
 })
 export class UiBottomPanel {
   readonly tabs = input.required<readonly UiPanelTab[]>();
@@ -22,6 +23,15 @@ export class UiBottomPanel {
 
   /** Accessible name of the tab list. */
   readonly label = input<string>('Panel');
+
+  /**
+   * Whether only the tab bar is showing.
+   *
+   * A collapsed panel keeps its tabs — they are the handle it is reopened by,
+   * and the counts on them are the reason to reopen it. What it drops is the
+   * body, which is also what makes it worth collapsing.
+   */
+  readonly collapsed = input<boolean>(false);
 
   readonly select = output<string>();
   readonly actionSelect = output<string>();

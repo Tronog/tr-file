@@ -117,21 +117,25 @@
       </ui-panel-grid>
     </div>
 
-    <ui-sash
-      orientation="horizontal"
-      label="Resize bottom panel"
-      [value]="workbench.bottomPanelHeight()"
-      [min]="80"
-      [max]="720"
-      (resize)="resize.resizeBottomPanel($event)"
-    />
+    <!-- Nothing to resize while the panel is its tab bar. -->
+    @if (!panel.collapsed()) {
+      <ui-sash
+        orientation="horizontal"
+        label="Resize bottom panel"
+        [value]="workbench.bottomPanelHeight()"
+        [min]="80"
+        [max]="720"
+        (resize)="resize.resizeBottomPanel($event)"
+      />
+    }
 
     <ui-bottom-panel
       class="bottom-panel"
       label="Workbench panel"
-      [style.height.px]="workbench.bottomPanelHeight()"
+      [style.height.px]="panel.collapsed() ? null : workbench.bottomPanelHeight()"
+      [collapsed]="panel.collapsed()"
       [tabs]="panel.tabs()"
-      [actions]="panel.actions"
+      [actions]="panel.actions()"
       (select)="panel.select($event)"
       (actionSelect)="panel.runAction($event)"
     >

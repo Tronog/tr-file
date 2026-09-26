@@ -91,7 +91,39 @@ describe('BottomPanelFeature', () => {
 
     it('ignores an action with nothing behind it', () => {
       expect(() => workbench.bottomPanelFt.runAction('close')).not.toThrow();
-      expect(workbench.bottomPanelFt.actions.map((action) => action.id)).toEqual(['clear', 'close']);
+      expect(workbench.bottomPanelFt.actions().map((action) => action.id)).toEqual([
+        'clear',
+        'toggle',
+      ]);
+    });
+  });
+
+  describe('collapsing', () => {
+    const toggleIcon = (): string | undefined =>
+      workbench.bottomPanelFt.actions().find((action) => action.id === 'toggle')?.icon;
+
+    it('starts collapsed, with a double chevron pointing the way back up', () => {
+      expect(workbench.bottomPanelFt.collapsed()).toBe(true);
+      expect(toggleIcon()).toBe('chevrons-up');
+    });
+
+    it('toggles on the action the close button used to be', () => {
+      workbench.bottomPanelFt.runAction('toggle');
+
+      expect(workbench.bottomPanelFt.collapsed()).toBe(false);
+      expect(toggleIcon()).toBe('chevrons-down');
+
+      workbench.bottomPanelFt.runAction('toggle');
+
+      expect(workbench.bottomPanelFt.collapsed()).toBe(true);
+    });
+
+    /** Asking for a tab is asking to see it — the activity bar relies on this. */
+    it('opens when a tab is chosen', () => {
+      workbench.bottomPanelFt.select('problems');
+
+      expect(workbench.bottomPanelFt.collapsed()).toBe(false);
+      expect(workbench.bottomPanelFt.problemsVisible()).toBe(true);
     });
   });
 });
