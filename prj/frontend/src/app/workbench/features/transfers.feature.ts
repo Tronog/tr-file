@@ -9,7 +9,19 @@ import type {
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
 
-type TransferStatus = 'active' | 'done' | 'error' | 'cancelled';
+type TransferStatus = 'active' | 'done' | 'error' | 'cancelled' | 'skipped';
+
+/**
+ * One drop or pick of files. Conflicts in it are asked about one at a time,
+ * and "do this for all" answers the rest of the batch.
+ */
+interface UploadBatch {
+  readonly size: number;
+  /** The answer every later conflict gets, once someone ticks "for all". */
+  forAll: 'replace' | 'skip' | null;
+  /** Conflicts wait for the question before them. */
+  queue: Promise<unknown>;
+}
 
 /** One transfer the workbench is tracking, live progress included. */
 interface TransferRecord {
@@ -65,8 +77,9 @@ export class TransfersFeature {
 
   /** Starts one upload per file into `directoryPath`. */
   uploadFiles(directoryPath: string, files: readonly File[]): void {
+    const batch: UploadBatch = { size: files.length, forAll: null, queue: Promise.resolve() };
     for (const file of files) {
-      this.startUpload(directoryPath, file);
+      this.startUpload(directoryPath, file, batch);
     }
   }
 
@@ -118,28 +131,45 @@ export class TransfersFeature {
     this.records.update((records) => records.filter((record) => record.status === 'active'));
   }
 
-  private startUpload(directoryPath: string, file: File): void {
+  private startUpload(directoryPath: string, file: File, batch: UploadBatch): void {
     this.sequence += 1;
     const id = `upload-${this.sequence}`;
-    const upload: FsUpload = this.parent.fileSystem.transferFt.upload(directoryPath, file, {
-      overwrite: false,
-    });
-
     this.records.update((records) => [
       {
         id,
         direction: 'upload',
         name: file.name,
         path: directoryPath,
-        progress: upload.progress,
+        progress: signal<FsUploadProgress>({ loaded: 0, total: file.size, percent: null }),
         status: 'active',
-        cancel: () => {
-          upload.cancel();
-          this.settle(id, 'cancelled');
-        },
+        cancel: () => undefined,
       },
       ...records,
     ]);
+    this.send(id, directoryPath, file, batch, false);
+  }
+
+  /**
+   * Sends one file, into the row `id` already has. A file that is already
+   * there is not a failure yet: the user is asked whether to replace it
+   * (PRD 002, §3), and a yes sends it again with `overwrite`.
+   */
+  private send(id: string, directoryPath: string, file: File, batch: UploadBatch, overwrite: boolean): void {
+    const upload: FsUpload = this.parent.fileSystem.transferFt.upload(directoryPath, file, { overwrite });
+    this.records.update((records) =>
+      records.map((record) =>
+        record.id === id
+          ? {
+              ...record,
+              progress: upload.progress,
+              cancel: () => {
+                upload.cancel();
+                this.settle(id, 'cancelled');
+              },
+            }
+          : record,
+      ),
+    );
 
     void upload.result.then(
       (details) => {
@@ -147,11 +177,57 @@ export class TransfersFeature {
         // The directory now has one more file; everything showing it re-reads.
         this.parent.fsDataFt.invalidateListing(directoryPath);
       },
-      (error: unknown) => {
+      async (error: unknown) => {
         const failure = FsError.from(error);
+        if (failure.code === 'CONFLICT' && !overwrite && this.isActive(id)) {
+          const decision = await this.askAboutConflict(file.name, directoryPath, batch);
+          if (!this.isActive(id)) {
+            return;
+          }
+          if (decision === 'replace') {
+            this.send(id, directoryPath, file, batch, true);
+          } else {
+            this.settle(id, 'skipped', failure);
+          }
+          return;
+        }
         this.settle(id, failure.code === 'ABORTED' ? 'cancelled' : 'error', failure);
       },
     );
+  }
+
+  /**
+   * VS Code's question for a name that is taken. Asked one conflict at a
+   * time, however many arrive at once; with more than one file in the batch
+   * it offers to answer the rest the same way. Closing the dialog skips.
+   */
+  private askAboutConflict(name: string, directoryPath: string, batch: UploadBatch): Promise<'replace' | 'skip'> {
+    const asked = batch.queue.then(async () => {
+      if (batch.forAll !== null) {
+        return batch.forAll;
+      }
+      const result = await this.parent.modal.show({
+        severity: 'warning',
+        message: `A file named '${name}' already exists in '${directoryPath || '/'}'. Do you want to replace it?`,
+        detail: 'Replacing it will overwrite its current contents.',
+        buttons: [
+          { id: 'replace', label: 'Replace' },
+          { id: 'skip', label: 'Skip' },
+        ],
+        ...(batch.size > 1 ? { checkbox: { label: 'Do this for all remaining conflicts' } } : {}),
+      });
+      const decision = result?.buttonId === 'replace' ? 'replace' : 'skip';
+      if (result?.checked) {
+        batch.forAll = decision;
+      }
+      return decision;
+    });
+    batch.queue = asked;
+    return asked;
+  }
+
+  private isActive(id: string): boolean {
+    return this.records().some((record) => record.id === id && record.status === 'active');
   }
 
   private settle(
@@ -207,13 +283,14 @@ export class TransfersFeature {
           statusLabel: this.reasonOf(record.error),
         };
       case 'cancelled':
+      case 'skipped':
         return {
           id: record.id,
           name,
           icon: 'x',
           iconColor: 'var(--vsc-fg-dim)',
           progress: 100,
-          statusLabel: 'cancelled',
+          statusLabel: record.status === 'skipped' ? 'skipped · already exists' : 'cancelled',
         };
       default:
         return {

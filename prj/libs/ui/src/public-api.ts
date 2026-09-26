@@ -34,6 +34,7 @@ export { UiActionList } from './lib/details/ui-action-list';
 
 /* controls ---------------------------------------------------------------- */
 export { UiIconButton } from './lib/controls/ui-icon-button';
+export { UiButton } from './lib/controls/ui-button';
 export { UiSegmented } from './lib/controls/ui-segmented';
 export type { UiSegmentedOption } from './lib/controls/ui-segmented';
 export { UiSearchField } from './lib/controls/ui-search-field';
@@ -58,6 +59,10 @@ export { UiPanelGrid } from './lib/panel-grid/ui-panel-grid';
 
 /* panel content ----------------------------------------------------------- */
 export { UiFileBrowser } from './lib/file-browser/ui-file-browser';
+
+/* modal windows (PRD 002, §3) -------------------------------------------- */
+export { UiModal } from './lib/modal/ui-modal';
+export { UiDialog } from './lib/modal/ui-dialog';
 
 /* bottom panel ------------------------------------------------------------ */
 export { UiBottomPanel } from './lib/bottom-panel/ui-bottom-panel';

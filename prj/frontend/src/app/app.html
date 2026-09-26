@@ -1,14 +1,19 @@
-@switch (auth.view()) {
-  @case ('signed-in') {
-    <router-outlet />
+<!-- Everything but the modal windows, which make it inert while one is open (PRD 002, §3). -->
+<div class="app-content" [attr.inert]="modal.isOpen() ? '' : null">
+  @switch (auth.view()) {
+    @case ('signed-in') {
+      <router-outlet />
+    }
+    @case ('open') {
+      <router-outlet />
+    }
+    @case ('signed-out') {
+      <app-login />
+    }
+    @case ('unreachable') {
+      <p class="unreachable" role="alert">Could not reach the server: {{ auth.error() }}</p>
+    }
   }
-  @case ('open') {
-    <router-outlet />
-  }
-  @case ('signed-out') {
-    <app-login />
-  }
-  @case ('unreachable') {
-    <p class="unreachable" role="alert">Could not reach the server: {{ auth.error() }}</p>
-  }
-}
+</div>
+
+<app-modal-host />

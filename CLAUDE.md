@@ -92,6 +92,14 @@ contain (§7.3.1). The viewer's model lives in `UiImageViewService`, provided pe
 Selecting an image also shows it on the details card, fitted `contain` and non-interactive
 (§9); the panel and the sidebar read from the same cache, so a file is fetched once.
 
+Modal windows (PRD 002, §3) are `ModalService` (`prj/frontend/src/app/modal/`): `await
+modal.confirm(…)`, `prompt(…)`, `message(…)`, `show(…)` for a full VS Code message dialog,
+or `open(Component, …)` for a component of the app's own, which closes itself through
+`MODAL_REF`. `ModalHost` at the root draws the stack with the library's `UiModal` and
+`UiDialog`, and `App` makes everything behind it `inert` while one is open. The first user
+is an upload whose name is taken: `TransfersFeature` asks Replace / Skip, one conflict at a
+time, with "Do this for all remaining conflicts" for a batch.
+
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a
 double chevron pointing the way the panel will move. Choosing a tab, including from the

@@ -1,0 +1,139 @@
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 20px 16px;
+}
+
+.close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--vsc-radius);
+  background: transparent;
+  color: var(--vsc-fg);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--vsc-focus-border);
+    outline-offset: -1px;
+  }
+}
+
+.message-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding-right: 16px;
+}
+
+.severity {
+  flex: none;
+}
+
+.severity-info,
+.severity-question {
+  color: var(--vsc-severity-info);
+}
+
+.severity-warning {
+  color: var(--vsc-severity-warning);
+}
+
+.severity-error {
+  color: var(--vsc-severity-error);
+}
+
+.message-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.message {
+  margin: 0;
+  color: var(--vsc-fg-bright);
+  font-weight: 600;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.detail {
+  margin: 0;
+  color: var(--vsc-fg);
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+}
+
+.field input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--vsc-input-border);
+  border-radius: 2px;
+  background: var(--vsc-input-bg);
+  color: var(--vsc-fg-bright);
+  font: inherit;
+
+  &:focus {
+    border-color: var(--vsc-focus-border);
+    outline: none;
+  }
+
+  &.is-invalid {
+    border-color: var(--vsc-severity-error);
+  }
+}
+
+.field-error {
+  margin: 0;
+  color: var(--vsc-severity-error);
+  font-size: var(--vsc-font-size-sm);
+}
+
+.checkbox {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+
+  input {
+    margin: 0;
+    accent-color: var(--vsc-accent);
+  }
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}

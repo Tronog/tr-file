@@ -1,0 +1,66 @@
+@if (dismissible()) {
+  <button type="button" class="close" aria-label="Close dialog" title="Close" (click)="dismiss.emit()">
+    <ui-icon name="x" />
+  </button>
+}
+
+<div class="message-row">
+  @if (icon(); as name) {
+    <ui-icon class="severity severity-{{ severity() }}" [name]="name" size="lg" aria-hidden="true" />
+  }
+  <div class="message-body">
+    <p class="message" [id]="messageId()">{{ dialog().message }}</p>
+    @if (dialog().detail; as detail) {
+      <p class="detail" [id]="detailId()">{{ detail }}</p>
+    }
+
+    @if (dialog().input; as field) {
+      <label class="field">
+        @if (field.label) {
+          <span class="field-label">{{ field.label }}</span>
+        }
+        <input
+          #field
+          data-autofocus
+          [type]="field.password ? 'password' : 'text'"
+          [value]="value()"
+          [attr.placeholder]="field.placeholder ?? null"
+          [attr.aria-invalid]="field.error ? 'true' : null"
+          [attr.aria-describedby]="field.error ? messageId() + '-error' : null"
+          [class.is-invalid]="!!field.error"
+          spellcheck="false"
+          autocomplete="off"
+          (input)="onInput($event)"
+          (keydown)="onFieldKeydown($event)"
+        />
+      </label>
+      @if (field.error; as error) {
+        <p class="field-error" role="alert" [id]="messageId() + '-error'">{{ error }}</p>
+      }
+    }
+
+    @if (dialog().checkbox; as box) {
+      <label class="checkbox">
+        <input type="checkbox" [checked]="checked()" (change)="checked.set($any($event.target).checked)" />
+        <span>{{ box.label }}</span>
+      </label>
+    }
+  </div>
+</div>
+
+<div class="buttons">
+  @for (button of dialog().buttons; track button.id; let index = $index; let first = $first) {
+    <button
+      #choice
+      uiButton
+      type="button"
+      [variant]="first ? 'primary' : 'secondary'"
+      [disabled]="first && blocked()"
+      [attr.data-autofocus]="first && !dialog().input ? '' : null"
+      (click)="press(button.id)"
+      (keydown)="onButtonKeydown($event, index)"
+    >
+      {{ button.label }}
+    </button>
+  }
+</div>

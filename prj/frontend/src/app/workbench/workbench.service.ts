@@ -23,6 +23,7 @@ import { WindowControlsFeature } from './features/window-controls.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
 import { AuthService } from '../auth/auth.service';
+import { ModalService } from '../modal/modal.service';
 
 /**
  * The workbench's common state, and the seam every feature talks through.
@@ -52,6 +53,9 @@ export class WorkbenchService {
 
   /** Who is signed in, if anyone has to be (PRD 003, §2). */
   readonly auth = inject(AuthService);
+
+  /** Modal windows — questions the workbench has to ask (PRD 002, §3). */
+  readonly modal = inject(ModalService);
 
   /**
    * Seed for the parts of the workbench no backend owns yet — the menus, the

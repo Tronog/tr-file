@@ -1,0 +1,63 @@
+/* Over everything, the context menu included. */
+:host {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inset: 0;
+  padding: 16px;
+}
+
+.backdrop {
+  position: absolute;
+  background: var(--vsc-dialog-backdrop);
+  inset: 0;
+}
+
+.window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: min(460px, 100%);
+  max-width: min(90vw, 720px);
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--vsc-dialog-border);
+  border-radius: var(--vsc-radius-lg);
+  background: var(--vsc-dialog-bg);
+  box-shadow: var(--vsc-shadow);
+  color: var(--vsc-fg);
+  font-family: var(--vsc-font);
+  font-size: var(--vsc-font-size);
+  outline: none;
+}
+
+/* VS Code's answer to a click outside a dialog that is waiting for one. */
+.window.is-shaking {
+  animation: ui-modal-shake 0.3s ease-in-out;
+}
+
+@keyframes ui-modal-shake {
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window.is-shaking {
+    animation: ui-modal-flash 0.3s linear;
+  }
+
+  @keyframes ui-modal-flash {
+    50% {
+      border-color: var(--vsc-focus-border);
+    }
+  }
+}

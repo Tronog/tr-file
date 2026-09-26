@@ -113,23 +113,97 @@ describe('TransfersFeature', () => {
     });
   });
 
-  describe('a failed upload', () => {
-    it('says "already exists" when the file is there and overwrite is off', async () => {
-      workbench.transfersFt.uploadFiles('docs', [file()]);
+  /** PRD 002, §3 — a name that is taken is a question, asked in a modal dialog. */
+  describe('a name that is already taken', () => {
+    /** Answers every upload in flight to `directory` with "already exists". */
+    const conflict = (directory = 'docs'): void => {
+      for (const request of http.match(uploadUrl(directory))) {
+        request.flush(fsErrorBody('CONFLICT', 'Already exists'), { status: 409, statusText: 'Conflict' });
+      }
+    };
 
-      http
-        .expectOne(uploadUrl('docs'))
-        .flush(fsErrorBody('CONFLICT', 'Already exists'), { status: 409, statusText: 'Conflict' });
+    const dialog = () => workbench.modal.stack().at(-1);
+    const answer = (buttonId: string, checked = false): void => {
+      const top = dialog();
+      if (top?.kind === 'dialog') {
+        workbench.modal.choose(top.id, { buttonId, checked, value: '' });
+      }
+    };
+
+    it('asks whether to replace it, keeping the row running meanwhile', async () => {
+      workbench.transfersFt.uploadFiles('docs', [file()]);
+      conflict();
       await settled();
 
-      expect(rows()[0]).toMatchObject({
-        icon: 'alert-triangle',
-        progress: 100,
-        statusLabel: 'already exists',
+      const top = dialog();
+      expect(top?.kind).toBe('dialog');
+      expect(top?.kind === 'dialog' && top.model()).toMatchObject({
+        severity: 'warning',
+        message: "A file named 'notes.txt' already exists in 'docs'. Do you want to replace it?",
+        buttons: [
+          { id: 'replace', label: 'Replace' },
+          { id: 'skip', label: 'Skip' },
+        ],
       });
-      expect(workbench.transfersFt.activeCount()).toBe(0);
+      // One file, so there is nothing for "all" to mean.
+      expect(top?.kind === 'dialog' && top.model().checkbox).toBeUndefined();
+      expect(workbench.transfersFt.activeCount()).toBe(1);
     });
 
+    it('sends it again with overwrite when told to replace it', async () => {
+      workbench.transfersFt.uploadFiles('docs', [file()]);
+      conflict();
+      await settled();
+
+      answer('replace');
+      await settled();
+
+      const retry = http.expectOne(uploadUrl('docs', true));
+      retry.flush(fsEnvelope(fsDetails('docs/notes.txt', { size: 11 })));
+      await settled();
+
+      expect(rows()[0]).toMatchObject({ icon: 'check', statusLabel: 'done · 11 B' });
+      expect(workbench.modal.isOpen()).toBe(false);
+    });
+
+    it('skips it when told to, or when the dialog is closed', async () => {
+      workbench.transfersFt.uploadFiles('docs', [file('a.txt'), file('b.txt')]);
+      conflict();
+      await settled();
+
+      answer('skip');
+      await settled();
+      // The second question waited for the first.
+      const second = dialog();
+      expect(second?.kind === 'dialog' && second.model().message).toContain("'b.txt'");
+      workbench.modal.dismiss(second?.id ?? -1);
+      await settled();
+
+      expect(rows().map((row) => row.statusLabel)).toEqual(['skipped · already exists', 'skipped · already exists']);
+      http.expectNone(uploadUrl('docs', true));
+    });
+
+    it('answers every later conflict in the batch the same way, once asked to', async () => {
+      workbench.transfersFt.uploadFiles('docs', [file('a.txt'), file('b.txt'), file('c.txt')]);
+      conflict();
+      await settled();
+
+      const first = dialog();
+      expect(first?.kind === 'dialog' && first.model().checkbox?.label).toBe('Do this for all remaining conflicts');
+      answer('replace', true);
+      await settled();
+
+      expect(workbench.modal.isOpen()).toBe(false);
+      const retries = http.match(uploadUrl('docs', true));
+      expect(retries).toHaveLength(3);
+      for (const retry of retries) {
+        retry.flush(fsEnvelope(fsDetails('docs/x.txt', { size: 1 })));
+      }
+      await settled();
+    });
+  });
+
+  describe('a failed upload', () => {
     it('says "failed" for anything else', async () => {
       workbench.transfersFt.uploadFiles('docs', [file()]);
 

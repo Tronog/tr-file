@@ -60,7 +60,8 @@ structural helpers. No component hardcodes a colour.
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
 | Panel content | `UiFileBrowser` (with `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
 | Bottom panel | `UiBottomPanel`, `UiTransferList` |
-| Controls | `UiIconButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
+| Controls | `UiIconButton`, `UiButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
+| Modal windows | `UiModal`, `UiDialog` |
 | Icons | `UiIcon`, `UiIconSprite` |
 
 View models are exported from `lib/models`. Where a model would collide with the
@@ -333,6 +334,32 @@ Two inputs exist for the asynchronous world the workbench now lives in:
 being fetched, and `UiPanelGroupModel.loading` lights a 2px indeterminate rail
 under the tab bar. Both are pure inputs — the library never knows what is being
 loaded, only that something is.
+
+## Modal windows (PRD 002, §3)
+
+Two pieces, split the way VS Code's own are:
+
+- **`UiModal`** is the window: the page dimmed behind it, the window centred,
+  `role="dialog"` with `aria-modal`, and the keyboard kept inside — focus goes
+  to the element marked `data-autofocus` (else the first focusable), `Tab`
+  wraps, and focus returns to wherever it was when the window closes.
+  `Escape` emits `dismiss` when `dismissible`; a click outside never closes
+  it — the window shakes, as VS Code's does, to say it is waiting.
+- **`UiDialog`** is VS Code's message dialog inside it: a close button in the
+  corner, the severity icon (`info`, `question`, `warning`, `error`) beside the
+  bold message, a quieter `detail`, then an optional text field (with an
+  `error` that holds the primary button back, and a `selection` to preselect)
+  and checkbox, and the buttons bottom-right. The first button is primary —
+  accent-coloured, focused first, what `Enter` in the field presses — and
+  `←`/`→` move between buttons. It reports `choose` with the button, the
+  checkbox and the field, and never closes itself.
+
+Anything else — a form, a picker — is projected into `UiModal` as it is.
+`button[uiButton]` (`variant: 'primary' | 'secondary'`) is the text button both
+use. Making the page behind the window `inert` is the host's job: the library
+does not own the page. In the app, `ModalService` (`confirm`, `prompt`,
+`message`, `show`, and `open` for a component of its own) keeps the stack and
+`ModalHost` draws it.
 
 ## Long lists
 

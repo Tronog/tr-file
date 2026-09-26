@@ -57,6 +57,16 @@
   --vsc-hover-bg: #2a2a2a;
   --vsc-shadow: 0 4px 14px rgb(0 0 0 / 55%);
 
+  /* dialogs (VS Code's modal dialogs; PRD 002, §3) */
+  --vsc-dialog-bg: #202020;
+  --vsc-dialog-border: #454545;
+  --vsc-dialog-backdrop: rgb(0 0 0 / 30%);
+  --vsc-button-secondary-bg: #313131;
+  --vsc-button-secondary-hover: #3c3c3c;
+  --vsc-severity-info: #3794ff;
+  --vsc-severity-warning: #cca700;
+  --vsc-severity-error: #f14c4c;
+
   /* git decorations */
   --vsc-git-modified: #e2c08d;
   --vsc-git-untracked: #73c991;

@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { App } from '../app';
+import { ModalService } from '../modal/modal.service';
 import { csrfInterceptor, sessionExpiryInterceptor } from '../file-system/fs-http.interceptors';
 import { settled } from '../workbench/testing/fs-fixtures';
 import { AuthService } from './auth.service';
@@ -269,6 +270,22 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('router-outlet')).toBeNull();
     // Nothing asked the file system for anything.
     http.verify();
+  });
+
+  /** PRD 002, §3: nothing behind an open modal window can be reached. */
+  it('makes the page inert while a modal window is open', async () => {
+    const fixture = TestBed.createComponent(App);
+    http.expectOne('/api/auth/session').flush({ data: OPEN });
+    await settled();
+    fixture.detectChanges();
+    const content = (): HTMLElement => fixture.nativeElement.querySelector('.app-content');
+    expect(content().hasAttribute('inert')).toBe(false);
+
+    void TestBed.inject(ModalService).message({ message: 'Hello' });
+    fixture.detectChanges();
+
+    expect(content().hasAttribute('inert')).toBe(true);
+    expect(fixture.nativeElement.querySelector('app-modal-host ui-modal')).not.toBeNull();
   });
 
   it('goes straight to the workbench when nobody has to sign in', async () => {

@@ -1,0 +1,38 @@
+:host {
+  box-sizing: border-box;
+  min-width: 72px;
+  height: 26px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: var(--vsc-accent);
+  color: var(--vsc-accent-fg);
+  font: inherit;
+  font-size: var(--vsc-font-size);
+  line-height: 24px;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--vsc-accent-hover);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--vsc-focus-border);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+:host(.is-secondary) {
+  background: var(--vsc-button-secondary-bg);
+  color: var(--vsc-fg);
+
+  &:hover:not(:disabled) {
+    background: var(--vsc-button-secondary-hover);
+  }
+}
