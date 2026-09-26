@@ -22,6 +22,7 @@ import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { OperationsFeature } from './features/operations.feature';
+import { FileClipboardFeature } from './features/file-clipboard.feature';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
 import { AuthService } from '../auth/auth.service';
 import { ModalService } from '../modal/modal.service';
@@ -110,6 +111,8 @@ export class WorkbenchService {
   readonly transfersFt = new TransfersFeature(this);
   /** Copy, move, trash and empty trash, followed to the end (PRD 005, §1). */
   readonly operationsFt = new OperationsFeature(this);
+  /** Copy, cut and paste of entries, within a panel or across panels (PRD 005, §2). */
+  readonly fileClipboardFt = new FileClipboardFeature(this);
   /** Read-only file previews; read by the groups that show them. */
   readonly filePreviewFt = new FilePreviewFeature(this);
   readonly chromeFt = new ChromeFeature(this);

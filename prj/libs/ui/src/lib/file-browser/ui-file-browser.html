@@ -27,7 +27,18 @@
   </ui-panel-toolbar>
 }
 
-<div #body uiPanelBody class="browser-body" (keydown)="onBodyKeydown($event)">
+<div
+  #body
+  uiPanelBody
+  class="browser-body"
+  [class.is-drop-target]="bodyDropTarget()"
+  (keydown)="onBodyKeydown($event)"
+  (dragstart)="onDragStart($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+  (dragend)="onDragEnd()"
+>
   @if (document(); as doc) {
     <!-- A file is open: the viewer owns its own scrolling, because its status
          line is pinned under the document rather than scrolling with it. -->
@@ -42,6 +53,8 @@
             <ui-file-list
               [columns]="browser().columns"
               [rows]="browser().rows"
+              [draggable]="true"
+              [dropTargetId]="dropTargetId()"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="rowActivate.emit($event)"
               (command)="command.emit($event)"
@@ -53,6 +66,8 @@
               [tree]="true"
               [columns]="browser().columns"
               [rows]="browser().rows"
+              [draggable]="true"
+              [dropTargetId]="dropTargetId()"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="rowActivate.emit($event)"
               (toggle)="rowToggle.emit($event)"
@@ -62,6 +77,8 @@
           @case ('grid') {
             <ui-icon-view
               [items]="browser().items"
+              [draggable]="true"
+              [dropTargetId]="dropTargetId()"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="itemActivate.emit($event)"
               (command)="command.emit($event)"

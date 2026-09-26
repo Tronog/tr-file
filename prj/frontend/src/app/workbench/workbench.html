@@ -126,6 +126,7 @@
                       (rowToggle)="files.toggleEntry(groupId, $event)"
                       (itemActivate)="files.openEntry(groupId, $event)"
                       (command)="panelKeys.run(groupId, $event)"
+                      (entryDrop)="files.dropEntries(groupId, $event)"
                     />
                   }
                 }

@@ -1,6 +1,7 @@
 import { computed, signal } from '@angular/core';
 import type {
   UiBreadcrumb,
+  UiEntryDrop,
   UiFileBrowserModel,
   UiFileColumn,
   UiFileRow,
@@ -386,6 +387,20 @@ export class FileBrowserFeature implements PanelContentFeature {
   }
 
   /** Files dropped from the desktop onto a panel land in its directory. */
+  /**
+   * Entries dropped on this panel (PRD 005, §2) — from it or from another:
+   * into the folder they were dropped on, or the one the panel lists. A move
+   * unless `Ctrl` was held; either way a job of `OperationsFeature`.
+   */
+  dropEntries(groupId: string, drop: UiEntryDrop): void {
+    const destination = drop.target ?? this.groups.stateOf(groupId)?.path;
+    if (destination === undefined) {
+      return;
+    }
+    this.groups.focus(groupId);
+    void this.parent.operationsFt.transfer(drop.copy ? 'copy' : 'move', drop.sources, destination);
+  }
+
   uploadInto(groupId: string, files: readonly File[]): void {
     const group = this.groups.stateOf(groupId);
     if (!group || files.length === 0) {
@@ -470,7 +485,7 @@ export class FileBrowserFeature implements PanelContentFeature {
           ? this.treeRows(group, group.path, 0, active)
           : entries.map((entry) => this.row(entry, group, active)),
       items: entries.map((entry) => this.item(entry, group, active)),
-      ...(state?.status === 'ready' ? { summary: this.summary(entries.length) } : {}),
+      ...(state?.status === 'ready' ? { summary: this.summary(entries.length), dropFolder: true } : {}),
       ...this.placeholder(state, entries.length),
     };
   }
@@ -576,6 +591,15 @@ export class FileBrowserFeature implements PanelContentFeature {
       ...(selected && active ? { selected: true } : {}),
       ...(selected && !active ? { inactiveSelected: true } : {}),
       ...(active && group.focusedEntryId === entry.path ? { focused: true } : {}),
+      ...this.dragFlags(entry),
+    };
+  }
+
+  /** A folder takes drops; an entry on the clipboard to be moved is drawn faded (PRD 005, §2). */
+  private dragFlags(entry: FsEntry): { dropTarget?: true; cut?: true } {
+    return {
+      ...(isFolder(entry) ? { dropTarget: true as const } : {}),
+      ...(this.parent.fileClipboardFt.isCut(entry.path) ? { cut: true as const } : {}),
     };
   }
 
@@ -588,6 +612,7 @@ export class FileBrowserFeature implements PanelContentFeature {
       tint: files.tint(entry),
       ...(group.selection.includes(entry.path) ? { selected: true } : {}),
       ...(active && group.focusedEntryId === entry.path ? { focused: true } : {}),
+      ...this.dragFlags(entry),
     };
   }
 }

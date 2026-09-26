@@ -94,6 +94,9 @@ interface MarqueeDrag {
         role="option"
         [attr.data-item-id]="item.id"
         [class.is-selected]="item.selected"
+        [class.is-cut]="item.cut"
+        [class.is-drop-target]="item.id === dropTargetId()"
+        [attr.draggable]="draggable() ? 'true' : null"
         [attr.aria-selected]="item.selected ? 'true' : 'false'"
         [attr.aria-posinset]="virtual() ? index + 1 : null"
         [attr.aria-setsize]="virtual() ? items().length : null"
@@ -138,6 +141,12 @@ export class UiIconView {
 
   /** Accessible name of the listbox. */
   readonly label = input<string>('Files');
+
+  /** Tiles may be dragged (PRD 005, §2); `UiFileBrowser` handles the drag. */
+  readonly draggable = input(false);
+
+  /** The folder tile a drag is over, lit as the drop target. */
+  readonly dropTargetId = input<string | null>(null);
 
   readonly activate = output<string>();
 

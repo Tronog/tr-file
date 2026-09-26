@@ -57,6 +57,15 @@ export class ChromeFeature {
             ),
           }
         : {}),
+      ...(menu.id === 'edit'
+        ? {
+            items: (menu.items ?? []).map((item) =>
+              (item.id === 'edit.paste' ? this.parent.fileClipboardFt.canPaste() : selected)
+                ? item
+                : { ...item, disabled: true },
+            ),
+          }
+        : {}),
       ...(menu.id === 'go'
         ? {
             items: (menu.items ?? []).map((item) =>
@@ -83,6 +92,7 @@ export class ChromeFeature {
    *   *Connect to Remote Server*.
    * - **File › Copy To… / Move To… / Move to Trash / Empty Trash…** — the
    *   file operations of PRD 005, §1, on the active panel's selection.
+   * - **Edit › Cut / Copy / Paste** — the file clipboard (§2), on the active panel.
    */
   runMenuItem(selection: UiMenuBarSelection): void {
     this.openMenuId.set(null);
@@ -92,6 +102,15 @@ export class ChromeFeature {
         break;
       case 'go.remote':
         this.parent.commandPaletteFt.run('remote.connect');
+        break;
+      case 'edit.cut':
+        this.parent.fileClipboardFt.cut();
+        break;
+      case 'edit.copy':
+        this.parent.fileClipboardFt.copy();
+        break;
+      case 'edit.paste':
+        void this.parent.fileClipboardFt.paste();
         break;
       case 'file.copyTo':
         void this.parent.operationsFt.copySelection();

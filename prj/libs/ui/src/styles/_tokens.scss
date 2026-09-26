@@ -47,6 +47,8 @@
   --vsc-list-hover: #2a2d2e;
   --vsc-list-active: #04395e;
   --vsc-list-inactive: #37373d;
+  /* A folder, or a whole listing, that a drag would drop into (PRD 005, §2). */
+  --vsc-list-drop: rgb(0 120 212 / 18%);
 
   /* widgets */
   --vsc-badge-bg: #0078d4;

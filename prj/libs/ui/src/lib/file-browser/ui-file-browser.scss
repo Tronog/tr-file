@@ -14,6 +14,13 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
+
+  /* Entries dragged over the blank space drop into the listed folder. */
+  &.is-drop-target {
+    outline: 1px solid var(--vsc-accent);
+    outline-offset: -1px;
+    background: var(--vsc-list-drop);
+  }
 }
 
 /* The read-only viewer replaces the scroll container entirely, so it takes the

@@ -187,6 +187,8 @@ entry would maximize the window.
 | `Ctrl`+`A` | Selects every entry |
 | Drag across blank space in the icon view | Box selection: every tile the box touches; added to the selection with `Ctrl`/`Shift`. A plain click on blank space clears it |
 | `Enter` / `Space` / `Backspace` / `F5` / `Delete` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
+| `Ctrl`+`C` / `X` / `V` over a listing | `copy` / `cut` / `paste` panel keys (PRD 005, §2) |
+| Drag a row or tile | Onto a folder or another listing: `entryDrop`, a move — or a copy with `Ctrl` |
 | `Alt`+`←` / `Alt`+`→` in a body | Emitted as `back` / `forward`; the app walks that panel's own trail |
 | `Alt`+`↑` in a body | Emitted as `up`; the app leaves the folder for its parent |
 | Tree view (`UiPanelView` `'tree'`) | The details table as a tree grid: same columns, folders open in place |
@@ -338,6 +340,28 @@ Two inputs exist for the asynchronous world the workbench now lives in:
 being fetched, and `UiPanelGroupModel.loading` lights a 2px indeterminate rail
 under the tab bar. Both are pure inputs — the library never knows what is being
 loaded, only that something is.
+
+### Copy, paste, drag and drop (PRD 005, §2)
+
+`UiFileBrowser` adds file-manager clipboard chords and drag and drop to any
+listing, and — as everywhere else — decides nothing about what they do:
+
+- **`Ctrl`+`C` / `X` / `V`** (`Cmd` on macOS) leave as the `copy`, `cut` and
+  `paste` `UiPanelKey`s, with the entry the cursor is on. Not in a text field,
+  and not over a document, where the chords keep their meaning for text.
+- **Dragging** a row or tile drags the selection it is part of — or that entry
+  alone, which it then selects — as `UI_ENTRY_MIME` (`{ sources }`), so it
+  passes between browsers and nothing else (the group's zones, the OS file
+  drop) takes it. Several entries drag as a count.
+- **Dropping**: a row or tile marked `dropTarget` (a folder) lights up under
+  the drag; elsewhere the listing's blank space takes it for the listed folder
+  when the model says `dropFolder`. A browser never offers its own dragged
+  entries as their target, nor its own blank space for a plain move — which
+  would put entries where they already are. The drop is an `entryDrop`
+  (`UiEntryDrop`: `sources`, `target` or `null` for the listed folder, and
+  `copy` when `Ctrl` or `Alt` was held — a move otherwise, as in VS Code).
+- Rows and tiles marked **`cut`** are drawn faded, as file managers draw what
+  waits to be moved.
 
 ## Quick input (PRD 009, §1)
 

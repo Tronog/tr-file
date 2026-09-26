@@ -109,6 +109,18 @@ tbody tr:not(.spacer) {
   &:focus-visible {
     @include focus-ring;
   }
+
+  /* On the clipboard to be moved: faded, as file managers draw it. */
+  &.is-cut .name-cell {
+    opacity: 0.55;
+  }
+
+  /* After the selection rules, so a folder under the drag always shows it. */
+  &.is-drop-target {
+    background: var(--vsc-list-drop);
+    outline: 1px solid var(--vsc-accent);
+    outline-offset: -1px;
+  }
 }
 
 .name-cell {

@@ -64,6 +64,10 @@ export interface UiFileRow {
   readonly expanded?: boolean;
   /** An expanded row whose contents are being fetched — the twisty spins. */
   readonly busy?: boolean;
+  /** A folder: dragged entries may be dropped onto it (PRD 005, §2). */
+  readonly dropTarget?: boolean;
+  /** On the clipboard to be moved: drawn faded, as file managers do. */
+  readonly cut?: boolean;
 }
 
 /** A tile in the grid ("large icons") view. */
@@ -75,6 +79,10 @@ export interface UiIconViewItem {
   readonly selected?: boolean;
   /** The one tile that owns keyboard focus; drives the roving tabindex. */
   readonly focused?: boolean;
+  /** A folder: dragged entries may be dropped onto it (PRD 005, §2). */
+  readonly dropTarget?: boolean;
+  /** On the clipboard to be moved: drawn faded. */
+  readonly cut?: boolean;
 }
 
 /** One segment of the path bar above a panel body. */

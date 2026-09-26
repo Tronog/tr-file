@@ -78,6 +78,12 @@ export class UiFileList {
   /** Render the rows as a tree grid; see the class comment. */
   readonly tree = input<boolean>(false);
 
+  /** Rows may be dragged (PRD 005, §2); `UiFileBrowser` handles the drag. */
+  readonly draggable = input(false);
+
+  /** The folder row a drag is over, lit as the drop target. */
+  readonly dropTargetId = input<string | null>(null);
+
   /** Double click: open the entry. */
   readonly activate = output<string>();
 

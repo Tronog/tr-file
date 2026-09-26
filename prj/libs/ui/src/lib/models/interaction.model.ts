@@ -13,6 +13,24 @@ export type UiDropZone = 'left' | 'right' | 'top' | 'bottom' | 'center';
 /** MIME type carrying a dragged tab through the HTML drag-and-drop API. */
 export const UI_TAB_MIME = 'application/x-tr-file-tab';
 
+/**
+ * MIME type carrying dragged entries of a `UiFileBrowser` — within a panel or
+ * to another (PRD 005, §2). The payload is `{ "sources": string[] }`.
+ */
+export const UI_ENTRY_MIME = 'application/x-tr-file-entries';
+
+/**
+ * Entries dropped on a `UiFileBrowser` (PRD 005, §2): onto a folder in it
+ * (`target`), or onto the listing's blank space (`target: null`, the folder
+ * it lists). `copy` when `Ctrl` (or `Alt`) was held — a move otherwise, as in
+ * VS Code's explorer. What happens is the application's business.
+ */
+export interface UiEntryDrop {
+  readonly sources: readonly string[];
+  readonly target: string | null;
+  readonly copy: boolean;
+}
+
 /** Identifies the tab being dragged and where it came from. */
 export interface UiTabDragData {
   readonly tabId: string;
@@ -61,7 +79,10 @@ export type UiPanelCommand =
   | 'refresh'
   | 'back'
   | 'forward'
-  | 'delete';
+  | 'delete'
+  | 'copy'
+  | 'cut'
+  | 'paste';
 
 /**
  * One `UiPanelCommand`, with the entry focus sat on when the key was hit.

@@ -1,4 +1,4 @@
-import { Component, computed, input, output, viewChild, type ElementRef } from '@angular/core';
+import { Component, computed, input, output, signal, viewChild, type ElementRef } from '@angular/core';
 import { UiBreadcrumbs } from '../breadcrumbs/ui-breadcrumbs';
 import { UiSearchField } from '../controls/ui-search-field';
 import { UiSegmented, type UiSegmentedOption } from '../controls/ui-segmented';
@@ -8,7 +8,26 @@ import { UiFileList } from '../file-list/ui-file-list';
 import { UiIconView } from '../icon-view/ui-icon-view';
 import { UiPanelBody } from '../panel-group/ui-panel-body';
 import { UiPanelToolbar } from '../panel-toolbar/ui-panel-toolbar';
-import type { UiFileBrowserModel, UiPanelKey, UiPanelView, UiSelectionChange } from '../models';
+import {
+  UI_ENTRY_MIME,
+  type UiEntryDrop,
+  type UiFileBrowserModel,
+  type UiPanelCommand,
+  type UiPanelKey,
+  type UiPanelView,
+  type UiSelectionChange,
+} from '../models';
+
+/** An entry of whichever view is showing, as far as dragging needs it. */
+interface DragEntry {
+  readonly id: string;
+  readonly selected?: boolean;
+  readonly inactiveSelected?: boolean;
+  readonly dropTarget?: boolean;
+}
+
+/** The clipboard chords, by key. */
+const CLIPBOARD_KEYS: Readonly<Record<string, UiPanelCommand>> = { c: 'copy', x: 'cut', v: 'paste' };
 
 /**
  * File-management content for a panel: a path bar, a toolbar, and a body
@@ -26,7 +45,13 @@ import type { UiFileBrowserModel, UiPanelKey, UiPanelView, UiSelectionChange } f
  *
  * Keys that mean something to the workbench leave as a `UiPanelKey`; the list
  * and the grid report theirs, and the browser adds the ones that are about the
- * listing as a whole rather than one row in it.
+ * listing as a whole rather than one row in it — among them the clipboard,
+ * `Ctrl`+`C` / `X` / `V` (PRD 005, §2).
+ *
+ * Entries can be dragged — onto a folder in the listing, or to another
+ * browser, onto a folder there or its blank space — and a drop is reported as
+ * a `UiEntryDrop`. The drag is one for the page's own drag and drop, typed
+ * `UI_ENTRY_MIME`, so it passes between panels and nothing else takes it.
  */
 @Component({
   selector: 'ui-file-browser',
@@ -64,6 +89,18 @@ export class UiFileBrowser {
 
   /** A key pressed inside the browser whose meaning is the application's. */
   readonly command = output<UiPanelKey>();
+
+  /** Entries were dropped here — from this browser or another (PRD 005, §2). */
+  readonly entryDrop = output<UiEntryDrop>();
+
+  /** The folder a drag is over, lit in the list or grid. */
+  protected readonly dropTargetId = signal<string | null>(null);
+
+  /** A drag is over blank space, so the listed folder itself is the target. */
+  protected readonly bodyDropTarget = signal(false);
+
+  /** What is being dragged out of *this* browser, while it is. */
+  private dragging: ReadonlySet<string> | null = null;
 
   private readonly bodyElement = viewChild.required<ElementRef<HTMLElement>>('body');
 
@@ -118,6 +155,9 @@ export class UiFileBrowser {
    * around it, which claims the other `Ctrl` chords.
    */
   protected onKeydown(event: KeyboardEvent): void {
+    if (this.onClipboardKey(event)) {
+      return;
+    }
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.key !== 'Enter') {
       return;
     }
@@ -188,6 +228,188 @@ export class UiFileBrowser {
     }
 
     event.preventDefault();
+  }
+
+  /**
+   * `Ctrl`+`C` / `X` / `V` (`Cmd` on macOS) — copy, cut and paste entries
+   * (PRD 005, §2). Only over a listing, and never in a text field or the
+   * document viewer, where the chords keep their usual meaning for text.
+   * Copy and cut need an entry to stand on; paste goes into the listed folder.
+   */
+  private onClipboardKey(event: KeyboardEvent): boolean {
+    const chord = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
+    const command = chord ? CLIPBOARD_KEYS[event.key.toLowerCase()] : undefined;
+    if (command === undefined || this.document() || UiFileBrowser.isTextField(event.target)) {
+      return false;
+    }
+    const entryId = this.focusedEntry();
+    if (command !== 'paste' && entryId === null) {
+      return false;
+    }
+    this.command.emit({ command, entryId });
+    event.preventDefault();
+    return true;
+  }
+
+  /* -- drag and drop (PRD 005, §2) ------------------------------------------- */
+
+  /**
+   * A row or tile starts a drag: the whole selection when it is part of it,
+   * else that entry alone — which it then selects, as file managers do.
+   */
+  protected onDragStart(event: DragEvent): void {
+    const transfer = event.dataTransfer;
+    const id = UiFileBrowser.entryIdAt(event.target);
+    if (transfer === null || id === null || this.document()) {
+      return;
+    }
+    const entries = this.entries();
+    const isSelected = (entry: DragEntry | undefined): boolean => !!entry && (!!entry.selected || !!entry.inactiveSelected);
+    const sources = isSelected(entries.find((entry) => entry.id === id))
+      ? entries.filter(isSelected).map((entry) => entry.id)
+      : [id];
+    if (sources.length === 1 && sources[0] === id && !isSelected(entries.find((entry) => entry.id === id))) {
+      this.selectionChange.emit({ selected: [id], focused: id });
+    }
+
+    transfer.setData(UI_ENTRY_MIME, JSON.stringify({ sources }));
+    transfer.effectAllowed = 'copyMove';
+    if (sources.length > 1) {
+      UiFileBrowser.countImage(transfer, sources.length);
+    }
+    this.dragging = new Set(sources);
+  }
+
+  protected onDragOver(event: DragEvent): void {
+    const transfer = event.dataTransfer;
+    if (transfer === null || !Array.from(transfer.types).includes(UI_ENTRY_MIME)) {
+      return;
+    }
+    const target = this.dropTargetAt(event);
+    if (target === undefined) {
+      transfer.dropEffect = 'none';
+      this.clearDropTarget();
+      return;
+    }
+    event.preventDefault();
+    transfer.dropEffect = UiFileBrowser.copies(event) ? 'copy' : 'move';
+    this.dropTargetId.set(target);
+    this.bodyDropTarget.set(target === null);
+  }
+
+  protected onDragLeave(event: DragEvent): void {
+    const body = event.currentTarget;
+    const related = event.relatedTarget;
+    if (body instanceof Node && related instanceof Node && body.contains(related)) {
+      return;
+    }
+    this.clearDropTarget();
+  }
+
+  protected onDrop(event: DragEvent): void {
+    const transfer = event.dataTransfer;
+    if (transfer === null || !Array.from(transfer.types).includes(UI_ENTRY_MIME)) {
+      return;
+    }
+    const target = this.dropTargetAt(event);
+    this.clearDropTarget();
+    this.dragging = null;
+    // Ours either way: the group around the browser has nothing to do with it.
+    event.preventDefault();
+    event.stopPropagation();
+    const sources = UiFileBrowser.readSources(transfer);
+    if (target === undefined || sources.length === 0) {
+      return;
+    }
+    this.entryDrop.emit({ sources, target, copy: UiFileBrowser.copies(event) });
+  }
+
+  protected onDragEnd(): void {
+    this.dragging = null;
+    this.clearDropTarget();
+  }
+
+  /**
+   * Where a drop at the pointer would go: a folder entry under it, `null` for
+   * the listed folder, `undefined` for nowhere. A dragged entry is never its
+   * own target; and within one browser the blank space is a target only for a
+   * copy, since moving entries to the folder they are in does nothing.
+   */
+  private dropTargetAt(event: DragEvent): string | null | undefined {
+    if (this.document()) {
+      return undefined;
+    }
+    const id = UiFileBrowser.entryIdAt(event.target);
+    const entry = id === null ? undefined : this.entries().find((candidate) => candidate.id === id);
+    if (entry?.dropTarget && !this.dragging?.has(entry.id)) {
+      return entry.id;
+    }
+    if (!this.browser().dropFolder) {
+      return undefined;
+    }
+    return this.dragging === null || UiFileBrowser.copies(event) ? null : undefined;
+  }
+
+  private clearDropTarget(): void {
+    this.dropTargetId.set(null);
+    this.bodyDropTarget.set(false);
+  }
+
+  private entries(): readonly DragEntry[] {
+    const browser = this.browser();
+    return browser.view === 'grid' ? browser.items : browser.rows;
+  }
+
+  /** `Ctrl` (or `Alt`, macOS's Option) copies; a plain drag moves. */
+  private static copies(event: DragEvent): boolean {
+    return event.ctrlKey || event.altKey;
+  }
+
+  private static entryIdAt(target: EventTarget | null): string | null {
+    if (!(target instanceof Element)) {
+      return null;
+    }
+    const element = target.closest('[data-row-id], [data-item-id]');
+    return element?.getAttribute('data-row-id') ?? element?.getAttribute('data-item-id') ?? null;
+  }
+
+  /** The dragged paths, or none for a payload that is not one. */
+  private static readSources(transfer: DataTransfer): readonly string[] {
+    try {
+      const parsed = JSON.parse(transfer.getData(UI_ENTRY_MIME)) as { sources?: unknown };
+      return Array.isArray(parsed.sources) ? parsed.sources.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Several entries are dragged as a count, the way file managers show them,
+   * rather than as a picture of whichever row the pointer happened to grab.
+   */
+  private static countImage(transfer: DataTransfer, count: number): void {
+    const ghost = document.createElement('div');
+    ghost.textContent = `${count} items`;
+    Object.assign(ghost.style, {
+      position: 'fixed',
+      top: '-1000px',
+      left: '-1000px',
+      padding: '2px 8px',
+      borderRadius: '10px',
+      background: 'var(--vsc-badge-bg, #0078d4)',
+      color: 'var(--vsc-accent-fg, #fff)',
+      font: '12px sans-serif',
+    });
+    document.body.append(ghost);
+    transfer.setDragImage(ghost, -12, -12);
+    setTimeout(() => ghost.remove());
+  }
+
+  private static isTextField(target: EventTarget | null): boolean {
+    return (
+      target instanceof HTMLElement &&
+      (target.isContentEditable || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+    );
   }
 
   /**

@@ -42,6 +42,16 @@
   &:focus-visible {
     @include focus-ring;
   }
+
+  &.is-cut > * {
+    opacity: 0.55;
+  }
+
+  &.is-drop-target {
+    background: var(--vsc-list-drop);
+    outline: 1px solid var(--vsc-accent);
+    outline-offset: -1px;
+  }
 }
 
 /* Stands in for visual rows that are not rendered, across every column. */

@@ -20,7 +20,8 @@ import type { WorkbenchService } from '../workbench.service';
  * `Alt`+`←`/`→` is the only way to walk a panel's trail, since nothing in the
  * chrome offers it yet — as is `Ctrl`+`Enter`, which opens an entry in a panel
  * that does not exist until the key is pressed (§6.2.5). `Delete` moves the
- * selection to the trash, after asking (PRD 005, §1).
+ * selection to the trash, after asking (PRD 005, §1), and `Ctrl`+`C` / `X` /
+ * `V` are the clipboard (§2).
  */
 export class PanelKeyboardFeature {
   constructor(private readonly parent: WorkbenchService) {}
@@ -76,6 +77,19 @@ export class PanelKeyboardFeature {
       case 'forward':
         this.parent.panelHistoryFt.forward(groupId);
         this.keepFocusInBody(groupId);
+        break;
+
+      // The clipboard (PRD 005, §2): the panel's selection, or the entry the key was pressed on.
+      case 'copy':
+        this.parent.fileClipboardFt.copy(groupId, key.entryId);
+        break;
+
+      case 'cut':
+        this.parent.fileClipboardFt.cut(groupId, key.entryId);
+        break;
+
+      case 'paste':
+        void this.parent.fileClipboardFt.paste(groupId);
         break;
 
       case 'delete':

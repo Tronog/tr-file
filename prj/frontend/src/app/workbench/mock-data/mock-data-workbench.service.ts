@@ -58,7 +58,16 @@ export class MockDataWorkbenchService {
         { id: 'file.emptyTrash', label: 'Empty Trash…', separatorBefore: true },
       ],
     },
-    { id: 'edit', label: 'Edit', items: [TODO] },
+    {
+      id: 'edit',
+      label: 'Edit',
+      items: [
+        // The file clipboard (PRD 005, §2); what is enabled follows the selection — see `ChromeFeature.menuItems`.
+        { id: 'edit.cut', label: 'Cut', keybinding: 'Ctrl+X' },
+        { id: 'edit.copy', label: 'Copy', keybinding: 'Ctrl+C' },
+        { id: 'edit.paste', label: 'Paste', keybinding: 'Ctrl+V' },
+      ],
+    },
     { id: 'selection', label: 'Selection', items: [TODO] },
     { id: 'view', label: 'View', items: [TODO] },
     {

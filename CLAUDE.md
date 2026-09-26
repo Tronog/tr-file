@@ -152,6 +152,17 @@ is flooded. A job still running at its first poll opens a progress window
 runs. When one ends, the folders it names in `affected` are re-read. Entry points: `Delete` in a
 panel (a `UiPanelKey`), the File menu and the palette's `File:` commands.
 
+Copy / cut / paste and drag & drop of entries (PRD 005 §2) sit on top of those jobs.
+`UiFileBrowser` reports `Ctrl`+`C`/`X`/`V` as `copy` / `cut` / `paste` panel keys (never in
+a text field or the document viewer), and is itself the drag source and drop target: rows and
+tiles drag the selection as `UI_ENTRY_MIME`, a folder row (`dropTarget`) or the listing's blank
+space (`dropFolder`) takes it, and it emits `entryDrop` — a move, or a copy with `Ctrl`/`Alt`.
+`FileClipboardFeature` is the workbench's own clipboard (paths, not the system's); a paste goes
+into the panel's folder, a cut is drawn faded (`cut`) until pasted, and pasting a copy where it
+came from makes `name copy.ext`. `FileBrowserFeature.dropEntries` turns a drop into
+`OperationsFeature.transfer`, which starts nothing for a move to where the entries already are.
+Edit › Cut / Copy / Paste run the same.
+
 Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
 `/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details
 sidebar all read from. Fetches are only ever started by an action (expanding a node, opening a

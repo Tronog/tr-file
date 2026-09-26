@@ -90,26 +90,33 @@ export class OperationsFeature {
     await this.trash(paths);
   }
 
-  /** Copies or moves `sources` into the folder `destination`. */
-  async transfer(kind: 'copy' | 'move', sources: readonly string[], destination: string): Promise<void> {
+  /**
+   * Copies or moves `sources` into the folder `destination`; resolves with
+   * whether a job was started. Moving entries to the folder they are already
+   * in starts nothing — nor does cancelling the question about taken names.
+   */
+  async transfer(kind: 'copy' | 'move', sources: readonly string[], destination: string): Promise<boolean> {
+    if (kind === 'move' && sources.every((source) => OperationsFeature.parentOf(source) === destination)) {
+      return false;
+    }
     let conflict: FsConflictPolicy = 'fail';
     for (;;) {
       try {
         const job = await this.parent.fileSystem.operationsFt.start({ kind, sources, destination, conflict });
         this.track(job, kind === 'move' ? sources : []);
-        return;
+        return true;
       } catch (error) {
         const failure = FsError.from(error);
         if (failure.code === 'CONFLICT' && conflict === 'fail') {
           const decision = await this.askAboutConflicts(OperationsFeature.conflictsOf(failure), destination);
           if (decision === null) {
-            return;
+            return false;
           }
           conflict = decision;
           continue;
         }
         await this.refused(kind === 'copy' ? 'copy' : 'move', failure);
-        return;
+        return false;
       }
     }
   }
@@ -296,6 +303,7 @@ export class OperationsFeature {
         });
       }
     }
+    this.parent.fileClipboardFt.forget(gone);
     const selected = this.parent.selectedEntryId();
     if (gone(selected)) {
       this.parent.selectedEntryId.set(OperationsFeature.parentOf(selected));
@@ -338,6 +346,11 @@ export class OperationsFeature {
       return;
     }
     await this.transfer(kind, sources, OperationsFeature.cleanPath(answer));
+  }
+
+  /** What a panel has selected, for copying, cutting or trashing; see `trashSelection`. */
+  selectionIn(groupId: string, entryId: string | null = null): readonly string[] {
+    return this.selectionOf(groupId, entryId);
   }
 
   /**
@@ -532,7 +545,7 @@ export class OperationsFeature {
     return path.slice(path.lastIndexOf('/') + 1) || path;
   }
 
-  private static parentOf(path: string): string {
+  static parentOf(path: string): string {
     return path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
   }
 

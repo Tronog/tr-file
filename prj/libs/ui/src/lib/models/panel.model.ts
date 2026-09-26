@@ -92,6 +92,11 @@ export interface UiFileBrowserModel {
    * explains itself.
    */
   readonly document?: UiDocumentModel;
+  /**
+   * The listed folder takes entries dropped on the listing's blank space —
+   * and its empty state (PRD 005, §2). Folders in it say so per row.
+   */
+  readonly dropFolder?: boolean;
 }
 
 /** Placeholder shown where a panel has nothing to show. */
