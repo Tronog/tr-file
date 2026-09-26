@@ -8,6 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import { HttpError, type Logger } from '../../core/index.js';
 import type { AuthService } from '../auth/index.js';
 import type { FileDetails, FilesService } from '../files/index.js';
+import { parseOperationRequest, type OperationsService } from '../operations/index.js';
 import {
   FS_BRIDGE_CHUNK_BYTES,
   type FsBridgeFailure,
@@ -76,6 +77,7 @@ export class FileSystemBridge {
     private readonly files: FilesService,
     private readonly logger: Logger,
     private readonly auth: AuthService,
+    private readonly operations: OperationsService,
   ) {}
 
   /** A connection that has not signed in; the channel keeps one per window. */
@@ -97,7 +99,13 @@ export class FileSystemBridge {
       // the bridge would otherwise be a silent second door into the same API.
       this.logger.debug('command', {
         command: parsed.command,
-        ...('path' in parsed ? { path: parsed.path } : 'uploadId' in parsed ? { uploadId: parsed.uploadId } : {}),
+        ...('path' in parsed
+          ? { path: parsed.path }
+          : 'uploadId' in parsed
+            ? { uploadId: parsed.uploadId }
+            : 'jobId' in parsed
+              ? { jobId: parsed.jobId }
+              : {}),
         durationMs: Number((performance.now() - startedAt).toFixed(3)),
       });
       return { data };
@@ -185,6 +193,24 @@ export class FileSystemBridge {
       case 'upload-abort':
         await this.abortUpload(request.uploadId);
         return { aborted: true };
+      case 'op-info':
+        return this.operations.info;
+      case 'op-copy':
+      case 'op-move':
+        return this.operations.start({
+          kind: request.command === 'op-copy' ? 'copy' : 'move',
+          sources: request.sources,
+          destination: request.destination,
+          conflict: request.conflict,
+        });
+      case 'op-trash':
+        return this.operations.start({ kind: 'trash', paths: request.paths });
+      case 'op-empty-trash':
+        return this.operations.start({ kind: 'empty-trash' });
+      case 'op-status':
+        return this.operations.status(request.jobId);
+      case 'op-cancel':
+        return this.operations.cancel(request.jobId);
     }
   }
 
@@ -443,6 +469,24 @@ export class FileSystemBridge {
       case 'upload-commit':
       case 'upload-abort':
         return { command, uploadId: FileSystemBridge.readString(value, 'uploadId') };
+      case 'op-info':
+      case 'op-empty-trash':
+        return { command };
+      case 'op-copy':
+      case 'op-move': {
+        const parsed = parseOperationRequest(command === 'op-copy' ? 'copy' : 'move', value);
+        if (parsed.kind !== 'copy' && parsed.kind !== 'move') {
+          throw HttpError.internal();
+        }
+        return { command, sources: parsed.sources, destination: parsed.destination, conflict: parsed.conflict };
+      }
+      case 'op-trash': {
+        const parsed = parseOperationRequest('trash', value);
+        return { command, paths: parsed.kind === 'trash' ? parsed.paths : [] };
+      }
+      case 'op-status':
+      case 'op-cancel':
+        return { command, jobId: FileSystemBridge.readString(value, 'jobId') };
       default:
         throw HttpError.badRequest(`Unknown bridge command: ${String(command)}`);
     }

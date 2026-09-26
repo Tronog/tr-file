@@ -85,6 +85,11 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `auth-status` | — | `{ required, authenticated, username }` for this connection |
 | `login` | `username`, `password` | signs this connection in; `401` / `429` as over HTTP |
 | `logout` | — | signs this connection out |
+| `op-info` | — | `GET /api/ops/info`: `{ trash: 'server' \| 'system' }` |
+| `op-copy`, `op-move` | `sources`, `destination`, `conflict` | the job, started — as `POST /api/ops/copy` / `move` |
+| `op-trash` | `paths` | the job, started |
+| `op-empty-trash` | — | the job, started |
+| `op-status`, `op-cancel` | `jobId` | the job as it stands; `op-cancel` stops it first |
 
 `dispatch(request, session)` takes the connection's `FsBridgeSession` — on the
 desktop, one per window — and with signing in on refuses every file-system
@@ -133,9 +138,9 @@ Successful JSON responses are `{ "data": … }`; errors are
 | 401 | `UNAUTHORIZED` | No session, or a wrong username or password |
 | 403 | `CSRF_REJECTED` | A write without the `X-TR-File-Request` header, or from another site |
 | 429 | `TOO_MANY_REQUESTS` | Too many failed sign-ins |
-| 403 | `FORBIDDEN` | Path escapes `FILES_ROOT`, or the OS denies access |
+| 403 | `FORBIDDEN` | Path escapes `FILES_ROOT`, reaches into the server's trash, or the OS denies access |
 | 404 | `NOT_FOUND` | No such path |
-| 409 | `CONFLICT` | Upload target exists and `overwrite` is not `true` |
+| 409 | `CONFLICT` | Upload target exists and `overwrite` is not `true`; a copy or move with `conflict: 'fail'` onto taken names (`details.conflicts`) |
 | 413 | `PAYLOAD_TOO_LARGE` | Upload exceeds `UPLOAD_MAX_BYTES` |
 | 500 | `INTERNAL_ERROR` | Anything else |
 
@@ -163,3 +168,48 @@ Notes worth knowing before you call it:
 
 The frontend client for this API is `prj/frontend/src/app/file-system/`
 (`FileSystemService` plus its read and transfer feature classes).
+
+## `/api/ops` — file operations (PRD 005, §1)
+
+Copy, move, move to trash and empty trash, in `src/modules/operations`. Each is
+a **background job**: starting one checks everything that can be checked before
+a file is touched and answers `202` with the job at once; the client asks for it
+again to see how far it has got — the frontend asks once a second, so progress
+costs one small message a second however fast the job runs — and may cancel it.
+
+| Method | Path | Body | Answers with |
+| --- | --- | --- | --- |
+| `GET` | `/api/ops/info` | — | `{ trash: 'server' \| 'system' }` |
+| `POST` | `/api/ops/copy`, `/api/ops/move` | `{ sources: string[], destination, conflict? }` | `202`, the job |
+| `POST` | `/api/ops/trash` | `{ paths: string[] }` | `202`, the job |
+| `POST` | `/api/ops/empty-trash` | — | `202`, the job |
+| `GET` | `/api/ops/jobs/:id` | — | the job |
+| `POST` | `/api/ops/jobs/:id/cancel` | — | the job; one that has ended stays as it ended |
+
+A job is `{ id, kind, state, title, startedAt, finishedAt, totalBytes, doneBytes,
+totalItems, doneItems, current, skipped, error, affected }`: `state` is
+`running`, `done`, `failed` or `cancelled`; the totals are `null` while unknown;
+`error` is `{ code, message }` when it failed; `affected` names the folders
+whose listings it changed, for a client to read again. Finished jobs are kept
+for ten minutes.
+
+- **`conflict`** says what to do with a name that is taken at the destination:
+  `fail` (the default) refuses before anything is done with `409` and
+  `details.conflicts`, naming every clash; `overwrite`, `skip`, or `rename` —
+  keep both, as `name copy.ext`, `name copy 2.ext`, …. Copying an entry into
+  the folder it is in makes a copy that way; moving it there does nothing.
+- **Refused up front** (`400`): an empty or over-long list, a destination that
+  is not a folder, a folder into itself, the root itself, anything in or into
+  the trash. Every path goes through the same resolver as `/api/fs`.
+- **Copies** go entry by entry, a stream per file, so progress is in bytes;
+  symlinks are copied as links, never followed; modes and times are kept where
+  the OS allows. **Moves** are a `rename`, or a copy then delete across file
+  systems.
+- **Cancelling** stops the job between two chunks: what was fully copied
+  stays, the file being written is removed.
+- **The trash** is a `TrashProvider`. A server keeps its own: `.tr-file-trash`
+  in the root, laid out as the freedesktop.org trash is (`files/` and, beside
+  each entry, `info/<name>.json` saying where it came from and when). The
+  resolver reserves that name, so it is in no listing and no `/api/fs` or
+  `/api/ops` path can reach into it. The desktop hands `App` the system trash
+  instead (`new App(config, logger, version, { trash })`; see `prj/desktop`).

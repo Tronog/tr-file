@@ -47,7 +47,17 @@ export class MockDataWorkbenchService {
    * rest hold a placeholder until their commands exist.
    */
   readonly menuItems: readonly UiMenuBarItem[] = [
-    { id: 'file', label: 'File', items: [TODO] },
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        // File operations (PRD 005, §1); disabled while nothing is selected — see `ChromeFeature.menuItems`.
+        { id: 'file.copyTo', label: 'Copy To…' },
+        { id: 'file.moveTo', label: 'Move To…' },
+        { id: 'file.trash', label: 'Move to Trash', keybinding: 'Delete' },
+        { id: 'file.emptyTrash', label: 'Empty Trash…', separatorBefore: true },
+      ],
+    },
     { id: 'edit', label: 'Edit', items: [TODO] },
     { id: 'selection', label: 'Selection', items: [TODO] },
     { id: 'view', label: 'View', items: [TODO] },

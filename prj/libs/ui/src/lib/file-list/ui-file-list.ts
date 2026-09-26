@@ -100,7 +100,7 @@ export class UiFileList {
   });
 
   /** Keys documented on every row, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace F5 PageUp PageDown Home End';
+  protected readonly keyShortcuts = 'Enter Space Backspace Delete F5 PageUp PageDown Home End';
 
   private readonly rowElements = viewChildren<ElementRef<HTMLTableRowElement>>('rowElement');
   private readonly body = viewChild<ElementRef<HTMLTableSectionElement>>('body');
@@ -280,6 +280,9 @@ export class UiFileList {
         break;
       case 'F5':
         this.command.emit({ command: 'refresh', entryId: row.id });
+        break;
+      case 'Delete':
+        this.command.emit({ command: 'delete', entryId: row.id });
         break;
       default: {
         if (!isTypeaheadKey(event)) {

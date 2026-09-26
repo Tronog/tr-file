@@ -13,6 +13,23 @@ import { AuthRoutes, AuthService, SessionMiddleware } from './modules/auth/index
 import { FileSystemBridge } from './modules/bridge/index.js';
 import { FilePathResolver, FilesRoutes, FilesService } from './modules/files/index.js';
 import { HealthRoutes, HealthService } from './modules/health/index.js';
+import {
+  OperationsRoutes,
+  OperationsService,
+  SERVER_TRASH_DIR,
+  ServerTrash,
+  type TrashProvider,
+} from './modules/operations/index.js';
+
+/** What a host can plug in that a plain server has no use for. */
+export interface AppOptions {
+  /**
+   * Where trashed entries go (PRD 005, §1). A server keeps its own trash in
+   * the files root; the desktop, on the user's own machine, hands in the
+   * system's.
+   */
+  readonly trash?: TrashProvider;
+}
 
 /**
  * Composition root: owns the Express instance and wires configuration,
@@ -37,6 +54,9 @@ export class App {
    */
   readonly auth: AuthService;
 
+  /** Copy, move, trash and empty trash, as background jobs (PRD 005, §1); shared like `auth`. */
+  readonly operations: OperationsService;
+
   private readonly filesService: FilesService;
   private readonly filesLogger: Logger;
 
@@ -44,13 +64,14 @@ export class App {
     private readonly config: AppConfig,
     private readonly logger: Logger,
     private readonly version: string,
+    options: AppOptions = {},
   ) {
     this.filesLogger = this.logger.child({ module: 'files' });
-    this.filesService = new FilesService(
-      new FilePathResolver(this.config.filesRoot),
-      this.filesLogger,
-      this.config.uploadMaxBytes,
-    );
+    const trash = options.trash ?? new ServerTrash(this.config.filesRoot);
+    // One resolver for every module: the server's own trash is out of reach of all of them.
+    const resolver = new FilePathResolver(this.config.filesRoot, trash.kind === 'server' ? [SERVER_TRASH_DIR] : []);
+    this.filesService = new FilesService(resolver, this.filesLogger, this.config.uploadMaxBytes);
+    this.operations = new OperationsService(resolver, trash, this.logger.child({ module: 'operations' }));
     this.auth = new AuthService(
       this.config.auth,
       this.config.sessionIdleMs,
@@ -59,7 +80,7 @@ export class App {
     if (!this.auth.required) {
       this.logger.warn('signing in is switched off: anyone who can reach this server can use it');
     }
-    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger, this.auth);
+    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger, this.auth, this.operations);
 
     this.instance = express();
     this.configure();
@@ -87,6 +108,7 @@ export class App {
       new HealthRoutes(healthService),
       new AuthRoutes(this.auth),
       new FilesRoutes(this.filesService, this.filesLogger),
+      new OperationsRoutes(this.operations),
     ];
   }
 

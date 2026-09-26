@@ -158,7 +158,7 @@ export class UiIconView {
   });
 
   /** Keys documented on every tile, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace F5 PageUp PageDown Home End';
+  protected readonly keyShortcuts = 'Enter Space Backspace Delete F5 PageUp PageDown Home End';
 
   private readonly tiles = viewChildren<ElementRef<HTMLButtonElement>>('tile');
 
@@ -305,6 +305,9 @@ export class UiIconView {
         break;
       case 'F5':
         this.command.emit({ command: 'refresh', entryId: item.id });
+        break;
+      case 'Delete':
+        this.command.emit({ command: 'delete', entryId: item.id });
         break;
       default: {
         if (!isTypeaheadKey(event)) {

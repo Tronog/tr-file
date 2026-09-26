@@ -142,6 +142,16 @@ double chevron pointing the way the panel will move. Choosing a tab, including f
 activity bar, opens it again; `BottomPanelFeature` owns all of that and `UiBottomPanel` only
 takes a `collapsed` input.
 
+File operations (PRD 005 §1) — copy, move, move to trash, empty trash — are backend jobs,
+started and followed by `OperationsFeature`: it asks first (destination, what to do with
+taken names, and *always* a confirmation before anything is trashed or the trash emptied),
+then polls each running job once a second — never faster, so neither the UI nor the channel
+is flooded. A job still running at its first poll opens a progress window
+(`OperationProgressModal` over the library's `UiProgressDialog`: *Run in Background* /
+*Cancel*); every job is a row in the bottom panel's Progress tab, with a stop button while it
+runs. When one ends, the folders it names in `affected` are re-read. Entry points: `Delete` in a
+panel (a `UiPanelKey`), the File menu and the palette's `File:` commands.
+
 Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
 `/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details
 sidebar all read from. Fetches are only ever started by an action (expanding a node, opening a
@@ -166,7 +176,9 @@ a production server refuses to start without one. Every write needs the
 frontend shows `auth/login` until `AuthService` says there is a session (PRD 003, §2).
 The file-system API lives at `/api/fs`
 (listing, details, download, upload) — see `prj/backend/README.md` for the
-endpoint reference, the error codes and the `FILES_ROOT` confinement rules. The same
+endpoint reference, the error codes and the `FILES_ROOT` confinement rules. File operations are the `operations` module at `/api/ops`: background jobs, polled
+by id and cancellable; the server's trash is `.tr-file-trash` in the root, reserved by the
+path resolver so no API reaches into it. The same
 API is reachable without HTTP through `App.bridge`, for the desktop shell. Its
 frontend client is `prj/frontend/src/app/file-system/`, where `FsHttpService` and
 `FsBridgeService` are the two transports behind one `FsTransport`.
@@ -201,6 +213,11 @@ backend, Express and all — into one `dist/main.cjs`, so the distributable carr
 `node_modules`, and `electron-builder.yml` turns that into a single file per platform
 (an AppImage, a portable `.exe`). Nothing in `prj/desktop/package.json` is a runtime
 dependency any more, which is why they are all `devDependencies`.
+
+File operations (PRD 005 §1) run in the backend on whichever side the window is on; on
+this computer `App` is given `ShellTrash`, so trash goes to the system trash
+(`shell.trashItem`), and on a remote server `RemoteBackend` maps the `op-*` commands onto
+its `/api/ops`.
 
 Section 8.2 took the window's frame away: `UiTitleBar` is the title bar, with the drag
 region and the window buttons in it. `WindowControlsChannel` plus the preload give the

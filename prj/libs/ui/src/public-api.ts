@@ -67,6 +67,7 @@ export { UiQuickInput } from './lib/quick-input/ui-quick-input';
 /* modal windows (PRD 002, §3) -------------------------------------------- */
 export { UiModal } from './lib/modal/ui-modal';
 export { UiDialog } from './lib/modal/ui-dialog';
+export { UiProgressDialog } from './lib/modal/ui-progress-dialog';
 
 /* bottom panel ------------------------------------------------------------ */
 export { UiBottomPanel } from './lib/bottom-panel/ui-bottom-panel';

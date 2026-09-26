@@ -34,9 +34,11 @@ describe('BottomPanelFeature', () => {
   it('opens on Transfers with no counts and an empty list', () => {
     expect(workbench.bottomPanelFt.tabs().map((candidate) => candidate.id)).toEqual([
       'transfers',
+      'progress',
       'problems',
     ]);
     expect(tab('transfers')).toEqual({ id: 'transfers', label: 'Transfers', active: true });
+    expect(tab('progress')).toEqual({ id: 'progress', label: 'Progress' });
     expect(tab('problems')).toEqual({ id: 'problems', label: 'Problems' });
     expect(workbench.bottomPanelFt.transfersEmpty()).toBe(true);
     expect(workbench.bottomPanelFt.transfersVisible()).toBe(true);

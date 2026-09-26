@@ -60,7 +60,8 @@ export type UiPanelCommand =
   | 'up'
   | 'refresh'
   | 'back'
-  | 'forward';
+  | 'forward'
+  | 'delete';
 
 /**
  * One `UiPanelCommand`, with the entry focus sat on when the key was hit.

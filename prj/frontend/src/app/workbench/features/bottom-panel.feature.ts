@@ -3,11 +3,12 @@ import type { UiIconAction, UiPanelTab, UiTransfer } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /**
- * The bottom panel: the Transfers list and the Problems list.
+ * The bottom panel: Transfers, Progress and Problems.
  *
- * Both are views over live state — uploads from `TransfersFeature`, failed
- * requests from the file-system cache — so the counts in the tab bar are
- * always the real ones.
+ * All three are views over live state — uploads and downloads from
+ * `TransfersFeature`, file operations from `OperationsFeature` (PRD 005, §1),
+ * failed requests from the file-system cache — so the counts in the tab bar
+ * are always the real ones. Progress counts what is still running.
  */
 export class BottomPanelFeature {
   private readonly activeTabId: WritableSignal<string>;
@@ -38,7 +39,9 @@ export class BottomPanelFeature {
   readonly actions = computed<readonly UiIconAction[]>(() => {
     const collapsed = this.collapsed();
     return [
-      { id: 'clear', label: 'Clear finished transfers', icon: 'trash' },
+      this.activeTabId() === 'progress'
+        ? { id: 'clear', label: 'Clear finished operations', icon: 'trash' }
+        : { id: 'clear', label: 'Clear finished transfers', icon: 'trash' },
       collapsed
         ? { id: 'toggle', label: 'Restore panel', icon: 'chevrons-up' }
         : { id: 'toggle', label: 'Hide panel', icon: 'chevrons-down' },
@@ -49,12 +52,19 @@ export class BottomPanelFeature {
     const activeId = this.activeTabId();
     const problems = this.parent.fsDataFt.errors().length;
     const transfers = this.parent.transfersFt.rows().length;
+    const running = this.parent.operationsFt.runningCount();
     return [
       {
         id: 'transfers',
         label: 'Transfers',
         ...(transfers > 0 ? { count: transfers } : {}),
         ...(activeId === 'transfers' ? { active: true } : {}),
+      },
+      {
+        id: 'progress',
+        label: 'Progress',
+        ...(running > 0 ? { count: running } : {}),
+        ...(activeId === 'progress' ? { active: true } : {}),
       },
       {
         id: 'problems',
@@ -66,7 +76,11 @@ export class BottomPanelFeature {
   });
 
   readonly transfersVisible = computed(() => this.activeTabId() === 'transfers');
+  readonly progressVisible = computed(() => this.activeTabId() === 'progress');
   readonly problemsVisible = computed(() => this.activeTabId() === 'problems');
+
+  /** Copies, moves, trashing and emptying the trash, newest first. */
+  readonly operations = computed<readonly UiTransfer[]>(() => this.parent.operationsFt.rows());
 
   readonly transfers = computed<readonly UiTransfer[]>(() => this.parent.transfersFt.rows());
 
@@ -99,7 +113,11 @@ export class BottomPanelFeature {
 
   runAction(actionId: string): void {
     if (actionId === 'clear') {
-      this.parent.transfersFt.clearFinished();
+      if (this.activeTabId() === 'progress') {
+        this.parent.operationsFt.clearFinished();
+      } else {
+        this.parent.transfersFt.clearFinished();
+      }
     } else if (actionId === 'toggle') {
       this.toggleCollapsed();
     }

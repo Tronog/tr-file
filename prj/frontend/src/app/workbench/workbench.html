@@ -164,7 +164,17 @@
             No transfers yet — drop files onto a panel, or use its upload button.
           </p>
         } @else {
-          <ui-transfer-list [transfers]="panel.transfers()" />
+          <ui-transfer-list [transfers]="panel.transfers()" (cancel)="workbench.transfersFt.cancel($event)" />
+        }
+      }
+
+      @if (panel.progressVisible()) {
+        @if (panel.operations().length === 0) {
+          <p class="panel-note">
+            Nothing running — copy, move or delete something, and its progress shows here.
+          </p>
+        } @else {
+          <ui-transfer-list [transfers]="panel.operations()" (cancel)="workbench.operationsFt.cancel($event)" />
         }
       }
 

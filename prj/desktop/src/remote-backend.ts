@@ -230,6 +230,23 @@ export class RemoteBackend {
         this.cookie = null;
         return status;
       }
+      // File operations run on the server (PRD 005, §1); the window polls them through here.
+      case 'op-info':
+        return this.json('GET', '/ops/info');
+      case 'op-copy':
+      case 'op-move':
+        return this.json('POST', request.command === 'op-copy' ? '/ops/copy' : '/ops/move', {
+          body: { sources: request.sources, destination: request.destination, conflict: request.conflict },
+          accept: [202],
+        });
+      case 'op-trash':
+        return this.json('POST', '/ops/trash', { body: { paths: request.paths }, accept: [202] });
+      case 'op-empty-trash':
+        return this.json('POST', '/ops/empty-trash', { body: {}, accept: [202] });
+      case 'op-status':
+        return this.json('GET', `/ops/jobs/${encodeURIComponent(request.jobId)}`);
+      case 'op-cancel':
+        return this.json('POST', `/ops/jobs/${encodeURIComponent(request.jobId)}/cancel`, { body: {} });
     }
   }
 
@@ -421,7 +438,7 @@ export class RemoteBackend {
   private async json<T>(
     method: 'GET' | 'POST',
     path: string,
-    options: { query?: Record<string, string>; body?: unknown } = {},
+    options: { query?: Record<string, string>; body?: unknown; accept?: readonly number[] } = {},
   ): Promise<T> {
     const response = await this.request(method, path, options);
     return ((await response.json()) as { data: T }).data;

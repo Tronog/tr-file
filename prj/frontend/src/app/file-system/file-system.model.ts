@@ -148,3 +148,46 @@ export interface FsDownload {
   /** Stops the download; `result` then rejects with an `FsError` (`ABORTED`). */
   cancel(): void;
 }
+
+/* -- file operations (PRD 005, §1) ------------------------------------------ */
+
+export type FsOperationKind = 'copy' | 'move' | 'trash' | 'empty-trash';
+
+export type FsOperationState = 'running' | 'done' | 'failed' | 'cancelled';
+
+/** What to do when a name is taken at the destination; see the backend's `ConflictPolicy`. */
+export type FsConflictPolicy = 'fail' | 'overwrite' | 'skip' | 'rename';
+
+export type FsOperationRequest =
+  | {
+      readonly kind: 'copy' | 'move';
+      readonly sources: readonly string[];
+      readonly destination: string;
+      readonly conflict: FsConflictPolicy;
+    }
+  | { readonly kind: 'trash'; readonly paths: readonly string[] }
+  | { readonly kind: 'empty-trash' };
+
+/** A background job on the backend, as `GET /api/ops/jobs/:id` answers. */
+export interface FsOperationJob {
+  readonly id: string;
+  readonly kind: FsOperationKind;
+  readonly state: FsOperationState;
+  readonly title: string;
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+  readonly totalBytes: number | null;
+  readonly doneBytes: number;
+  readonly totalItems: number | null;
+  readonly doneItems: number;
+  readonly current: string | null;
+  readonly skipped: number;
+  readonly error: { readonly code: string; readonly message: string } | null;
+  /** Folders whose listing the job changed, root-relative. */
+  readonly affected: readonly string[];
+}
+
+/** Whose trash a trashed entry goes to: the server's own, or the desktop's system trash. */
+export interface FsOperationsInfo {
+  readonly trash: 'server' | 'system';
+}

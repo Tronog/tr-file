@@ -1,4 +1,4 @@
-import { app, dialog } from 'electron';
+import { app, dialog, shell } from 'electron';
 
 import { installAppMenu } from './app-menu.js';
 import { DesktopConfig } from './desktop.config.js';
@@ -8,6 +8,7 @@ import { FsBridgeChannel } from './fs-bridge.channel.js';
 import { BridgeSessions } from './bridge-sessions.js';
 import { MainWindow } from './main-window.js';
 import { SaveFileChannel } from './save-file.channel.js';
+import { ShellTrash } from './shell-trash.js';
 import { WindowControlsChannel } from './window-controls.channel.js';
 
 /**
@@ -28,7 +29,12 @@ class DesktopApplication {
     packaged: app.isPackaged,
   });
 
-  private readonly stack = new DesktopStack(this.config);
+  /** On the user's own machine, trash goes where their file manager shows it (PRD 005, §1). */
+  private readonly stack = new DesktopStack(
+    this.config,
+    undefined,
+    (filesRoot) => new ShellTrash(filesRoot, { trashItem: (path) => shell.trashItem(path) }),
+  );
 
   private window: MainWindow | null = null;
   /** What the window loads: the stack, or the dev server in its place. */

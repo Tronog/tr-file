@@ -6,6 +6,9 @@ import type {
   FsDirectoryListing,
   FsDownload,
   FsDownloadResult,
+  FsOperationJob,
+  FsOperationRequest,
+  FsOperationsInfo,
   FsUpload,
   FsUploadProgress,
 } from './file-system.model';
@@ -347,6 +350,25 @@ export class FsBridgeService implements FsTransport {
   }
 
   /** Tells the backend to discard an upload; best effort, and idempotent there. */
+  /* -- file operations (PRD 005, §1) --------------------------------------- */
+
+  async operationsInfo(): Promise<FsOperationsInfo> {
+    return this.invoke<FsOperationsInfo>({ command: 'op-info' });
+  }
+
+  async startOperation(request: FsOperationRequest): Promise<FsOperationJob> {
+    const { kind, ...rest } = request;
+    return this.invoke<FsOperationJob>({ command: `op-${kind}`, ...rest });
+  }
+
+  async operationStatus(id: string): Promise<FsOperationJob> {
+    return this.invoke<FsOperationJob>({ command: 'op-status', jobId: id });
+  }
+
+  async cancelOperation(id: string): Promise<FsOperationJob> {
+    return this.invoke<FsOperationJob>({ command: 'op-cancel', jobId: id });
+  }
+
   private abandon(uploadId: string | undefined): void {
     if (uploadId !== undefined) {
       void this.invoke({ command: 'upload-abort', uploadId }).catch(() => undefined);

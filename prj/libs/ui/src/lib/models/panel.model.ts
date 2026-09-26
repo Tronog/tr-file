@@ -144,4 +144,8 @@ export interface UiTransfer {
   /** 0–100, or `null` for an indeterminate (queued) transfer. */
   readonly progress: number | null;
   readonly statusLabel: string;
+  /** Shown as the row's tooltip — what it is working on, or why it failed. */
+  readonly detail?: string;
+  /** Gives the row a stop button, which `UiTransferList` reports as `cancel`. */
+  readonly cancellable?: boolean;
 }

@@ -46,9 +46,17 @@ export class ChromeFeature {
   readonly menuItems = computed<readonly UiMenuBarItem[]>(() => {
     const open = this.openMenuId();
     const backend = this.parent.backend();
+    const selected = this.parent.operationsFt.hasSelection();
     return this.parent.mockWorkbench.menuItems.map((menu) => ({
       ...menu,
       open: menu.id === open,
+      ...(menu.id === 'file'
+        ? {
+            items: (menu.items ?? []).map((item) =>
+              item.id === 'file.emptyTrash' || selected ? item : { ...item, disabled: true },
+            ),
+          }
+        : {}),
       ...(menu.id === 'go'
         ? {
             items: (menu.items ?? []).map((item) =>
@@ -73,6 +81,8 @@ export class ChromeFeature {
    *   disconnects from a remote server, if the window is on one.
    * - **Go › Remote Computer…** (§1.3) — the command palette, straight at
    *   *Connect to Remote Server*.
+   * - **File › Copy To… / Move To… / Move to Trash / Empty Trash…** — the
+   *   file operations of PRD 005, §1, on the active panel's selection.
    */
   runMenuItem(selection: UiMenuBarSelection): void {
     this.openMenuId.set(null);
@@ -82,6 +92,18 @@ export class ChromeFeature {
         break;
       case 'go.remote':
         this.parent.commandPaletteFt.run('remote.connect');
+        break;
+      case 'file.copyTo':
+        void this.parent.operationsFt.copySelection();
+        break;
+      case 'file.moveTo':
+        void this.parent.operationsFt.moveSelection();
+        break;
+      case 'file.trash':
+        void this.parent.operationsFt.trashSelection();
+        break;
+      case 'file.emptyTrash':
+        void this.parent.operationsFt.emptyTrash();
         break;
       default:
         break;

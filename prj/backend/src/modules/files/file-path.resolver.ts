@@ -21,7 +21,15 @@ export class ResolvedPath {
 export class FilePathResolver {
   private readonly root: string;
 
-  constructor(root: string) {
+  /**
+   * @param reserved Names directly in the root that belong to the server,
+   *   not to its users — the server's trash (PRD 005, §1). No path into one
+   *   resolves, and no listing shows it.
+   */
+  constructor(
+    root: string,
+    private readonly reserved: readonly string[] = [],
+  ) {
     this.root = resolve(root);
   }
 
@@ -41,7 +49,17 @@ export class FilePathResolver {
     const absolute = resolve(this.root, cleaned);
     this.assertInsideRoot(absolute);
 
-    return new ResolvedPath(absolute, FilePathResolver.toPosix(relativePath(this.root, absolute)));
+    const relative = FilePathResolver.toPosix(relativePath(this.root, absolute));
+    if (this.isReserved(relative)) {
+      throw HttpError.forbidden('That folder belongs to the server');
+    }
+    return new ResolvedPath(absolute, relative);
+  }
+
+  /** Whether a root-relative path is, or is inside, one of the reserved names. */
+  isReserved(relative: string): boolean {
+    const first = relative.split('/', 1)[0] as string;
+    return this.reserved.includes(first);
   }
 
   /**
@@ -60,6 +78,10 @@ export class FilePathResolver {
       throw error;
     }
     this.assertInsideRoot(real);
+    // A link elsewhere in the root must not be a way into a reserved folder either.
+    if (this.isReserved(FilePathResolver.toPosix(relativePath(this.root, real)))) {
+      throw HttpError.forbidden('That folder belongs to the server');
+    }
     return candidate;
   }
 

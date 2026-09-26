@@ -15,6 +15,7 @@
 
 import type { AuthStatusDto } from '../auth/auth.model.js';
 import type { DirectoryListingDto, FileDetailsDto } from '../files/models/index.js';
+import type { ConflictPolicy, OperationJobDto, OperationsInfoDto } from '../operations/operation.model.js';
 
 /** Every operation the bridge offers. */
 export type FsBridgeCommand =
@@ -27,7 +28,14 @@ export type FsBridgeCommand =
   | 'upload-abort'
   | 'auth-status'
   | 'login'
-  | 'logout';
+  | 'logout'
+  | 'op-info'
+  | 'op-copy'
+  | 'op-move'
+  | 'op-trash'
+  | 'op-empty-trash'
+  | 'op-status'
+  | 'op-cancel';
 
 /**
  * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
@@ -121,6 +129,35 @@ export interface FsLogoutRequest {
   readonly command: 'logout';
 }
 
+/**
+ * File operations (PRD 005, §1), the commands `/api/ops` answers: each start
+ * answers with the job at once, and the caller asks `op-status` for progress.
+ */
+export interface FsOpInfoRequest {
+  readonly command: 'op-info';
+}
+
+export interface FsOpTransferRequest {
+  readonly command: 'op-copy' | 'op-move';
+  readonly sources: readonly string[];
+  readonly destination: string;
+  readonly conflict: ConflictPolicy;
+}
+
+export interface FsOpTrashRequest {
+  readonly command: 'op-trash';
+  readonly paths: readonly string[];
+}
+
+export interface FsOpEmptyTrashRequest {
+  readonly command: 'op-empty-trash';
+}
+
+export interface FsOpJobRequest {
+  readonly command: 'op-status' | 'op-cancel';
+  readonly jobId: string;
+}
+
 export type FsBridgeRequest =
   | FsAuthStatusRequest
   | FsLoginRequest
@@ -131,7 +168,12 @@ export type FsBridgeRequest =
   | FsUploadBeginRequest
   | FsUploadChunkRequest
   | FsUploadCommitRequest
-  | FsUploadAbortRequest;
+  | FsUploadAbortRequest
+  | FsOpInfoRequest
+  | FsOpTransferRequest
+  | FsOpTrashRequest
+  | FsOpEmptyTrashRequest
+  | FsOpJobRequest;
 
 /** One chunk of a file, with the metadata the HTTP headers would have carried. */
 export interface FsReadResult {
@@ -163,6 +205,13 @@ export interface FsBridgeResults {
   readonly 'auth-status': AuthStatusDto;
   readonly login: AuthStatusDto;
   readonly logout: AuthStatusDto;
+  readonly 'op-info': OperationsInfoDto;
+  readonly 'op-copy': OperationJobDto;
+  readonly 'op-move': OperationJobDto;
+  readonly 'op-trash': OperationJobDto;
+  readonly 'op-empty-trash': OperationJobDto;
+  readonly 'op-status': OperationJobDto;
+  readonly 'op-cancel': OperationJobDto;
 }
 
 export interface FsBridgeSuccess<T> {

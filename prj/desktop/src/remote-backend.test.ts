@@ -234,4 +234,30 @@ describe('RemoteBackend commands', () => {
     assert.equal(seen.at(-1), 15);
     await rm(destination);
   });
+
+  it('runs file operations on the server, polled by id (PRD 005, §1)', async () => {
+    assert.deepEqual(dataOf(await remote.dispatch({ command: 'op-info' })), { trash: 'server' });
+    const started = dataOf<{ id: string; state: string }>(
+      await remote.dispatch({ command: 'op-copy', sources: ['README.md'], destination: '', conflict: 'rename' }),
+    );
+
+    let job = started;
+    while (job.state === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      job = dataOf(await remote.dispatch({ command: 'op-status', jobId: started.id }));
+    }
+
+    assert.equal(job.state, 'done');
+    assert.equal(await readFile(join(root, 'README copy.md'), 'utf8'), '# hello remote\n');
+    assert.equal(errorOf(await remote.dispatch({ command: 'op-trash', paths: 'README.md' })).code, 'BAD_REQUEST');
+    assert.equal(
+      errorOf(await remote.dispatch({ command: 'op-copy', sources: ['nope'], destination: '', conflict: 'fail' })).status,
+      404,
+    );
+    assert.equal(
+      dataOf<{ state: string }>(await remote.dispatch({ command: 'op-cancel', jobId: started.id })).state,
+      'done',
+    );
+    assert.equal(errorOf(await remote.dispatch({ command: 'op-status', jobId: 'nope' })).status, 404);
+  });
 });

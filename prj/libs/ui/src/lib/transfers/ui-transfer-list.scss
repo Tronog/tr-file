@@ -29,3 +29,9 @@ ui-progress {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+.transfer-action {
+  display: flex;
+  flex: none;
+  width: 20px;
+}

@@ -153,6 +153,7 @@ bridge, over HTTP:
 | `upload-begin` / `-chunk` / `-commit` / `-abort` | One streamed multipart `POST /api/fs/upload`; a taken name is checked for first |
 | `auth-status`, `login`, `logout` | `/api/auth/*`; the session cookie is kept by the client |
 | `saveCopy` | `GET /api/fs/download`, streamed to the chosen file |
+| `op-*` (PRD 005, §1) | `/api/ops/*` — the file operations run on the server; the window polls them |
 
 Every write carries the CSRF header; the server's refusals come back with its
 own code and status, and an unreachable server as `NETWORK_ERROR`.
@@ -164,6 +165,27 @@ normal sign-in screen. The window reloads after connecting or disconnecting —
 the connection survives the reload — so everything is read afresh. HTTPS is
 used when asked for (`https://`) or on port 443; plain HTTP otherwise, which
 on anything but a trusted network sends the password in the clear.
+
+## File operations (PRD 005, §1)
+
+Copy, move, move to trash and empty trash are backend jobs everywhere
+(`prj/backend`, `/api/ops`), reached through the same bridge commands
+(`op-copy`, `op-status`, …) whichever backend the window is on. What differs is
+the trash:
+
+- **This computer** — `App` is built with `ShellTrash` (`src/shell-trash.ts`),
+  so trashed entries land in the system trash the user's file manager shows and
+  can be restored from there. Trashing is Electron's `shell.trashItem`, handed
+  in by `main.ts`, so the class itself imports no `electron` and is tested
+  without a desktop session. Emptying has no Electron call: on Linux the
+  freedesktop.org home trash is cleared entry by entry (with progress), on
+  macOS Finder empties it, on Windows `Clear-RecycleBin` does.
+- **A remote server** — `RemoteBackend` maps the commands onto that server's
+  `/api/ops`; the work, and the server's own trash, are over there.
+
+Copies and moves run in the backend on this machine either way — Electron has
+no file-copy call of its own — so progress and cancelling behave the same
+locally and remotely.
 
 ## No window decorations (PRD 001, §8.2)
 
@@ -205,6 +227,9 @@ those three cases (browser, macOS, everywhere else) are decided.
 | `src/desktop.stack.ts` | The server: backend + bundle + fallback |
 | `src/main-window.ts` | The window, and the rules about what may happen in it |
 | `src/fs-bridge.channel.ts` | The IPC channel: who may ask, and nothing else |
+| `src/bridge-sessions.ts` | Each window's session, and which backend it talks to |
+| `src/remote-backend.ts` | A remote server's REST API, spoken as bridge commands |
+| `src/shell-trash.ts` | The system trash, for file operations on this computer |
 | `src/window-controls.channel.ts` | The four verbs a page may use on its own window |
 | `src/app-menu.ts` | The accelerator table; deliberately without `Ctrl`+`W` |
 | `src/preload.cts` | The two small objects the renderer is given |

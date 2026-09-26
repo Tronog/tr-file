@@ -5,6 +5,7 @@ import { App } from '@tr-file/backend/app';
 import type { FileSystemBridge } from '@tr-file/backend/bridge';
 import { AppConfig } from '@tr-file/backend/config';
 import { Logger } from '@tr-file/backend/core';
+import type { TrashProvider } from '@tr-file/backend/operations';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 
 import type { DesktopConfig } from './desktop.config.js';
@@ -41,9 +42,14 @@ export class DesktopStack {
 
   private readonly logger: Logger;
 
+  /**
+   * @param trash The system trash for a files root (PRD 005, §1). `main.ts`
+   *   passes the shell's; without one — in tests — the backend keeps its own.
+   */
   constructor(
     private readonly config: DesktopConfig,
     logger?: Logger,
+    private readonly trash?: (filesRoot: string) => TrashProvider,
   ) {
     this.logger =
       logger ??
@@ -98,7 +104,9 @@ export class DesktopStack {
     }
 
     const appConfig = AppConfig.fromEnv(this.config.serverEnv());
-    const api = new App(appConfig, this.logger.child({ service: 'tr-file-backend' }), VERSION);
+    const api = new App(appConfig, this.logger.child({ service: 'tr-file-backend' }), VERSION, {
+      ...(this.trash === undefined ? {} : { trash: this.trash(appConfig.filesRoot) }),
+    });
     let port = 0;
     const server = createServer(this.compose(appConfig.apiPrefix, () => port));
 

@@ -79,7 +79,9 @@ export class FilesService {
       throw HttpError.badRequest(`Not a directory: ${target.relative || '/'}`);
     }
 
-    const dirents = await this.readdirOrFail(target);
+    const dirents = (await this.readdirOrFail(target)).filter(
+      (dirent) => target.relative !== '' || !this.resolver.isReserved(dirent.name),
+    );
     const entries = await mapLimited(dirents, LISTING_CONCURRENCY, (dirent) => {
       const childRelative =
         target.relative === '' ? dirent.name : `${target.relative}/${dirent.name}`;

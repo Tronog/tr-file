@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiDocumentView, UiFileList, UiTree } from '@tr-file/ui';
+import { UiDocumentView, UiFileList, UiProgressDialog, UiTransferList, UiTree } from '@tr-file/ui';
 import type {
   UiDocumentModel,
   UiFileColumn,
   UiFileRow,
   UiPanelKey,
+  UiProgressDialogModel,
   UiTreeNode,
 } from '@tr-file/ui';
 
@@ -356,5 +357,76 @@ describe('UiFileList', () => {
     bodyRows()[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(commands).toEqual([{ command: 'open', entryId: 'b.md' }]);
+  });
+});
+
+/** PRD 005, §1 — the Progress tab's rows and the progress window. */
+describe('UiTransferList', () => {
+  it('gives a cancellable row a stop button that reports its id', async () => {
+    await TestBed.configureTestingModule({ imports: [UiTransferList] }).compileComponents();
+    const fixture = TestBed.createComponent(UiTransferList);
+    fixture.componentRef.setInput('transfers', [
+      { id: 'a', name: 'Copying a', icon: 'copy', progress: 40, statusLabel: '40%', cancellable: true, detail: '/docs/a' },
+      { id: 'b', name: 'Copying b', icon: 'check', progress: 100, statusLabel: 'done' },
+    ]);
+    fixture.detectChanges();
+    const cancelled: string[] = [];
+    fixture.componentInstance.cancel.subscribe((id) => cancelled.push(id));
+
+    const buttons = fixture.nativeElement.querySelectorAll('ui-icon-button button') as NodeListOf<HTMLButtonElement>;
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]?.getAttribute('aria-label')).toBe('Cancel Copying a');
+    buttons[0]?.click();
+
+    expect(cancelled).toEqual(['a']);
+    expect(fixture.nativeElement.querySelector('.transfer-name').getAttribute('title')).toBe('/docs/a');
+  });
+});
+
+describe('UiProgressDialog', () => {
+  let fixture: ComponentFixture<UiProgressDialog>;
+  const model = (overrides: Partial<UiProgressDialogModel> = {}): UiProgressDialogModel => ({
+    title: 'Copying 3 items to /docs',
+    current: '/src/a.txt',
+    progress: 40,
+    status: '1 of 3 items',
+    state: 'running',
+    ...overrides,
+  });
+  const buttons = (): HTMLButtonElement[] => Array.from(fixture.nativeElement.querySelectorAll('button'));
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [UiProgressDialog] }).compileComponents();
+    fixture = TestBed.createComponent(UiProgressDialog);
+  });
+
+  it('offers Run in Background and Cancel while running', () => {
+    fixture.componentRef.setInput('model', model());
+    fixture.detectChanges();
+    const said: string[] = [];
+    fixture.componentInstance.background.subscribe(() => said.push('background'));
+    fixture.componentInstance.cancel.subscribe(() => said.push('cancel'));
+
+    expect(buttons().map((button) => button.textContent?.trim())).toEqual(['Run in Background', 'Cancel']);
+    expect(fixture.nativeElement.querySelector('ui-progress').getAttribute('aria-valuenow')).toBe('40');
+    buttons().forEach((button) => button.click());
+
+    expect(said).toEqual(['background', 'cancel']);
+  });
+
+  it('says it is cancelling, and will not be asked twice', () => {
+    fixture.componentRef.setInput('model', model({ cancelling: true }));
+    fixture.detectChanges();
+
+    expect(buttons()[1]?.textContent?.trim()).toBe('Cancelling…');
+    expect(buttons()[1]?.disabled).toBe(true);
+  });
+
+  it('says why it failed, with only Close left', () => {
+    fixture.componentRef.setInput('model', model({ state: 'failed', error: 'Permission denied' }));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent.trim()).toBe('Permission denied');
+    expect(buttons().map((button) => button.textContent?.trim())).toEqual(['Close']);
   });
 });

@@ -246,6 +246,10 @@ describe('CommandPaletteFeature', () => {
     expect(palette().isOpen()).toBe(true);
     expect(palette().items().map((item) => item.label)).toEqual([
       'Go: Jump to Folder…',
+      'File: Copy To…',
+      'File: Move To…',
+      'File: Move to Trash',
+      'File: Empty Trash…',
       'Remote: Connect to Remote Server…',
     ]);
     expect(palette().activeId()).toBe('go.jumpToFolder');

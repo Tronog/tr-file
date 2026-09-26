@@ -54,8 +54,8 @@ describe('ChromeFeature', () => {
       expect(menus().every((menu) => !menu.open)).toBe(true);
     });
 
-    it('holds a placeholder in every menu but Go', () => {
-      for (const menu of menus().filter((candidate) => candidate.id !== 'go')) {
+    it('holds a placeholder in every menu but File and Go', () => {
+      for (const menu of menus().filter((candidate) => candidate.id !== 'go' && candidate.id !== 'file')) {
         expect(menu.items).toEqual([{ id: 'todo', label: 'Todo', disabled: true }]);
       }
     });

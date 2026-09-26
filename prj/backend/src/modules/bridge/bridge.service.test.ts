@@ -268,3 +268,28 @@ describe('a malformed request', () => {
     await assert.doesNotReject(() => bridge.dispatch(undefined));
   });
 });
+
+describe('file operations (PRD 005, §1)', () => {
+  it('starts a job and reports it, as /api/ops does', async () => {
+    await writeFile(join(root, 'op.txt'), 'op');
+    const started = dataOf<{ id: string; state: string }>(
+      await bridge.dispatch({ command: 'op-copy', sources: ['op.txt'], destination: '', conflict: 'rename' }),
+    );
+
+    let job = started;
+    while (job.state === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      job = dataOf(await bridge.dispatch({ command: 'op-status', jobId: started.id }));
+    }
+
+    assert.equal(job.state, 'done');
+    assert.equal(await readFile(join(root, 'op copy.txt'), 'utf8'), 'op');
+    assert.deepEqual(dataOf(await bridge.dispatch({ command: 'op-info' })), { trash: 'server' });
+  });
+
+  it('validates operation commands', async () => {
+    assert.equal(errorOf(await bridge.dispatch({ command: 'op-trash', paths: 'op.txt' })).code, 'BAD_REQUEST');
+    assert.equal(errorOf(await bridge.dispatch({ command: 'op-cancel' })).code, 'BAD_REQUEST');
+    assert.equal(errorOf(await bridge.dispatch({ command: 'op-status', jobId: 'nope' })).status, 404);
+  });
+});

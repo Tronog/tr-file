@@ -59,9 +59,9 @@ structural helpers. No component hardcodes a colour.
 | Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList` |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
 | Panel content | `UiFileBrowser` (with `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
-| Bottom panel | `UiBottomPanel`, `UiTransferList` |
+| Bottom panel | `UiBottomPanel`, `UiTransferList` (Transfers and Progress; `cancellable` rows report `cancel`) |
 | Controls | `UiIconButton`, `UiButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
-| Modal windows | `UiModal`, `UiDialog` |
+| Modal windows | `UiModal`, `UiDialog`, `UiProgressDialog` |
 | Quick input | `UiQuickInput` — the command palette's box |
 | Icons | `UiIcon`, `UiIconSprite` |
 
@@ -186,7 +186,7 @@ entry would maximize the window.
 | `Ctrl` + an arrow, `Home`, `End` | Moves the cursor without changing the selection |
 | `Ctrl`+`A` | Selects every entry |
 | Drag across blank space in the icon view | Box selection: every tile the box touches; added to the selection with `Ctrl`/`Shift`. A plain click on blank space clears it |
-| `Enter` / `Space` / `Backspace` / `F5` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
+| `Enter` / `Space` / `Backspace` / `F5` / `Delete` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
 | `Alt`+`←` / `Alt`+`→` in a body | Emitted as `back` / `forward`; the app walks that panel's own trail |
 | `Alt`+`↑` in a body | Emitted as `up`; the app leaves the folder for its parent |
 | Tree view (`UiPanelView` `'tree'`) | The details table as a tree grid: same columns, folders open in place |
@@ -285,8 +285,8 @@ plus the entry the cursor is on; `select` still names that entry, and
 hit-tested against the grid's geometry, not the rendered tiles, so it reaches
 tiles the virtual window has not drawn, and scrolls the panel when dragged
 near its edge. And **the views move focus but decide nothing**:
-`Enter`, `Space`, `Backspace` and `F5` leave as a `UiPanelKey`
-(`open` / `select` / `up` / `refresh`) for the application to interpret — in
+`Enter`, `Space`, `Backspace`, `F5` and `Delete` leave as a `UiPanelKey`
+(`open` / `select` / `up` / `refresh` / `delete`) for the application to interpret — in
 the app that is `PanelKeyboardFeature`, which is the whole answer to "what does
 this key do in a panel". Focus movement stays in the component because a
 roving tabindex can only be rolled where the elements are.
@@ -373,6 +373,13 @@ Two pieces, split the way VS Code's own are:
   accent-coloured, focused first, what `Enter` in the field presses — and
   `←`/`→` move between buttons. It reports `choose` with the button, the
   checkbox and the field, and never closes itself.
+
+- **`UiProgressDialog`** is a long-running operation (PRD 005, §1): the title,
+  the entry being worked on, a `UiProgress` bar and the counts, from a
+  `UiProgressDialogModel`. While it runs it offers *Run in Background*
+  (`background`) and *Cancel* (`cancel`, shown as *Cancelling…* and disabled
+  once asked); once it has ended, only *Close* (`close`) — with the reason,
+  as an alert, when it failed. It closes nothing itself either.
 
 Anything else — a form, a picker — is projected into `UiModal` as it is.
 `button[uiButton]` (`variant: 'primary' | 'secondary'`) is the text button both

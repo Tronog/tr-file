@@ -19,7 +19,8 @@ import type { WorkbenchService } from '../workbench.service';
  * `forward` are the exception, and the reason `PanelHistoryFeature` exists:
  * `Alt`+`←`/`→` is the only way to walk a panel's trail, since nothing in the
  * chrome offers it yet — as is `Ctrl`+`Enter`, which opens an entry in a panel
- * that does not exist until the key is pressed (§6.2.5).
+ * that does not exist until the key is pressed (§6.2.5). `Delete` moves the
+ * selection to the trash, after asking (PRD 005, §1).
  */
 export class PanelKeyboardFeature {
   constructor(private readonly parent: WorkbenchService) {}
@@ -75,6 +76,11 @@ export class PanelKeyboardFeature {
       case 'forward':
         this.parent.panelHistoryFt.forward(groupId);
         this.keepFocusInBody(groupId);
+        break;
+
+      case 'delete':
+        // Asks first, always (PRD 005, §1); the rows it takes away are re-read when it ends.
+        void this.parent.operationsFt.trashSelection(groupId, key.entryId);
         break;
     }
   }

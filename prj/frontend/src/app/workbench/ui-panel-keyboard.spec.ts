@@ -106,17 +106,19 @@ describe('UiFileList keyboard', () => {
    * These keys are reported, not acted on: what "open" means to the workbench
    * is `PanelKeyboardFeature`'s decision, not this table's.
    */
-  it('reports Enter, Space, Backspace and F5 as panel commands', () => {
+  it('reports Enter, Space, Backspace, F5 and Delete as panel commands', () => {
     press(2, 'Enter');
     press(2, ' ');
     press(2, 'Backspace');
     press(2, 'F5');
+    press(2, 'Delete');
 
     expect(commands).toEqual([
       { command: 'open', entryId: 'download.zip' },
       { command: 'select', entryId: 'download.zip' },
       { command: 'up', entryId: 'download.zip' },
       { command: 'refresh', entryId: 'download.zip' },
+      { command: 'delete', entryId: 'download.zip' },
     ]);
     // None of them moved the selection on their own.
     expect(selected).toEqual([]);
@@ -257,11 +259,13 @@ describe('UiIconView keyboard', () => {
     press(3, 'Enter');
     press(3, ' ');
     press(3, 'Backspace');
+    press(3, 'Delete');
 
     expect(commands).toEqual([
       { command: 'open', entryId: 'notes.md' },
       { command: 'select', entryId: 'notes.md' },
       { command: 'up', entryId: 'notes.md' },
+      { command: 'delete', entryId: 'notes.md' },
     ]);
   });
 

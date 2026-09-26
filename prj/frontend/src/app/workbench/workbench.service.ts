@@ -21,6 +21,7 @@ import { SidebarPanesFeature } from './features/sidebar-panes.feature';
 import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
+import { OperationsFeature } from './features/operations.feature';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
 import { AuthService } from '../auth/auth.service';
 import { ModalService } from '../modal/modal.service';
@@ -107,6 +108,8 @@ export class WorkbenchService {
   readonly fsDataFt = new FsDataFeature(this);
 
   readonly transfersFt = new TransfersFeature(this);
+  /** Copy, move, trash and empty trash, followed to the end (PRD 005, §1). */
+  readonly operationsFt = new OperationsFeature(this);
   /** Read-only file previews; read by the groups that show them. */
   readonly filePreviewFt = new FilePreviewFeature(this);
   readonly chromeFt = new ChromeFeature(this);

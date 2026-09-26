@@ -51,3 +51,23 @@ export const UI_DIALOG_ICONS: Readonly<Record<Exclude<UiDialogSeverity, 'none'>,
   warning: 'alert-triangle',
   error: 'alert-circle',
 };
+
+/**
+ * A long-running operation, as `UiProgressDialog` shows it (PRD 005, §1).
+ * The application builds it from whatever reports the progress.
+ */
+export interface UiProgressDialogModel {
+  /** e.g. `Copying 3 items to /docs`. */
+  readonly title: string;
+  /** What is being worked on right now; `null` between entries. */
+  readonly current: string | null;
+  /** 0–100, or `null` while there is nothing to measure against. */
+  readonly progress: number | null;
+  /** e.g. `2 of 10 items · 1.2 MB of 4 MB`. */
+  readonly status: string;
+  readonly state: 'running' | 'done' | 'failed' | 'cancelled';
+  /** Cancel was asked for and the operation has not stopped yet. */
+  readonly cancelling?: boolean;
+  /** Why it failed, when it did. */
+  readonly error?: string;
+}

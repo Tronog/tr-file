@@ -298,6 +298,7 @@ export class TransfersFeature {
           name,
           icon: upload ? 'upload' : 'download',
           iconColor: 'var(--vsc-accent)',
+          cancellable: true,
           progress: progress.percent,
           statusLabel:
             progress.percent === null

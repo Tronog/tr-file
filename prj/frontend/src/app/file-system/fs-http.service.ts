@@ -16,6 +16,9 @@ import type {
   FsDownload,
   FsDownloadResult,
   FsEnvelope,
+  FsOperationJob,
+  FsOperationRequest,
+  FsOperationsInfo,
   FsUpload,
   FsUploadProgress,
 } from './file-system.model';
@@ -243,6 +246,27 @@ export class FsHttpService implements FsTransport {
 
   async logout(): Promise<AuthStatus> {
     return this.request<AuthStatus>(this.http.post<FsEnvelope<AuthStatus>>('/api/auth/logout', {}));
+  }
+
+  /* -- file operations (PRD 005, §1) --------------------------------------- */
+
+  async operationsInfo(): Promise<FsOperationsInfo> {
+    return this.request(this.http.get<FsEnvelope<FsOperationsInfo>>('/api/ops/info'));
+  }
+
+  async startOperation(request: FsOperationRequest): Promise<FsOperationJob> {
+    const { kind, ...body } = request;
+    return this.request(this.http.post<FsEnvelope<FsOperationJob>>(`/api/ops/${kind}`, body));
+  }
+
+  async operationStatus(id: string): Promise<FsOperationJob> {
+    return this.request(this.http.get<FsEnvelope<FsOperationJob>>(`/api/ops/jobs/${encodeURIComponent(id)}`));
+  }
+
+  async cancelOperation(id: string): Promise<FsOperationJob> {
+    return this.request(
+      this.http.post<FsEnvelope<FsOperationJob>>(`/api/ops/jobs/${encodeURIComponent(id)}/cancel`, {}),
+    );
   }
 
   private async request<T>(response: Observable<FsEnvelope<T>>): Promise<T> {

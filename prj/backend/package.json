@@ -10,7 +10,8 @@
     "./app": "./dist/app.js",
     "./bridge": "./dist/modules/bridge/index.js",
     "./config": "./dist/config/index.js",
-    "./core": "./dist/core/index.js"
+    "./core": "./dist/core/index.js",
+    "./operations": "./dist/modules/operations/index.js"
   },
   "engines": {
     "node": ">=22"

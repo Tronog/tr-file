@@ -1,5 +1,13 @@
 import type { AuthStatus } from '../auth/auth.model';
-import type { FsDetails, FsDirectoryListing, FsDownload, FsUpload } from './file-system.model';
+import type {
+  FsDetails,
+  FsDirectoryListing,
+  FsDownload,
+  FsOperationJob,
+  FsOperationRequest,
+  FsOperationsInfo,
+  FsUpload,
+} from './file-system.model';
 
 /**
  * How the app reaches the backend (PRD 001, §8.1).
@@ -62,4 +70,22 @@ export interface FsTransport {
   login(username: string, password: string): Promise<AuthStatus>;
 
   logout(): Promise<AuthStatus>;
+
+  /* -- file operations (PRD 005, §1) --------------------------------------- */
+
+  /** Whose trash this backend puts things in. */
+  operationsInfo(): Promise<FsOperationsInfo>;
+
+  /**
+   * Starts a copy, move, trash or empty-trash on the backend and answers with
+   * the job at once. Rejects with `CONFLICT` (naming the clashes in
+   * `details.conflicts`) when the request said to fail on one.
+   */
+  startOperation(request: FsOperationRequest): Promise<FsOperationJob>;
+
+  /** How far a job has got. */
+  operationStatus(id: string): Promise<FsOperationJob>;
+
+  /** Stops a job; answers with how it stands. */
+  cancelOperation(id: string): Promise<FsOperationJob>;
 }

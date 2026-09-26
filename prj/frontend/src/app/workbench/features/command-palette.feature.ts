@@ -79,6 +79,16 @@ export class CommandPaletteFeature {
 
   readonly commands: readonly PaletteCommand[] = [
     { id: 'go.jumpToFolder', category: 'Go', label: 'Jump to Folder…', run: () => this.ask(this.jumpToFolder()) },
+    { id: 'files.copyTo', category: 'File', label: 'Copy To…', run: () => this.closeAnd(() => this.parent.operationsFt.copySelection()) },
+    { id: 'files.moveTo', category: 'File', label: 'Move To…', run: () => this.closeAnd(() => this.parent.operationsFt.moveSelection()) },
+    {
+      id: 'files.trash',
+      category: 'File',
+      label: 'Move to Trash',
+      keys: ['Delete'],
+      run: () => this.closeAnd(() => this.parent.operationsFt.trashSelection()),
+    },
+    { id: 'files.emptyTrash', category: 'File', label: 'Empty Trash…', run: () => this.closeAnd(() => this.parent.operationsFt.emptyTrash()) },
     {
       id: 'remote.connect',
       category: 'Remote',
@@ -165,6 +175,12 @@ export class CommandPaletteFeature {
       this.active.set(command.id);
       command.run();
     }
+  }
+
+  /** A command that asks its questions in a modal window rather than in the box: the box goes first. */
+  private closeAnd(action: () => Promise<void>): void {
+    this.close();
+    void action();
   }
 
   close(): void {

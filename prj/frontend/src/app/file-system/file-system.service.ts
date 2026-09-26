@@ -1,4 +1,5 @@
 import { Service, inject } from '@angular/core';
+import { FsOperationsFeature } from './features/fs-operations.feature';
 import { FsReadFeature } from './features/fs-read.feature';
 import { FsTransferFeature } from './features/fs-transfer.feature';
 import { FsBridgeService } from './fs-bridge.service';
@@ -36,4 +37,7 @@ export class FileSystemService {
 
   /** Downloads and uploads, including per-upload progress. */
   readonly transferFt = new FsTransferFeature(this);
+
+  /** Copy, move, trash and empty trash, as jobs on the backend (PRD 005, §1). */
+  readonly operationsFt = new FsOperationsFeature(this);
 }

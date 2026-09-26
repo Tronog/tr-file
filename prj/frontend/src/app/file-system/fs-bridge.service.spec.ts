@@ -369,6 +369,46 @@ describe('FsBridgeService', () => {
 
     expect(bridge.isAvailable).toBe(false);
   });
+  /** PRD 005, §1 — the file operations are commands like any other. */
+  describe('file operations', () => {
+    it('starts, polls and cancels a job with op-* commands', async () => {
+      fake.answer = { data: { id: 'job-1', state: 'running' } };
+
+      await fs.operationsFt.start({ kind: 'copy', sources: ['a.txt'], destination: 'docs', conflict: 'rename' });
+      await fs.operationsFt.start({ kind: 'trash', paths: ['a.txt'] });
+      await fs.operationsFt.start({ kind: 'empty-trash' });
+      await fs.operationsFt.status('job-1');
+      await fs.operationsFt.cancel('job-1');
+
+      expect(fake.sent).toEqual([
+        { command: 'op-copy', sources: ['a.txt'], destination: 'docs', conflict: 'rename' },
+        { command: 'op-trash', paths: ['a.txt'] },
+        { command: 'op-empty-trash' },
+        { command: 'op-status', jobId: 'job-1' },
+        { command: 'op-cancel', jobId: 'job-1' },
+      ]);
+    });
+
+    it('asks whose trash it is once', async () => {
+      fake.answer = { data: { trash: 'system' } };
+
+      await expect(fs.operationsFt.operationsInfo()).resolves.toEqual({ trash: 'system' });
+      await fs.operationsFt.operationsInfo();
+
+      expect(fake.sent).toEqual([{ command: 'op-info' }]);
+    });
+
+    it('passes a conflict through with the names that clash', async () => {
+      fake.answer = { error: { code: 'CONFLICT', message: 'taken', status: 409, details: { conflicts: ['a.txt'] } } };
+
+      const failure = await fs.operationsFt
+        .start({ kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail' })
+        .catch((error: unknown) => error as FsError);
+
+      expect(failure).toBeInstanceOf(FsError);
+      expect((failure as FsError).details).toEqual({ conflicts: ['a.txt'] });
+    });
+  });
 });
 
 describe('FileSystemService without a desktop bridge', () => {
@@ -382,5 +422,31 @@ describe('FileSystemService without a desktop bridge', () => {
   it('falls back to HTTP, which is every browser', () => {
     expect(TestBed.inject(FsBridgeService).isAvailable).toBe(false);
     expect(TestBed.inject(FileSystemService).transport.kind).toBe('http');
+  });
+
+  it('speaks /api/ops over HTTP', async () => {
+    const fs = TestBed.inject(FileSystemService);
+    const http = TestBed.inject(HttpTestingController);
+    const job = { id: 'job 1', state: 'running' };
+
+    const started = fs.operationsFt.start({ kind: 'copy', sources: ['a.txt'], destination: 'docs', conflict: 'fail' });
+    const request = http.expectOne('/api/ops/copy');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ sources: ['a.txt'], destination: 'docs', conflict: 'fail' });
+    request.flush({ data: job }, { status: 202, statusText: 'Accepted' });
+    await expect(started).resolves.toEqual(job);
+
+    const status = fs.operationsFt.status('job 1');
+    http.expectOne({ method: 'GET', url: '/api/ops/jobs/job%201' }).flush({ data: job });
+    await status;
+
+    const cancel = fs.operationsFt.cancel('job 1');
+    http.expectOne({ method: 'POST', url: '/api/ops/jobs/job%201/cancel' }).flush({ data: job });
+    await cancel;
+
+    const info = fs.operationsFt.operationsInfo();
+    http.expectOne('/api/ops/info').flush({ data: { trash: 'server' } });
+    await expect(info).resolves.toEqual({ trash: 'server' });
+    http.verify();
   });
 });
