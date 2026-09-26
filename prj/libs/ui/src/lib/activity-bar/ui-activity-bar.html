@@ -3,10 +3,12 @@
     type="button"
     class="activity-btn"
     [class.is-active]="item.active"
-    [attr.aria-pressed]="item.active ?? false"
+    [attr.aria-pressed]="item.hasMenu ? null : (item.active ?? false)"
     [attr.title]="item.label"
     [attr.aria-label]="item.badge ? item.label + ' (' + item.badge + ')' : item.label"
-    (click)="select.emit(item.id)"
+    [attr.aria-haspopup]="item.hasMenu ? 'menu' : null"
+    [attr.aria-expanded]="item.hasMenu ? (item.expanded ?? false) : null"
+    (click)="press(item, $event)"
   >
     <ui-icon [name]="item.icon" size="lg" />
     @if (item.badge) {
@@ -22,10 +24,12 @@
     type="button"
     class="activity-btn"
     [class.is-active]="item.active"
-    [attr.aria-pressed]="item.active ?? false"
+    [attr.aria-pressed]="item.hasMenu ? null : (item.active ?? false)"
     [attr.title]="item.label"
     [attr.aria-label]="item.badge ? item.label + ' (' + item.badge + ')' : item.label"
-    (click)="select.emit(item.id)"
+    [attr.aria-haspopup]="item.hasMenu ? 'menu' : null"
+    [attr.aria-expanded]="item.hasMenu ? (item.expanded ?? false) : null"
+    (click)="press(item, $event)"
   >
     <ui-icon [name]="item.icon" size="lg" />
     @if (item.badge) {

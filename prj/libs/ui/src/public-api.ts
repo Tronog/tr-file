@@ -43,6 +43,7 @@ export { UiProgress } from './lib/progress/ui-progress';
 export { UiEmptyState } from './lib/empty-state/ui-empty-state';
 export { UiBreadcrumbs } from './lib/breadcrumbs/ui-breadcrumbs';
 export { UiContextMenu } from './lib/context-menu/ui-context-menu';
+export type { UiMenuDismissReason } from './lib/context-menu/ui-context-menu';
 
 /* editor area ------------------------------------------------------------- */
 export { UiTabBar } from './lib/tabs/ui-tab-bar';

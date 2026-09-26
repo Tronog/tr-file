@@ -13,6 +13,11 @@
   font-size: var(--vsc-font-size);
 }
 
+/* Opens upward from `(x, y)`: the point is its bottom-left corner. */
+:host(.from-bottom) {
+  transform: translateY(-100%);
+}
+
 .menu-row {
   display: flex;
   gap: 8px;

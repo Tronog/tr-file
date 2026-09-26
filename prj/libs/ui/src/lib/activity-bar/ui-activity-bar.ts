@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
-import type { UiActivityItem } from '../models/chrome.model';
+import type { UiActivityItem, UiMenuAnchor } from '../models/chrome.model';
 
 /**
  * The 48px activity bar: primary view switchers at the top, secondary entries
@@ -27,4 +27,16 @@ export class UiActivityBar {
   readonly bottomItems = input<readonly UiActivityItem[]>([]);
 
   readonly select = output<string>();
+
+  /** A `hasMenu` item was pressed; opening (or closing) its menu is the app's call. */
+  readonly menuOpen = output<UiMenuAnchor>();
+
+  protected press(item: UiActivityItem, event: MouseEvent): void {
+    if (!item.hasMenu) {
+      this.select.emit(item.id);
+      return;
+    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.menuOpen.emit({ id: item.id, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
+  }
 }

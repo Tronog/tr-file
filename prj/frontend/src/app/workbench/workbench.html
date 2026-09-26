@@ -43,6 +43,7 @@
     [items]="chrome.activityItems()"
     [bottomItems]="chrome.activityBottomItems()"
     (select)="chrome.selectActivity($event)"
+    (menuOpen)="chrome.openMenu($event)"
   />
 
   <!-- left sidebar: the directory tree -->
@@ -240,3 +241,17 @@
   aria-hidden="true"
   (change)="onFilesChosen($event)"
 />
+
+<!-- The Settings gear's menu (PRD 007, §1): fixed, beside the gear, opening upward. -->
+@if (chrome.settingsMenu(); as menu) {
+  <ui-context-menu
+    label="Settings"
+    origin="bottom-left"
+    [fixed]="true"
+    [x]="menu.x"
+    [y]="menu.y"
+    [items]="chrome.settingsMenuItems"
+    (select)="chrome.runSettingsItem($event)"
+    (dismiss)="chrome.closeSettingsMenu()"
+  />
+}

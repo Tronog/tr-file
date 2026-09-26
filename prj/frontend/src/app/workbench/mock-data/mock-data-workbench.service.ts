@@ -1,5 +1,5 @@
 import { Service } from '@angular/core';
-import type { UiActivityItem, UiIconAction, UiMenuBarItem } from '@tr-file/ui';
+import type { UiActivityItem, UiIconAction, UiMenuBarItem, UiMenuItem } from '@tr-file/ui';
 import type { MockWorkbenchLayout } from './mock-data.model';
 
 /**
@@ -61,8 +61,14 @@ export class MockDataWorkbenchService {
 
   readonly activityBottomItems: readonly UiActivityItem[] = [
     { id: 'account', label: 'Account', icon: 'user' },
-    { id: 'settings', label: 'Settings', icon: 'settings' },
+    { id: 'settings', label: 'Settings', icon: 'settings', hasMenu: true },
   ];
+
+  /**
+   * What the Settings gear's menu offers (PRD 007, §1). A placeholder for now:
+   * the settings themselves are still to come.
+   */
+  readonly settingsMenuItems: readonly UiMenuItem[] = [{ id: 'todo', label: 'Todo', disabled: true }];
 
   readonly sidebarMoreActions: readonly UiIconAction[] = [
     { id: 'more', label: 'More actions', icon: 'dots' },

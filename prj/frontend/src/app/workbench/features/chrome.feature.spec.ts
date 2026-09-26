@@ -44,6 +44,45 @@ describe('ChromeFeature', () => {
     await settled();
   };
 
+  /** PRD 007, §1 — the Settings gear opens a menu beside it. */
+  describe('the Settings menu', () => {
+    const gear = () => workbench.chromeFt.activityBottomItems().find((item) => item.id === 'settings');
+    const anchor = { id: 'settings', left: 0, top: 700, right: 48, bottom: 748 };
+
+    it('is a menu button, closed to start with', () => {
+      expect(gear()).toMatchObject({ hasMenu: true, expanded: false });
+      expect(workbench.chromeFt.settingsMenu()).toBeNull();
+    });
+
+    it('opens beside the gear, from its bottom edge, and offers a disabled Todo', () => {
+      workbench.chromeFt.openMenu(anchor);
+
+      expect(workbench.chromeFt.settingsMenu()).toEqual({ x: 48, y: 748 });
+      expect(gear()).toMatchObject({ expanded: true, active: true });
+      expect(workbench.chromeFt.settingsMenuItems).toEqual([{ id: 'todo', label: 'Todo', disabled: true }]);
+    });
+
+    it('closes when the gear is pressed again, when dismissed, and after a choice', () => {
+      workbench.chromeFt.openMenu(anchor);
+      workbench.chromeFt.openMenu(anchor);
+      expect(workbench.chromeFt.settingsMenu()).toBeNull();
+
+      workbench.chromeFt.openMenu(anchor);
+      workbench.chromeFt.closeSettingsMenu();
+      expect(workbench.chromeFt.settingsMenu()).toBeNull();
+
+      workbench.chromeFt.openMenu(anchor);
+      workbench.chromeFt.runSettingsItem('todo');
+      expect(workbench.chromeFt.settingsMenu()).toBeNull();
+    });
+
+    it('ignores a menu request from anything else', () => {
+      workbench.chromeFt.openMenu({ ...anchor, id: 'account' });
+
+      expect(workbench.chromeFt.settingsMenu()).toBeNull();
+    });
+  });
+
   /** PRD 003, §2 — the account button is how a signed-in user signs out. */
   describe('the account button', () => {
     const account = () => workbench.chromeFt.activityBottomItems().find((item) => item.id === 'account');

@@ -1,5 +1,5 @@
-import { computed } from '@angular/core';
-import type { UiActivityItem, UiIconAction, UiMenuBarItem, UiStatusItem } from '@tr-file/ui';
+import { computed, signal } from '@angular/core';
+import type { UiActivityItem, UiIconAction, UiMenuAnchor, UiMenuBarItem, UiMenuItem, UiStatusItem } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 import { isFolder } from '../../file-system/fs-entry-kind';
 
@@ -16,6 +16,8 @@ export class ChromeFeature {
   readonly commandKeys: readonly string[];
   readonly titleBarActions: readonly UiIconAction[];
   readonly sidebarMoreActions: readonly UiIconAction[];
+  /** What the Settings menu offers (PRD 007, §1). */
+  readonly settingsMenuItems: readonly UiMenuItem[];
 
   constructor(private readonly parent: WorkbenchService) {
     const mock = parent.mockWorkbench;
@@ -24,20 +26,54 @@ export class ChromeFeature {
     this.commandKeys = mock.commandKeys;
     this.titleBarActions = mock.titleBarActions;
     this.sidebarMoreActions = mock.sidebarMoreActions;
+    this.settingsMenuItems = mock.settingsMenuItems;
   }
+
+  /** Where the Settings menu is open — its bottom-left corner — or `null` (PRD 007, §1). */
+  private readonly settingsMenuAt = signal<{ readonly x: number; readonly y: number } | null>(null);
+
+  readonly settingsMenu = this.settingsMenuAt.asReadonly();
+
 
   /**
    * Account and settings. While someone is signed in the account button says
-   * who, and is how they sign out (PRD 003, §2).
+   * who, and is how they sign out (PRD 003, §2); the Settings gear says
+   * whether its menu is open.
    */
   readonly activityBottomItems = computed<readonly UiActivityItem[]>(() => {
     const auth = this.parent.auth;
-    return this.parent.mockWorkbench.activityBottomItems.map((item) =>
-      item.id === 'account' && auth.canSignOut()
-        ? { ...item, label: `Sign out ${auth.username() ?? ''}`.trim() }
-        : item,
-    );
+    const menuOpen = this.settingsMenuAt() !== null;
+    return this.parent.mockWorkbench.activityBottomItems.map((item) => {
+      if (item.id === 'account' && auth.canSignOut()) {
+        return { ...item, label: `Sign out ${auth.username() ?? ''}`.trim() };
+      }
+      if (item.id === 'settings') {
+        return { ...item, expanded: menuOpen, active: menuOpen };
+      }
+      return item;
+    });
   });
+
+  /**
+   * A menu button in the activity bar was pressed. The Settings gear opens its
+   * menu beside it, growing upward from the gear's bottom edge the way VS
+   * Code's Manage menu does — or closes it, when it is already open.
+   */
+  openMenu(anchor: UiMenuAnchor): void {
+    if (anchor.id !== 'settings') {
+      return;
+    }
+    this.settingsMenuAt.set(this.settingsMenuAt() === null ? { x: anchor.right, y: anchor.bottom } : null);
+  }
+
+  closeSettingsMenu(): void {
+    this.settingsMenuAt.set(null);
+  }
+
+  /** A Settings menu entry was chosen. None does anything yet; the menu just closes. */
+  runSettingsItem(_id: string): void {
+    this.closeSettingsMenu();
+  }
 
   /** A click in the activity bar. Only the account button acts yet (the rest is PRD 003, §3). */
   selectActivity(id: string): void {

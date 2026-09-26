@@ -100,6 +100,11 @@ or `open(Component, …)` for a component of the app's own, which closes itself 
 is an upload whose name is taken: `TransfersFeature` asks Replace / Skip, one conflict at a
 time, with "Do this for all remaining conflicts" for a batch.
 
+The Settings gear in the activity bar opens a menu (PRD 007, §1): the item is `hasMenu`, the
+bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`,
+`openMenu`, `closeSettingsMenu`) shows `UiContextMenu` fixed beside it, opening upward. Its
+items come from `MockDataWorkbenchService.settingsMenuItems` — for now one disabled `Todo`.
+
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a
 double chevron pointing the way the panel will move. Choosing a tab, including from the

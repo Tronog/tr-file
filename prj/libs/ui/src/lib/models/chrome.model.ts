@@ -33,6 +33,23 @@ export interface UiActivityItem {
   readonly active?: boolean;
   /** Unread/pending count rendered as the corner badge. */
   readonly badge?: number;
+  /**
+   * Opens a menu rather than a view (VS Code's Manage gear): the button says
+   * so to assistive tech, and a press is reported as `menuOpen`, with where
+   * the button is, instead of `select`.
+   */
+  readonly hasMenu?: boolean;
+  /** For a `hasMenu` item: its menu is open. */
+  readonly expanded?: boolean;
+}
+
+/** Where a menu should open: the button that asked for it, in viewport pixels. */
+export interface UiMenuAnchor {
+  readonly id: string;
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
 }
 
 /** An item in the status bar. */
