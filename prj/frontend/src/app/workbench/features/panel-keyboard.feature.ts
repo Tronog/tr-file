@@ -32,14 +32,15 @@ export class PanelKeyboardFeature {
    * in it to open.
    */
   run(groupId: string, key: UiPanelKey): void {
-    const groups = this.parent.editorGroupsFt;
+    // File management is the only panel content that reports keys so far.
+    const files = this.parent.fileBrowserFt;
 
     switch (key.command) {
       case 'open':
         // `openEntry` keeps the focus itself, since a double click has to do
         // exactly the same thing.
         if (key.entryId !== null) {
-          groups.openEntry(groupId, key.entryId);
+          files.openEntry(groupId, key.entryId);
         }
         break;
 
@@ -47,23 +48,23 @@ export class PanelKeyboardFeature {
         // No `keepFocusInBody` here: the new panel takes the keyboard, and
         // asking the old one for it too would drag focus back out of it.
         if (key.entryId !== null) {
-          groups.openEntryAside(groupId, key.entryId);
+          files.openEntryAside(groupId, key.entryId);
         }
         break;
 
       case 'select':
         if (key.entryId !== null) {
-          groups.selectEntry(groupId, key.entryId);
+          files.selectEntry(groupId, key.entryId);
         }
         break;
 
       case 'up':
-        groups.navigateUp(groupId);
+        files.navigateUp(groupId);
         this.keepFocusInBody(groupId);
         break;
 
       case 'refresh':
-        groups.runToolbarAction(groupId, 'refresh');
+        files.runToolbarAction(groupId, 'refresh');
         break;
 
       case 'back':

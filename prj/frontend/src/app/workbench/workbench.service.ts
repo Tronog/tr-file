@@ -8,6 +8,7 @@ import { DetailsFeature } from './features/details.feature';
 import { EditorGroupsFeature } from './features/editor-groups.feature';
 import { ExplorerFeature } from './features/explorer.feature';
 import { ExplorerNavigationFeature } from './features/explorer-navigation.feature';
+import { FileBrowserFeature } from './features/file-browser.feature';
 import { FilePreviewFeature } from './features/file-preview.feature';
 import { FileViewModelFeature } from './features/file-view-model.feature';
 import { FsDataFeature } from './features/fs-data.feature';
@@ -91,8 +92,10 @@ export class WorkbenchService {
   readonly panelLayoutFt = new PanelLayoutFeature(this);
   readonly explorerFt = new ExplorerFeature(this);
   readonly editorGroupsFt = new EditorGroupsFeature(this);
+  /** File management: what folder and file tabs show, and navigating in them. */
+  readonly fileBrowserFt = new FileBrowserFeature(this);
   readonly detailsFt = new DetailsFeature(this);
-  /** The panel key map; every binding it runs belongs to the groups above. */
+  /** The panel key map; every binding it runs belongs to the features above. */
   readonly panelKeyboardFt = new PanelKeyboardFeature(this);
   /** Sends focus into a panel body once a chosen tab has rendered. */
   readonly panelFocusFt = new PanelFocusFeature(this);
@@ -136,7 +139,7 @@ export class WorkbenchService {
 
   /** Points the active group at a directory — used by the details actions. */
   openInActiveGroup(path: string, label: string): void {
-    this.editorGroupsFt.navigateTo(this.activeGroupId(), path, label);
+    this.fileBrowserFt.navigateTo(this.activeGroupId(), path, label);
   }
 
   /** Asks the component to open the file picker for a group's directory. */

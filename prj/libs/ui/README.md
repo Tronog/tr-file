@@ -57,7 +57,8 @@ structural helpers. No component hardcodes a colour.
 | Shell | `UiWorkbench`, `UiTitleBar`, `UiActivityBar`, `UiStatusBar` |
 | Sidebars | `UiSidebar`, `UiPane`, `UiTree` |
 | Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList` |
-| Editor | `UiPanelGrid`, `UiPanelGroup`, `UiTabBar`, `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView` |
+| Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
+| Panel content | `UiFileBrowser` (with `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
 | Bottom panel | `UiBottomPanel`, `UiTransferList` |
 | Controls | `UiIconButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
 | Icons | `UiIcon`, `UiIconSprite` |
@@ -65,6 +66,41 @@ structural helpers. No component hardcodes a colour.
 View models are exported from `lib/models`. Where a model would collide with the
 component that renders it, the model carries the `Model` suffix
 (`UiPanelGroupModel`, `UiEmptyStateModel`).
+
+## Panel content
+
+`UiPanelGroup` is a frame, not a file manager. It renders the tab bar, the
+loading rail under it and the body — tab drop zones, OS file drops, the
+focus request — and whatever the active tab *shows* is projected into that
+body by the application:
+
+```html
+<ui-panel-group [group]="shell" [acceptFiles]="true" …>
+  <ui-file-browser [browser]="files" (rowActivate)="…" (command)="…" />
+</ui-panel-group>
+```
+
+Each kind of content is its own component with its own model and its own
+toolbar. File management is `UiFileBrowser` over a `UiFileBrowserModel`: a path
+bar, a `UiPanelToolbar` and a list, a grid or a read-only document. A new kind
+of content follows the same shape:
+
+- **Model** — its own interface; `UiPanelGroupModel` never grows fields for it.
+- **Toolbar** — `UiPanelToolbar` for the row itself, with icon `actions`, a
+  right-aligned `summary`, and anything else (a view switch, a filter box)
+  projected between them, so every content type looks like it belongs.
+- **Body** — mark the element below its chrome with `uiPanelBody`. That is the
+  only contract with the group: asked to focus its body, the group looks for the
+  tab stop (`tabindex="0"`) inside that element and focuses the element itself
+  when there is none; a press on it — not on something focusable in it — is a
+  `bodyPress`, while a press on the chrome above it is not. `UiPanelBody` finds
+  the group by injection, which works because the content is projected into it.
+- **Keys** — the content handles its own; it sits inside the group's host, so it
+  sees a key before the group's panel chords do.
+- **File drops** — off unless the application sets `acceptFiles` for the tab
+  that is showing.
+
+A group with no tabs has no content and renders `UiPanelGroupModel.empty`.
 
 Icons are a `<symbol>` sprite (`UiIconSprite`, rendered once by `UiWorkbench`);
 `UiIcon` references symbols by a name from the `UiIconName` union, so a typo is
@@ -143,7 +179,7 @@ entry would maximize the window.
 | `Enter` / `Space` / `Backspace` / `F5` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
 | `Alt`+`←` / `Alt`+`→` in a body | Emitted as `back` / `forward`; the app walks that panel's own trail |
 | `Alt`+`↑` in a body | Emitted as `up`; the app leaves the folder for its parent |
-| Double-click a file (group gets a `document`) | The body becomes a read-only `UiDocumentView`: markdown or text, path and `Read-only` on a status line, no view switch |
+| Double-click a file (browser gets a `document`) | The body becomes a read-only `UiDocumentView`: markdown or text, path and `Read-only` on a status line, no view switch |
 
 Closing the last group anywhere leaves a single empty group, so there is always
 somewhere to drop a tab.
@@ -181,10 +217,11 @@ Typing letters jumps to a name in both: a prefix while the keystrokes keep
 coming, and a single letter pressed repeatedly cycles through the entries
 sharing it.
 
-`UiPanelGroup` adds the chords that belong to the *panel* rather than to what
-is selected in it: `Alt`+`←`/`→` walks the folders it has visited (PRD 001,
-§6.2.1) and `Alt`+`↑` leaves the current one for its parent (§6.2.3) — the
-trail and the tree are different journeys, so they are different chords. It is handled on the body rather than in either view, so it works
+`UiFileBrowser` adds the chords that are about the *folder* rather than what
+is selected in it: `Alt`+`←`/`→` walks the folders the panel has visited
+(PRD 001, §6.2.1) and `Alt`+`↑` leaves the current one for its parent (§6.2.3)
+— the trail and the tree are different journeys, so they are different chords.
+They are handled on its `uiPanelBody` rather than in either view, so they work
 just as well over a document or an empty placeholder — neither of which has a
 keyboard of its own — and both views let an `Alt` chord bubble untouched so it
 arrives exactly once.
@@ -193,7 +230,7 @@ Some chords belong to the panel as a whole rather than to what is selected in
 it: `Ctrl`+`T` splits it, `Ctrl`+`W` closes its focused tab (PRD 001, §6.2.2)
 and `Ctrl`+`PageUp`/`PageDown` moves between its tabs, wrapping at either end
 (§6.2.4). They are bound on the group's host, so they answer with focus
-anywhere inside — a row, a tile, the document, or a tab in the bar — and each
+anywhere inside — its content, or a tab in the bar — and each
 emits exactly what the equivalent pointer gesture emits: the split and close
 buttons, or a click on the neighbouring tab. The pointer and the keyboard
 cannot drift apart, and switching by keyboard lands focus in the new tab's
@@ -201,20 +238,24 @@ content just as clicking would.
 
 `Ctrl`+`Enter` is the exception to that symmetry (§6.2.5): opening an entry in
 a panel that does not exist yet has no pointer equivalent, so it leaves as a
-`UiPanelKey` for the application to carry out. The group supplies the entry
-from its own model — the cursor if there is one, the selection otherwise —
-which is what lets one handler serve the listing and the grid alike.
+`UiPanelKey` for the application to carry out. It is `UiFileBrowser`'s, bound
+on its host so it answers from a row, a tile, the document or the path bar,
+and it supplies the entry from its own model — the cursor if there is one, the
+selection otherwise — which is what lets one handler serve the listing and the
+grid alike. With focus on a tab in the bar the key goes to the group, which has
+no entries to open, so it does nothing there.
 
 Both body views therefore let an `Alt` *or* `Ctrl` chord bubble untouched. The
 list pages its rows on a bare `PageDown`, so without that it would page **and**
 switch tabs on the same key.
 
 An **empty folder** is the case that makes all of this hold together. Its
-placeholder contains nothing focusable, so the body carries `tabindex="-1"` and
-takes focus itself when it has nothing else to offer; without that the keyboard
-would fall out of the panel and every one of its keys would reach nothing — a
-keyboard user could walk into an empty folder and not get out. For the same
-reason the group answers `Backspace` and `F5` when the body *itself* has focus,
+placeholder contains nothing focusable, so the `uiPanelBody` element carries
+`tabindex="-1"` and takes focus itself when it has nothing else to offer (the
+group's own body does the same when it has no content at all); without that the
+keyboard would fall out of the panel and every one of its keys would reach
+nothing — a keyboard user could walk into an empty folder and not get out. For
+the same reason the browser answers `Backspace` and `F5` when its body *itself* has focus,
 and only then: whenever there is a row or a tile to stand on, those keys belong
 to the view that owns it.
 

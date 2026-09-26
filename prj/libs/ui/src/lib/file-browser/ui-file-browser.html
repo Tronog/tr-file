@@ -1,0 +1,62 @@
+@if (browser().breadcrumbs.length) {
+  <ui-breadcrumbs
+    [items]="browser().breadcrumbs"
+    [label]="breadcrumbLabel()"
+    (select)="breadcrumbSelect.emit($event)"
+  />
+}
+
+@if (showToolbar()) {
+  <ui-panel-toolbar
+    [actions]="browser().toolbarActions"
+    [summary]="browser().summary"
+    (action)="toolbarAction.emit($event)"
+  >
+    @if (showViewSwitch()) {
+      <ui-segmented
+        [options]="viewOptions"
+        label="View mode"
+        [value]="browser().view"
+        (valueChange)="onViewChange($event)"
+      />
+    }
+
+    @if (browser().searchPlaceholder; as placeholder) {
+      <ui-search-field [placeholder]="placeholder" label="Filter files" />
+    }
+  </ui-panel-toolbar>
+}
+
+<div #body uiPanelBody class="browser-body" (keydown)="onBodyKeydown($event)">
+  @if (document(); as doc) {
+    <!-- A file is open: the viewer owns its own scrolling, because its status
+         line is pinned under the document rather than scrolling with it. -->
+    <ui-document-view [document]="doc" />
+  } @else {
+    <div class="browser-scroll">
+      @if (browser().empty; as empty) {
+        <ui-empty-state [state]="empty" />
+      } @else {
+        @switch (browser().view) {
+          @case ('list') {
+            <ui-file-list
+              [columns]="browser().columns"
+              [rows]="browser().rows"
+              (select)="rowSelect.emit($event)"
+              (activate)="rowActivate.emit($event)"
+              (command)="command.emit($event)"
+            />
+          }
+          @case ('grid') {
+            <ui-icon-view
+              [items]="browser().items"
+              (select)="itemSelect.emit($event)"
+              (activate)="itemActivate.emit($event)"
+              (command)="command.emit($event)"
+            />
+          }
+        }
+      }
+    </div>
+  }
+</div>

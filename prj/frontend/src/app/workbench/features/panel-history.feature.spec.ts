@@ -52,7 +52,7 @@ describe('PanelHistoryFeature', () => {
 
   /** Navigates the active panel and answers the listing it asks for. */
   const goTo = async (path: string, entries = ROOT_ENTRIES): Promise<void> => {
-    workbench.editorGroupsFt.navigateTo(groupId(), path, path || 'tr-file');
+    workbench.fileBrowserFt.navigateTo(groupId(), path, path || 'tr-file');
     const pending = http.match(listUrl(path));
     for (const request of pending) {
       request.flush(fsEnvelope(fsListing(path, entries)));

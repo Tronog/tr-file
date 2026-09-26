@@ -10,17 +10,6 @@
   background: var(--vsc-editor-bg);
 }
 
-.toolbar {
-  display: flex;
-  flex: none;
-  gap: 6px;
-  align-items: center;
-  height: 30px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--vsc-border);
-  background: var(--vsc-editor-bg);
-}
-
 /* The 2px rail under the tab bar is reserved whether or not the group is
    loading, so the bar appearing and disappearing never shifts the rows. */
 .loading-rail {
@@ -33,12 +22,6 @@
   }
 }
 
-.summary {
-  margin-left: auto;
-  color: var(--vsc-fg-dim);
-  font-size: var(--vsc-font-size-xs);
-}
-
 .group-body {
   position: relative;
   display: flex;
@@ -47,15 +30,8 @@
   min-height: 0;
 }
 
-/* The read-only viewer replaces the scroll container entirely, so it takes the
-   body's full height and scrolls itself. */
-ui-document-view {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.group-scroll {
+/* The "no tabs" placeholder; content brings its own scrolling. */
+.group-empty {
   @include scrollable;
 
   flex: 1;

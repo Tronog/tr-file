@@ -1,0 +1,16 @@
+:host {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  height: 30px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--vsc-border);
+  background: var(--vsc-editor-bg);
+}
+
+.summary {
+  margin-left: auto;
+  color: var(--vsc-fg-dim);
+  font-size: var(--vsc-font-size-xs);
+}

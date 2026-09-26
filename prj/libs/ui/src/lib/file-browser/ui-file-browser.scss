@@ -1,0 +1,31 @@
+@use 'mixins' as *;
+
+/* Fills the group's body, which it is projected into. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.browser-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The read-only viewer replaces the scroll container entirely, so it takes the
+   body's full height and scrolls itself. */
+ui-document-view {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.browser-scroll {
+  @include scrollable;
+
+  flex: 1;
+}

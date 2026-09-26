@@ -3,6 +3,7 @@
 @let explorerNav = workbench.explorerNavFt;
 @let preview = workbench.filePreviewFt;
 @let groups = workbench.editorGroupsFt;
+@let files = workbench.fileBrowserFt;
 @let panelKeys = workbench.panelKeyboardFt;
 @let panelFocus = workbench.panelFocusFt;
 @let windowControls = workbench.windowControlsFt;
@@ -91,6 +92,7 @@
             <ui-panel-group
               [group]="group"
               [active]="groups.isActive(groupId)"
+              [acceptFiles]="groups.acceptsFiles(groupId)"
               [focusBody]="panelFocus.token(groupId)"
               (focusRequest)="groups.focus(groupId)"
               (tabSelect)="groups.selectTab(groupId, $event)"
@@ -101,17 +103,28 @@
               (tabMove)="groups.moveTab(groupId, $event)"
               (tabDrop)="groups.applyReorder($event)"
               (zoneDrop)="groups.applyZoneDrop($event)"
-              (fileDrop)="groups.uploadInto(groupId, $event)"
+              (fileDrop)="files.uploadInto(groupId, $event)"
               (actionSelect)="groups.runAction(groupId, $event)"
-              (toolbarAction)="groups.runToolbarAction(groupId, $event)"
-              (breadcrumbSelect)="groups.openBreadcrumb(groupId, $event)"
-              (viewChange)="groups.setView(groupId, $event)"
-              (rowSelect)="groups.selectEntry(groupId, $event)"
-              (rowActivate)="groups.openEntry(groupId, $event)"
-              (itemSelect)="groups.selectEntry(groupId, $event)"
-              (itemActivate)="groups.openEntry(groupId, $event)"
-              (command)="panelKeys.run(groupId, $event)"
-            />
+            >
+              <!-- What the active tab shows; one case per kind of panel content. -->
+              @switch (groups.activeContent(groupId)) {
+                @case ('files') {
+                  @if (files.browser(groupId); as browser) {
+                    <ui-file-browser
+                      [browser]="browser"
+                      (toolbarAction)="files.runToolbarAction(groupId, $event)"
+                      (breadcrumbSelect)="files.openBreadcrumb(groupId, $event)"
+                      (viewChange)="files.setView(groupId, $event)"
+                      (rowSelect)="files.selectEntry(groupId, $event)"
+                      (rowActivate)="files.openEntry(groupId, $event)"
+                      (itemSelect)="files.selectEntry(groupId, $event)"
+                      (itemActivate)="files.openEntry(groupId, $event)"
+                      (command)="panelKeys.run(groupId, $event)"
+                    />
+                  }
+                }
+              }
+            </ui-panel-group>
           }
         </ng-template>
       </ui-panel-grid>

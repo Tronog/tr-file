@@ -287,18 +287,13 @@ describe('UiPanelGroup', () => {
     id: 'group-root',
     tabs: [{ id: 'tab-root', label: 'tr-file', icon: 'folder', tint: 'folder', active: true }],
     actions: [],
-    breadcrumbs: [{ id: 'root', label: 'tr-file', icon: 'desktop' }],
-    view: 'list',
-    toolbarActions: [],
-    columns: [{ key: 'name', label: 'Name' }],
-    rows: [],
-    items: [],
   };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [UiPanelGroup] }).compileComponents();
     fixture = TestBed.createComponent(UiPanelGroup);
     fixture.componentRef.setInput('group', GROUP);
+    fixture.componentRef.setInput('acceptFiles', true);
     fixture.detectChanges();
   });
 
@@ -323,6 +318,27 @@ describe('UiPanelGroup', () => {
     expect(dropped[0]?.map((file) => file.name)).toEqual(['a.txt', 'b.txt']);
     // The overlay goes with the gesture.
     expect(fixture.nativeElement.querySelector('.filedrop')).toBeNull();
+  });
+
+  /** Content that has nowhere to put files leaves the drop to the browser. */
+  it('refuses files when its content does not accept them', () => {
+    fixture.componentRef.setInput('acceptFiles', false);
+    fixture.detectChanges();
+    const dropped: (readonly File[])[] = [];
+    fixture.componentInstance.fileDrop.subscribe((files) => dropped.push(files));
+    const transfer = new TestDataTransfer();
+    transfer.files.push(new File(['a'], 'a.txt'));
+
+    const over = dragEvent('dragover', transfer);
+    body().dispatchEvent(over);
+    fixture.detectChanges();
+
+    expect(over.defaultPrevented).toBe(false);
+    expect(fixture.nativeElement.querySelector('.filedrop')).toBeNull();
+
+    body().dispatchEvent(dragEvent('drop', transfer));
+
+    expect(dropped).toEqual([]);
   });
 
   it('stays quiet for a drop that carries no files at all', () => {

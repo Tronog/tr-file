@@ -92,7 +92,7 @@ describe('ChromeFeature', () => {
       // `.env` is hidden, so it is not part of what the group shows.
       expect(trailing('selection')?.label).toBe('2 items');
 
-      workbench.editorGroupsFt.selectEntry('group-root', 'README.md');
+      workbench.fileBrowserFt.selectEntry('group-root', 'README.md');
       http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
       await settled();
 

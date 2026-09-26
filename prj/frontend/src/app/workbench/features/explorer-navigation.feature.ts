@@ -28,7 +28,7 @@ export class ExplorerNavigationFeature {
     }
 
     this.parent.explorerFt.expand(path);
-    this.parent.editorGroupsFt.openFolder(this.parent.activeGroupId(), path, this.labelFor(path));
+    this.parent.fileBrowserFt.openFolder(this.parent.activeGroupId(), path, this.labelFor(path));
   }
 
   /**

@@ -332,7 +332,7 @@ describe('FilePreviewFeature', () => {
       const groupId = workbench.activeGroupId();
 
       // Opening a folder must not rewrite the preview tab underneath it.
-      workbench.editorGroupsFt.openFolder(groupId, 'docs', 'docs');
+      workbench.fileBrowserFt.openFolder(groupId, 'docs', 'docs');
       http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [])));
       await settled();
 

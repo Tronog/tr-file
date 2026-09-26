@@ -3,6 +3,21 @@ import type { UiPanelView } from '@tr-file/ui';
 /** What a tab is showing: a directory listing, or one file read-only. */
 export type PanelTabKind = 'folder' | 'file';
 
+/**
+ * Which kind of panel content renders a tab — one component and one feature
+ * class per kind. File management is the only one so far.
+ */
+export type PanelContentType = 'files';
+
+/**
+ * The content each tab kind is rendered by. A `Record`, so a new tab kind
+ * does not compile until it says which content shows it.
+ */
+export const PANEL_CONTENT: Readonly<Record<PanelTabKind, PanelContentType>> = {
+  folder: 'files',
+  file: 'files',
+};
+
 /** One tab of a panel group. */
 export interface PanelTabState {
   readonly id: string;

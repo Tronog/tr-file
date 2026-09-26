@@ -85,7 +85,7 @@ export class FilePreviewFeature {
   open(path: string): void {
     const groupId = this.parent.activeGroupId();
     this.parent.select(path);
-    this.parent.editorGroupsFt.openFile(groupId, path, this.nameOf(path));
+    this.parent.fileBrowserFt.openFile(groupId, path, this.nameOf(path));
     this.load(path);
   }
 

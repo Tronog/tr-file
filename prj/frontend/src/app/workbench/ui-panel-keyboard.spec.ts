@@ -1,13 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiFileList, UiIconView, UiPanelGroup } from '@tr-file/ui';
+import { UiFileList, UiIconView } from '@tr-file/ui';
 import type {
+  UiFileBrowserModel,
   UiFileColumn,
   UiFileRow,
   UiIconViewItem,
   UiPanelGroupModel,
   UiPanelKey,
 } from '@tr-file/ui';
+import { PanelHost } from './testing/panel-host';
 
 /**
  * PRD 001, Section 6.2 — the keyboard a panel body answers to once focus is
@@ -289,14 +291,22 @@ describe('UiIconView keyboard', () => {
  * than by either body view, so they work over a listing, a grid, a document
  * and an empty placeholder alike.
  */
-describe('UiPanelGroup panel keys', () => {
-  let fixture: ComponentFixture<UiPanelGroup>;
+/**
+ * The keys of a panel as the workbench composes one: the `UiPanelGroup` frame
+ * answers the chords about the panel itself (split, close, switch tab), and
+ * the `UiFileBrowser` projected into it answers the ones about its folder.
+ */
+describe('panel keys', () => {
+  let fixture: ComponentFixture<PanelHost>;
   let commands: UiPanelKey[];
 
   const GROUP: UiPanelGroupModel = {
     id: 'group-root',
     tabs: [{ id: 'tab-root', label: 'tr-file', icon: 'folder', tint: 'folder', active: true }],
     actions: [],
+  };
+
+  const BROWSER: UiFileBrowserModel = {
     breadcrumbs: [],
     view: 'list',
     toolbarActions: [],
@@ -306,18 +316,28 @@ describe('UiPanelGroup panel keys', () => {
   };
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [UiPanelGroup] }).compileComponents();
-    fixture = TestBed.createComponent(UiPanelGroup);
+    await TestBed.configureTestingModule({ imports: [PanelHost] }).compileComponents();
+    fixture = TestBed.createComponent(PanelHost);
     fixture.componentRef.setInput('group', GROUP);
+    fixture.componentRef.setInput('browser', BROWSER);
     fixture.detectChanges();
 
     commands = [];
-    fixture.componentInstance.command.subscribe((key) => commands.push(key));
+    fixture.componentInstance.content()?.command.subscribe((key) => commands.push(key));
   });
+
+  /** The content's body: where focus sits when it is not on a row. */
+  const contentBody = (): HTMLElement => fixture.nativeElement.querySelector('.browser-body');
+
+  /** What the content shows next, with the frame left as it is. */
+  const show = (browser: Partial<UiFileBrowserModel>): void => {
+    fixture.componentRef.setInput('browser', { ...BROWSER, ...browser });
+    fixture.detectChanges();
+  };
 
   const press = (key: string, modifiers: KeyboardEventInit = {}): KeyboardEvent => {
     const event = keydown(key, modifiers);
-    fixture.nativeElement.querySelector('.group-body').dispatchEvent(event);
+    contentBody().dispatchEvent(event);
     fixture.detectChanges();
     return event;
   };
@@ -331,12 +351,7 @@ describe('UiPanelGroup panel keys', () => {
 
   /** An empty folder gives focus to the body; the chord must still answer. */
   it('reports Alt+Up from an empty body too', () => {
-    fixture.componentRef.setInput('group', {
-      ...GROUP,
-      rows: [],
-      empty: { icon: 'folder-open', title: 'This folder is empty' },
-    } satisfies UiPanelGroupModel);
-    fixture.detectChanges();
+    show({ rows: [], empty: { icon: 'folder-open', title: 'This folder is empty' } });
 
     press('ArrowUp', { altKey: true });
 
@@ -354,14 +369,11 @@ describe('UiPanelGroup panel keys', () => {
   });
 
   it('answers from a document body too, which has no keyboard of its own', () => {
-    fixture.componentRef.setInput('group', {
-      ...GROUP,
-      rows: [],
-      document: { path: 'docs/README.md', kind: 'text', text: 'hello' },
-    } satisfies UiPanelGroupModel);
-    fixture.detectChanges();
+    show({ rows: [], document: { path: 'docs/README.md', kind: 'text', text: 'hello' } });
 
-    press('ArrowLeft', { altKey: true });
+    fixture.nativeElement
+      .querySelector('article.doc')
+      .dispatchEvent(keydown('ArrowLeft', { altKey: true }));
 
     expect(commands).toEqual([{ command: 'back', entryId: null }]);
   });
@@ -371,9 +383,8 @@ describe('UiPanelGroup panel keys', () => {
    * be able to walk back out of it (PRD 001, §6.2.1 with §6.3.1).
    */
   it('answers Backspace and F5 when the body itself has focus', () => {
-    const body = fixture.nativeElement.querySelector('.group-body') as HTMLElement;
-    body.dispatchEvent(keydown('Backspace'));
-    body.dispatchEvent(keydown('F5'));
+    contentBody().dispatchEvent(keydown('Backspace'));
+    contentBody().dispatchEvent(keydown('F5'));
     fixture.detectChanges();
 
     expect(commands).toEqual([
@@ -385,7 +396,7 @@ describe('UiPanelGroup panel keys', () => {
   /**
    * The list owns those keys whenever there is a row to stand on. Each must
    * therefore arrive exactly once — from the list, carrying its entry — and
-   * not a second time from the group.
+   * not a second time from the browser.
    */
   it('leaves Backspace and F5 to the row that has focus', () => {
     const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
@@ -411,8 +422,8 @@ describe('UiPanelGroup panel keys', () => {
     beforeEach(() => {
       actions = [];
       closed = [];
-      fixture.componentInstance.actionSelect.subscribe((id) => actions.push(id));
-      fixture.componentInstance.tabClose.subscribe((id) => closed.push(id));
+      fixture.componentInstance.panel().actionSelect.subscribe((id) => actions.push(id));
+      fixture.componentInstance.panel().tabClose.subscribe((id) => closed.push(id));
     });
 
     const chord = (key: string, target: Element, modifiers: KeyboardEventInit = { ctrlKey: true }) => {
@@ -423,14 +434,14 @@ describe('UiPanelGroup panel keys', () => {
     };
 
     it('splits the panel on Ctrl+T', () => {
-      const event = chord('t', fixture.nativeElement.querySelector('.group-body'));
+      const event = chord('t', contentBody());
 
       expect(actions).toEqual(['split-right']);
       expect(event.defaultPrevented).toBe(true);
     });
 
     it('closes the focused tab on Ctrl+W', () => {
-      const event = chord('w', fixture.nativeElement.querySelector('.group-body'));
+      const event = chord('w', contentBody());
 
       // GROUP's only tab is the active one.
       expect(closed).toEqual(['tab-root']);
@@ -448,58 +459,54 @@ describe('UiPanelGroup panel keys', () => {
 
     /** PRD 001, §6.2.5 — open what the cursor is on, in a panel of its own. */
     describe('Ctrl+Enter', () => {
-      const body = (): Element => fixture.nativeElement.querySelector('.group-body');
-
       it('reports the entry the listing is standing on', () => {
         // ROWS marks the first entry focused.
-        const event = chord('Enter', body());
+        const event = chord('Enter', contentBody());
 
         expect(commands).toEqual([{ command: 'open-aside', entryId: 'alpha.ts' }]);
         expect(event.defaultPrevented).toBe(true);
       });
 
+      /** Bound on the browser, so it answers from its row as well as its body. */
+      it('answers from the focused row', () => {
+        chord('Enter', fixture.nativeElement.querySelector('tbody tr'));
+
+        expect(commands).toEqual([{ command: 'open-aside', entryId: 'alpha.ts' }]);
+      });
+
       it('falls back to the selection when nothing has the cursor', () => {
-        fixture.componentRef.setInput('group', {
-          ...GROUP,
+        show({
           rows: [
             { id: 'a.ts', name: 'a.ts', icon: 'file', cells: {} },
             { id: 'b.md', name: 'b.md', icon: 'file', cells: {}, selected: true },
           ],
-        } satisfies UiPanelGroupModel);
-        fixture.detectChanges();
+        });
 
-        chord('Enter', body());
+        chord('Enter', contentBody());
 
         expect(commands).toEqual([{ command: 'open-aside', entryId: 'b.md' }]);
       });
 
       /** The grid is the other body view, and the same handler serves it. */
       it('reads the grid when that is what is showing', () => {
-        fixture.componentRef.setInput('group', {
-          ...GROUP,
+        show({
           view: 'grid',
           rows: [],
           items: [
             { id: 'one.png', label: 'one.png', icon: 'file' },
             { id: 'two.png', label: 'two.png', icon: 'file', focused: true },
           ],
-        } satisfies UiPanelGroupModel);
-        fixture.detectChanges();
+        });
 
-        chord('Enter', body());
+        chord('Enter', contentBody());
 
         expect(commands).toEqual([{ command: 'open-aside', entryId: 'two.png' }]);
       });
 
       it('claims nothing when the body has no entries', () => {
-        fixture.componentRef.setInput('group', {
-          ...GROUP,
-          rows: [],
-          empty: { icon: 'folder-open', title: 'This folder is empty' },
-        } satisfies UiPanelGroupModel);
-        fixture.detectChanges();
+        show({ rows: [], empty: { icon: 'folder-open', title: 'This folder is empty' } });
 
-        const event = chord('Enter', body());
+        const event = chord('Enter', contentBody());
 
         expect(commands).toEqual([]);
         expect(event.defaultPrevented).toBe(false);
@@ -524,18 +531,16 @@ describe('UiPanelGroup panel keys', () => {
         fixture.detectChanges();
         selected = [];
         chosen = [];
-        fixture.componentInstance.tabSelect.subscribe((id) => selected.push(id));
-        fixture.componentInstance.tabActivate.subscribe((id) => chosen.push(id));
+        fixture.componentInstance.panel().tabSelect.subscribe((id) => selected.push(id));
+        fixture.componentInstance.panel().tabActivate.subscribe((id) => chosen.push(id));
       });
-
-      const body = (): Element => fixture.nativeElement.querySelector('.group-body');
 
       /**
        * The same pair a click emits, so the keyboard lands focus in the new
        * tab's content just as the pointer would (§6.3).
        */
       it('moves to the next tab, as if it had been clicked', () => {
-        const event = chord('PageDown', body());
+        const event = chord('PageDown', contentBody());
 
         expect(selected).toEqual(['tab-docs']);
         expect(chosen).toEqual(['tab-docs']);
@@ -552,14 +557,14 @@ describe('UiPanelGroup panel keys', () => {
         } satisfies UiPanelGroupModel);
         fixture.detectChanges();
 
-        chord('PageUp', body());
+        chord('PageUp', contentBody());
 
         expect(selected).toEqual(['tab-root']);
       });
 
       /** Wrapping keeps the chord useful at either end of the bar. */
       it('wraps around both ends', () => {
-        chord('PageUp', body());
+        chord('PageUp', contentBody());
 
         expect(selected).toEqual(['tab-docs']);
       });
@@ -575,7 +580,7 @@ describe('UiPanelGroup panel keys', () => {
         fixture.componentRef.setInput('group', GROUP);
         fixture.detectChanges();
 
-        const event = chord('PageDown', body());
+        const event = chord('PageDown', contentBody());
 
         expect(selected).toEqual([]);
         expect(event.defaultPrevented).toBe(false);
@@ -583,7 +588,8 @@ describe('UiPanelGroup panel keys', () => {
     });
 
     it('has nothing to close in a group with no tabs', () => {
-      fixture.componentRef.setInput('group', { ...GROUP, tabs: [], rows: [] } satisfies UiPanelGroupModel);
+      fixture.componentRef.setInput('group', { ...GROUP, tabs: [] } satisfies UiPanelGroupModel);
+      fixture.componentRef.setInput('browser', null);
       fixture.detectChanges();
 
       const event = chord('w', fixture.nativeElement.querySelector('.group-body'));
@@ -594,9 +600,9 @@ describe('UiPanelGroup panel keys', () => {
 
     /** A fuller chord is the OS's, and a bare letter is type-to-find. */
     it('claims neither a bare letter nor a wider chord', () => {
-      chord('t', fixture.nativeElement.querySelector('.group-body'), {});
-      chord('w', fixture.nativeElement.querySelector('.group-body'), { ctrlKey: true, shiftKey: true });
-      chord('t', fixture.nativeElement.querySelector('.group-body'), { ctrlKey: true, altKey: true });
+      chord('t', contentBody(), {});
+      chord('w', contentBody(), { ctrlKey: true, shiftKey: true });
+      chord('t', contentBody(), { ctrlKey: true, altKey: true });
 
       expect(actions).toEqual([]);
       expect(closed).toEqual([]);

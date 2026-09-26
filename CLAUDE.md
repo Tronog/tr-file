@@ -42,6 +42,16 @@ library ported from `mockup/001/`; see `prj/libs/ui/README.md`, including why th
 not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin `WorkbenchService`
 holding shared state, plus feature classes holding everything else.
 
+A panel is a frame plus content. `UiPanelGroup` renders the tab bar, loading rail and body
+frame (drops, focus, the `Ctrl` chords); what the active tab shows is a separate component
+the app projects into it — file management is `UiFileBrowser`, with its own model and toolbar
+(`UiPanelToolbar`), marking its body `uiPanelBody` so the frame knows where focus goes.
+In the app `EditorGroupsFeature` keeps groups and tabs only; `PANEL_CONTENT`
+(`panel-group.model.ts`) maps each tab kind to a content type, whose feature
+(`FileBrowserFeature` for `'files'`) implements `PanelContentFeature` and renders its model.
+A new kind of content is a new tab kind, a library component, a feature class, and a
+`@case` in the leaf template of `workbench.html` — see `prj/libs/ui/README.md` § Panel content.
+
 The explorer tree lists *folders only* (§9.1.1) — it is a map of the workspace, and files
 belong to the panels. Clicking a folder in the explorer shows it in the *active* panel; that
 link lives in `ExplorerNavigationFeature` so neither side has to know about the other.
@@ -49,17 +59,17 @@ Inside a panel body the library components move focus (arrows, `Home`/`End`, pag
 type-to-find, selection following focus) and report the keys that mean something to the
 workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as a `UiPanelKey`;
 `PanelKeyboardFeature` is the one place those bindings are decided. `Ctrl`+`T` (split),
-`Ctrl`+`W` (close the focused tab), `Ctrl`+`PageUp`/`PageDown` (previous/next tab) and
-`Ctrl`+`Enter` (open the focused entry in a new panel on the right) are bound on the
-group's host instead, and emit
-the same outputs the tab bar's buttons do; the desktop shell installs its own accelerator
+`Ctrl`+`W` (close the focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab) are
+bound on the group's host instead, and emit the same outputs the tab bar's buttons do;
+`Ctrl`+`Enter` (open the focused entry in a new panel on the right) is `UiFileBrowser`'s,
+on its host; the desktop shell installs its own accelerator
 table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
 since two panels are two places someone is working. Any key that changes the folder also
 re-asks for body focus, or the rows it was standing on are gone and the keyboard is left
 outside the panel — and that includes opening a folder by double click. An empty folder
-has nothing focusable in it, so `.group-body` carries `tabindex="-1"` and takes focus
-itself; otherwise a keyboard user could walk into one and not get out.
+has nothing focusable in it, so the content's `uiPanelBody` carries `tabindex="-1"` and
+takes focus itself; otherwise a keyboard user could walk into one and not get out.
 Double-clicking a tab maximizes or restores its group (§6.1.1) — the bar reports the
 gesture, the app decides what it means. Choosing a tab (a click, not an arrow-key rove),
 or pressing the blank space of a panel body, hands focus to that panel's content once it

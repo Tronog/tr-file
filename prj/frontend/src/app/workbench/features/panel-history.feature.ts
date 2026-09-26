@@ -103,7 +103,7 @@ export class PanelHistoryFeature {
     // The cursor moves first, so the navigation below lands on the folder it
     // already names and `record` correctly does nothing.
     this.histories.update((all) => ({ ...all, [groupId]: { ...history, index } }));
-    this.parent.editorGroupsFt.navigateTo(groupId, path, this.labelFor(path));
+    this.parent.fileBrowserFt.navigateTo(groupId, path, this.labelFor(path));
   }
 
   private historyOf(groupId: string): PanelHistory {

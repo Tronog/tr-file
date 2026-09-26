@@ -8,23 +8,14 @@ import {
   viewChild,
   type ElementRef,
 } from '@angular/core';
-import { UiBreadcrumbs } from '../breadcrumbs/ui-breadcrumbs';
-import { UiIconButton } from '../controls/ui-icon-button';
-import { UiSearchField } from '../controls/ui-search-field';
-import { UiSegmented, type UiSegmentedOption } from '../controls/ui-segmented';
-import { UiDocumentView } from '../document-view/ui-document-view';
 import { UiEmptyState } from '../empty-state/ui-empty-state';
-import { UiFileList } from '../file-list/ui-file-list';
 import { UiIcon } from '../icon/ui-icon';
-import { UiIconView } from '../icon-view/ui-icon-view';
 import { UiProgress } from '../progress/ui-progress';
 import { UiTabBar } from '../tabs/ui-tab-bar';
 import { UI_TAB_MIME } from '../models';
 import type {
   UiDropZone,
   UiPanelGroupModel,
-  UiPanelKey,
-  UiPanelView,
   UiTabDragData,
   UiTabDrop,
   UiTabMove,
@@ -60,13 +51,16 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
 }
 
 /**
- * One editor group: tab bar, optional breadcrumbs, optional toolbar and a body.
+ * One editor group: the shell around whatever its active tab shows.
  *
- * Every chrome row is conditional on the data — breadcrumbs appear only when
- * the group has any, the toolbar only when it has something to show — and a
- * group carrying an `empty` state renders that instead of a body, which is how
- * "no folder opened" is expressed. The view switch is stateless: it renders
- * `group().view` and re-emits changes through `viewChange`.
+ * The group owns the tab bar, the loading rail under it and the body's frame;
+ * what goes *in* the body is content the application projects — file
+ * management today (`UiFileBrowser`), other kinds later — each its own
+ * component with its own toolbar and model. The group never looks inside that
+ * content. It agrees with it on one thing only: the element marked
+ * `uiPanelBody` (see `UiPanelBody`) is where focus goes and where a press
+ * counts as a press on blank space. A group with no tabs has no content, and
+ * renders its `empty` placeholder instead.
  *
  * The body is a drop target for tabs: the pointer's position inside it picks a
  * `UiDropZone` — the outer quarter on a side splits, the middle joins — which
@@ -74,26 +68,14 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
  * when it ends. Which zone is lit is transient presentation state; the layout
  * itself is the application's business.
  *
- * The body also accepts files dragged in from the desktop: such a drag carries
- * no tab payload, so it never computes a zone — it lights the whole body and
- * reports the dropped `File`s through `fileDrop`. Uploading them is, again,
- * the application's business.
+ * The body also accepts files dragged in from the desktop, when `acceptFiles`
+ * says the content wants them: such a drag carries no tab payload, so it never
+ * computes a zone — it lights the whole body and reports the dropped `File`s
+ * through `fileDrop`. Uploading them is, again, the application's business.
  */
 @Component({
   selector: 'ui-panel-group',
-  imports: [
-    UiTabBar,
-    UiBreadcrumbs,
-    UiIconButton,
-    UiSegmented,
-    UiSearchField,
-    UiFileList,
-    UiIconView,
-    UiEmptyState,
-    UiDocumentView,
-    UiProgress,
-    UiIcon,
-  ],
+  imports: [UiTabBar, UiEmptyState, UiProgress, UiIcon],
   templateUrl: './ui-panel-group.html',
   styleUrl: './ui-panel-group.scss',
   host: {
@@ -107,6 +89,13 @@ export class UiPanelGroup {
 
   /** Whether this group owns the workbench focus. */
   readonly active = input<boolean>(false);
+
+  /**
+   * Whether files dragged in from the desktop may be dropped on the body.
+   * Off by default: only content that has somewhere to put them — a folder
+   * listing — turns it on.
+   */
+  readonly acceptFiles = input<boolean>(false);
 
   /**
    * A token the application bumps to ask the body to take focus (PRD 001,
@@ -137,16 +126,6 @@ export class UiPanelGroup {
 
   readonly tabClose = output<string>();
   readonly actionSelect = output<string>();
-  readonly breadcrumbSelect = output<string>();
-  readonly toolbarAction = output<string>();
-  readonly viewChange = output<UiPanelView>();
-  readonly rowSelect = output<string>();
-  readonly rowActivate = output<string>();
-  readonly itemSelect = output<string>();
-  readonly itemActivate = output<string>();
-
-  /** A key pressed inside the body whose meaning is the application's. */
-  readonly command = output<UiPanelKey>();
 
   /** A tab was dropped on this group's tab bar. */
   readonly tabDrop = output<UiTabReorder>();
@@ -170,6 +149,9 @@ export class UiPanelGroup {
   protected readonly fileDragging = signal(false);
 
   private readonly bodyElement = viewChild.required<ElementRef<HTMLElement>>('body');
+
+  /** The projected content's `uiPanelBody` element, while there is one. */
+  private contentBody: HTMLElement | null = null;
 
   /** The last `focusBody` this component has seen; a change is a new request. */
   private seenFocusToken = 0;
@@ -204,13 +186,35 @@ export class UiPanelGroup {
   }
 
   /**
+   * Called by `UiPanelBody` when content marks its body. Only one content is
+   * showing at a time; the latest to arrive is the one that counts.
+   */
+  attachContentBody(element: HTMLElement): void {
+    this.contentBody = element;
+  }
+
+  /**
+   * Called by `UiPanelBody` as its content goes away. Guarded, because the
+   * content replacing it may already have attached: a tab switch can build the
+   * new body before the old one is torn down.
+   */
+  detachContentBody(element: HTMLElement): void {
+    if (this.contentBody === element) {
+      this.contentBody = null;
+    }
+  }
+
+  /**
    * Focuses the body's single tab stop — the focused row, the focused tile or
-   * the document's scroll container, whichever the body is currently showing.
+   * the document's scroll container, whichever the content is showing. It is
+   * looked for inside the content's `uiPanelBody`, so a tab stop in the chrome
+   * above it (a path bar, a toolbar) never wins.
    *
-   * A body with nothing in it still takes focus, on the container itself:
-   * an empty folder shows a placeholder with no focusable element at all, and
-   * leaving the keyboard outside the panel would strand it there — the panel's
-   * own keys (`Alt`+`←`/`→`, `Backspace`) would reach nothing, so a keyboard
+   * A body with nothing in it still takes focus, on the `uiPanelBody` element
+   * itself, or on the group's own body when there is no content at all: an
+   * empty folder shows a placeholder with no focusable element, and leaving the
+   * keyboard outside the panel would strand it there — the panel's own keys
+   * (`Alt`+`←`/`→`, `Backspace`, `Ctrl`+`W`) would reach nothing, so a keyboard
    * user could enter an empty folder and not get out again.
    *
    * Reports whether a *real* tab stop was found, which is not the same thing:
@@ -218,93 +222,33 @@ export class UiPanelGroup {
    * it arrives.
    */
   private moveFocusIntoBody(): boolean {
-    const body = this.bodyElement().nativeElement;
-    const target = body.querySelector<HTMLElement>('[tabindex="0"]');
-    (target ?? body).focus();
+    const scope = this.contentBody ?? this.bodyElement().nativeElement;
+    const target = scope.querySelector<HTMLElement>('[tabindex="0"]');
+    (target ?? scope).focus();
     return target !== null;
   }
-
-  protected readonly viewOptions: readonly UiSegmentedOption[] = [
-    { id: 'list', label: 'List view', icon: 'list' },
-    { id: 'grid', label: 'Grid view', icon: 'layout-grid' },
-  ];
-
-  /**
-   * Each group's path bar is its own landmark, so they need distinct names —
-   * duplicated landmark labels are indistinguishable to a screen reader.
-   */
-  protected readonly breadcrumbLabel = computed(() => {
-    const group = this.group();
-    const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
-    return active ? `Path of ${active.label}` : 'Path';
-  });
 
   /** Accessible name of the loading bar, e.g. `Loading Documents`. */
   protected readonly loadingLabel = computed(() => {
     const group = this.group();
     const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
-    const folder = active?.label ?? group.breadcrumbs.at(-1)?.label;
-    return folder ? `Loading ${folder}` : 'Loading';
+    return active ? `Loading ${active.label}` : 'Loading';
   });
 
-  /**
-   * A file is open in this group, so its body is a read-only viewer rather
-   * than a listing. `empty` still wins: a group with no tabs has no document.
-   */
-  protected readonly document = computed(() => {
-    const group = this.group();
-    return group.empty ? undefined : group.document;
-  });
-
-  /**
-   * The list/grid switch is a choice about a directory listing, so a document
-   * hides it — a file has no second view to offer.
-   */
-  protected readonly showViewSwitch = computed(
-    () => !!this.group().showViewSwitch && !this.document(),
-  );
-
-  protected readonly showToolbar = computed(() => {
-    const group = this.group();
-    return group.toolbarActions.length > 0 || this.showViewSwitch() || !!group.searchPlaceholder;
-  });
-
-  protected onViewChange(value: string): void {
-    this.viewChange.emit(value === 'grid' ? 'grid' : 'list');
-  }
-
-  /**
-   * The panel's own keys, wherever focus sits inside its body.
-   *
-   * `Alt`+`←`/`→` walks the folders this panel has visited (PRD 001, §6.2.1)
-   * and `Alt`+`↑` leaves the current one for its parent (§6.2.3) — the
-   * *trail* and the *tree* are different journeys, which is why they are
-   * different chords. They are handled here rather than in the list and the
-   * grid because they are about the *panel*, not about what is selected in it
-   * — and because they must work just as well when the body is a document, or
-   * the empty-state placeholder, neither of which has a keyboard of its own.
-   * Both views let an `Alt` chord bubble untouched so it arrives here exactly
-   * once.
-   *
-   * `Backspace` and `F5` are handled here *only* when the body itself has
-   * focus, which is the empty-folder case: without it, a keyboard user who
-   * walked into an empty folder would have no way to walk back out of it.
-   * Whenever there is a row or a tile to stand on, those keys belong to the
-   * view that owns it. `Alt`+`↑` needs no such guard, since neither view
-   * claims an `Alt` chord.
-   */
   /**
    * The chords that belong to the panel as a whole (PRD 001, §6.2.2).
    *
    * Bound on the host rather than the body, so they work with focus anywhere
-   * in the group — a row, a tile, the document, or a tab in the bar. None is a
-   * new capability: `Ctrl`+`T` and `Ctrl`+`W` emit exactly what the tab bar's
+   * in the group — in its content, or on a tab in the bar. None is a new
+   * capability: `Ctrl`+`T` and `Ctrl`+`W` emit exactly what the tab bar's
    * split and close buttons emit, and `Ctrl`+`PageUp`/`PageDown` (§6.2.4)
    * emits what clicking the neighbouring tab emits. That is why the
    * application needs no new wiring, and why the pointer and the keyboard can
-   * never drift apart. `Ctrl`+`Enter` is the exception — opening an entry in a
-   * panel that does not exist yet has no pointer equivalent — so it leaves as
-   * a `UiPanelKey` for the application to carry out (§6.2.5).
+   * never drift apart.
+   *
+   * Everything else is the content's: it sits inside this host, so its own
+   * handlers see a key first — which is how `UiFileBrowser` answers
+   * `Ctrl`+`Enter` about the entry it is standing on (§6.2.5).
    */
   protected onGroupKeydown(event: KeyboardEvent): void {
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
@@ -326,16 +270,6 @@ export class UiPanelGroup {
         this.tabClose.emit(active.id);
         break;
       }
-      case 'enter': {
-        // The group knows which entry has focus from its own model, so one
-        // handler covers the listing and the grid alike (PRD 001, §6.2.5).
-        const entryId = this.focusedEntry();
-        if (entryId === null) {
-          return;
-        }
-        this.command.emit({ command: 'open-aside', entryId });
-        break;
-      }
       default:
         // `event.key`, not the letter cases above: the page keys have names.
         if (event.key === 'PageDown') {
@@ -353,21 +287,6 @@ export class UiPanelGroup {
     }
 
     event.preventDefault();
-  }
-
-  /**
-   * The entry the body is standing on, from whichever view is showing.
-   *
-   * `focused` is the cursor and `selected` the fallback, because a panel that
-   * has only ever been clicked in has a selection but no keyboard cursor yet.
-   */
-  private focusedEntry(): string | null {
-    const group = this.group();
-    const entries: readonly { id: string; focused?: boolean; selected?: boolean }[] =
-      group.view === 'grid' ? group.items : group.rows;
-    const entry = entries.find((candidate) => candidate.focused) ??
-      entries.find((candidate) => candidate.selected);
-    return entry?.id ?? null;
   }
 
   /**
@@ -399,51 +318,14 @@ export class UiPanelGroup {
     return true;
   }
 
-  protected onBodyKeydown(event: KeyboardEvent): void {
-    if (event.ctrlKey || event.metaKey || event.shiftKey) {
-      return;
-    }
-
-    if (event.altKey) {
-      if (event.key === 'ArrowLeft') {
-        this.command.emit({ command: 'back', entryId: null });
-      } else if (event.key === 'ArrowRight') {
-        this.command.emit({ command: 'forward', entryId: null });
-      } else if (event.key === 'ArrowUp') {
-        this.command.emit({ command: 'up', entryId: null });
-      } else {
-        return;
-      }
-      event.preventDefault();
-      return;
-    }
-
-    // Only when the body itself has focus, which happens when it has nothing
-    // to give focus to: an empty folder. The list and the grid own these keys
-    // whenever there is a row or a tile to stand on, and handling them here as
-    // well would run them twice.
-    if (event.target !== this.bodyElement().nativeElement) {
-      return;
-    }
-
-    if (event.key === 'Backspace') {
-      this.command.emit({ command: 'up', entryId: null });
-    } else if (event.key === 'F5') {
-      this.command.emit({ command: 'refresh', entryId: null });
-    } else {
-      return;
-    }
-
-    event.preventDefault();
-  }
-
   /**
-   * Reports a press only when it landed on the body itself.
+   * Reports a press only when it landed on the body's blank space.
    *
    * Anything focusable under the pointer — a row, a tile, the document's
    * scroll container, a button — is already about to take focus, and asking
    * for the body's tab stop as well would drag focus off whatever was
-   * actually clicked.
+   * actually clicked. A press on the content's chrome, above its
+   * `uiPanelBody`, is not a press on the body at all.
    */
   protected onBodyPointerDown(event: PointerEvent): void {
     const target = event.target;
@@ -451,13 +333,19 @@ export class UiPanelGroup {
       return;
     }
 
-    // The body carries `tabindex="-1"` so it can hold focus when it has
-    // nothing else to offer, so a match on the body itself is not a match:
-    // pressing it *is* pressing the empty area.
+    const body = this.bodyElement().nativeElement;
+    const scope = this.contentBody ?? body;
+    if (target !== body && !scope.contains(target)) {
+      return;
+    }
+
+    // Both the group's body and the content's carry `tabindex="-1"` so they
+    // can hold focus when there is nothing else, so a match on either is not
+    // a match: pressing it *is* pressing the empty area.
     const focusable = target.closest(
       'button, a, input, textarea, select, [tabindex], [contenteditable]',
     );
-    if (focusable !== null && focusable !== this.bodyElement().nativeElement) {
+    if (focusable !== null && focusable !== scope && focusable !== body) {
       return;
     }
 
@@ -479,7 +367,7 @@ export class UiPanelGroup {
       return;
     }
 
-    if (types.includes('Files')) {
+    if (types.includes('Files') && this.acceptFiles()) {
       event.preventDefault();
       transfer.dropEffect = 'copy';
       this.dropZone.set(null);
@@ -509,7 +397,7 @@ export class UiPanelGroup {
     this.clearDragState();
 
     if (isFileDrag) {
-      const files = transfer ? Array.from(transfer.files) : [];
+      const files = transfer && this.acceptFiles() ? Array.from(transfer.files) : [];
       if (files.length > 0) {
         this.fileDrop.emit(files);
       }

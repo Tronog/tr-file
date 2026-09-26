@@ -39,16 +39,35 @@ export interface UiDocumentModel {
 export type UiPanelView = 'list' | 'grid';
 
 /**
- * Everything one editor group needs to render itself. Named `…Model` because
- * `UiPanelGroup` is the component that renders it.
+ * The shell of one editor group: its tab bar and the frame around a body.
+ * Named `…Model` because `UiPanelGroup` is the component that renders it.
+ *
+ * What the body shows is not part of it. Each kind of panel content is its
+ * own component with its own model — `UiFileBrowser` and `UiFileBrowserModel`
+ * for file management — projected into the group by the application.
  */
 export interface UiPanelGroupModel {
   readonly id: string;
   readonly tabs: readonly UiTab[];
   readonly actions: readonly UiIconAction[];
+  /** Rendered instead of any content when the group holds no tabs. */
+  readonly empty?: UiEmptyStateModel;
+  /**
+   * The active tab's content is being fetched — an indeterminate 2px bar
+   * appears under the tab bar. The rail is reserved either way, so it never
+   * shifts.
+   */
+  readonly loading?: boolean;
+}
+
+/**
+ * The file-management content of a panel: a path bar, a toolbar and either a
+ * listing or one file rendered read-only. Rendered by `UiFileBrowser`.
+ */
+export interface UiFileBrowserModel {
   readonly breadcrumbs: readonly UiBreadcrumb[];
   readonly view: UiPanelView;
-  /** Leading icon buttons of the group toolbar (up, refresh, sort, filter…). */
+  /** Leading icon buttons of the toolbar (up, refresh, sort, filter…). */
   readonly toolbarActions: readonly UiIconAction[];
   /** Whether the toolbar offers the list/grid switch. */
   readonly showViewSwitch?: boolean;
@@ -57,23 +76,22 @@ export interface UiPanelGroupModel {
   readonly columns: readonly UiFileColumn[];
   readonly rows: readonly UiFileRow[];
   readonly items: readonly UiIconViewItem[];
-  /** Shown on the right of the group toolbar, e.g. `'6 items'`. */
+  /** Shown on the right of the toolbar, e.g. `'6 items'`. */
   readonly summary?: string;
-  /** Rendered instead of a body when the group holds no tabs. */
+  /**
+   * Rendered instead of a listing: an empty folder, a folder that could not
+   * be read, a file that cannot be shown.
+   */
   readonly empty?: UiEmptyStateModel;
   /**
-   * A file open in this group: rendered instead of a listing when the active
-   * tab is a file. `empty` still wins, since that is the "no tabs" case.
+   * A file open read-only: rendered instead of a listing when the tab is a
+   * file. `empty` still wins, since that is how a file that cannot be shown
+   * explains itself.
    */
   readonly document?: UiDocumentModel;
-  /**
-   * The group's listing is being fetched — an indeterminate 2px bar appears
-   * under the tab bar. The rail is reserved either way, so it never shifts.
-   */
-  readonly loading?: boolean;
 }
 
-/** Placeholder shown by a group with nothing open. */
+/** Placeholder shown where a panel has nothing to show. */
 export interface UiEmptyStateModel {
   readonly icon: UiIconName;
   readonly title: string;

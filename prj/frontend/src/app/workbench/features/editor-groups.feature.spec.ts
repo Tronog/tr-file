@@ -3,13 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import type { UiFileRow } from '@tr-file/ui';
 import {
-  detailsUrl,
-  downloadUrl,
-  fsDetails,
   fsDirectory,
   fsEntry,
   fsEnvelope,
-  fsErrorBody,
   fsListing,
   listUrl,
   settled,
@@ -40,7 +36,7 @@ describe('EditorGroupsFeature', () => {
   });
 
   const rowOf = (groupId: string, entryId: string): UiFileRow | undefined =>
-    workbench.editorGroupsFt.group(groupId)?.rows.find((row) => row.id === entryId);
+    workbench.fileBrowserFt.browser(groupId)?.rows.find((row) => row.id === entryId);
 
   const tabIds = (groupId: string): readonly string[] =>
     workbench.editorGroupsFt.group(groupId)?.tabs.map((tab) => tab.id) ?? [];
@@ -70,12 +66,12 @@ describe('EditorGroupsFeature', () => {
       http.expectOne(listUrl('')).flush(fsEnvelope(fsListing('', ROOT_ENTRIES)));
       await settled();
 
-      const group = workbench.editorGroupsFt.group('group-root');
-      expect(group?.loading).toBeUndefined();
-      expect(group?.rows.map((row) => row.id)).toEqual(['docs', 'README.md', 'main.ts']);
-      expect(group?.items.map((item) => item.id)).toEqual(['docs', 'README.md', 'main.ts']);
-      expect(group?.summary).toBe('3 items');
-      expect(group?.columns.map((column) => column.key)).toEqual(['name', 'size', 'type', 'modified']);
+      expect(workbench.editorGroupsFt.group('group-root')?.loading).toBeUndefined();
+      const browser = workbench.fileBrowserFt.browser('group-root');
+      expect(browser?.rows.map((row) => row.id)).toEqual(['docs', 'README.md', 'main.ts']);
+      expect(browser?.items.map((item) => item.id)).toEqual(['docs', 'README.md', 'main.ts']);
+      expect(browser?.summary).toBe('3 items');
+      expect(browser?.columns.map((column) => column.key)).toEqual(['name', 'size', 'type', 'modified']);
       expect(rowOf('group-root', 'README.md')?.cells).toMatchObject({
         size: '3.4 KB',
         type: 'MD',
@@ -92,6 +88,7 @@ describe('EditorGroupsFeature', () => {
     });
   });
 
+
   describe('empty states', () => {
     it('invites a folder to be opened when the group holds no tabs', async () => {
       await start();
@@ -102,253 +99,40 @@ describe('EditorGroupsFeature', () => {
       const group = workbench.editorGroupsFt.group(id);
       expect(group?.empty).toMatchObject({ icon: 'folder-open', title: 'Open a folder to browse it here' });
       expect(group?.tabs).toEqual([]);
-      expect(group?.toolbarActions).toEqual([]);
-      expect(group?.breadcrumbs).toEqual([]);
-      expect(group?.rows).toEqual([]);
-      expect(group?.summary).toBeUndefined();
+      expect(group?.actions).toEqual([]);
+      // No tab, so no content: nothing to browse, and nothing to render it with.
+      expect(workbench.editorGroupsFt.activeContent(id)).toBeNull();
+      expect(workbench.fileBrowserFt.browser(id)).toBeUndefined();
+      expect(workbench.editorGroupsFt.acceptsFiles(id)).toBe(false);
+    });
+  });
+
+  describe('panel content', () => {
+    it('shows a folder tab as file management, which takes dropped files', async () => {
+      await start();
+
+      expect(workbench.editorGroupsFt.activeContent('group-root')).toBe('files');
+      expect(workbench.editorGroupsFt.acceptsFiles('group-root')).toBe(true);
+      expect(workbench.fileBrowserFt.browser('group-root')).toBeDefined();
     });
 
-    it('reports a folder that could not be read, with the server message', async () => {
-      workbench.editorGroupsFt.start();
-      http
-        .expectOne(listUrl(''))
-        .flush(fsErrorBody('FORBIDDEN', 'Outside the root'), { status: 403, statusText: 'Forbidden' });
-      await settled();
+    it('frames only the tabs and the loading rail, leaving the body to the content', async () => {
+      await start();
 
-      expect(workbench.editorGroupsFt.group('group-root')?.empty).toEqual({
-        icon: 'alert-triangle',
-        title: 'Could not open this folder',
-        hint: 'Outside the root',
+      expect(workbench.editorGroupsFt.group('group-root')).toEqual({
+        id: 'group-root',
+        tabs: [expect.objectContaining({ id: 'tab-root', active: true })],
+        actions: [
+          expect.objectContaining({ id: 'split-right' }),
+          expect.objectContaining({ id: 'split-down' }),
+          expect.objectContaining({ id: 'maximize' }),
+        ],
       });
     });
 
-    it('offers to fill an empty folder', async () => {
-      await start([]);
-
-      expect(workbench.editorGroupsFt.group('group-root')?.empty).toMatchObject({
-        title: 'This folder is empty',
-        hint: 'Drop files here to upload them',
-      });
-      expect(workbench.editorGroupsFt.group('group-root')?.summary).toBe('0 items');
-    });
-
-    it('shows no placeholder while a folder with contents is open', async () => {
-      await start();
-
-      expect(workbench.editorGroupsFt.group('group-root')?.empty).toBeUndefined();
-    });
-  });
-
-  describe('openEntry()', () => {
-    it('navigates the group into a directory, moving tab, path and breadcrumbs', async () => {
-      await start();
-
-      workbench.editorGroupsFt.openEntry('group-root', 'docs');
-
-      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [fsEntry('docs/NOTES.md')])));
-      await settled();
-
-      const group = workbench.editorGroupsFt.group('group-root');
-      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('docs');
-      expect(group?.tabs[0]).toMatchObject({ id: 'tab-root', label: 'docs', active: true });
-      expect(group?.breadcrumbs.map((crumb) => crumb.label)).toEqual(['tr-file', 'docs']);
-      expect(group?.rows.map((row) => row.id)).toEqual(['docs/NOTES.md']);
-    });
-
-    it('opens a file in a read-only tab instead of downloading it', async () => {
-      await start();
-
-      workbench.editorGroupsFt.openEntry('group-root', 'README.md');
-
-      // Selecting it describes it on the right; opening it reads the bytes.
-      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
-      http
-        .expectOne(downloadUrl('README.md'))
-        .flush(new Blob(['# Title'], { type: 'text/markdown' }));
-      await settled();
-
-      const group = workbench.editorGroupsFt.group('group-root');
-      expect(group?.tabs.map((tab) => tab.label)).toEqual(['tr-file', 'README.md']);
-      expect(group?.tabs[1]).toMatchObject({ active: true, icon: 'file' });
-      // A file tab lists nothing and offers no list/grid switch.
-      expect(group?.rows).toEqual([]);
-      expect(group?.showViewSwitch).toBeUndefined();
-      expect(group?.document).toMatchObject({ path: 'README.md', kind: 'markdown' });
-      expect(group?.document?.html).toContain('<h1>Title</h1>');
-    });
-
-    it('ignores an entry the listing does not contain', async () => {
-      await start();
-
-      workbench.editorGroupsFt.openEntry('group-root', 'nope');
-
-      http.expectNone(() => true);
-      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('');
-    });
-  });
-
-  describe('runToolbarAction()', () => {
-    it('offers the three toolbar actions of an open group', async () => {
-      await start();
-
-      expect(workbench.editorGroupsFt.group('group-root')?.toolbarActions.map((action) => action.id)).toEqual([
-        'up',
-        'refresh',
-        'upload',
-      ]);
-    });
-
-    it('up walks the group to the parent directory', async () => {
-      await start();
-      workbench.editorGroupsFt.openEntry('group-root', 'docs');
-      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [fsDirectory('docs/prd')])));
-      await settled();
-      workbench.editorGroupsFt.openEntry('group-root', 'docs/prd');
-      http.expectOne(listUrl('docs/prd')).flush(fsEnvelope(fsListing('docs/prd')));
-      await settled();
-
-      workbench.editorGroupsFt.runToolbarAction('group-root', 'up');
-
-      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('docs');
-      expect(workbench.editorGroupsFt.group('group-root')?.tabs[0]?.label).toBe('docs');
-      // `docs` is still cached, so walking back up costs no request.
-      http.expectNone(listUrl('docs'));
-    });
-
-    it('up does nothing at the root', async () => {
-      await start();
-
-      workbench.editorGroupsFt.runToolbarAction('group-root', 'up');
-
-      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('');
-      http.expectNone(() => true);
-    });
-
-    it('refresh re-reads the open directory', async () => {
-      await start();
-
-      workbench.editorGroupsFt.runToolbarAction('group-root', 'refresh');
-
-      http.expectOne(listUrl('')).flush(fsEnvelope(fsListing('', [fsEntry('new.ts')])));
-      await settled();
-
-      expect(workbench.editorGroupsFt.group('group-root')?.rows.map((row) => row.id)).toEqual(['new.ts']);
-    });
-
-    it('upload asks the component for the file picker', async () => {
-      await start();
-
-      workbench.editorGroupsFt.runToolbarAction('group-root', 'upload');
-
-      expect(workbench.uploadRequest()).toEqual({ groupId: 'group-root', path: '' });
-    });
-
-    it('ignores an unknown action and an unknown group', async () => {
-      await start();
-
-      workbench.editorGroupsFt.runToolbarAction('group-root', 'sort');
-      workbench.editorGroupsFt.runToolbarAction('nope', 'refresh');
-
-      http.expectNone(() => true);
-      expect(workbench.uploadRequest()).toBeNull();
-    });
-  });
-
-  describe('selectEntry()', () => {
-    it('updates the group selection and the workbench selection', async () => {
-      await start();
-
-      workbench.editorGroupsFt.selectEntry('group-root', 'README.md');
-      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
-      await settled();
-
-      expect(workbench.selectedEntryId()).toBe('README.md');
-      expect(workbench.activeGroupId()).toBe('group-root');
-      expect(rowOf('group-root', 'README.md')).toMatchObject({ selected: true, focused: true });
-      expect(rowOf('group-root', 'main.ts')?.selected).toBeUndefined();
-      expect(
-        workbench.editorGroupsFt
-          .group('group-root')
-          ?.items.filter((item) => item.selected)
-          .map((item) => item.id),
-      ).toEqual(['README.md']);
-    });
-
-    it('replaces the previous selection rather than adding to it', async () => {
-      await start();
-
-      workbench.editorGroupsFt.selectEntry('group-root', 'README.md');
-      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
-      workbench.editorGroupsFt.selectEntry('group-root', 'main.ts');
-      http.expectOne(detailsUrl('main.ts')).flush(fsEnvelope(fsDetails('main.ts')));
-      await settled();
-
-      expect(rowOf('group-root', 'README.md')?.selected).toBeUndefined();
-      expect(rowOf('group-root', 'main.ts')?.selected).toBe(true);
-    });
-
-    it('dims the selection of a group that is not active', async () => {
-      await start();
-      workbench.editorGroupsFt.selectEntry('group-root', 'README.md');
-      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
-      await settled();
-
-      workbench.activeGroupId.set('somewhere-else');
-
-      expect(rowOf('group-root', 'README.md')?.inactiveSelected).toBe(true);
-      expect(rowOf('group-root', 'README.md')?.selected).toBeUndefined();
-      expect(rowOf('group-root', 'README.md')?.focused).toBeUndefined();
-    });
-  });
-
-  describe('openBreadcrumb()', () => {
-    it('walks the group back to the workspace root', async () => {
-      await start();
-      workbench.editorGroupsFt.openEntry('group-root', 'docs');
-      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs')));
-      await settled();
-
-      workbench.editorGroupsFt.openBreadcrumb('group-root', 'root');
-
-      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('');
-      expect(workbench.editorGroupsFt.group('group-root')?.tabs[0]?.label).toBe('tr-file');
-      http.expectNone(listUrl(''));
-    });
-  });
-
-  describe('setView()', () => {
-    it('switches only the targeted group', async () => {
-      await start();
-      workbench.editorGroupsFt.runAction('group-root', 'split-right');
-      const second = workbench.panelLayoutFt.groupIds()[1] as string;
-
-      workbench.editorGroupsFt.setView('group-root', 'grid');
-
-      expect(workbench.editorGroupsFt.group('group-root')?.view).toBe('grid');
-      expect(workbench.editorGroupsFt.group(second)?.view).toBe('list');
-    });
-  });
-
-  describe('uploadInto()', () => {
-    it('starts one upload per dropped file in the group directory', async () => {
-      await start();
-
-      workbench.editorGroupsFt.uploadInto('group-root', [new File(['a'], 'a.txt')]);
-
-      const request = http.expectOne((candidate) => candidate.url.startsWith('/api/fs/upload'));
-      expect(request.request.url).toBe('/api/fs/upload?path=&overwrite=false');
-      expect(workbench.activeGroupId()).toBe('group-root');
-      request.flush(fsEnvelope(fsDetails('a.txt')));
-      await settled();
-      http.expectOne(listUrl(''));
-    });
-
-    it('ignores an empty drop', async () => {
-      await start();
-
-      workbench.editorGroupsFt.uploadInto('group-root', []);
-
-      http.expectNone(() => true);
+    it('knows nothing about a group that does not exist', () => {
+      expect(workbench.editorGroupsFt.activeContent('nope')).toBeNull();
+      expect(workbench.editorGroupsFt.acceptsFiles('nope')).toBe(false);
     });
   });
 
@@ -371,7 +155,7 @@ describe('EditorGroupsFeature', () => {
       expect(tabIds('group-root')).toEqual(['tab-root']);
       expect(activeTabId('group-root')).toBe('tab-root');
       // Both groups show the same cached directory, fetched once.
-      expect(workbench.editorGroupsFt.group(newGroupId)?.rows.map((row) => row.id)).toEqual([
+      expect(workbench.fileBrowserFt.browser(newGroupId)?.rows.map((row) => row.id)).toEqual([
         'docs',
         'README.md',
         'main.ts',
@@ -418,7 +202,7 @@ describe('EditorGroupsFeature', () => {
     });
 
     it('selectTab re-points the group at the tab folder and focuses it', async () => {
-      workbench.editorGroupsFt.openEntry('group-root', 'docs');
+      workbench.fileBrowserFt.openEntry('group-root', 'docs');
       http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [fsEntry('docs/NOTES.md')])));
       await settled();
 

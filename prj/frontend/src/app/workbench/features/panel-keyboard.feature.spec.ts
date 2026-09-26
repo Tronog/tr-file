@@ -41,12 +41,13 @@ describe('PanelKeyboardFeature', () => {
 
   const groupId = (): string => workbench.activeGroupId();
   const activeGroup = () => workbench.editorGroupsFt.group(groupId());
+  const activeBrowser = () => workbench.fileBrowserFt.browser(groupId());
   const crumbs = (): string =>
-    (activeGroup()?.breadcrumbs ?? []).map((crumb) => crumb.label).join('/');
+    (activeBrowser()?.breadcrumbs ?? []).map((crumb) => crumb.label).join('/');
 
   /** Opens `docs` in the active panel, so there is somewhere to come back up from. */
   const openDocs = async (): Promise<void> => {
-    workbench.editorGroupsFt.navigateTo(groupId(), 'docs', 'docs');
+    workbench.fileBrowserFt.navigateTo(groupId(), 'docs', 'docs');
     http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
     await settled();
   };
@@ -70,7 +71,7 @@ describe('PanelKeyboardFeature', () => {
     await settled();
 
     expect(activeGroup()?.tabs.map((tab) => tab.label)).toContain('README.md');
-    expect(activeGroup()?.document).toBeDefined();
+    expect(activeBrowser()?.document).toBeDefined();
   });
 
   it('selects on Space, which is what the details sidebar follows', async () => {
@@ -81,7 +82,7 @@ describe('PanelKeyboardFeature', () => {
     await settled();
 
     expect(workbench.selectedEntryId()).toBe('README.md');
-    expect(activeGroup()?.rows.find((row) => row.id === 'README.md')).toMatchObject({
+    expect(activeBrowser()?.rows.find((row) => row.id === 'README.md')).toMatchObject({
       selected: true,
       focused: true,
     });
@@ -105,7 +106,7 @@ describe('PanelKeyboardFeature', () => {
     http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [fsDirectory('docs/prd')])));
     await settled();
 
-    expect(activeGroup()?.rows.map((row) => row.id)).toEqual(['docs/prd']);
+    expect(activeBrowser()?.rows.map((row) => row.id)).toEqual(['docs/prd']);
   });
 
   /** An empty listing still has a folder to leave; it just has nothing to open. */
@@ -136,7 +137,7 @@ describe('PanelKeyboardFeature', () => {
       await start();
       const before = token();
 
-      workbench.editorGroupsFt.openEntry(groupId(), 'docs');
+      workbench.fileBrowserFt.openEntry(groupId(), 'docs');
       http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
       await settled();
 
@@ -152,7 +153,7 @@ describe('PanelKeyboardFeature', () => {
       await start();
       const before = token();
 
-      workbench.editorGroupsFt.openEntry(groupId(), 'README.md');
+      workbench.fileBrowserFt.openEntry(groupId(), 'README.md');
       http.expectOne(downloadUrl('README.md')).flush(new Blob(['# hi'], { type: 'text/markdown' }));
       http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
       await settled();
@@ -234,7 +235,7 @@ describe('PanelKeyboardFeature', () => {
         await start();
         const first = groupId();
 
-        workbench.editorGroupsFt.openEntryAside(first, 'docs');
+        workbench.fileBrowserFt.openEntryAside(first, 'docs');
         http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
         await settled();
 
@@ -250,7 +251,7 @@ describe('PanelKeyboardFeature', () => {
         await start();
         const first = groupId();
 
-        workbench.editorGroupsFt.openEntryAside(first, 'README.md');
+        workbench.fileBrowserFt.openEntryAside(first, 'README.md');
         http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
         http.expectOne(downloadUrl('README.md')).flush(new Blob(['# hi'], { type: 'text/markdown' }));
         await settled();
@@ -258,14 +259,14 @@ describe('PanelKeyboardFeature', () => {
         const second = groupId();
         const group = workbench.editorGroupsFt.group(second);
         expect(group?.tabs.map((tab) => tab.label)).toEqual(['README.md']);
-        expect(group?.document).toBeDefined();
+        expect(workbench.fileBrowserFt.browser(second)?.document).toBeDefined();
       });
 
       /** A file is not a folder, so it is not a stop on the panel's trail. */
       it('starts a file panel with no history of its own', async () => {
         await start();
 
-        workbench.editorGroupsFt.openEntryAside(groupId(), 'README.md');
+        workbench.fileBrowserFt.openEntryAside(groupId(), 'README.md');
         http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
         http.expectOne(downloadUrl('README.md')).flush(new Blob(['# hi'], { type: 'text/markdown' }));
         await settled();
@@ -277,7 +278,7 @@ describe('PanelKeyboardFeature', () => {
         await start();
         const before = groupId();
 
-        workbench.editorGroupsFt.openEntryAside(before, 'nowhere/at/all');
+        workbench.fileBrowserFt.openEntryAside(before, 'nowhere/at/all');
         await settled();
 
         expect(groupId()).toBe(before);

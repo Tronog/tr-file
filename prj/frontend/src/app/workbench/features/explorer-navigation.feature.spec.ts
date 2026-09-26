@@ -40,9 +40,10 @@ describe('ExplorerNavigationFeature', () => {
   };
 
   const activeGroup = () => workbench.editorGroupsFt.group(workbench.activeGroupId());
+  const activeBrowser = () => workbench.fileBrowserFt.browser(workbench.activeGroupId());
   const crumbs = (): string =>
-    (activeGroup()?.breadcrumbs ?? []).map((crumb) => crumb.label).join('/');
-  const rows = (): readonly string[] => (activeGroup()?.rows ?? []).map((row) => row.id);
+    (activeBrowser()?.breadcrumbs ?? []).map((crumb) => crumb.label).join('/');
+  const rows = (): readonly string[] => (activeBrowser()?.rows ?? []).map((row) => row.id);
   const treeRow = (id: string) => workbench.explorerFt.nodes().find((node) => node.id === id);
 
   describe('clicking a folder', () => {
@@ -82,7 +83,7 @@ describe('ExplorerNavigationFeature', () => {
       await settled();
 
       // Navigate away, then click the same folder in the tree a second time.
-      workbench.editorGroupsFt.navigateTo(workbench.activeGroupId(), '', 'tr-file');
+      workbench.fileBrowserFt.navigateTo(workbench.activeGroupId(), '', 'tr-file');
       await settled();
 
       workbench.explorerNavFt.open('docs');
@@ -180,7 +181,7 @@ describe('ExplorerNavigationFeature', () => {
       expect(group?.tabs).toHaveLength(1);
       expect(group?.tabs[0]).toMatchObject({ label: 'docs', active: true });
       expect(group?.empty).toBeUndefined();
-      expect(group?.rows.map((row) => row.id)).toEqual(['docs/prd', 'docs/NOTES.md']);
+      expect(activeBrowser()?.rows.map((row) => row.id)).toEqual(['docs/prd', 'docs/NOTES.md']);
     });
   });
 
