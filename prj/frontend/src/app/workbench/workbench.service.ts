@@ -24,6 +24,7 @@ import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
 import { AuthService } from '../auth/auth.service';
 import { ModalService } from '../modal/modal.service';
+import { CommandPaletteFeature } from './features/command-palette.feature';
 
 /**
  * The workbench's common state, and the seam every feature talks through.
@@ -119,6 +120,8 @@ export class WorkbenchService {
   readonly resizeFt = new WorkbenchResizeFeature(this);
   /** The frameless window's own buttons and drag region. */
   readonly windowControlsFt = new WindowControlsFeature(this);
+  /** The command palette: `Ctrl`+`Shift`+`P` (PRD 009, §1). */
+  readonly commandPaletteFt = new CommandPaletteFeature(this);
 
   /* -- cross-feature operations ------------------------------------------ */
 

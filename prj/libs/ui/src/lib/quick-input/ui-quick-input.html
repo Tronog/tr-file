@@ -1,0 +1,64 @@
+<div class="progress">
+  @if (busy()) {
+    <ui-progress [value]="null" label="Working" />
+  }
+</div>
+
+<div class="field-row">
+  <input
+    #field
+    class="field"
+    role="combobox"
+    aria-autocomplete="list"
+    [attr.aria-label]="label()"
+    [attr.aria-expanded]="showList()"
+    [attr.aria-controls]="showList() ? listId : null"
+    [attr.aria-activedescendant]="activeOption()"
+    [attr.aria-describedby]="message() ? listId + '-message' : null"
+    [attr.aria-invalid]="message()?.severity === 'error' ? 'true' : null"
+    [type]="password() ? 'password' : 'text'"
+    [value]="value()"
+    [placeholder]="placeholder()"
+    [class.is-invalid]="message()?.severity === 'error'"
+    spellcheck="false"
+    autocomplete="off"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  />
+</div>
+
+@if (message(); as note) {
+  <p class="message message-{{ note.severity }}" [id]="listId + '-message'">{{ note.text }}</p>
+}
+
+@if (showList()) {
+  <ul class="list" role="listbox" [id]="listId" [attr.aria-label]="label()">
+    @for (item of items(); track item.id) {
+      <li
+        role="option"
+        class="row"
+        [id]="optionId(item.id)"
+        [class.is-active]="item.id === activeId()"
+        [attr.aria-selected]="item.id === activeId()"
+        (pointerdown)="onRowPointerDown($event)"
+        (pointermove)="item.id === activeId() ? null : activeChange.emit(item.id)"
+        (click)="onPick(item)"
+      >
+        <!-- One line: the label keeps its spaces, so the template must not add any. -->
+        <span class="row-label">@for (part of parts(item); track $index) {<span [class.hl]="part.match">{{ part.text }}</span>}</span>
+        @if (item.description) {
+          <span class="row-description">{{ item.description }}</span>
+        }
+        @if (item.keys?.length) {
+          <span class="row-keys" aria-hidden="true">
+            @for (key of item.keys; track $index) {
+              <kbd>{{ key }}</kbd>
+            }
+          </span>
+        }
+      </li>
+    } @empty {
+      <li class="empty" role="presentation">{{ emptyText() }}</li>
+    }
+  </ul>
+}

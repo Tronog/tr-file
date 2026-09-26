@@ -12,6 +12,7 @@
 @let panes = workbench.sidebarPanesFt;
 @let layout = workbench.panelLayoutFt;
 @let resize = workbench.resizeFt;
+@let palette = workbench.commandPaletteFt;
 
 <ui-workbench
   [leftWidth]="workbench.leftSidebarWidth()"
@@ -35,6 +36,7 @@
     [draggable]="windowControls.draggable()"
     [leadingInset]="windowControls.leadingInset()"
     (windowControlSelect)="windowControls.run($event)"
+    (commandSelect)="palette.show()"
     (dragAreaDoubleClick)="windowControls.toggleFromDragArea()"
   />
 
@@ -253,5 +255,24 @@
     [items]="chrome.settingsMenuItems"
     (select)="chrome.runSettingsItem($event)"
     (dismiss)="chrome.closeSettingsMenu()"
+  />
+}
+
+<!-- The command palette (PRD 009, §1): VS Code's quick input, at the top of the window. -->
+@if (palette.isOpen()) {
+  <ui-quick-input
+    emptyText="No matching commands"
+    [label]="palette.label()"
+    [value]="palette.query()"
+    [placeholder]="palette.placeholder()"
+    [items]="palette.items()"
+    [activeId]="palette.activeId()"
+    [message]="palette.message()"
+    [showList]="palette.showList()"
+    [busy]="palette.busy()"
+    (valueChange)="palette.setQuery($event)"
+    (activeChange)="palette.setActive($event)"
+    (accept)="palette.accept()"
+    (dismiss)="palette.close()"
   />
 }

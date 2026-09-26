@@ -61,6 +61,9 @@ export { UiPanelGrid } from './lib/panel-grid/ui-panel-grid';
 /* panel content ----------------------------------------------------------- */
 export { UiFileBrowser } from './lib/file-browser/ui-file-browser';
 
+/* quick input — the command palette's box (PRD 009, §1) ------------------ */
+export { UiQuickInput } from './lib/quick-input/ui-quick-input';
+
 /* modal windows (PRD 002, §3) -------------------------------------------- */
 export { UiModal } from './lib/modal/ui-modal';
 export { UiDialog } from './lib/modal/ui-dialog';

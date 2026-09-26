@@ -1,0 +1,140 @@
+/* VS Code's quick input: a box hanging from the top of the window, centred. */
+:host {
+  position: fixed;
+  top: calc(var(--vsc-titlebar-height) + 4px);
+  left: 50%;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(600px, calc(100vw - 32px));
+  max-height: min(440px, calc(100vh - var(--vsc-titlebar-height) - 24px));
+  padding: 0 0 6px;
+  border: 1px solid var(--vsc-menu-border);
+  border-radius: var(--vsc-radius-lg);
+  background: var(--vsc-menu-bg);
+  box-shadow: var(--vsc-shadow);
+  color: var(--vsc-fg);
+  font-family: var(--vsc-font);
+  font-size: var(--vsc-font-size);
+  transform: translateX(-50%);
+}
+
+/* The rail is kept whether or not it is busy, so nothing shifts. */
+.progress {
+  height: 2px;
+
+  ui-progress {
+    height: 2px;
+    border-radius: 0;
+  }
+}
+
+.field-row {
+  padding: 4px 6px 0;
+}
+
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--vsc-input-border);
+  border-radius: 2px;
+  background: var(--vsc-input-bg);
+  color: var(--vsc-fg-bright);
+  font: inherit;
+
+  &:focus {
+    border-color: var(--vsc-focus-border);
+    outline: none;
+  }
+
+  &.is-invalid {
+    border-color: var(--vsc-severity-error);
+  }
+}
+
+.message {
+  margin: 6px 6px 0;
+  padding: 4px 8px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: 2px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.message-info {
+  border-color: var(--vsc-severity-info);
+}
+
+.message-warning {
+  border-color: var(--vsc-severity-warning);
+}
+
+.message-error {
+  border-color: var(--vsc-severity-error);
+}
+
+.list {
+  flex: 1;
+  margin: 6px 0 0;
+  padding: 0 6px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--vsc-radius);
+  cursor: pointer;
+
+  &.is-active {
+    background: var(--vsc-list-active);
+    color: var(--vsc-fg-bright);
+  }
+}
+
+.row-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+/* VS Code's match highlight: bold, in the link blue. */
+.hl {
+  color: var(--vsc-link);
+  font-weight: 600;
+}
+
+.row-description {
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+  white-space: nowrap;
+}
+
+.row-keys {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+
+  kbd {
+    padding: 0 4px;
+    border: 1px solid var(--vsc-border-strong);
+    border-radius: 3px;
+    background: var(--vsc-button-secondary-bg);
+    color: var(--vsc-fg);
+    font-family: inherit;
+    font-size: var(--vsc-font-size-xs);
+    line-height: 16px;
+  }
+}
+
+.empty {
+  padding: 2px 8px;
+  color: var(--vsc-fg-muted);
+}

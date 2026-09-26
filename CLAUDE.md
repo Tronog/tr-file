@@ -105,6 +105,14 @@ bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`
 `openMenu`, `closeSettingsMenu`) shows `UiContextMenu` fixed beside it, opening upward. Its
 items come from `MockDataWorkbenchService.settingsMenuItems` — for now one disabled `Todo`.
 
+The command palette (PRD 009, §1) is `CommandPaletteFeature`: `Ctrl`+`Shift`+`P`, `F1`,
+`Ctrl`+`P` or the title bar's command centre open it in the library's `UiQuickInput`;
+commands are filtered by `command-palette/fuzzy-match.ts`, and a command that needs a value
+turns the box into an input box (`InputStep`: `validate` as you type, `accept` does the work
+and returns why it could not). *Go: Jump to Folder…* takes an absolute path within the
+workspace and checks it is a folder before showing it; *Remote: Connect to Remote Server…*
+parses `[user:password@]host:port` (`remote-target.ts`) and, until PRD 006, only says so.
+
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a
 double chevron pointing the way the panel will move. Choosing a tab, including from the

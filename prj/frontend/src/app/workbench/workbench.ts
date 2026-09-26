@@ -9,6 +9,7 @@ import {
   UiPanelGrid,
   UiPanelGroup,
   UiPermissionGrid,
+  UiQuickInput,
   UiPreviewCard,
   UiPropertyList,
   UiSash,
@@ -42,6 +43,7 @@ import { WorkbenchService } from './workbench.service';
     UiPanelGrid,
     UiPanelGroup,
     UiPermissionGrid,
+    UiQuickInput,
     UiPreviewCard,
     UiPropertyList,
     UiSash,
@@ -54,6 +56,10 @@ import { WorkbenchService } from './workbench.service';
   ],
   templateUrl: './workbench.html',
   styleUrl: './workbench.scss',
+  host: {
+    // The palette opens from anywhere in the workbench (PRD 009, §1).
+    '(document:keydown)': 'workbench.commandPaletteFt.handleShortcut($event)',
+  },
 })
 export class Workbench {
   protected readonly workbench = inject(WorkbenchService);

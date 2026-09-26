@@ -62,6 +62,7 @@ structural helpers. No component hardcodes a colour.
 | Bottom panel | `UiBottomPanel`, `UiTransferList` |
 | Controls | `UiIconButton`, `UiButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
 | Modal windows | `UiModal`, `UiDialog` |
+| Quick input | `UiQuickInput` — the command palette's box |
 | Icons | `UiIcon`, `UiIconSprite` |
 
 View models are exported from `lib/models`. Where a model would collide with the
@@ -336,6 +337,19 @@ Two inputs exist for the asynchronous world the workbench now lives in:
 being fetched, and `UiPanelGroupModel.loading` lights a 2px indeterminate rail
 under the tab bar. Both are pure inputs — the library never knows what is being
 loaded, only that something is.
+
+## Quick input (PRD 009, §1)
+
+`UiQuickInput` is VS Code's quick input: a box hanging from the top of the
+window, centred, with one field and under it either a list to pick from or a
+message (a hint in blue, a problem in red). Focus stays in the field — it is a
+`combobox` whose list is announced through `aria-activedescendant` — so `↑`/`↓`
+move the active row (wrapping), `Enter` emits `accept`, `Escape` emits
+`dismiss` and hands focus back, and focus leaving the box dismisses it too.
+Rows carry optional `highlights` (drawn bold in the link blue) and key chips;
+`busy` draws a progress rail along the top. It filters nothing and decides
+nothing: in the app the command palette (`CommandPaletteFeature`) owns the
+list, the matching and what accepting means.
 
 ## Modal windows (PRD 002, §3)
 

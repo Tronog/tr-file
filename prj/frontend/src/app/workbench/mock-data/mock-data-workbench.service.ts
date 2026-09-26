@@ -49,8 +49,9 @@ export class MockDataWorkbenchService {
     { id: 'help', label: 'Help' },
   ];
 
-  readonly commandLabel = 'Go to file or folder…';
-  readonly commandKeys: readonly string[] = ['Ctrl', 'P'];
+  /** The title bar's command centre opens the command palette (PRD 009, §1). */
+  readonly commandLabel = 'Search commands…';
+  readonly commandKeys: readonly string[] = ['Ctrl', 'Shift', 'P'];
 
   readonly titleBarActions: readonly UiIconAction[] = [
     { id: 'toggle-left', label: 'Toggle left sidebar', icon: 'sidebar-left', active: true },
