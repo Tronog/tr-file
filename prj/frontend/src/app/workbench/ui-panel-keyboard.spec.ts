@@ -147,8 +147,10 @@ describe('UiFileList keyboard', () => {
     expect(press(1, 'PageDown').defaultPrevented).toBe(true);
     expect(press(4, 'q').defaultPrevented).toBe(true);
 
+    // `Ctrl`+`A` is claimed now — it selects all (PRD 004, §1.2) — but a
+    // chord like `Ctrl`+`T` is the panel's, and passes through untouched.
     const modified = new KeyboardEvent('keydown', {
-      key: 'a',
+      key: 't',
       ctrlKey: true,
       bubbles: true,
       cancelable: true,

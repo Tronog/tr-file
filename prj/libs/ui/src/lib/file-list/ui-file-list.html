@@ -47,7 +47,7 @@
         [attr.aria-busy]="tree() && row.busy ? 'true' : null"
         [attr.tabindex]="row.id === tabStopId() ? 0 : -1"
         [attr.aria-keyshortcuts]="keyShortcuts"
-        (click)="select.emit(row.id)"
+        (click)="onClick($event, index)"
         (dblclick)="activate.emit(row.id)"
         (keydown)="onKeydown($event, index)"
       >

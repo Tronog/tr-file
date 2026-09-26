@@ -13,7 +13,8 @@ import {
 } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
-import type { UiIconViewItem, UiPanelKey } from '../models';
+import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
+import type { UiIconViewItem, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
 
 /** The grid's `gap` and `padding`, as the stylesheet sets them. */
@@ -22,6 +23,33 @@ const PADDING = 10;
 
 /** One visual row of tiles, gap included, until one has been measured. */
 const DEFAULT_LINE_HEIGHT = 84;
+
+/** A press that moves less than this is a click, not the start of a box. */
+const DRAG_THRESHOLD = 4;
+
+/** How close to the scroll container's edge a box drag starts scrolling it. */
+const AUTOSCROLL_EDGE = 24;
+const AUTOSCROLL_STEP = 20;
+
+/** A rectangle in the host's own coordinates, which scroll with the tiles. */
+interface Box {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** A box selection in progress. */
+interface MarqueeDrag {
+  readonly pointerId: number;
+  readonly startX: number;
+  readonly startY: number;
+  /** What stays selected whatever the box covers: nothing, or — with `Ctrl` or `Shift` — what already was. */
+  readonly base: ReadonlySet<string>;
+  dragging: boolean;
+  /** The last selection reported, so an unchanged box reports nothing. */
+  lastKey: string;
+}
 
 /**
  * The "large icons" view of a directory: an auto-filling grid of 96px tiles.
@@ -41,6 +69,14 @@ const DEFAULT_LINE_HEIGHT = 84;
  * as the list view does: a full-width spacer stands in above and below, and
  * a key that moves off the rendered tiles scrolls there and focuses the tile
  * once it exists.
+ *
+ * Selection is multiple (PRD 004, §1.2), exactly as in the list view — see
+ * `UiListSelection` — and the grid adds a *box selection*: dragging across the
+ * blank space between and around the tiles selects every tile the box
+ * touches, added to the selection when `Ctrl` or `Shift` is held; a plain
+ * click on blank space clears it. The box is hit-tested against the grid's
+ * geometry rather than against rendered tiles, so it reaches tiles the window
+ * has not rendered, and dragging near the edge of the panel scrolls it.
  */
 @Component({
   selector: 'ui-icon-view',
@@ -64,7 +100,7 @@ const DEFAULT_LINE_HEIGHT = 84;
         [attr.aria-keyshortcuts]="keyShortcuts"
         [attr.tabindex]="item.id === tabStopId() ? 0 : -1"
         [attr.title]="item.label"
-        (click)="select.emit(item.id)"
+        (click)="onClick($event, index)"
         (dblclick)="activate.emit(item.id)"
         (keydown)="onKeydown($event, index)"
       >
@@ -75,11 +111,26 @@ const DEFAULT_LINE_HEIGHT = 84;
     @if (spaceBelow() > 0) {
       <div class="spacer" aria-hidden="true" [style.height.px]="spaceBelow()"></div>
     }
+    @if (marquee(); as box) {
+      <div
+        class="marquee"
+        aria-hidden="true"
+        [style.left.px]="box.left"
+        [style.top.px]="box.top"
+        [style.width.px]="box.width"
+        [style.height.px]="box.height"
+      ></div>
+    }
   `,
   styleUrl: './ui-icon-view.scss',
   host: {
     role: 'listbox',
     '[attr.aria-label]': 'label()',
+    'aria-multiselectable': 'true',
+    '(pointerdown)': 'onPointerDown($event)',
+    '(pointermove)': 'onPointerMove($event)',
+    '(pointerup)': 'onPointerUp($event)',
+    '(pointercancel)': 'endMarquee($event)',
   },
 })
 export class UiIconView {
@@ -89,7 +140,12 @@ export class UiIconView {
   readonly label = input<string>('Files');
 
   readonly activate = output<string>();
+
+  /** The tile a click or a key made current. */
   readonly select = output<string>();
+
+  /** The whole selection after a click, a key or a box; see `UiSelectionChange`. */
+  readonly selectionChange = output<UiSelectionChange>();
 
   /** A key whose meaning is the application's; see `UiPanelKey`. */
   readonly command = output<UiPanelKey>();
@@ -107,6 +163,11 @@ export class UiIconView {
   private readonly tiles = viewChildren<ElementRef<HTMLButtonElement>>('tile');
 
   private readonly typeahead = new UiTypeahead();
+  private readonly selection = new UiListSelection();
+
+  /** The box being dragged, in host coordinates, or `null`. */
+  protected readonly marquee = signal<Box | null>(null);
+  private drag: MarqueeDrag | null = null;
 
   private readonly viewport = new UiVirtualViewport();
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
@@ -188,6 +249,14 @@ export class UiIconView {
     });
   }
 
+  /** A click selects by the keys held: alone, toggled, or as a range. */
+  protected onClick(event: MouseEvent, index: number): void {
+    const item = this.items()[index];
+    if (item) {
+      this.pick(item.id, clickMode(event));
+    }
+  }
+
   protected onKeydown(event: KeyboardEvent, index: number): void {
     const items = this.items();
     const item = items[index];
@@ -195,40 +264,36 @@ export class UiIconView {
       return;
     }
 
-    // An `Alt` or `Ctrl` chord is the panel's, not a step between tiles: its
-    // history and `Up`, and switching tabs (PRD 001, §6.2.1, §6.2.3, §6.2.4).
-    // Let it bubble to `UiPanelGroup` untouched.
-    if (event.altKey || event.ctrlKey || event.metaKey) {
+    // An `Alt` chord is the panel's, not a step between tiles: its history
+    // and `Up` (PRD 001, §6.2.1, §6.2.3). So are most `Ctrl` chords — switching
+    // tabs (§6.2.4), `Ctrl`+`Enter` — so they bubble to `UiPanelGroup`
+    // untouched; only the ones about the selection are claimed here.
+    if (event.altKey) {
+      return;
+    }
+    const command = event.ctrlKey || event.metaKey;
+
+    if (command && !event.shiftKey && (event.key === ' ' || event.key.toLowerCase() === 'a')) {
+      this.pick(item.id, event.key === ' ' ? 'toggle' : 'all');
+      event.preventDefault();
       return;
     }
 
-    const columns = this.columns();
+    const target = this.movementTarget(event.key, index);
+    if (target !== null) {
+      if (command && (event.key === 'PageUp' || event.key === 'PageDown')) {
+        return;
+      }
+      this.focusTile(target, moveMode(event));
+      event.preventDefault();
+      return;
+    }
+
+    if (command) {
+      return;
+    }
 
     switch (event.key) {
-      case 'ArrowRight':
-        this.focusTile(index + 1);
-        break;
-      case 'ArrowLeft':
-        this.focusTile(index - 1);
-        break;
-      case 'ArrowDown':
-        this.focusTile(index + columns);
-        break;
-      case 'ArrowUp':
-        this.focusTile(index - columns);
-        break;
-      case 'Home':
-        this.focusTile(0);
-        break;
-      case 'End':
-        this.focusTile(items.length - 1);
-        break;
-      case 'PageDown':
-        this.focusTile(index + columns * this.rowsPerPage());
-        break;
-      case 'PageUp':
-        this.focusTile(index - columns * this.rowsPerPage());
-        break;
       case 'Enter':
         this.command.emit({ command: 'open', entryId: item.id });
         break;
@@ -263,8 +328,171 @@ export class UiIconView {
     event.preventDefault();
   }
 
-  /** Moves focus to a tile and makes it the selection; indices are clamped. */
-  private focusTile(index: number): void {
+  /** Where a movement key goes from `index`, or `null` for any other key. */
+  private movementTarget(key: string, index: number): number | null {
+    const columns = this.columns();
+    switch (key) {
+      case 'ArrowRight':
+        return index + 1;
+      case 'ArrowLeft':
+        return index - 1;
+      case 'ArrowDown':
+        return index + columns;
+      case 'ArrowUp':
+        return index - columns;
+      case 'Home':
+        return 0;
+      case 'End':
+        return this.items().length - 1;
+      case 'PageDown':
+        return index + columns * this.rowsPerPage();
+      case 'PageUp':
+        return index - columns * this.rowsPerPage();
+      default:
+        return null;
+    }
+  }
+
+  /** Applies a selection gesture to `id` and reports the result. */
+  private pick(id: string, mode: UiSelectMode): void {
+    const change = this.selection.pick({
+      ids: this.items().map((item) => item.id),
+      selected: this.selectedIds(),
+      cursor: this.focusId(),
+      target: id,
+      mode,
+    });
+    this.selectionChange.emit(change);
+    if (change.focused !== null) {
+      this.select.emit(change.focused);
+    }
+  }
+
+  private selectedIds(): ReadonlySet<string> {
+    return new Set(this.items().filter((item) => item.selected).map((item) => item.id));
+  }
+
+  /* -- box selection ------------------------------------------------------ */
+
+  /** A primary press on blank space may start a box; a press on a tile is a click. */
+  protected onPointerDown(event: PointerEvent): void {
+    if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest('.item') !== null) {
+      return;
+    }
+    const point = this.pointIn(event);
+    const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+    this.drag = {
+      pointerId: event.pointerId,
+      startX: point.x,
+      startY: point.y,
+      base: additive ? this.selectedIds() : new Set(),
+      dragging: false,
+      lastKey: '',
+    };
+    this.host.setPointerCapture?.(event.pointerId);
+  }
+
+  protected onPointerMove(event: PointerEvent): void {
+    const drag = this.drag;
+    if (drag === null || event.pointerId !== drag.pointerId) {
+      return;
+    }
+
+    this.viewport.autoScroll(event.clientY, AUTOSCROLL_EDGE, AUTOSCROLL_STEP);
+    const point = this.pointIn(event);
+    if (!drag.dragging && Math.hypot(point.x - drag.startX, point.y - drag.startY) < DRAG_THRESHOLD) {
+      return;
+    }
+    drag.dragging = true;
+
+    const box: Box = {
+      left: Math.min(drag.startX, point.x),
+      top: Math.min(drag.startY, point.y),
+      width: Math.abs(point.x - drag.startX),
+      height: Math.abs(point.y - drag.startY),
+    };
+    this.marquee.set(box);
+
+    const hits = this.tilesIn(box);
+    const selected = new Set([...drag.base, ...hits]);
+    const ordered = this.items().map((item) => item.id).filter((id) => selected.has(id));
+    const key = ordered.join('\u0000');
+    if (key === drag.lastKey) {
+      return;
+    }
+    drag.lastKey = key;
+    // The cursor goes to the last tile the box caught, and the next Shift
+    // range starts there — as after clicking it.
+    const focused = hits.at(-1) ?? null;
+    this.selection.setAnchor(focused);
+    this.selectionChange.emit({ selected: ordered, focused });
+  }
+
+  protected onPointerUp(event: PointerEvent): void {
+    const drag = this.drag;
+    if (drag === null || event.pointerId !== drag.pointerId) {
+      return;
+    }
+    // A plain click on blank space clears the selection, as in every file
+    // manager; with a modifier held it leaves it be.
+    if (!drag.dragging && drag.base.size === 0 && !(event.ctrlKey || event.metaKey || event.shiftKey)) {
+      if (this.selectedIds().size > 0) {
+        this.selection.setAnchor(null);
+        this.selectionChange.emit({ selected: [], focused: null });
+      }
+    }
+    this.endMarquee(event);
+  }
+
+  protected endMarquee(event: PointerEvent): void {
+    if (this.drag !== null) {
+      this.host.releasePointerCapture?.(event.pointerId);
+    }
+    this.drag = null;
+    this.marquee.set(null);
+  }
+
+  /** The pointer, in host coordinates — which scroll with the tiles. */
+  private pointIn(event: PointerEvent): { x: number; y: number } {
+    const rect = this.host.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  /**
+   * Every tile the box touches, in list order. Worked out from the grid's
+   * geometry — the first rendered tile, the stride between columns and
+   * between rows — so tiles the window has not rendered are found too.
+   */
+  private tilesIn(box: Box): string[] {
+    const tiles = this.tiles().map((tile) => tile.nativeElement);
+    const first = tiles[0];
+    if (first === undefined) {
+      return [];
+    }
+    const columns = this.columns();
+    const width = first.offsetWidth;
+    const height = first.offsetHeight;
+    const strideX = columns > 1 && tiles[1] !== undefined ? tiles[1].offsetLeft - first.offsetLeft : width + GAP;
+    const strideY =
+      tiles[columns] !== undefined && tiles[columns].offsetTop > first.offsetTop
+        ? tiles[columns].offsetTop - first.offsetTop
+        : height + GAP;
+    const originX = first.offsetLeft;
+    const originY = first.offsetTop - Math.floor(this.range().start / columns) * strideY;
+
+    const right = box.left + box.width;
+    const bottom = box.top + box.height;
+    return this.items()
+      .filter((_, index) => {
+        const x = originX + (index % columns) * strideX;
+        const y = originY + Math.floor(index / columns) * strideY;
+        return x < right && x + width > box.left && y < bottom && y + height > box.top;
+      })
+      .map((item) => item.id);
+  }
+
+  /** Moves focus to a tile and selects by `mode` — the tile alone unless told otherwise; indices are clamped. */
+  private focusTile(index: number, mode: UiSelectMode = 'replace'): void {
     const items = this.items();
     const clamped = Math.min(Math.max(index, 0), items.length - 1);
     const item = items[clamped];
@@ -280,7 +508,7 @@ export class UiIconView {
     // are the old window's until the next render.
     this.pendingFocusId = item.id;
     this.focusPending();
-    this.select.emit(item.id);
+    this.pick(item.id, mode);
   }
 
   /** Focuses the tile a key moved to, if it is rendered yet. */

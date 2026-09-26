@@ -176,6 +176,11 @@ entry would maximize the window.
 | Click a window button | Emits `windowControlSelect`; the shell minimizes, maximizes or closes |
 | Click a tree row / press `Enter` | Emits `activate`; the twisty and `←`/`→` emit `toggle` |
 | Arrow around a panel body | Moves focus *and* the selection; the details sidebar follows |
+| `Ctrl`/`⌘`-click, `Ctrl`+`Space` | Toggles one entry in or out of the selection (every view) |
+| `Shift`-click, `Shift` + a movement key | Selects the range from the anchor; `Ctrl`+`Shift`-click adds the range |
+| `Ctrl` + an arrow, `Home`, `End` | Moves the cursor without changing the selection |
+| `Ctrl`+`A` | Selects every entry |
+| Drag across blank space in the icon view | Box selection: every tile the box touches; added to the selection with `Ctrl`/`Shift`. A plain click on blank space clears it |
 | `Enter` / `Space` / `Backspace` / `F5` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
 | `Alt`+`←` / `Alt`+`→` in a body | Emitted as `back` / `forward`; the app walks that panel's own trail |
 | `Alt`+`↑` in a body | Emitted as `up`; the app leaves the folder for its parent |
@@ -262,8 +267,19 @@ and only then: whenever there is a row or a tile to stand on, those keys belong
 to the view that owns it.
 
 Two rules are worth stating outright. **Selection follows focus**: arrowing
-onto an entry emits `select`, so the details sidebar tracks the keyboard the
-same way it tracks the mouse. And **the views move focus but decide nothing**:
+onto an entry selects it, so the details sidebar tracks the keyboard the same
+way it tracks the mouse.
+
+Selection is **multiple** in all three views (PRD 004, §1.2). `UiListSelection`
+(`lib/keyboard/list-selection.ts`) is the one place the rules live — replace,
+toggle, range from an anchor, range added, cursor only, all — and `UiFileList`
+and `UiIconView` only decide which rule a gesture means. Every change leaves as
+one `selectionChange: { selected, focused }`, the whole selection in list order
+plus the entry the cursor is on; `select` still names that entry, and
+`UiFileBrowser` forwards `selectionChange`. The icon view's box selection is
+hit-tested against the grid's geometry, not the rendered tiles, so it reaches
+tiles the virtual window has not drawn, and scrolls the panel when dragged
+near its edge. And **the views move focus but decide nothing**:
 `Enter`, `Space`, `Backspace` and `F5` leave as a `UiPanelKey`
 (`open` / `select` / `up` / `refresh`) for the application to interpret — in
 the app that is `PanelKeyboardFeature`, which is the whole answer to "what does

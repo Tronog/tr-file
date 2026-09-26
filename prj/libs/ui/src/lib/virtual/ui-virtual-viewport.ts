@@ -99,6 +99,23 @@ export class UiVirtualViewport {
     this.container = null;
   }
 
+  /**
+   * Scrolls the container a step when `clientY` is within `edge` pixels of
+   * its top or bottom — what a drag near the edge of a list expects.
+   */
+  autoScroll(clientY: number, edge: number, step: number): void {
+    const container = this.container;
+    if (container === null) {
+      return;
+    }
+    const rect = container.getBoundingClientRect();
+    const delta = clientY < rect.top + edge ? -step : clientY > rect.bottom - edge ? step : 0;
+    if (delta !== 0) {
+      container.scrollTop += delta;
+      this.scrollTop.set(container.scrollTop);
+    }
+  }
+
   /** How far below the top of the scroll content `element` starts. */
   offsetOf(element: HTMLElement): number {
     const container = this.container;

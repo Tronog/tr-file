@@ -199,6 +199,38 @@ describe('FileBrowserFeature', () => {
     });
   });
 
+  /** PRD 004, §1.2 — one entry or many, from any view. */
+  describe('setSelection()', () => {
+    it('selects many, keeps the cursor on one, and describes that one', async () => {
+      await start();
+
+      workbench.fileBrowserFt.setSelection('group-root', { selected: ['docs', 'main.ts'], focused: 'main.ts' });
+      http.expectOne(detailsUrl('main.ts')).flush(fsEnvelope(fsDetails('main.ts')));
+      await settled();
+
+      const rows = workbench.fileBrowserFt.browser('group-root')?.rows ?? [];
+      expect(rows.filter((row) => row.selected).map((row) => row.id)).toEqual(['docs', 'main.ts']);
+      expect(rows.find((row) => row.focused)?.id).toBe('main.ts');
+      expect(workbench.selectedEntryId()).toBe('main.ts');
+      // The grid shows the same selection.
+      expect(workbench.fileBrowserFt.browser('group-root')?.items.filter((item) => item.selected)).toHaveLength(2);
+    });
+
+    it('keeps the cursor and the sidebar where they were when a box caught nothing', async () => {
+      await start();
+      workbench.fileBrowserFt.setSelection('group-root', { selected: ['main.ts'], focused: 'main.ts' });
+      http.expectOne(detailsUrl('main.ts')).flush(fsEnvelope(fsDetails('main.ts')));
+      await settled();
+
+      workbench.fileBrowserFt.setSelection('group-root', { selected: [], focused: null });
+
+      expect(workbench.fileBrowserFt.browser('group-root')?.rows.filter((row) => row.selected)).toEqual([]);
+      expect(rowOf('group-root', 'main.ts')?.focused).toBe(true);
+      expect(workbench.selectedEntryId()).toBe('main.ts');
+      http.expectNone(() => true);
+    });
+  });
+
   describe('selectEntry()', () => {
     it('updates the group selection and the workbench selection', async () => {
       await start();

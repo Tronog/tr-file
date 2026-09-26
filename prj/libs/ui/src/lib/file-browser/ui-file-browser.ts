@@ -8,7 +8,7 @@ import { UiFileList } from '../file-list/ui-file-list';
 import { UiIconView } from '../icon-view/ui-icon-view';
 import { UiPanelBody } from '../panel-group/ui-panel-body';
 import { UiPanelToolbar } from '../panel-toolbar/ui-panel-toolbar';
-import type { UiFileBrowserModel, UiPanelKey, UiPanelView } from '../models';
+import type { UiFileBrowserModel, UiPanelKey, UiPanelView, UiSelectionChange } from '../models';
 
 /**
  * File-management content for a panel: a path bar, a toolbar, and a body
@@ -51,12 +51,15 @@ export class UiFileBrowser {
   readonly breadcrumbSelect = output<string>();
   readonly toolbarAction = output<string>();
   readonly viewChange = output<UiPanelView>();
-  readonly rowSelect = output<string>();
+  /**
+   * A new selection in whichever view is showing — one entry or many
+   * (PRD 004, §1.2).
+   */
+  readonly selectionChange = output<UiSelectionChange>();
   readonly rowActivate = output<string>();
 
   /** A folder in the tree view was opened or closed in place. */
   readonly rowToggle = output<string>();
-  readonly itemSelect = output<string>();
   readonly itemActivate = output<string>();
 
   /** A key pressed inside the browser whose meaning is the application's. */

@@ -1,7 +1,13 @@
 @use 'mixins' as *;
 
 :host {
+  position: relative;
   display: grid;
+  /* Fill the body, so a box selection can start anywhere below the tiles. */
+  min-height: 100%;
+  box-sizing: border-box;
+  align-content: start;
+  user-select: none;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 4px;
   min-width: 0;
@@ -48,4 +54,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The box of a box selection: the accent, as VS Code tints a selection. */
+.marquee {
+  position: absolute;
+  z-index: 2;
+  border: 1px solid var(--vsc-focus-border);
+  background: rgb(0 120 212 / 15%);
+  pointer-events: none;
 }

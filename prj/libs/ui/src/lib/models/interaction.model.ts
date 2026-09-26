@@ -75,6 +75,17 @@ export interface UiPanelKey {
   readonly entryId: string | null;
 }
 
+/**
+ * A new selection in a list or grid (PRD 004, §1.2): every selected entry, in
+ * list order, and the one the cursor is on — which is what a single-entry
+ * consumer, like the details sidebar, follows. `focused` is `null` only when a
+ * box selection caught nothing.
+ */
+export interface UiSelectionChange {
+  readonly selected: readonly string[];
+  readonly focused: string | null;
+}
+
 /** Where a sash drag is in its lifecycle. */
 export type UiSashPhase = 'start' | 'move' | 'end';
 

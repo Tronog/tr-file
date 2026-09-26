@@ -14,7 +14,8 @@ import {
 } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
-import type { UiFileColumn, UiFileRow, UiPanelKey } from '../models';
+import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
+import type { UiFileColumn, UiFileRow, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
 
 /** A row's height until one has been measured: `--vsc-row-height`. */
@@ -31,8 +32,15 @@ const DEFAULT_ROW_HEIGHT = 22;
  * Keyboard (PRD 001, Section 6.2) is the traditional file-manager set rather
  * than the bare ARIA grid one: `↑`/`↓`, `Home`/`End` and `PageUp`/`PageDown`
  * move, and typing letters jumps to a name. Selection follows focus — moving
- * onto a row emits `select`, which is what makes the details sidebar track the
+ * onto a row selects it, which is what makes the details sidebar track the
  * keyboard the same way it tracks the mouse.
+ *
+ * Selection is multiple (PRD 004, §1.2; see `UiListSelection`): `Ctrl`/`⌘`
+ * click toggles a row, `Shift` click selects the range from the anchor, and
+ * with the keyboard `Shift` plus a movement key extends, `Ctrl` plus an arrow
+ * moves the cursor alone, `Ctrl`+`Space` toggles and `Ctrl`+`A` selects all.
+ * Every change leaves as one `selectionChange`; `select` still names the row
+ * the cursor landed on.
  *
  * The keys that mean something to the *workbench* rather than to this table
  * — `Enter`, `Space`, `Backspace`, `F5` — leave as a `UiPanelKey` instead of
@@ -73,8 +81,11 @@ export class UiFileList {
   /** Double click: open the entry. */
   readonly activate = output<string>();
 
-  /** Single click / arrow key: make the entry the selection. */
+  /** The row a click or a key made current. */
   readonly select = output<string>();
+
+  /** The whole selection after a click or a key; see `UiSelectionChange`. */
+  readonly selectionChange = output<UiSelectionChange>();
 
   /** A key whose meaning is the application's; see `UiPanelKey`. */
   readonly command = output<UiPanelKey>();
@@ -95,6 +106,7 @@ export class UiFileList {
   private readonly body = viewChild<ElementRef<HTMLTableSectionElement>>('body');
 
   private readonly typeahead = new UiTypeahead();
+  private readonly selection = new UiListSelection();
 
   private readonly viewport = new UiVirtualViewport();
   private readonly rowHeight = signal(DEFAULT_ROW_HEIGHT);
@@ -188,6 +200,14 @@ export class UiFileList {
     }
   }
 
+  /** A click selects by the keys held: alone, toggled, or as a range. */
+  protected onClick(event: MouseEvent, index: number): void {
+    const row = this.rows()[index];
+    if (row) {
+      this.pick(row.id, clickMode(event));
+    }
+  }
+
   protected onKeydown(event: KeyboardEvent, index: number): void {
     const rows = this.rows();
     const row = rows[index];
@@ -195,34 +215,38 @@ export class UiFileList {
       return;
     }
 
-    // `Alt` and `Ctrl` belong to the panel, not to the table: its history and
-    // its `Up` (PRD 001, §6.2.1, §6.2.3), and switching tabs with
-    // `Ctrl`+`PageUp`/`PageDown` (§6.2.4). `UiFileBrowser` and `UiPanelGroup`
-    // listen for them, so a chord must not also move the cursor here on its
-    // way past.
-    if (event.altKey || event.ctrlKey || event.metaKey) {
+    // `Alt` belongs to the panel, not to the table: its history and its `Up`
+    // (PRD 001, §6.2.1, §6.2.3). So do most `Ctrl` chords — switching tabs
+    // with `Ctrl`+`PageUp`/`PageDown` (§6.2.4), `Ctrl`+`Enter`, `Ctrl`+`T` —
+    // and `UiFileBrowser` and `UiPanelGroup` listen for them, so they must not
+    // also move the cursor here on their way past. The `Ctrl` chords that are
+    // about the selection are the exception.
+    if (event.altKey) {
+      return;
+    }
+    const command = event.ctrlKey || event.metaKey;
+
+    if (command && !event.shiftKey && (event.key === ' ' || event.key.toLowerCase() === 'a')) {
+      this.pick(row.id, event.key === ' ' ? 'toggle' : 'all');
+      event.preventDefault();
+      return;
+    }
+
+    const target = this.movementTarget(event.key, index);
+    if (target !== null) {
+      if (command && (event.key === 'PageUp' || event.key === 'PageDown')) {
+        return;
+      }
+      this.focusRow(target, moveMode(event));
+      event.preventDefault();
+      return;
+    }
+
+    if (command) {
       return;
     }
 
     switch (event.key) {
-      case 'ArrowDown':
-        this.focusRow(index + 1);
-        break;
-      case 'ArrowUp':
-        this.focusRow(index - 1);
-        break;
-      case 'Home':
-        this.focusRow(0);
-        break;
-      case 'End':
-        this.focusRow(rows.length - 1);
-        break;
-      case 'PageDown':
-        this.focusRow(index + this.page());
-        break;
-      case 'PageUp':
-        this.focusRow(index - this.page());
-        break;
       case 'ArrowRight':
         if (!this.tree()) {
           return;
@@ -279,12 +303,48 @@ export class UiFileList {
     event.preventDefault();
   }
 
+  /** Where a movement key goes from `index`, or `null` for any other key. */
+  private movementTarget(key: string, index: number): number | null {
+    switch (key) {
+      case 'ArrowDown':
+        return index + 1;
+      case 'ArrowUp':
+        return index - 1;
+      case 'Home':
+        return 0;
+      case 'End':
+        return this.rows().length - 1;
+      case 'PageDown':
+        return index + this.page();
+      case 'PageUp':
+        return index - this.page();
+      default:
+        return null;
+    }
+  }
+
+  /** Applies a selection gesture to `id` and reports the result. */
+  private pick(id: string, mode: UiSelectMode): void {
+    const rows = this.rows();
+    const change = this.selection.pick({
+      ids: rows.map((row) => row.id),
+      selected: new Set(rows.filter((row) => row.selected || row.inactiveSelected).map((row) => row.id)),
+      cursor: this.focusId(),
+      target: id,
+      mode,
+    });
+    this.selectionChange.emit(change);
+    if (change.focused !== null) {
+      this.select.emit(change.focused);
+    }
+  }
+
   /**
-   * Moves focus to a row and makes it the selection; indices are clamped. A
-   * row that is not rendered is scrolled in first and focused after the next
-   * render.
+   * Moves focus to a row and selects by `mode` — the row alone unless told
+   * otherwise; indices are clamped. A row that is not rendered is scrolled in
+   * first and focused after the next render.
    */
-  private focusRow(index: number): void {
+  private focusRow(index: number, mode: UiSelectMode = 'replace'): void {
     const rows = this.rows();
     const clamped = Math.min(Math.max(index, 0), rows.length - 1);
     const row = rows[clamped];
@@ -299,7 +359,7 @@ export class UiFileList {
     // the old window's until the next render.
     this.pendingFocusId = row.id;
     this.focusPending();
-    this.select.emit(row.id);
+    this.pick(row.id, mode);
   }
 
   /** Focuses the row a key moved to, if it is rendered yet. */

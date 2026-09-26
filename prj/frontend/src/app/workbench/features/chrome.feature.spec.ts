@@ -131,6 +131,17 @@ describe('ChromeFeature', () => {
       expect(trailing('selection')?.label).toBe('1 of 2 selected · 3.4 KB');
     });
 
+    /** PRD 004, §1.2: the count and size are the whole selection's. */
+    it('counts a multiple selection, folders adding no size', async () => {
+      await startRoot();
+
+      workbench.fileBrowserFt.setSelection('group-root', { selected: ['docs', 'README.md'], focused: 'README.md' });
+      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+      await settled();
+
+      expect(trailing('selection')?.label).toBe('2 of 2 selected · 3.4 KB');
+    });
+
     it('says so when the active group has no folder at all', async () => {
       await startRoot();
 

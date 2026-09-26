@@ -110,6 +110,9 @@ A symlink is judged by what it leads to (`targetType`, `isFolder`/`isFile` in
 Previews decide text by sniffing the bytes (`text-sniff.ts`), the extension list only
 refuses early. Downloads are rows in the Transfers panel like uploads. Lists and grids of
 200+ entries render only what is near the viewport (`UiVirtualViewport` in the library).
+Every view selects many (PRD 004, §1.2): `Ctrl`/`Shift` clicks and keys, and box selection in
+the icon view, all through `UiListSelection`; the views emit `selectionChange` and
+`FileBrowserFeature.setSelection` stores it in the group's `selection` / `focusedEntryId`.
 
 # Backend
 Refer to `docs/ai/EXPRESS.md`. Every `/api` route but `/api/auth/*` and `/api/health`

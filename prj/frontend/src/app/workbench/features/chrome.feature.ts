@@ -1,6 +1,7 @@
 import { computed } from '@angular/core';
 import type { UiActivityItem, UiIconAction, UiMenuBarItem, UiStatusItem } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
+import { isFolder } from '../../file-system/fs-entry-kind';
 
 /**
  * The window chrome: title bar, activity bar and status bar.
@@ -118,21 +119,28 @@ export class ChromeFeature {
     }
   }
 
-  /** e.g. `'1 of 12 selected · 6.4 MB'`, from the active group's listing. */
+  /**
+   * e.g. `'3 of 12 selected · 6.4 MB'`, from the active group's listing and
+   * selection — which may be many entries (PRD 004, §1.2), some of them inside
+   * folders opened in the tree view.
+   */
   private readonly selectionSummary = computed(() => {
-    const groupPath = this.parent.editorGroupsFt.pathOf(this.parent.activeGroupId());
-    if (groupPath === undefined) {
+    const group = this.parent.editorGroupsFt.stateOf(this.parent.activeGroupId());
+    if (group === undefined) {
       return 'No folder open';
     }
 
-    const entries = this.parent.fsDataFt.entries(groupPath);
-    const selectedId = this.parent.selectedEntryId();
-    const selected = entries.filter((entry) => entry.path === selectedId);
+    const data = this.parent.fsDataFt;
+    const entries = data.entries(group.path);
+    const selected = group.selection
+      .map((path) => data.entryAt(path))
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
     if (selected.length === 0) {
       return `${entries.length} ${entries.length === 1 ? 'item' : 'items'}`;
     }
 
-    const bytes = selected.reduce((total, entry) => total + entry.size, 0);
+    // Folders report no size of their own, so they add nothing to the total.
+    const bytes = selected.reduce((total, entry) => total + (isFolder(entry) ? 0 : entry.size), 0);
     return `${selected.length} of ${entries.length} selected · ${this.parent.fileViewModel.formatBytes(bytes)}`;
   });
 }

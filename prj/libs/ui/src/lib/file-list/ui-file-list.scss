@@ -80,6 +80,11 @@ tbody tr.spacer td {
   padding: 0;
 }
 
+/* A `Shift` click selects rows, not the text across them. */
+tbody {
+  user-select: none;
+}
+
 tbody tr:not(.spacer) {
   &:hover {
     background: var(--vsc-list-hover);

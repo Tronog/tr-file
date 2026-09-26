@@ -7,6 +7,7 @@ import type {
   UiIconAction,
   UiIconViewItem,
   UiPanelView,
+  UiSelectionChange,
 } from '@tr-file/ui';
 import type { FsEntry } from '../../file-system/file-system.model';
 import type { PanelContentFeature } from '../panel-content.model';
@@ -153,7 +154,25 @@ export class FileBrowserFeature implements PanelContentFeature {
     this.groups.focus(groupId);
   }
 
-  /** Selects an entry inside a group; the details sidebar follows. */
+  /**
+   * Takes a selection from the list, tree or grid (PRD 004, §1.2): one entry
+   * or many, and the one the cursor is on. The details sidebar follows the
+   * cursor; a box that caught nothing leaves the cursor, and the sidebar,
+   * where they were.
+   */
+  setSelection(groupId: string, change: UiSelectionChange): void {
+    this.groups.update(groupId, (group) => ({
+      ...group,
+      selection: [...change.selected],
+      ...(change.focused === null ? {} : { focusedEntryId: change.focused }),
+    }));
+    this.groups.focus(groupId);
+    if (change.focused !== null) {
+      this.parent.select(change.focused);
+    }
+  }
+
+  /** Selects an entry inside a group, and only it; the details sidebar follows. */
   selectEntry(groupId: string, entryId: string): void {
     this.groups.update(groupId, (group) => ({ ...group, selection: [entryId], focusedEntryId: entryId }));
     this.groups.focus(groupId);
