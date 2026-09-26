@@ -64,6 +64,12 @@ ui-icon.menu-logo {
   }
 }
 
+/* A menu hangs below the bar; in a frameless window it must still take clicks. */
+.menubar-menu {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 .command-center {
   display: flex;
   gap: 6px;

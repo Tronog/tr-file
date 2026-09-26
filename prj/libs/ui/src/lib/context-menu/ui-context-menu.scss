@@ -56,6 +56,16 @@
   }
 }
 
+/* Room for a check mark on every row of a menu that has choices, so labels line up. */
+.menu-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  margin-left: -2px;
+}
+
 .menu-label {
   overflow: hidden;
   text-overflow: ellipsis;

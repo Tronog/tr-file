@@ -7,12 +7,20 @@
     type="button"
     tabindex="-1"
     class="menu-row"
-    role="menuitem"
+    [attr.role]="item.checked === undefined ? 'menuitem' : 'menuitemradio'"
+    [attr.aria-checked]="item.checked === undefined ? null : item.checked"
     [class.is-active]="item.active"
     [class.is-disabled]="item.disabled"
     [attr.aria-disabled]="item.disabled ? 'true' : null"
     (click)="onSelect(item)"
   >
+    @if (hasChecks()) {
+      <span class="menu-check" aria-hidden="true">
+        @if (item.checked) {
+          <ui-icon name="check" />
+        }
+      </span>
+    }
     <span class="menu-label">{{ item.label }}</span>
     @if (item.keybinding; as keybinding) {
       <span class="k">{{ keybinding }}</span>

@@ -1,7 +1,8 @@
-import { Component, input, output } from '@angular/core';
+import { Component, ElementRef, computed, input, output, viewChildren } from '@angular/core';
+import { UiContextMenu } from '../context-menu/ui-context-menu';
 import { UiIcon } from '../icon/ui-icon';
 import type { UiIconAction, UiIconName } from '../models/icon.model';
-import type { UiMenuBarItem, UiWindowControl } from '../models/chrome.model';
+import type { UiMenuBarItem, UiMenuBarSelection, UiWindowControl } from '../models/chrome.model';
 
 /**
  * The window title bar: menu bar on the left, command centre in the middle and
@@ -20,7 +21,7 @@ import type { UiMenuBarItem, UiWindowControl } from '../models/chrome.model';
  */
 @Component({
   selector: 'ui-title-bar',
-  imports: [UiIcon],
+  imports: [UiIcon, UiContextMenu],
   templateUrl: './ui-title-bar.html',
   styleUrl: './ui-title-bar.scss',
   host: {
@@ -62,7 +63,15 @@ export class UiTitleBar {
    */
   readonly leadingInset = input<number>(0);
 
-  readonly menuSelect = output<string>();
+  /**
+   * Which menu should be open: a title was pressed, hovered while another
+   * menu was open, or reached with `←`/`→` — or `null` to close it. The
+   * application sets `open` on the item to follow (PRD 008, §1).
+   */
+  readonly menuOpenChange = output<string | null>();
+
+  /** An entry of an open menu was chosen. */
+  readonly menuItemSelect = output<UiMenuBarSelection>();
 
   readonly commandSelect = output<void>();
 
@@ -79,6 +88,86 @@ export class UiTitleBar {
    * Without the guard, double-clicking a menu entry or the command centre
    * would also maximise the window, which is never what was meant.
    */
+  private readonly menuButtons = viewChildren<ElementRef<HTMLButtonElement>>('menuButton');
+
+  /**
+   * Set while a click on a title is being handled, so the open menu's "a
+   * click elsewhere" does not close the menu that click just opened.
+   */
+  private switching = false;
+
+  /** The open menu and where it goes: under its title, left edges aligned. */
+  protected readonly openMenu = computed(() => {
+    const item = this.menuItems().find((candidate) => candidate.open);
+    if (item === undefined) {
+      return null;
+    }
+    const button = this.menuButtons().find((candidate) => candidate.nativeElement.dataset['menuId'] === item.id);
+    const rect = button?.nativeElement.getBoundingClientRect();
+    return { item, x: rect?.left ?? 0, y: rect?.bottom ?? 0 };
+  });
+
+  /** A title opens its menu, or closes it when it is the open one. */
+  protected onMenuClick(item: UiMenuBarItem): void {
+    this.holdDismiss();
+    this.menuOpenChange.emit(item.open ? null : item.id);
+  }
+
+  /** With a menu open, pointing at another title opens that one instead, as in VS Code. */
+  protected onMenuHover(item: UiMenuBarItem): void {
+    if (!item.open && this.menuItems().some((candidate) => candidate.open)) {
+      // Focus goes to the title first, so the menu that opens hands it back there.
+      this.menuButtons()
+        .find((button) => button.nativeElement.dataset['menuId'] === item.id)
+        ?.nativeElement.focus();
+      this.menuOpenChange.emit(item.id);
+    }
+  }
+
+  /** On a title: `←`/`→` move along the bar, `↓` opens the menu. */
+  protected onMenuKeydown(event: KeyboardEvent, index: number): void {
+    const items = this.menuItems();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.menuOpenChange.emit(items[index]?.id ?? null);
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const next = items[(index + (event.key === 'ArrowRight' ? 1 : -1) + items.length) % items.length];
+      if (next !== undefined) {
+        this.menuButtons()[items.indexOf(next)]?.nativeElement.focus();
+        if (items.some((candidate) => candidate.open)) {
+          this.menuOpenChange.emit(next.id);
+        }
+      }
+    }
+  }
+
+  /**
+   * `←`/`→` inside an open menu: the menu beside it opens. Its title takes
+   * focus first, so the next menu hands focus back to it when it closes.
+   */
+  protected step(fromId: string, delta: 1 | -1): void {
+    const items = this.menuItems();
+    const index = items.findIndex((item) => item.id === fromId);
+    const next = items[(index + delta + items.length) % items.length];
+    if (next === undefined) {
+      return;
+    }
+    this.menuButtons()[items.indexOf(next)]?.nativeElement.focus();
+    this.menuOpenChange.emit(next.id);
+  }
+
+  protected onMenuDismiss(): void {
+    if (!this.switching) {
+      this.menuOpenChange.emit(null);
+    }
+  }
+
+  private holdDismiss(): void {
+    this.switching = true;
+    queueMicrotask(() => (this.switching = false));
+  }
+
   protected onDoubleClick(event: MouseEvent): void {
     if (!this.draggable()) {
       return;

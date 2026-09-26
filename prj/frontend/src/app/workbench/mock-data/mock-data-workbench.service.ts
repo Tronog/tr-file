@@ -10,6 +10,9 @@ import type { MockWorkbenchLayout } from './mock-data.model';
  * is what is left, and it is the seam a future settings or session service
  * replaces. Everything here is data — the features turn it into view models.
  */
+/** A menu's placeholder while its commands are still to come. */
+const TODO: UiMenuItem = { id: 'todo', label: 'Todo', disabled: true };
+
 @Service()
 export class MockDataWorkbenchService {
   /**
@@ -39,14 +42,24 @@ export class MockDataWorkbenchService {
 
   /* -- chrome ------------------------------------------------------------ */
 
+  /**
+   * The main menu (PRD 008, §1). Only Go has entries of its own so far; the
+   * rest hold a placeholder until their commands exist.
+   */
   readonly menuItems: readonly UiMenuBarItem[] = [
-    { id: 'file', label: 'File' },
-    { id: 'edit', label: 'Edit' },
-    { id: 'selection', label: 'Selection' },
-    { id: 'view', label: 'View' },
-    { id: 'go', label: 'Go' },
-    { id: 'transfer', label: 'Transfer' },
-    { id: 'help', label: 'Help' },
+    { id: 'file', label: 'File', items: [TODO] },
+    { id: 'edit', label: 'Edit', items: [TODO] },
+    { id: 'selection', label: 'Selection', items: [TODO] },
+    { id: 'view', label: 'View', items: [TODO] },
+    {
+      id: 'go',
+      label: 'Go',
+      items: [
+        // Which one is checked follows the connection; see `ChromeFeature.menuItems`.
+        { id: 'go.local', label: 'Local Computer', checked: true },
+        { id: 'go.remote', label: 'Remote Computer…', checked: false },
+      ],
+    },
   ];
 
   /** The title bar's command centre opens the command palette (PRD 009, §1). */

@@ -75,6 +75,13 @@ export class WorkbenchService {
   /** Dot-files are hidden until the status bar says otherwise. */
   readonly showHidden = signal(false);
 
+  /**
+   * Which backend the workbench is talking to (PRD 008, §1.2–1.3): this
+   * computer's — the desktop's own, or the server that served the page — or a
+   * remote server. Always `local` until connecting to one exists (PRD 006).
+   */
+  readonly backend = signal<'local' | 'remote'>('local');
+
   readonly leftSidebarWidth = signal(this.mockWorkbench.layout.leftSidebarWidth);
   readonly rightSidebarWidth = signal(this.mockWorkbench.layout.rightSidebarWidth);
   readonly bottomPanelHeight = signal(this.mockWorkbench.layout.bottomPanelHeight);

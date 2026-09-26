@@ -1,5 +1,13 @@
 import { computed, signal } from '@angular/core';
-import type { UiActivityItem, UiIconAction, UiMenuAnchor, UiMenuBarItem, UiMenuItem, UiStatusItem } from '@tr-file/ui';
+import type {
+  UiActivityItem,
+  UiIconAction,
+  UiMenuAnchor,
+  UiMenuBarItem,
+  UiMenuBarSelection,
+  UiMenuItem,
+  UiStatusItem,
+} from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 import { isFolder } from '../../file-system/fs-entry-kind';
 
@@ -11,7 +19,6 @@ import { isFolder } from '../../file-system/fs-entry-kind';
  * from the live workbench, so the bars never claim something that is not true.
  */
 export class ChromeFeature {
-  readonly menuItems: readonly UiMenuBarItem[];
   readonly commandLabel: string;
   readonly commandKeys: readonly string[];
   readonly titleBarActions: readonly UiIconAction[];
@@ -21,12 +28,65 @@ export class ChromeFeature {
 
   constructor(private readonly parent: WorkbenchService) {
     const mock = parent.mockWorkbench;
-    this.menuItems = mock.menuItems;
     this.commandLabel = mock.commandLabel;
     this.commandKeys = mock.commandKeys;
     this.titleBarActions = mock.titleBarActions;
     this.sidebarMoreActions = mock.sidebarMoreActions;
     this.settingsMenuItems = mock.settingsMenuItems;
+  }
+
+  /** The main menu that is open, if any (PRD 008, §1). */
+  private readonly openMenuId = signal<string | null>(null);
+
+  /**
+   * The main menu, with the open one marked and Go's choice of computer
+   * following the connection: Local Computer is checked while the workbench
+   * talks to its own backend, Remote Computer once it talks to a remote one.
+   */
+  readonly menuItems = computed<readonly UiMenuBarItem[]>(() => {
+    const open = this.openMenuId();
+    const backend = this.parent.backend();
+    return this.parent.mockWorkbench.menuItems.map((menu) => ({
+      ...menu,
+      open: menu.id === open,
+      ...(menu.id === 'go'
+        ? {
+            items: (menu.items ?? []).map((item) =>
+              item.id === 'go.local' || item.id === 'go.remote'
+                ? { ...item, checked: item.id === (backend === 'local' ? 'go.local' : 'go.remote') }
+                : item,
+            ),
+          }
+        : {}),
+    }));
+  });
+
+  /** Opens the main menu `id`, or closes the open one with `null`. */
+  setMenuOpen(id: string | null): void {
+    this.openMenuId.set(id);
+  }
+
+  /**
+   * An entry of the main menu was chosen; the menu closes either way.
+   *
+   * - **Go › Local Computer** (§1.2) — this computer's backend, the default.
+   *   It is the only one there is until PRD 006, so there is nothing to
+   *   switch; it is already in effect.
+   * - **Go › Remote Computer…** (§1.3) — the command palette, straight at
+   *   *Connect to Remote Server*.
+   */
+  runMenuItem(selection: UiMenuBarSelection): void {
+    this.openMenuId.set(null);
+    switch (selection.itemId) {
+      case 'go.local':
+        this.parent.backend.set('local');
+        break;
+      case 'go.remote':
+        this.parent.commandPaletteFt.run('remote.connect');
+        break;
+      default:
+        break;
+    }
   }
 
   /** Where the Settings menu is open — its bottom-left corner — or `null` (PRD 007, §1). */

@@ -28,7 +28,7 @@
 
   <ui-title-bar
     uiSlot="title"
-    [menuItems]="chrome.menuItems"
+    [menuItems]="chrome.menuItems()"
     [commandLabel]="chrome.commandLabel"
     [commandKeys]="chrome.commandKeys"
     [actions]="chrome.titleBarActions"
@@ -37,6 +37,8 @@
     [leadingInset]="windowControls.leadingInset()"
     (windowControlSelect)="windowControls.run($event)"
     (commandSelect)="palette.show()"
+    (menuOpenChange)="chrome.setMenuOpen($event)"
+    (menuItemSelect)="chrome.runMenuItem($event)"
     (dragAreaDoubleClick)="windowControls.toggleFromDragArea()"
   />
 

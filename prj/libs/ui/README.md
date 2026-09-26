@@ -177,6 +177,7 @@ entry would maximize the window.
 | Drag the title bar's empty space | Moves a frameless desktop window; double-click maximizes |
 | Click a window button | Emits `windowControlSelect`; the shell minimizes, maximizes or closes |
 | Click a tree row / press `Enter` | Emits `activate`; the twisty and `←`/`→` emit `toggle` |
+| Main menu (`UiTitleBar`, PRD 008) | A `role="menubar"`: a title opens its `items` under it (`menuOpenChange`), a second click closes it; with one open, pointing at another title or `←`/`→` inside it switches menus; `↓` on a title opens it, `←`/`→` walk the titles; a choice is `menuItemSelect({ menuId, itemId })`. Items with `checked` are `menuitemradio` rows with a check mark |
 | Click an activity item with `hasMenu` (the Settings gear) | Emits `menuOpen` with the button's rect instead of `select`; the button carries `aria-haspopup="menu"` and `aria-expanded` |
 | In a `UiContextMenu` | Focus starts on the first row; `↑`/`↓` wrap, `Home`/`End` jump, `Enter`/`Space` choose (disabled rows are readable but do nothing); `Escape` and a choice hand focus back to the opener; `Escape`, `Tab`, a click elsewhere, window blur or resize emit `dismiss` with the reason. `fixed` + `origin: 'bottom-left'` opens it upward from a point, as VS Code's Manage menu does |
 | Arrow around a panel body | Moves focus *and* the selection; the details sidebar follows |

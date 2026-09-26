@@ -44,6 +44,69 @@ describe('ChromeFeature', () => {
     await settled();
   };
 
+  /** PRD 008, §1 — the main menu, and its Go menu. */
+  describe('the main menu', () => {
+    const menus = () => workbench.chromeFt.menuItems();
+    const go = () => menus().find((menu) => menu.id === 'go');
+
+    it('has File, Edit, Selection, View and Go, all closed', () => {
+      expect(menus().map((menu) => menu.label)).toEqual(['File', 'Edit', 'Selection', 'View', 'Go']);
+      expect(menus().every((menu) => !menu.open)).toBe(true);
+    });
+
+    it('holds a placeholder in every menu but Go', () => {
+      for (const menu of menus().filter((candidate) => candidate.id !== 'go')) {
+        expect(menu.items).toEqual([{ id: 'todo', label: 'Todo', disabled: true }]);
+      }
+    });
+
+    it('offers Local Computer, checked by default, and Remote Computer in Go', () => {
+      expect(go()?.items).toEqual([
+        { id: 'go.local', label: 'Local Computer', checked: true },
+        { id: 'go.remote', label: 'Remote Computer…', checked: false },
+      ]);
+    });
+
+    it('checks whichever computer the workbench talks to', () => {
+      workbench.backend.set('remote');
+
+      expect(go()?.items?.map((item) => item.checked)).toEqual([false, true]);
+    });
+
+    it('opens one menu at a time, and closes', () => {
+      workbench.chromeFt.setMenuOpen('go');
+      expect(menus().filter((menu) => menu.open).map((menu) => menu.id)).toEqual(['go']);
+
+      workbench.chromeFt.setMenuOpen('file');
+      expect(menus().filter((menu) => menu.open).map((menu) => menu.id)).toEqual(['file']);
+
+      workbench.chromeFt.setMenuOpen(null);
+      expect(menus().some((menu) => menu.open)).toBe(false);
+    });
+
+    it('stays on this computer for Local Computer, closing the menu', () => {
+      workbench.chromeFt.setMenuOpen('go');
+      workbench.chromeFt.runMenuItem({ menuId: 'go', itemId: 'go.local' });
+
+      expect(workbench.backend()).toBe('local');
+      expect(go()?.open).toBe(false);
+      expect(workbench.commandPaletteFt.isOpen()).toBe(false);
+    });
+
+    /** §1.3: Remote Computer is the palette's Connect to Remote Server. */
+    it('opens the command palette at Connect to Remote Server for Remote Computer', () => {
+      workbench.chromeFt.setMenuOpen('go');
+      workbench.chromeFt.runMenuItem({ menuId: 'go', itemId: 'go.remote' });
+
+      const palette = workbench.commandPaletteFt;
+      expect(go()?.open).toBe(false);
+      expect(palette.isOpen()).toBe(true);
+      expect(palette.showList()).toBe(false);
+      expect(palette.label()).toBe('Connect to remote server');
+      expect(palette.placeholder()).toBe('[user:password@]host:port');
+    });
+  });
+
   /** PRD 007, §1 — the Settings gear opens a menu beside it. */
   describe('the Settings menu', () => {
     const gear = () => workbench.chromeFt.activityBottomItems().find((item) => item.id === 'settings');
@@ -235,7 +298,6 @@ describe('ChromeFeature', () => {
   });
 
   it('passes the static chrome through from the seed data', () => {
-    expect(workbench.chromeFt.menuItems).toBe(workbench.mockWorkbench.menuItems);
     expect(workbench.chromeFt.titleBarActions).toBe(workbench.mockWorkbench.titleBarActions);
     expect(workbench.chromeFt.commandLabel).toBe(workbench.mockWorkbench.commandLabel);
     expect(workbench.chromeFt.activityItems().map((item) => item.id)).toEqual([

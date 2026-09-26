@@ -128,6 +128,19 @@ export class CommandPaletteFeature {
     this.active.set(this.items()[0]?.id ?? null);
   }
 
+  /**
+   * Opens the palette straight at one command — the Go menu's Remote
+   * Computer… opens it at *Connect to Remote Server* (PRD 008, §1.3).
+   */
+  run(commandId: string): void {
+    this.show();
+    const command = this.commands.find((candidate) => candidate.id === commandId);
+    if (command !== undefined) {
+      this.active.set(command.id);
+      command.run();
+    }
+  }
+
   close(): void {
     this.opened.set(false);
     this.asking.set(null);

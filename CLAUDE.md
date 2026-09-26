@@ -105,6 +105,13 @@ bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`
 `openMenu`, `closeSettingsMenu`) shows `UiContextMenu` fixed beside it, opening upward. Its
 items come from `MockDataWorkbenchService.settingsMenuItems` — for now one disabled `Todo`.
 
+The main menu (PRD 008, §1) is File, Edit, Selection, View and Go, from
+`MockDataWorkbenchService.menuItems`; `UiTitleBar` draws the menus, `ChromeFeature` holds
+which is open (`setMenuOpen`) and runs entries (`runMenuItem`). Only Go has entries so far:
+*Local Computer* — checked while `WorkbenchService.backend` is `local`, the default and, until
+PRD 006, the only one — and *Remote Computer…*, which opens the command palette at *Connect
+to Remote Server* (`CommandPaletteFeature.run`). The others hold a disabled `Todo`.
+
 The command palette (PRD 009, §1) is `CommandPaletteFeature`: `Ctrl`+`Shift`+`P`, `F1`,
 `Ctrl`+`P` or the title bar's command centre open it in the library's `UiQuickInput`;
 commands are filtered by `command-palette/fuzzy-match.ts`, and a command that needs a value

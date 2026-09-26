@@ -2,11 +2,13 @@ import {
   Component,
   ElementRef,
   afterNextRender,
+  computed,
   inject,
   input,
   output,
   viewChildren,
 } from '@angular/core';
+import { UiIcon } from '../icon/ui-icon';
 import type { UiMenuItem } from '../models';
 
 /** Why a menu asks to close. */
@@ -36,6 +38,7 @@ export type UiMenuDismissReason = 'escape' | 'tab' | 'outside' | 'blur';
  */
 @Component({
   selector: 'ui-context-menu',
+  imports: [UiIcon],
   templateUrl: './ui-context-menu.html',
   styleUrl: './ui-context-menu.scss',
   host: {
@@ -73,6 +76,15 @@ export class UiContextMenu {
   /** The menu wants to close; the reason says why. */
   readonly dismiss = output<UiMenuDismissReason>();
 
+  /**
+   * `←`/`→`: in a menu bar's menu, move to the menu beside it (PRD 008, §1).
+   * Anywhere else nobody listens, and the keys do nothing.
+   */
+  readonly navigate = output<'previous' | 'next'>();
+
+  /** Whether any row is a choice, so every row keeps room for the check mark. */
+  protected readonly hasChecks = computed(() => this.items().some((item) => item.checked !== undefined));
+
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly rows = viewChildren<ElementRef<HTMLButtonElement>>('row');
 
@@ -104,6 +116,10 @@ export class UiContextMenu {
         break;
       case 'Home':
         rows[0]?.focus();
+        break;
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        this.navigate.emit(event.key === 'ArrowLeft' ? 'previous' : 'next');
         break;
       case 'End':
         rows.at(-1)?.focus();

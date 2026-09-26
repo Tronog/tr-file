@@ -4,7 +4,16 @@ import type { UiIconName } from './icon.model';
 export interface UiMenuBarItem {
   readonly id: string;
   readonly label: string;
+  /** Its menu is showing. */
   readonly open?: boolean;
+  /** What its menu offers (PRD 008, §1). */
+  readonly items?: readonly UiMenuItem[];
+}
+
+/** A choice made in one of the menu bar's menus. */
+export interface UiMenuBarSelection {
+  readonly menuId: string;
+  readonly itemId: string;
 }
 
 /**
@@ -69,6 +78,12 @@ export interface UiMenuItem {
   readonly label: string;
   readonly keybinding?: string;
   readonly disabled?: boolean;
+  /**
+   * One of a set of choices, of which this is (or is not) the one in effect:
+   * the row is a `menuitemradio` and draws a check mark when `true` — Go ›
+   * Local Computer (PRD 008, §1.1). Leave it out for an ordinary row.
+   */
+  readonly checked?: boolean;
   /** The row under the pointer / keyboard cursor. */
   readonly active?: boolean;
   readonly separatorBefore?: boolean;

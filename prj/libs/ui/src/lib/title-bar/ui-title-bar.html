@@ -1,18 +1,39 @@
-<nav class="menu">
+<nav class="menu" role="menubar" aria-label="Main menu">
   <ui-icon class="menu-logo" [name]="brandIcon()" />
 
-  @for (item of menuItems(); track item.id) {
+  @for (item of menuItems(); track item.id; let index = $index) {
     <button
+      #menuButton
       type="button"
       class="menu-item"
+      role="menuitem"
+      aria-haspopup="menu"
+      [attr.data-menu-id]="item.id"
       [class.is-open]="item.open"
       [attr.aria-expanded]="item.open ?? false"
-      (click)="menuSelect.emit(item.id)"
+      (click)="onMenuClick(item)"
+      (pointerenter)="onMenuHover(item)"
+      (keydown)="onMenuKeydown($event, index)"
     >
       {{ item.label }}
     </button>
   }
 </nav>
+
+<!-- The open menu, under its title (PRD 008, §1). -->
+@if (openMenu(); as open) {
+  <ui-context-menu
+    class="menubar-menu"
+    [label]="open.item.label"
+    [fixed]="true"
+    [x]="open.x"
+    [y]="open.y"
+    [items]="open.item.items ?? []"
+    (select)="menuItemSelect.emit({ menuId: open.item.id, itemId: $event })"
+    (dismiss)="onMenuDismiss()"
+    (navigate)="step(open.item.id, $event === 'next' ? 1 : -1)"
+  />
+}
 
 @if (commandLabel()) {
   <button type="button" class="command-center" (click)="commandSelect.emit()">
