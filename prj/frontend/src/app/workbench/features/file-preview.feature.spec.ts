@@ -23,6 +23,8 @@ const ROOT_ENTRIES = [
   fsEntry('huge.txt', { size: 5 * 1024 * 1024 }),
   fsEntry('archive.zip', { size: 4096 }),
   fsEntry('poster.jpg', { size: 64 * 1024 * 1024 }),
+  fsEntry('report.docx', { size: 4096 }),
+  fsEntry('legacy.txt', { size: 4 }),
 ];
 
 describe('FilePreviewFeature', () => {
@@ -175,6 +177,44 @@ describe('FilePreviewFeature', () => {
       expect(revoked).toEqual([made[0]]);
       expect(workbench.filePreviewFt.documentFor('logo.png')?.src).toBe(made[1]);
     });
+
+    /** The cache owns the URL; a preview never holds on to a revoked one. */
+    it('reads the picture again after the cache let it go', async () => {
+      await start();
+      await openImage('logo.png');
+
+      workbench.images.release('logo.png');
+      expect(workbench.filePreviewFt.documentFor('logo.png')).toBeUndefined();
+
+      workbench.filePreviewFt.load('logo.png');
+      http.expectOne(downloadUrl('logo.png')).flush(new Blob(['PNGDATA'], { type: 'image/png' }));
+      await settled();
+
+      expect(workbench.filePreviewFt.documentFor('logo.png')?.src).toBe(made[1]);
+    });
+
+    /** PRD 003, §1 — what nothing shows is let go, not kept for the session. */
+    it('lets go of a preview once no tab shows it', async () => {
+      await start();
+      await open('main.ts', 'const x = 1;\n');
+      TestBed.tick();
+      expect(workbench.filePreviewFt.documentFor('main.ts')).toBeDefined();
+
+      const group = workbench.activeGroupId();
+      const tab = workbench.editorGroupsFt.group(group)?.tabs.find((candidate) => candidate.label === 'main.ts');
+      workbench.editorGroupsFt.closeTab(group, tab?.id ?? '');
+      TestBed.tick();
+
+      expect(workbench.filePreviewFt.documentFor('main.ts')).toBeUndefined();
+    });
+
+    it('tells the image cache which pictures are on screen', async () => {
+      await start();
+      await openImage('logo.png');
+
+      expect([...workbench.previewRetentionFt.shownImages()]).toEqual(['logo.png']);
+      expect([...workbench.previewRetentionFt.openFiles()]).toEqual(['logo.png']);
+    });
   });
 
   describe('files that are not shown', () => {
@@ -214,6 +254,29 @@ describe('FilePreviewFeature', () => {
       expect(workbench.filePreviewFt.documentFor('main.ts')).toBeUndefined();
       expect(workbench.filePreviewFt.noticeFor('main.ts')).toMatchObject({
         title: 'Binary file not shown',
+      });
+    });
+
+    /** PRD 003, §1 — no extension list knows every binary format. */
+    it('refuses an unlisted binary format by looking at its bytes', async () => {
+      await start();
+      await open('report.docx', 'PK\u0003\u0004\u0014\u0000\u0006\u0000word/document.xml');
+
+      expect(workbench.filePreviewFt.documentFor('report.docx')).toBeUndefined();
+      expect(workbench.filePreviewFt.noticeFor('report.docx')).toMatchObject({ title: 'Binary file not shown' });
+    });
+
+    it('shows a legacy Latin text file in its own code page, and says so', async () => {
+      await start();
+      workbench.filePreviewFt.open('legacy.txt');
+      http.expectOne(detailsUrl('legacy.txt')).flush(fsEnvelope(fsDetails('legacy.txt')));
+      http.expectOne(downloadUrl('legacy.txt')).flush(new Blob([new Uint8Array([0x63, 0x61, 0x66, 0xe9])]));
+      await settled();
+
+      expect(workbench.filePreviewFt.documentFor('legacy.txt')).toMatchObject({
+        kind: 'text',
+        text: 'café',
+        meta: '4 B · 1 line · Windows-1252',
       });
     });
 

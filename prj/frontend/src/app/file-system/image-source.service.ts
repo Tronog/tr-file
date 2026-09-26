@@ -19,12 +19,22 @@ const IMAGE_EXTENSIONS = new Set([
  */
 export const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
 
+/**
+ * Images nobody is showing any more that are kept anyway, most recent first,
+ * so stepping back to the previous selection does not read it again. Both
+ * limits apply; whichever is reached first evicts.
+ */
+const KEEP_RECENT = 8;
+const KEEP_RECENT_BYTES = 64 * 1024 * 1024;
+
 type SourceStatus = 'loading' | 'ready' | 'error';
 
 interface SourceState {
   readonly status: SourceStatus;
   /** An object URL this service made, and is therefore the one to revoke. */
   readonly url?: string;
+  /** Size of the blob behind `url`, which is what an eviction frees. */
+  readonly bytes?: number;
   readonly error?: FsError;
 }
 
@@ -40,9 +50,13 @@ interface SourceState {
  * over IPC and has no URL at all (§8.1). Both come back as a `Blob`, and a
  * `blob:` URL is the one thing an `<img>` understands either way.
  *
- * Nothing else can free those URLs, so this service is their owner: it revokes
- * one when it replaces it, and `release` exists for a caller that knows an
- * image will not be wanted again.
+ * Nothing else can free those URLs, so this service is their owner, and it
+ * frees them by what is on screen rather than by asking every consumer to
+ * remember (PRD 003, §1): the workbench says which paths it is showing through
+ * `retainOnly`, and everything else is revoked — apart from the few most
+ * recently let go (`KEEP_RECENT`, `KEEP_RECENT_BYTES`), so going back to the
+ * previous picture is free. Without this every image ever previewed stayed in
+ * memory, up to 32 MiB apiece, for the whole session.
  */
 @Service()
 export class ImageSourceService {
@@ -52,6 +66,12 @@ export class ImageSourceService {
   private readonly pending = new Map<string, Promise<void>>();
 
   private readonly fileSystem = inject(FileSystemService);
+
+  /** What the workbench is showing; `null` until it has said, so nothing is evicted before then. */
+  private wanted: ReadonlySet<string> | null = null;
+
+  /** Ready images nobody is showing, least recently let go first. */
+  private released: string[] = [];
 
   /** Whether a path names something an `<img>` can decode. */
   isImage(path: string): boolean {
@@ -90,13 +110,61 @@ export class ImageSourceService {
     return this.pending.get(path) ?? this.fetch(path);
   }
 
+  /**
+   * Tells the cache which paths are on screen. Anything else it holds is let
+   * go: failures at once (asking again is how they are retried), pictures
+   * after the few most recent. A path asked for again before it is evicted is
+   * simply kept.
+   */
+  retainOnly(paths: ReadonlySet<string>): void {
+    this.wanted = paths;
+    this.released = this.released.filter((path) => !paths.has(path));
+
+    for (const [path, state] of this.sources()) {
+      if (paths.has(path) || this.pending.has(path)) {
+        continue;
+      }
+      if (state.url === undefined) {
+        this.drop(path);
+      } else if (!this.released.includes(path)) {
+        this.released.push(path);
+      }
+    }
+
+    this.evictReleased();
+  }
+
   /** Frees the URL for a path, if this service made one. */
   release(path: string): void {
+    this.released = this.released.filter((candidate) => candidate !== path);
+    this.drop(path);
+  }
+
+  /** How many images the cache holds; for diagnostics and tests. */
+  get size(): number {
+    return this.sources().size;
+  }
+
+  /** Revokes the oldest let-go images until both limits hold. */
+  private evictReleased(): void {
+    const bytesOf = (path: string): number => this.sources().get(path)?.bytes ?? 0;
+    let bytes = this.released.reduce((total, path) => total + bytesOf(path), 0);
+
+    while (this.released.length > KEEP_RECENT || (bytes > KEEP_RECENT_BYTES && this.released.length > 0)) {
+      const oldest = this.released.shift() as string;
+      bytes -= bytesOf(oldest);
+      this.drop(oldest);
+    }
+  }
+
+  private drop(path: string): void {
     const url = this.sources().get(path)?.url;
-    if (url === undefined) {
+    if (url !== undefined) {
+      URL.revokeObjectURL(url);
+    }
+    if (!this.sources().has(path)) {
       return;
     }
-    URL.revokeObjectURL(url);
     this.sources.update((cache) => {
       const next = new Map(cache);
       next.delete(path);
@@ -105,7 +173,14 @@ export class ImageSourceService {
   }
 
   private fetch(path: string): Promise<void> {
-    const read = this.read(path).finally(() => this.pending.delete(path));
+    const read = this.read(path).finally(() => {
+      this.pending.delete(path);
+      // Nobody may be showing it any more by the time it arrives — a quick
+      // run down a photo folder — and then it is let go like any other.
+      if (this.wanted !== null && !this.wanted.has(path)) {
+        this.retainOnly(this.wanted);
+      }
+    });
     this.pending.set(path, read);
     return read;
   }
@@ -125,7 +200,7 @@ export class ImageSourceService {
           'PAYLOAD_TOO_LARGE',
         );
       }
-      this.patch(path, { status: 'ready', url: URL.createObjectURL(blob) });
+      this.patch(path, { status: 'ready', url: URL.createObjectURL(blob), bytes: blob.size });
     } catch (error) {
       this.patch(path, { status: 'error', error: FsError.from(error) });
     }

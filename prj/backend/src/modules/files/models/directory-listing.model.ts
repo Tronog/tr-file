@@ -1,5 +1,8 @@
 import { FileEntry, type FileEntryDto } from './file-entry.model.js';
 
+/** One collator for every listing: building one per comparison is slow. */
+const NATURAL_ORDER = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
 export interface DirectoryListingDto {
   readonly path: string;
   readonly parent: string | null;
@@ -22,13 +25,17 @@ export class DirectoryListing {
     return index === -1 ? '' : this.path.slice(0, index);
   }
 
-  /** Directories first, then files, each alphabetically (case-insensitive). */
+  /**
+   * Folders first — links to folders included — then everything else, each in
+   * natural order: case-insensitive, and numeric runs compared as numbers, so
+   * `file2` comes before `file10`.
+   */
   sorted(): DirectoryListing {
     const entries = [...this.entries].sort((a, b) => {
-      if (a.isDirectory !== b.isDirectory) {
-        return a.isDirectory ? -1 : 1;
+      if (a.isFolderLike !== b.isFolderLike) {
+        return a.isFolderLike ? -1 : 1;
       }
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      return NATURAL_ORDER.compare(a.name, b.name);
     });
     return new DirectoryListing(this.path, entries);
   }

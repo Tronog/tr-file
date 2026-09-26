@@ -1,4 +1,4 @@
-import { computed } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import type {
   UiBreadcrumb,
   UiFileBrowserModel,
@@ -14,6 +14,7 @@ import { PANEL_CONTENT, type PanelGroupState, type PanelTabState } from '../pane
 import type { WorkbenchService } from '../workbench.service';
 import type { EditorGroupsFeature } from './editor-groups.feature';
 import type { FsListingState } from './fs-data.feature';
+import { isFolder } from '../../file-system/fs-entry-kind';
 
 /** Columns of the list view; the backend supplies every value. */
 const COLUMNS: readonly UiFileColumn[] = [
@@ -43,6 +44,14 @@ const EMPTY_FOLDER = {
   hint: 'Drop files here to upload them',
 } as const;
 
+/** The tree view of a panel that has opened nothing yet. */
+const NONE_OPEN: ReadonlySet<string> = new Set();
+
+/** Parent of a root-relative path; the root's children answer `''`. */
+function parentOf(path: string): string {
+  return path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+}
+
 /**
  * File management as panel content: what a folder tab lists and a file tab
  * shows, and everything done from inside them — opening entries, walking up
@@ -55,8 +64,17 @@ const EMPTY_FOLDER = {
  * files from `FilePreviewFeature`. Like every model here it only ever *reads*
  * those while rendering — fetches are started by the actions below, never by
  * a computed.
+ *
+ * The tree view (PRD 002, §4.1) is the details table with folders that open in
+ * place. Which ones are open is this feature's own state, kept *per panel*:
+ * two panels on the same folder are two places someone is working, as with
+ * their history. Opening a folder is an action, so that is where its listing
+ * is fetched; the rows only read what the cache already holds.
  */
 export class FileBrowserFeature implements PanelContentFeature {
+  /** Folders open in each panel's tree view, keyed by group id. */
+  private readonly expanded = signal<Readonly<Record<string, ReadonlySet<string>>>>({});
+
   constructor(private readonly parent: WorkbenchService) {}
 
   private get groups(): EditorGroupsFeature {
@@ -111,6 +129,30 @@ export class FileBrowserFeature implements PanelContentFeature {
     this.groups.update(id, (group) => ({ ...group, view }));
   }
 
+  /**
+   * Opens a folder in place in the tree view, or closes it again — fetching
+   * its listing the first time. Anything that is not a folder on screen in
+   * this panel is ignored.
+   */
+  toggleEntry(groupId: string, entryId: string): void {
+    const entry = this.entryIn(groupId, entryId);
+    if (entry === undefined || !isFolder(entry)) {
+      return;
+    }
+
+    const open = this.expandedIn(groupId);
+    const next = new Set(open);
+    if (open.has(entry.path)) {
+      next.delete(entry.path);
+    } else {
+      next.add(entry.path);
+      this.parent.fsDataFt.ensureListing(entry.path);
+    }
+
+    this.expanded.update((all) => ({ ...all, [groupId]: next }));
+    this.groups.focus(groupId);
+  }
+
   /** Selects an entry inside a group; the details sidebar follows. */
   selectEntry(groupId: string, entryId: string): void {
     this.groups.update(groupId, (group) => ({ ...group, selection: [entryId], focusedEntryId: entryId }));
@@ -128,7 +170,8 @@ export class FileBrowserFeature implements PanelContentFeature {
     if (!entry) {
       return;
     }
-    if (entry.type === 'directory') {
+    // A link to a folder is navigated into like one (PRD 003, §1).
+    if (isFolder(entry)) {
       this.navigateTo(groupId, entry.path, entry.name);
     } else {
       this.groups.focus(groupId);
@@ -165,7 +208,7 @@ export class FileBrowserFeature implements PanelContentFeature {
       return;
     }
 
-    const directory = entry.type === 'directory';
+    const directory = isFolder(entry);
     const newGroupId = this.groups.openBeside(groupId, 'right', (id) => ({
       id: `tab-${id}`,
       label: entry.name,
@@ -202,7 +245,7 @@ export class FileBrowserFeature implements PanelContentFeature {
         if (from === '') {
           return;
         }
-        const parentPath = from.includes('/') ? from.slice(0, from.lastIndexOf('/')) : '';
+        const parentPath = parentOf(from);
         this.openFolder(groupId, parentPath, this.labelFor(parentPath));
         break;
       }
@@ -210,7 +253,12 @@ export class FileBrowserFeature implements PanelContentFeature {
         if (active.kind === 'file') {
           this.parent.filePreviewFt.reload(active.path);
         } else {
+          // Everything on screen is re-read: in the tree, that includes the
+          // folders open under this one.
           this.parent.fsDataFt.reloadListing(group.path);
+          for (const path of this.openFoldersShown(group)) {
+            this.parent.fsDataFt.reloadListing(path);
+          }
         }
         break;
       case 'upload':
@@ -328,11 +376,53 @@ export class FileBrowserFeature implements PanelContentFeature {
     this.parent.transfersFt.uploadFiles(group.path, files);
   }
 
+  /**
+   * An entry the panel is showing: one of its folder's own, or — in the tree
+   * view — one inside a folder that is open under it.
+   */
   private entryIn(groupId: string, entryId: string): FsEntry | undefined {
     const group = this.groups.stateOf(groupId);
-    return group
-      ? this.parent.fsDataFt.entries(group.path).find((entry) => entry.path === entryId)
-      : undefined;
+    if (!group) {
+      return undefined;
+    }
+
+    const own = this.parent.fsDataFt.entries(group.path).find((entry) => entry.path === entryId);
+    if (own || !this.isShownInTree(group, entryId)) {
+      return own;
+    }
+    return this.parent.fsDataFt.entries(parentOf(entryId)).find((entry) => entry.path === entryId);
+  }
+
+  private expandedIn(groupId: string): ReadonlySet<string> {
+    return this.expanded()[groupId] ?? NONE_OPEN;
+  }
+
+  /**
+   * Whether the tree view is showing `path`: it lies under the panel's folder
+   * and every folder between the two is open. Folders opened and then left
+   * behind by navigating elsewhere stay remembered, but are not shown.
+   */
+  private isShownInTree(group: PanelGroupState, path: string): boolean {
+    if (group.view !== 'tree' || path === group.path) {
+      return false;
+    }
+    const under = group.path === '' ? path !== '' : path.startsWith(`${group.path}/`);
+    if (!under) {
+      return false;
+    }
+
+    const open = this.expandedIn(group.id);
+    for (let folder = parentOf(path); folder !== group.path; folder = parentOf(folder)) {
+      if (!open.has(folder)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** The open folders the tree view is currently showing. */
+  private openFoldersShown(group: PanelGroupState): readonly string[] {
+    return [...this.expandedIn(group.id)].filter((path) => this.isShownInTree(group, path));
   }
 
   private labelFor(path: string): string {
@@ -356,7 +446,10 @@ export class FileBrowserFeature implements PanelContentFeature {
       toolbarActions: FOLDER_TOOLBAR,
       showViewSwitch: true,
       columns: COLUMNS,
-      rows: entries.map((entry) => this.row(entry, group, active)),
+      rows:
+        group.view === 'tree'
+          ? this.treeRows(group, group.path, 0, active)
+          : entries.map((entry) => this.row(entry, group, active)),
       items: entries.map((entry) => this.item(entry, group, active)),
       ...(state?.status === 'ready' ? { summary: this.summary(entries.length) } : {}),
       ...this.placeholder(state, entries.length),
@@ -426,13 +519,34 @@ export class FileBrowserFeature implements PanelContentFeature {
     ];
   }
 
-  private row(entry: FsEntry, group: PanelGroupState, active: boolean): UiFileRow {
+  /**
+   * The tree view's rows, flattened depth first: each folder's entries, with an
+   * open folder's own entries straight after it, one level deeper.
+   */
+  private treeRows(group: PanelGroupState, path: string, depth: number, active: boolean): UiFileRow[] {
+    const open = this.expandedIn(group.id);
+    return this.parent.fsDataFt.entries(path).flatMap((entry) => {
+      const expandable = isFolder(entry);
+      const expanded = expandable && open.has(entry.path);
+      const loading = expanded && this.parent.fsDataFt.listingState(entry.path)?.status === 'loading';
+      const row: UiFileRow = {
+        ...this.row(entry, group, active, expanded),
+        depth,
+        expandable,
+        ...(expandable ? { expanded } : {}),
+        ...(loading ? { busy: true } : {}),
+      };
+      return expanded ? [row, ...this.treeRows(group, entry.path, depth + 1, active)] : [row];
+    });
+  }
+
+  private row(entry: FsEntry, group: PanelGroupState, active: boolean, expanded = false): UiFileRow {
     const files = this.parent.fileViewModel;
     const selected = group.selection.includes(entry.path);
     return {
       id: entry.path,
       name: entry.name,
-      icon: files.icon(entry),
+      icon: files.icon(entry, expanded),
       tint: files.tint(entry),
       cells: {
         size: files.sizeLabel(entry),

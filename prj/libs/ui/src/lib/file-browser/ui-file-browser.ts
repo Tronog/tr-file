@@ -14,6 +14,9 @@ import type { UiFileBrowserModel, UiPanelKey, UiPanelView } from '../models';
  * File-management content for a panel: a path bar, a toolbar, and a body
  * that is a listing (list or grid) or one file rendered read-only.
  *
+ * The listing is a details table (`list`), large icons (`grid`), or the
+ * details table as a tree whose folders open in place (`tree`, PRD 002 §4.1).
+ *
  * Meant to be projected into a `UiPanelGroup`, which frames it — tab bar,
  * loading rail, drop targets — and asks it for focus through the body it
  * marks with `uiPanelBody`. Every chrome row is conditional on the data: the
@@ -50,6 +53,9 @@ export class UiFileBrowser {
   readonly viewChange = output<UiPanelView>();
   readonly rowSelect = output<string>();
   readonly rowActivate = output<string>();
+
+  /** A folder in the tree view was opened or closed in place. */
+  readonly rowToggle = output<string>();
   readonly itemSelect = output<string>();
   readonly itemActivate = output<string>();
 
@@ -61,6 +67,7 @@ export class UiFileBrowser {
   protected readonly viewOptions: readonly UiSegmentedOption[] = [
     { id: 'list', label: 'List view', icon: 'list' },
     { id: 'grid', label: 'Grid view', icon: 'layout-grid' },
+    { id: 'tree', label: 'Tree view', icon: 'list-tree' },
   ];
 
   /**
@@ -96,7 +103,7 @@ export class UiFileBrowser {
   });
 
   protected onViewChange(value: string): void {
-    this.viewChange.emit(value === 'grid' ? 'grid' : 'list');
+    this.viewChange.emit(value === 'grid' || value === 'tree' ? value : 'list');
   }
 
   /**
@@ -104,7 +111,7 @@ export class UiFileBrowser {
    * (PRD 001, §6.2.5). Bound on the host, so it answers with focus anywhere in
    * the browser — a row, a tile, the document, the path bar. The browser
    * knows which entry has focus from its own model, so one handler covers the
-   * listing and the grid alike. Handled before the key reaches the group
+   * listing, the tree and the grid alike. Handled before the key reaches the group
    * around it, which claims the other `Ctrl` chords.
    */
   protected onKeydown(event: KeyboardEvent): void {

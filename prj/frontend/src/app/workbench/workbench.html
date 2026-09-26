@@ -117,6 +117,7 @@
                       (viewChange)="files.setView(groupId, $event)"
                       (rowSelect)="files.selectEntry(groupId, $event)"
                       (rowActivate)="files.openEntry(groupId, $event)"
+                      (rowToggle)="files.toggleEntry(groupId, $event)"
                       (itemSelect)="files.selectEntry(groupId, $event)"
                       (itemActivate)="files.openEntry(groupId, $event)"
                       (command)="panelKeys.run(groupId, $event)"

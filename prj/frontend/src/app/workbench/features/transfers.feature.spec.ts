@@ -183,9 +183,12 @@ describe('TransfersFeature', () => {
     });
   });
 
+  /** PRD 003, §1: downloads are rows too, so a failure is seen, not logged. */
   describe('download()', () => {
-    it('hands the browser a download link and tracks nothing', async () => {
-      const hrefs: (string | null)[] = [];
+    let hrefs: (string | null)[];
+
+    beforeEach(() => {
+      hrefs = [];
       const create = document.createElement.bind(document);
       vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
         const element = create(tag);
@@ -194,15 +197,56 @@ describe('TransfersFeature', () => {
         }
         return element;
       }) as typeof document.createElement);
+    });
 
+    it('checks the file is there, then hands the browser the link, as a row', async () => {
       workbench.transfersFt.download('docs/notes.txt', 'notes.txt');
-      // The URL is resolved through the transport since §8.1, so the anchor
-      // is clicked a microtask later even though HTTP knows it immediately.
+
+      expect(rows()[0]).toMatchObject({ icon: 'download', statusLabel: 'starting…', progress: null });
+      expect(workbench.transfersFt.activeCount()).toBe(1);
+
+      http.expectOne(downloadUrl('docs/notes.txt')).flush(new Blob(['n']));
       await settled();
 
       expect(hrefs).toEqual([downloadUrl('docs/notes.txt')]);
-      expect(rows()).toEqual([]);
-      http.expectNone(() => true);
+      expect(rows()[0]).toMatchObject({ name: 'notes.txt ← docs/notes.txt', icon: 'check', statusLabel: 'sent to browser' });
+      expect(workbench.transfersFt.activeCount()).toBe(0);
+    });
+
+    it('shows why the server refused, and hands the browser nothing', async () => {
+      workbench.transfersFt.download('docs/secret.txt', 'secret.txt');
+
+      http
+        .expectOne(downloadUrl('docs/secret.txt'))
+        .flush(new Blob([JSON.stringify(fsErrorBody('FORBIDDEN', 'Permission denied: docs/secret.txt'))]), {
+          status: 403,
+          statusText: 'Forbidden',
+        });
+      await settled();
+
+      expect(hrefs).toEqual([]);
+      expect(rows()[0]).toMatchObject({ icon: 'alert-triangle', statusLabel: 'failed · permission denied' });
+    });
+
+    it('saves an empty file, which has no first byte to check', async () => {
+      workbench.transfersFt.download('empty.txt', 'empty.txt');
+
+      http.expectOne(downloadUrl('empty.txt')).flush(new Blob([]), { status: 416, statusText: 'Range Not Satisfiable' });
+      await settled();
+
+      expect(hrefs).toEqual([downloadUrl('empty.txt')]);
+    });
+
+    it('can be cancelled before the browser has it', async () => {
+      workbench.transfersFt.download('docs/notes.txt', 'notes.txt');
+      const check = http.expectOne(downloadUrl('docs/notes.txt'));
+
+      workbench.transfersFt.cancel('download-1');
+      await settled();
+
+      expect(check.cancelled).toBe(true);
+      expect(hrefs).toEqual([]);
+      expect(rows()[0]).toMatchObject({ statusLabel: 'cancelled' });
     });
   });
 });

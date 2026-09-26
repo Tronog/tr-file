@@ -1,37 +1,46 @@
 import { computed, signal, type Signal, type WritableSignal } from '@angular/core';
 import type { UiTransfer } from '@tr-file/ui';
-import type { FsUpload, FsUploadProgress } from '../../file-system/file-system.model';
+import type {
+  FsDownload,
+  FsDownloadResult,
+  FsUpload,
+  FsUploadProgress,
+} from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
 
 type TransferStatus = 'active' | 'done' | 'error' | 'cancelled';
 
-/** One upload the workbench is tracking, live progress included. */
+/** One transfer the workbench is tracking, live progress included. */
 interface TransferRecord {
   readonly id: string;
+  readonly direction: 'upload' | 'download';
   readonly name: string;
-  readonly directoryPath: string;
+  /** Where an upload lands, or the path a download comes from. */
+  readonly path: string;
   readonly progress: Signal<FsUploadProgress>;
   readonly status: TransferStatus;
-  /** Bytes actually stored, known once the upload finishes. */
-  readonly storedBytes?: number;
+  /** Bytes actually stored or saved, known once the transfer finishes. */
+  readonly bytes?: number;
+  /** How a finished download ended. */
+  readonly outcome?: FsDownloadResult['outcome'];
   readonly error?: FsError;
   readonly cancel: () => void;
 }
 
 /**
- * Uploads in flight and what became of them.
+ * Uploads and downloads in flight, and what became of them.
  *
  * Each record keeps the progress signal handed back by `FsTransferFeature`, so
  * the panel rows are a computed over live signals rather than something that
  * has to be polled. A finished upload refreshes the directory it landed in,
  * which is what makes the new file appear in every panel showing that folder.
  *
- * Downloads are deliberately not tracked: over HTTP the backend answers with
- * `Content-Disposition: attachment`, so handing the URL to the browser lets it
- * stream the file to disk without pulling it through memory first. (The
- * desktop transport has no such endpoint and does read the bytes first; see
- * `download` below.)
+ * Downloads are rows too (PRD 003, §1), so a failure is shown where the user
+ * looks rather than in the console. On the desktop the main process streams
+ * the file and reports real progress; over HTTP the browser saves it, so the
+ * row says the file was handed over — after a check that would have failed it
+ * with the server's reason.
  */
 export class TransfersFeature {
   private readonly records: WritableSignal<readonly TransferRecord[]>;
@@ -61,36 +70,43 @@ export class TransfersFeature {
     }
   }
 
-  /**
-   * Hands a URL to the browser, which streams the file to disk.
-   *
-   * Fire and forget, as it has always been, but asynchronous underneath since
-   * §8.1: over HTTP the URL is the download endpoint and is known at once,
-   * while on the desktop there is no endpoint at all — the bytes come across
-   * the bridge and are wrapped in an object URL, which is then revoked.
-   */
+  /** Saves a file to the user's disk, tracked as a row like any upload. */
   download(path: string, name: string): void {
-    void this.saveToDisk(path, name).catch((error: unknown) => {
-      // The panel has no row shape for a download, so there is nowhere to show
-      // this yet; it is logged rather than swallowed. Over HTTP it cannot
-      // happen — only the desktop transport reads the file before saving it.
-      console.error(`Could not download ${path}:`, FsError.from(error).message);
-    });
-  }
+    this.sequence += 1;
+    const id = `download-${this.sequence}`;
+    const download: FsDownload = this.parent.fileSystem.transferFt.save(path, name);
 
-  private async saveToDisk(path: string, name: string): Promise<void> {
-    const target = await this.parent.fileSystem.transferFt.saveUrl(path);
-    try {
-      const anchor = document.createElement('a');
-      anchor.href = target.url;
-      anchor.download = name;
-      anchor.rel = 'noopener';
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-    } finally {
-      target.release();
-    }
+    this.records.update((records) => [
+      {
+        id,
+        direction: 'download',
+        name,
+        path,
+        progress: download.progress,
+        status: 'active',
+        cancel: () => {
+          download.cancel();
+          this.settle(id, 'cancelled');
+        },
+      },
+      ...records,
+    ]);
+
+    void download.result.then(
+      (result) => {
+        if (result.outcome === 'dismissed') {
+          // Closing the Save dialog is a change of mind, not something to
+          // keep a row about.
+          this.records.update((records) => records.filter((record) => record.id !== id));
+          return;
+        }
+        this.settle(id, 'done', undefined, result.bytes, result.outcome);
+      },
+      (error: unknown) => {
+        const failure = FsError.from(error);
+        this.settle(id, failure.code === 'ABORTED' ? 'cancelled' : 'error', failure);
+      },
+    );
   }
 
   cancel(id: string): void {
@@ -112,8 +128,9 @@ export class TransfersFeature {
     this.records.update((records) => [
       {
         id,
+        direction: 'upload',
         name: file.name,
-        directoryPath,
+        path: directoryPath,
         progress: upload.progress,
         status: 'active',
         cancel: () => {
@@ -137,7 +154,13 @@ export class TransfersFeature {
     );
   }
 
-  private settle(id: string, status: TransferStatus, error?: FsError, storedBytes?: number): void {
+  private settle(
+    id: string,
+    status: TransferStatus,
+    error?: FsError,
+    bytes?: number,
+    outcome?: FsDownloadResult['outcome'],
+  ): void {
     this.records.update((records) =>
       records.map((record) =>
         record.id === id && record.status === 'active'
@@ -145,7 +168,8 @@ export class TransfersFeature {
               ...record,
               status,
               ...(error ? { error } : {}),
-              ...(storedBytes === undefined ? {} : { storedBytes }),
+              ...(bytes === undefined ? {} : { bytes }),
+              ...(outcome === undefined ? {} : { outcome }),
             }
           : record,
       ),
@@ -154,31 +178,38 @@ export class TransfersFeature {
 
   private toRow(record: TransferRecord): UiTransfer {
     const progress = record.progress();
+    const files = this.parent.fileViewModel;
+    const upload = record.direction === 'upload';
+    const name = upload ? `${record.name} → ${record.path || '/'}` : `${record.name} ← ${record.path}`;
+
     switch (record.status) {
       case 'done':
         return {
           id: record.id,
-          name: `${record.name} → ${record.directoryPath || '/'}`,
+          name,
           icon: 'check',
           iconColor: 'var(--vsc-git-untracked)',
           progress: 100,
-          // The response says what was stored; upload-progress events can be
-          // absent altogether for a small body.
-          statusLabel: `done · ${this.parent.fileViewModel.formatBytes(record.storedBytes ?? progress.loaded)}`,
+          statusLabel:
+            record.outcome === 'delegated'
+              ? 'sent to browser'
+              : // The response says what was stored; progress events can be
+                // absent altogether for a small body.
+                `${upload ? 'done' : 'saved'} · ${files.formatBytes(record.bytes ?? progress.loaded)}`,
         };
       case 'error':
         return {
           id: record.id,
-          name: `${record.name} → ${record.directoryPath || '/'}`,
+          name,
           icon: 'alert-triangle',
           iconColor: 'var(--vsc-git-conflict)',
           progress: 100,
-          statusLabel: record.error?.code === 'CONFLICT' ? 'already exists' : 'failed',
+          statusLabel: this.reasonOf(record.error),
         };
       case 'cancelled':
         return {
           id: record.id,
-          name: `${record.name} → ${record.directoryPath || '/'}`,
+          name,
           icon: 'x',
           iconColor: 'var(--vsc-fg-dim)',
           progress: 100,
@@ -187,15 +218,35 @@ export class TransfersFeature {
       default:
         return {
           id: record.id,
-          name: `${record.name} → ${record.directoryPath || '/'}`,
-          icon: 'upload',
+          name,
+          icon: upload ? 'upload' : 'download',
           iconColor: 'var(--vsc-accent)',
           progress: progress.percent,
           statusLabel:
             progress.percent === null
-              ? 'uploading…'
-              : `${progress.percent}% · ${this.parent.fileViewModel.formatBytes(progress.loaded)}`,
+              ? upload
+                ? 'uploading…'
+                : 'starting…'
+              : `${progress.percent}% · ${files.formatBytes(progress.loaded)}`,
         };
+    }
+  }
+
+  /** A failure, in the few words a row has room for. */
+  private reasonOf(error: FsError | undefined): string {
+    switch (error?.code) {
+      case 'CONFLICT':
+        return 'already exists';
+      case 'NOT_FOUND':
+        return 'failed · not found';
+      case 'FORBIDDEN':
+        return 'failed · permission denied';
+      case 'PAYLOAD_TOO_LARGE':
+        return 'failed · too large';
+      case 'NETWORK_ERROR':
+        return 'failed · server unreachable';
+      default:
+        return 'failed';
     }
   }
 }

@@ -1,5 +1,6 @@
 import type { UiIconName, UiIconTint } from '@tr-file/ui';
 import type { FsEntry, FsEntryType } from '../../file-system/file-system.model';
+import { isFolder } from '../../file-system/fs-entry-kind';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -34,31 +35,31 @@ const TINT_BY_EXTENSION: Readonly<Record<string, UiIconTint>> = {
  * identically.
  */
 export class FileViewModelFeature {
-  icon(entry: Pick<FsEntry, 'type'>, expanded = false): UiIconName {
-    if (entry.type === 'directory') {
+  icon(entry: Pick<FsEntry, 'type' | 'targetType'>, expanded = false): UiIconName {
+    if (isFolder(entry)) {
       return expanded ? 'folder-open' : 'folder';
     }
     return 'file';
   }
 
-  tint(entry: Pick<FsEntry, 'type' | 'name'>): UiIconTint {
-    if (entry.type === 'directory') {
+  tint(entry: Pick<FsEntry, 'type' | 'name' | 'targetType'>): UiIconTint {
+    if (isFolder(entry)) {
       return 'folder';
     }
     return TINT_BY_EXTENSION[this.extension(entry.name)] ?? 'generic';
   }
 
   /** `'1.1 KB'`, `'318 KB'`, `'942 B'`; directories report no size. */
-  sizeLabel(entry: Pick<FsEntry, 'type' | 'size'>): string {
-    return entry.type === 'directory' ? '—' : this.formatBytes(entry.size);
+  sizeLabel(entry: Pick<FsEntry, 'type' | 'size' | 'targetType'>): string {
+    return isFolder(entry) ? '—' : this.formatBytes(entry.size);
   }
 
-  typeLabel(entry: Pick<FsEntry, 'type' | 'name'>): string {
+  typeLabel(entry: Pick<FsEntry, 'type' | 'name' | 'targetType'>): string {
     switch (entry.type) {
       case 'directory':
         return 'Folder';
       case 'symlink':
-        return 'Link';
+        return entry.targetType === 'directory' ? 'Folder link' : 'Link';
       case 'other':
         return 'Special';
       default: {
@@ -101,8 +102,8 @@ export class FileViewModelFeature {
    * carry its children's counts, and fetching every subdirectory to print one
    * would turn opening a folder into a fan-out of requests.
    */
-  treeMeta(entry: Pick<FsEntry, 'type' | 'size'>): string | undefined {
-    if (entry.type === 'directory' || entry.size < 1024) {
+  treeMeta(entry: Pick<FsEntry, 'type' | 'size' | 'targetType'>): string | undefined {
+    if (isFolder(entry) || entry.size < 1024) {
       return undefined;
     }
     return this.formatBytes(entry.size);

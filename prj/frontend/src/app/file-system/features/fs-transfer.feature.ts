@@ -1,7 +1,7 @@
 import type { FileSystemService } from '../file-system.service';
-import type { FsUpload } from '../file-system.model';
+import type { FsDownload, FsUpload } from '../file-system.model';
 import { FsError } from '../fs-error';
-import type { FsSaveUrl, FsUploadOptions } from '../fs-transport';
+import type { FsUploadOptions } from '../fs-transport';
 
 export type { FsUploadOptions };
 
@@ -13,19 +13,19 @@ export type { FsUploadOptions };
  * of uploads can be in flight at once without sharing anything.
  *
  * What none of it knows is *how* the bytes travel. Over HTTP that is the
- * `/api/fs/download` and `/api/fs/upload` endpoints; on the desktop it is one
- * IPC command straight into the backend (PRD 001, §8.1).
+ * `/api/fs/download` and `/api/fs/upload` endpoints; on the desktop it is IPC
+ * straight into the backend (PRD 001, §8.1), a chunk at a time (PRD 003, §1).
  */
 export class FsTransferFeature {
   constructor(private readonly parent: FileSystemService) {}
 
   /**
-   * A URL the browser can stream to disk from, and the cleanup that goes with
-   * it. The caller must `release()` when the save has been kicked off — over
-   * HTTP that does nothing, on the desktop it revokes an object URL.
+   * Saves a file to the user's disk, as `name`: handed to the browser over
+   * HTTP, streamed by the main process on the desktop. Either way the handle
+   * reports how it went, so the Transfers panel can show it.
    */
-  async saveUrl(path: string): Promise<FsSaveUrl> {
-    return this.parent.transport.saveUrl(path);
+  save(path: string, name: string): FsDownload {
+    return this.parent.transport.save(path, name);
   }
 
   /**
@@ -63,9 +63,8 @@ export class FsTransferFeature {
    * Uploads one file into `directoryPath`.
    *
    * Returns immediately with a handle; the transfer runs in the background and
-   * reports progress through `handle.progress`. Over HTTP that is a real
-   * curve; on the desktop the bytes cross in one hand-off, so it is start and
-   * finish only.
+   * reports progress through `handle.progress` — on either transport a real
+   * curve, since the desktop sends the file in chunks too.
    */
   upload(directoryPath: string, file: File, options?: FsUploadOptions): FsUpload {
     return this.parent.transport.upload(directoryPath, file, options);

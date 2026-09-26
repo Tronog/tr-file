@@ -6,6 +6,7 @@ import { DesktopStack } from './desktop.stack.js';
 import { waitForDevServer } from './dev-server.js';
 import { FsBridgeChannel } from './fs-bridge.channel.js';
 import { MainWindow } from './main-window.js';
+import { SaveFileChannel } from './save-file.channel.js';
 import { WindowControlsChannel } from './window-controls.channel.js';
 
 /**
@@ -33,6 +34,7 @@ class DesktopApplication {
   private pageUrl: URL | null = null;
   private channel: FsBridgeChannel | null = null;
   private windowChannel: WindowControlsChannel | null = null;
+  private saveChannel: SaveFileChannel | null = null;
 
   /**
    * Starts the app, unless another copy already owns the lock — in which case
@@ -79,6 +81,11 @@ class DesktopApplication {
       // very first frame, and a command that arrives with no handler rejects.
       this.channel = new FsBridgeChannel(this.stack.bridge, page.origin, this.stack.log);
       this.channel.register();
+
+      // Downloads leave through the main process, which asks where to save
+      // them and streams the copy (PRD 003, §1).
+      this.saveChannel = new SaveFileChannel(this.stack.bridge, page.origin, this.stack.log);
+      this.saveChannel.register();
 
       // The window draws its own buttons now (§8.2), so the channel that acts
       // on them has to exist before the first frame asks for its state.
@@ -148,6 +155,7 @@ class DesktopApplication {
     event.preventDefault();
     this.channel?.dispose();
     this.windowChannel?.dispose();
+    this.saveChannel?.dispose();
     void this.stack
       .stop()
       .catch(() => undefined)

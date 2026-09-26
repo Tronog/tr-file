@@ -3,6 +3,7 @@ import type { UiActionListItem, UiPermissions, UiPreview, UiProperty } from '@tr
 import type { FsDetails } from '../../file-system/file-system.model';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import type { WorkbenchService } from '../workbench.service';
+import { isFile, isFolder } from '../../file-system/fs-entry-kind';
 
 /**
  * The right sidebar: everything `/api/fs/details` knows about the entry
@@ -32,7 +33,7 @@ export class DetailsFeature {
       return undefined;
     }
     const files = this.parent.fileViewModel;
-    const size = details.type === 'directory' ? this.entriesLabel(details) : files.formatBytes(details.size);
+    const size = isFolder(details) ? this.entriesLabel(details) : files.formatBytes(details.size);
     // Read, never fetched: the picture is asked for by `load` below, because a
     // `computed` that started a request would write signals during change
     // detection. Until it arrives the card shows the file-type icon.
@@ -63,7 +64,7 @@ export class DetailsFeature {
       { label: 'Inode', value: `${details.inode}` },
     ];
 
-    if (details.type === 'directory') {
+    if (isFolder(details)) {
       properties.push({ label: 'Entries', value: this.entriesLabel(details) });
     }
     if (details.mimeType) {
@@ -88,10 +89,10 @@ export class DetailsFeature {
       return [];
     }
     const actions: UiActionListItem[] = [];
-    if (details.type === 'file') {
+    if (isFile(details)) {
       actions.push({ id: 'download', label: 'Download', icon: 'download', tag: 'file' });
     }
-    if (details.type === 'directory') {
+    if (isFolder(details)) {
       actions.push({ id: 'open', label: 'Open in this panel', icon: 'folder-open' });
       actions.push({ id: 'upload', label: 'Upload files here', icon: 'upload' });
     }

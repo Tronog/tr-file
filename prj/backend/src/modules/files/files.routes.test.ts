@@ -102,6 +102,24 @@ describe('GET /api/fs/download', () => {
     assert.equal(response.status, 400);
     assert.equal(await errorCodeOf(response), 'BAD_REQUEST');
   });
+  /** The frontend asks for one byte to learn whether a download will work. */
+  it('answers a one-byte range with that byte', async () => {
+    const response = await fetch(`${base}/download?path=${encodeURIComponent(UNICODE_NAME)}`, {
+      headers: { Range: 'bytes=0-0' },
+    });
+
+    assert.equal(response.status, 206);
+    assert.equal(await response.text(), 'h');
+  });
+
+  it('answers a range on an empty file with 416, not a server error', async () => {
+    await writeFile(join(root, 'empty.txt'), '');
+
+    const response = await fetch(`${base}/download?path=empty.txt`, { headers: { Range: 'bytes=0-0' } });
+
+    assert.equal(response.status, 416);
+    assert.equal(response.headers.get('content-range'), 'bytes */0');
+  });
 });
 
 describe('POST /api/fs/upload', () => {

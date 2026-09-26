@@ -49,6 +49,10 @@ the app projects into it — file management is `UiFileBrowser`, with its own mo
 In the app `EditorGroupsFeature` keeps groups and tabs only; `PANEL_CONTENT`
 (`panel-group.model.ts`) maps each tab kind to a content type, whose feature
 (`FileBrowserFeature` for `'files'`) implements `PanelContentFeature` and renders its model.
+`UiFileBrowser` has three views — list, grid, and tree (PRD 002 §4.1): the list's
+`UiFileList` with `tree` set, whose folders open in place with the same detail columns.
+Which folders are open is `FileBrowserFeature`'s state, per panel; opening one is what
+fetches it.
 A new kind of content is a new tab kind, a library component, a feature class, and a
 `@case` in the leaf template of `workbench.html` — see `prj/libs/ui/README.md` § Panel content.
 
@@ -81,7 +85,8 @@ open — collapsing is the twisty's job (or `←` on the focused row). Double-cl
 it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
 into a `UiDocumentModel`, and the library only renders what it is handed. An image is read by
 `ImageSourceService` (`prj/frontend/src/app/file-system/`), one cache of object URLs keyed
-by path that owns their lifetime, and drawn by `UiImageView` — contain by default, five
+by path that owns their lifetime — `PreviewRetentionFeature` tells it (and the text previews)
+what is on screen, and everything else is freed but for a few recent ones — and drawn by `UiImageView` — contain by default, five
 icon controls, wheel zoom anchored under the pointer, drag to pan, double click back to
 contain (§7.3.1). The viewer's model lives in `UiImageViewService`, provided per component.
 Selecting an image also shows it on the details card, fitted `contain` and non-interactive
@@ -99,6 +104,12 @@ sidebar all read from. Fetches are only ever started by an action (expanding a n
 folder, selecting an entry) — never from a `computed`, which would write signals during change
 detection. What is left of `MockData*` is the shell the session starts with: menus, activity bar
 and the initial layout.
+
+A symlink is judged by what it leads to (`targetType`, `isFolder`/`isFile` in
+`file-system/fs-entry-kind.ts`): a link to a folder navigates, expands and sorts like one.
+Previews decide text by sniffing the bytes (`text-sniff.ts`), the extension list only
+refuses early. Downloads are rows in the Transfers panel like uploads. Lists and grids of
+200+ entries render only what is near the viewport (`UiVirtualViewport` in the library).
 
 # Backend
 Refer to `docs/ai/EXPRESS.md`. The file-system API lives at `/api/fs`

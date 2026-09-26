@@ -74,7 +74,13 @@ td.align-end {
   font-variant-numeric: tabular-nums;
 }
 
-tbody tr {
+/* Stands in for rows that are not rendered; nothing to hover or pad. */
+tbody tr.spacer td {
+  height: auto;
+  padding: 0;
+}
+
+tbody tr:not(.spacer) {
   &:hover {
     background: var(--vsc-list-hover);
   }
@@ -109,6 +115,52 @@ tbody tr {
 .name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Tree mode: the twisty slot is reserved on every row, so a file's icon lines
+   up with its sibling folders'. Same 16px slot and spinner as the explorer. */
+.is-tree .name-cell {
+  gap: 4px;
+}
+
+.twisty {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--vsc-fg);
+  cursor: pointer;
+
+  &.is-hidden {
+    visibility: hidden;
+  }
+}
+
+/* Decorative: the row itself carries `aria-busy`. */
+.spinner {
+  display: block;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 1px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ui-file-list-spin 0.8s linear infinite;
+}
+
+@keyframes ui-file-list-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    border-right-color: currentcolor;
+    animation: none;
+  }
 }
 
 /* git decorations — colour only, as in VS Code's explorer */

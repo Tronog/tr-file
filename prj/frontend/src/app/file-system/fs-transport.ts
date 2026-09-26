@@ -1,4 +1,4 @@
-import type { FsDetails, FsDirectoryListing, FsUpload } from './file-system.model';
+import type { FsDetails, FsDirectoryListing, FsDownload, FsUpload } from './file-system.model';
 
 /**
  * How the app reaches the backend (PRD 001, §8.1).
@@ -23,19 +23,6 @@ export interface FsUploadOptions {
   readonly overwrite?: boolean;
 }
 
-/**
- * A URL the browser can save a file from, and the cleanup that goes with it.
- *
- * Over HTTP it is the download endpoint and `release` does nothing. On the
- * desktop there is no such URL, so the bytes are fetched and wrapped in an
- * object URL — which must be revoked, hence `release`. Callers do not care
- * which they got; they must call `release` either way.
- */
-export interface FsSaveUrl {
-  readonly url: string;
-  release(): void;
-}
-
 /** The primitives every transport provides. Nothing here is UI-aware. */
 export interface FsTransport {
   /** Which implementation this is; for diagnostics, not for branching. */
@@ -48,7 +35,8 @@ export interface FsTransport {
   details(path: string): Promise<FsDetails>;
 
   /**
-   * Reads a file's bytes.
+   * Reads a file's bytes, for the app itself to use (a preview, a thumbnail).
+   * Not for saving: see `save`.
    *
    * `maxBytes` is advisory: a transport that can refuse an oversized file
    * *before* reading it does so, and one that cannot simply ignores it. Either
@@ -56,8 +44,12 @@ export interface FsTransport {
    */
   read(path: string, maxBytes?: number): Promise<Blob>;
 
-  /** A URL the browser can stream to disk from; see {@link FsSaveUrl}. */
-  saveUrl(path: string): Promise<FsSaveUrl>;
+  /**
+   * Saves a file to the user's disk, as `name`. The browser does it over HTTP;
+   * the desktop asks where with a native dialog and streams the copy. Neither
+   * pulls the whole file through the page's memory.
+   */
+  save(path: string, name: string): FsDownload;
 
   /** Uploads one file into `directoryPath`, reporting progress as it goes. */
   upload(directoryPath: string, file: File, options?: FsUploadOptions): FsUpload;

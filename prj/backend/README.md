@@ -39,8 +39,11 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | --- | --- | --- |
 | `list` | `path` | the listing `GET /api/fs/list` serves |
 | `details` | `path` | the entry `GET /api/fs/details` serves |
-| `read` | `path`, `maxBytes?` | `{ name, size, mimeType, content: Uint8Array }` |
-| `upload` | `path`, `filename`, `content`, `overwrite` | the stored file's details |
+| `read` | `path`, `offset?`, `length?`, `maxBytes?` | one chunk: `{ name, size, mimeType, offset, content: Uint8Array }` |
+| `upload-begin` | `path`, `filename`, `overwrite` | `{ uploadId }` — or the `CONFLICT` / `BAD_REQUEST` an upload would get, before any bytes |
+| `upload-chunk` | `uploadId`, `content` | `{ received }` once the chunk is on its way to disk |
+| `upload-commit` | `uploadId` | the stored file's details |
+| `upload-abort` | `uploadId` | `{ aborted: true }`; the temp file is discarded |
 
 Two rules follow from the channel it is reached through. Requests **are
 untrusted** — they come from a renderer, so every field is validated exactly as
@@ -50,9 +53,17 @@ usually its message crossing a structured clone, so a failure is flattened into
 the HTTP error envelope plus the `status` it would have had. That is what lets
 the frontend raise one `FsError` for either transport.
 
-`read` is the one place the bridge is *stricter* than HTTP: an in-process
-caller gets the whole file as one buffer, so `maxBytes` is refused before
-anything is read rather than after.
+**No file crosses whole** (PRD 003, §1). `read` answers at most
+`FS_BRIDGE_CHUNK_BYTES` (1 MiB) from `offset`, and an upload is a
+begin / chunk… / commit session, so neither process ever holds more than one
+chunk of a transfer; an upload left idle for a minute is aborted. `maxBytes`
+is checked on every `read`, before anything is read, which is the one place the
+bridge is stricter than HTTP.
+
+Downloads are not a command: a destination outside the root must never come
+from a renderer. `bridge.saveCopy(path, destination, { onProgress, signal })`
+streams a file to a path the desktop shell got from its native Save dialog,
+and removes the partial file if it fails or is aborted.
 
 ## `/api/fs` — file-system access (PRD 001, §7)
 
@@ -63,9 +74,9 @@ path reaches the file system.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/fs/list?path=` | Directory listing, directories first then files |
+| GET | `/api/fs/list?path=` | Directory listing: folders (and links to folders) first, then the rest, in natural order (`file2` before `file10`) |
 | GET | `/api/fs/details?path=` | Full metadata for one entry |
-| GET | `/api/fs/download?path=` | Stream a file (`Accept-Ranges`, `Content-Disposition: attachment`) |
+| GET | `/api/fs/download?path=` | Stream a file (`Accept-Ranges`, `Content-Disposition: attachment`); a range past the end — any range on an empty file — is `416` |
 | POST | `/api/fs/upload?path=&overwrite=` | Upload one file, `multipart/form-data`, field `file` |
 
 Successful JSON responses are `{ "data": … }`; errors are
@@ -93,8 +104,14 @@ Notes worth knowing before you call it:
 - **`mimeType` is a guess from the extension** (small built-in table, no
   dependency) and is `null` for directories and unknown extensions; downloads
   fall back to `application/octet-stream`.
-- **Symlinks** are reported as `type: 'symlink'`; `symlinkTarget` is
-  root-relative, or `null` when the link points outside the root.
+- **Symlinks** are reported as `type: 'symlink'`, with `targetType` saying what
+  the link leads to — `'directory'`, `'file'`, `'other'`, or `null` when it is
+  dangling or leads outside the root. A link to a folder inside the root lists
+  like the folder (the paths keep the link's name), and a link to a file
+  downloads as the file. `symlinkTarget` (details only) is root-relative, or
+  `null` when the link points outside the root.
+- **Listings `lstat` in parallel**, 64 entries at a time, so a large folder or
+  a network mount is not one syscall round trip per entry.
 
 The frontend client for this API is `prj/frontend/src/app/file-system/`
 (`FileSystemService` plus its read and transfer feature classes).

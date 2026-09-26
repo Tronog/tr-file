@@ -2,6 +2,7 @@ import {
   HttpClient,
   HttpErrorResponse,
   HttpEventType,
+  HttpHeaders,
   HttpParams,
   httpResource,
   type HttpProgressEvent,
@@ -12,12 +13,14 @@ import { firstValueFrom, type Subscription } from 'rxjs';
 import type {
   FsDetails,
   FsDirectoryListing,
+  FsDownload,
+  FsDownloadResult,
   FsEnvelope,
   FsUpload,
   FsUploadProgress,
 } from './file-system.model';
 import { FS_ABORTED, FsError } from './fs-error';
-import type { FsSaveUrl, FsTransport, FsUploadOptions } from './fs-transport';
+import type { FsTransport, FsUploadOptions } from './fs-transport';
 
 const IDLE_PROGRESS: FsUploadProgress = { loaded: 0, total: null, percent: null };
 
@@ -72,9 +75,82 @@ export class FsHttpService implements FsTransport {
     }
   }
 
-  /** The download endpoint itself: the browser streams it straight to disk. */
-  async saveUrl(path: string): Promise<FsSaveUrl> {
-    return { url: this.downloadUrl(path), release: () => undefined };
+  /**
+   * Hands the download endpoint to the browser, which streams the file
+   * straight to disk — the page never holds it.
+   *
+   * The browser reports nothing back about a download it was handed, so the
+   * endpoint is asked for its first byte beforehand: a missing file, a
+   * permission problem, a folder — anything the server would refuse — fails
+   * here, with the contract's own code, rather than as a mystery in the
+   * browser's downloads list. What the browser does after that is its
+   * business, hence `delegated`.
+   */
+  save(path: string, name: string): FsDownload {
+    const progress = signal<FsUploadProgress>(IDLE_PROGRESS);
+    let subscription: Subscription | undefined;
+    let settled = false;
+    let fail: (error: FsError) => void = () => undefined;
+
+    const result = new Promise<FsDownloadResult>((resolve, reject) => {
+      fail = (error: FsError) => {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      };
+
+      subscription = this.http
+        .get(this.downloadUrl(path), {
+          responseType: 'blob',
+          headers: new HttpHeaders({ Range: 'bytes=0-0' }),
+        })
+        .subscribe({
+          next: () => {
+            if (settled) {
+              return;
+            }
+            this.handToBrowser(path, name);
+            settled = true;
+            resolve({ outcome: 'delegated' });
+          },
+          error: (error: unknown) => {
+            // An empty file has no first byte to give: "range not
+            // satisfiable" still means it is there to be saved.
+            if (error instanceof HttpErrorResponse && error.status === 416 && !settled) {
+              this.handToBrowser(path, name);
+              settled = true;
+              resolve({ outcome: 'delegated' });
+            } else if (error instanceof HttpErrorResponse) {
+              void FsError.fromHttpResponse(error).then(fail);
+            } else {
+              fail(FsError.from(error));
+            }
+          },
+        });
+    });
+
+    return {
+      progress: progress.asReadonly(),
+      result,
+      cancel: () => {
+        // Only the check can be stopped; once the browser has the file, the
+        // download is in its hands and this does nothing.
+        subscription?.unsubscribe();
+        fail(new FsError('The download was cancelled.', 0, FS_ABORTED));
+      },
+    };
+  }
+
+  /** The backend answers with `Content-Disposition: attachment`, so this saves. */
+  private handToBrowser(path: string, name: string): void {
+    const anchor = document.createElement('a');
+    anchor.href = this.downloadUrl(path);
+    anchor.download = name;
+    anchor.rel = 'noopener';
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
   }
 
   /**

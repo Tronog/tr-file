@@ -11,6 +11,12 @@ import type { Signal } from '@angular/core';
 /** What a directory entry is, as the backend classifies it. */
 export type FsEntryType = 'file' | 'directory' | 'symlink' | 'other';
 
+/**
+ * What a symlink leads to, when that is inside the files root; `null` when it
+ * is dangling or leads out of the root, so there is nothing to reach.
+ */
+export type FsTargetType = Exclude<FsEntryType, 'symlink'> | null;
+
 /** One entry of a directory listing. */
 export interface FsEntry {
   /** Basename; `''` for the root itself. */
@@ -26,6 +32,8 @@ export interface FsEntry {
   readonly modifiedAt: string;
   /** ISO 8601. */
   readonly createdAt: string;
+  /** Symlinks only: what the link leads to. Absent for every other type. */
+  readonly targetType?: FsTargetType;
 }
 
 /** The payload of `GET /api/fs/list`. */
@@ -33,7 +41,7 @@ export interface FsDirectoryListing {
   readonly path: string;
   /** `null` at the root. */
   readonly parent: string | null;
-  /** Directories first, then files, case-insensitive. */
+  /** Folders (links to folders included) first, then the rest, in natural order. */
   readonly entries: readonly FsEntry[];
 }
 
@@ -89,7 +97,7 @@ export interface FsErrorBody {
 }
 
 /**
- * How far an upload has got.
+ * How far a transfer has got — an upload or a download.
  *
  * `total` and `percent` are `null` until the browser reports a content length —
  * some environments never do, so callers must handle the indeterminate case.
@@ -112,5 +120,31 @@ export interface FsUpload {
   /** Resolves with the stored file's details, or rejects with an `FsError`. */
   readonly result: Promise<FsDetails>;
   /** Aborts the request; `result` then rejects with an `FsError`. */
+  cancel(): void;
+}
+
+/**
+ * How a download ended, when it did not fail.
+ *
+ * - `saved` — the app wrote the file where the user chose (the desktop).
+ * - `delegated` — the browser was handed the file and is saving it; what it
+ *   does from there is in its own downloads list, not ours (HTTP).
+ * - `dismissed` — the user closed the Save dialog. Not an error.
+ */
+export interface FsDownloadResult {
+  readonly outcome: 'saved' | 'delegated' | 'dismissed';
+  /** Bytes written, when the app wrote them itself. */
+  readonly bytes?: number;
+}
+
+/**
+ * A single download, shaped like `FsUpload` so the Transfers panel can track
+ * both the same way (PRD 003, §1).
+ */
+export interface FsDownload {
+  readonly progress: Signal<FsUploadProgress>;
+  /** Resolves with how the download ended, or rejects with an `FsError`. */
+  readonly result: Promise<FsDownloadResult>;
+  /** Stops the download; `result` then rejects with an `FsError` (`ABORTED`). */
   cancel(): void;
 }

@@ -70,7 +70,7 @@ describe('ChromeFeature', () => {
     it('appears while uploads are running and disappears when they finish', async () => {
       workbench.transfersFt.uploadFiles('', [new File(['a'], 'a.txt')]);
 
-      expect(leading('transfers')).toMatchObject({ label: '1 uploading', icon: 'upload' });
+      expect(leading('transfers')).toMatchObject({ label: '1 transferring', icon: 'sync' });
       expect(
         workbench.chromeFt.activityItems().find((item) => item.id === 'transfers')?.badge,
       ).toBe(1);

@@ -106,10 +106,18 @@ the preload put one on `window`, HTTP otherwise. Nothing downstream branches on
 it, and a backend refusal arrives as the same `FsError`, with the same code and
 status, either way.
 
-Two differences are visible and deliberate. Uploads report **start and finish,
-not a curve** — the bytes cross in one hand-off, and a fake progress bar would
-be worse than none. And a **download has no URL**, so the bytes are fetched and
-wrapped in an object URL, which is why `FsSaveUrl` carries a `release()`.
+**No file crosses whole** (PRD 003, §1). Reads and uploads move in 1 MiB
+chunks (`read` from an offset; `upload-begin` / `upload-chunk` / `upload-commit`),
+so a large file costs one chunk of memory at a time on either side, an upload
+reports real progress, and a cancelled one stops part-way and is discarded.
+
+A **download has no URL** here, so it does not go through the page at all:
+`SaveFileChannel` (`'tr-file:save'`) shows the native Save dialog and streams
+the file to the chosen path with `App.bridge.saveCopy`, pushing progress to the
+window on `'tr-file:save:progress'`; the page can `cancel` it by the id it gave
+it. The destination comes from the dialog, never from the page. The preload
+exposes this as `trFileBridge.save` / `onSaveProgress`, and the bridge contract
+is version 2 — a page expecting version 1 does not use it.
 
 ## No window decorations (PRD 001, §8.2)
 

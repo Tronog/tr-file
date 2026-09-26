@@ -6,7 +6,7 @@ import type { WorkbenchService } from '../workbench.service';
  * The window chrome: title bar, activity bar and status bar.
  *
  * The menus are still static configuration, but everything that reports state —
- * problem count, active uploads, selection, hidden-file visibility — is derived
+ * problem count, active transfers, selection, hidden-file visibility — is derived
  * from the live workbench, so the bars never claim something that is not true.
  */
 export class ChromeFeature {
@@ -28,7 +28,7 @@ export class ChromeFeature {
   }
 
   readonly activityItems = computed<readonly UiActivityItem[]>(() => {
-    const uploads = this.parent.transfersFt.activeCount();
+    const transfers = this.parent.transfersFt.activeCount();
     return [
       { id: 'explorer', label: 'Explorer', icon: 'copy', active: true },
       { id: 'search', label: 'Search', icon: 'search' },
@@ -36,7 +36,7 @@ export class ChromeFeature {
         id: 'transfers',
         label: 'Transfers',
         icon: 'download',
-        ...(uploads > 0 ? { badge: uploads } : {}),
+        ...(transfers > 0 ? { badge: transfers } : {}),
       },
       { id: 'bookmarks', label: 'Bookmarks', icon: 'star' },
     ];
@@ -44,7 +44,7 @@ export class ChromeFeature {
 
   readonly statusLeadingItems = computed<readonly UiStatusItem[]>(() => {
     const problems = this.parent.fsDataFt.errors().length;
-    const uploads = this.parent.transfersFt.activeCount();
+    const transfers = this.parent.transfersFt.activeCount();
     const items: UiStatusItem[] = [
       {
         id: 'root',
@@ -61,11 +61,11 @@ export class ChromeFeature {
       },
     ];
 
-    if (uploads > 0) {
+    if (transfers > 0) {
       items.push({
         id: 'transfers',
-        label: `${uploads} uploading`,
-        icon: 'upload',
+        label: `${transfers} transferring`,
+        icon: 'sync',
         title: 'Show the Transfers panel',
       });
     }

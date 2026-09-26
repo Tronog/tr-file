@@ -47,6 +47,18 @@
               (command)="command.emit($event)"
             />
           }
+          @case ('tree') {
+            <ui-file-list
+              label="Files and folders"
+              [tree]="true"
+              [columns]="browser().columns"
+              [rows]="browser().rows"
+              (select)="rowSelect.emit($event)"
+              (activate)="rowActivate.emit($event)"
+              (toggle)="rowToggle.emit($event)"
+              (command)="command.emit($event)"
+            />
+          }
           @case ('grid') {
             <ui-icon-view
               [items]="browser().items"

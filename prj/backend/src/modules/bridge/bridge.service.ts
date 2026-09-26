@@ -1,16 +1,44 @@
-import { readFile } from 'node:fs/promises';
-import { Readable } from 'node:stream';
+import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { open, rm } from 'node:fs/promises';
+import { PassThrough } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
-import type { FilesService } from '../files/index.js';
-import type {
-  FsBridgeFailure,
-  FsBridgeRequest,
-  FsBridgeResponse,
-  FsReadRequest,
-  FsReadResult,
-  FsUploadRequest,
+import type { FileDetails, FilesService } from '../files/index.js';
+import {
+  FS_BRIDGE_CHUNK_BYTES,
+  type FsBridgeFailure,
+  type FsBridgeRequest,
+  type FsBridgeResponse,
+  type FsReadRequest,
+  type FsReadResult,
+  type FsUploadBeginRequest,
+  type FsUploadBeginResult,
+  type FsUploadChunkRequest,
 } from './bridge.model.js';
+
+/** An upload that has not been touched for this long is given up on. */
+const UPLOAD_IDLE_MS = 60_000;
+
+/** One upload whose bytes are still arriving, chunk by chunk. */
+interface UploadSession {
+  /** What the chunks are written into; `storeUpload` drains it to disk. */
+  readonly stream: PassThrough;
+  /** Settles when the file is stored, or when storing it failed. */
+  readonly done: Promise<FileDetails>;
+  /** Why `done` rejected, as soon as it has — so a chunk can fail fast. */
+  failure?: unknown;
+  received: number;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+/** Progress of a `saveCopy`, for the caller to relay however it likes. */
+export interface FsSaveCopyOptions {
+  readonly onProgress?: (loaded: number, total: number) => void;
+  readonly signal?: AbortSignal;
+}
 
 /**
  * The file-system API without HTTP (PRD 001, §8.1).
@@ -29,8 +57,15 @@ import type {
  *    clone boundary loses its type, its code and usually its message, so a
  *    failure is flattened into the same `{ error: { code, message } }` shape
  *    HTTP would have sent — plus the status that shape would have had.
+ * 3. **No file crosses whole** (PRD 003, §1). Reads and uploads move in
+ *    chunks of at most `FS_BRIDGE_CHUNK_BYTES`, so neither process ever holds
+ *    more than one of them for a transfer — the HTTP side streams, and this
+ *    one must not be the place a large file costs its size twice.
  */
 export class FileSystemBridge {
+  /** Uploads in progress, by the id `upload-begin` handed out. */
+  private readonly uploads = new Map<string, UploadSession>();
+
   constructor(
     private readonly files: FilesService,
     private readonly logger: Logger,
@@ -46,10 +81,54 @@ export class FileSystemBridge {
       // the bridge would otherwise be a silent second door into the same API.
       this.logger.debug('command', {
         command: parsed.command,
-        path: parsed.path,
+        ...('path' in parsed ? { path: parsed.path } : { uploadId: parsed.uploadId }),
         durationMs: Number((performance.now() - startedAt).toFixed(3)),
       });
       return { data };
+    } catch (error: unknown) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Copies one file out of the root to `destination`, streaming it, and
+   * answers the way `dispatch` does.
+   *
+   * Not a command: `destination` is a path *outside* the root, so it must never
+   * come from a renderer. The desktop shell calls this with the path the user
+   * picked in its own native Save dialog — the one way a download leaves the
+   * app there. A copy that fails or is aborted leaves nothing behind.
+   */
+  async saveCopy(
+    path: string,
+    destination: string,
+    options: FsSaveCopyOptions = {},
+  ): Promise<FsBridgeResponse<{ readonly bytes: number }>> {
+    try {
+      const target = await this.files.resolveDownload(path);
+      let loaded = 0;
+      const report = options.onProgress;
+
+      try {
+        await pipeline(
+          createReadStream(target.absolutePath),
+          async function* count(source: AsyncIterable<Buffer>): AsyncGenerator<Buffer> {
+            for await (const chunk of source) {
+              loaded += chunk.length;
+              report?.(loaded, target.size);
+              yield chunk;
+            }
+          },
+          createWriteStream(destination),
+          ...(options.signal === undefined ? [] : [{ signal: options.signal }]),
+        );
+      } catch (error) {
+        await rm(destination, { force: true });
+        throw options.signal?.aborted ? FileSystemBridge.aborted('The download was cancelled.') : error;
+      }
+
+      this.logger.debug('saved copy', { path, bytes: loaded });
+      return { data: { bytes: loaded } };
     } catch (error: unknown) {
       return this.toFailure(error);
     }
@@ -63,15 +142,22 @@ export class FileSystemBridge {
         return (await this.files.getDetails(request.path)).toJSON();
       case 'read':
         return this.read(request);
-      case 'upload':
-        return this.upload(request);
+      case 'upload-begin':
+        return this.beginUpload(request);
+      case 'upload-chunk':
+        return this.writeChunk(request);
+      case 'upload-commit':
+        return (await this.commitUpload(request.uploadId)).toJSON();
+      case 'upload-abort':
+        await this.abortUpload(request.uploadId);
+        return { aborted: true };
     }
   }
 
   /**
-   * Reads a whole file into memory, refusing anything past `maxBytes` *before*
-   * the read rather than after it — the caller knows the size from the listing
-   * and says what it is willing to hold.
+   * Reads one chunk of a file, refusing anything past `maxBytes` *before* the
+   * read rather than after it — the caller knows the size from the listing and
+   * says what it is willing to hold.
    */
   private async read(request: FsReadRequest): Promise<FsReadResult> {
     const target = await this.files.resolveDownload(request.path);
@@ -84,31 +170,149 @@ export class FileSystemBridge {
       );
     }
 
-    const content = await readFile(target.absolutePath);
+    const offset = request.offset ?? 0;
+    if (offset > target.size) {
+      throw HttpError.badRequest(`Offset ${offset} is past the end of the file`);
+    }
+    const length = Math.min(request.length ?? FS_BRIDGE_CHUNK_BYTES, FS_BRIDGE_CHUNK_BYTES, target.size - offset);
+
+    // `Buffer.alloc` never hands out a slice of Node's shared pool, so the
+    // `ArrayBuffer` a structured clone copies is this chunk and nothing else.
+    const buffer = Buffer.alloc(length);
+    let bytesRead = 0;
+    if (length > 0) {
+      const handle = await open(target.absolutePath, 'r');
+      try {
+        ({ bytesRead } = await handle.read(buffer, 0, length, offset));
+      } finally {
+        await handle.close();
+      }
+    }
+
     return {
       path: request.path,
       name: target.name,
       size: target.size,
       mimeType: target.mimeType,
+      offset,
       // A plain view over the buffer: `Buffer` is a `Uint8Array`, but only the
       // latter survives a structured clone as itself.
-      content: new Uint8Array(content),
+      content: new Uint8Array(buffer.buffer, buffer.byteOffset, bytesRead),
     };
   }
 
   /**
-   * Stores one file. The bytes arrive whole — there is no multipart stream to
-   * parse on this side — so they are handed to the service as a one-shot
-   * stream, which keeps `saveUpload`'s write-to-temp-then-rename intact.
+   * Accepts an upload, refusing up front what `prepareUpload` refuses, and
+   * starts `storeUpload` draining a stream the chunks will be written into —
+   * so `saveUpload`'s write-to-temp-then-rename holds here exactly as over
+   * HTTP, as does its size ceiling.
    */
-  private async upload(request: FsUploadRequest): Promise<unknown> {
-    const details = await this.files.saveUpload({
+  private async beginUpload(request: FsUploadBeginRequest): Promise<FsUploadBeginResult> {
+    const prepared = await this.files.prepareUpload({
       directoryPath: request.path,
       filename: request.filename,
-      content: Readable.from(Buffer.from(request.content)),
       overwrite: request.overwrite,
     });
-    return details.toJSON();
+
+    const uploadId = randomUUID();
+    const stream = new PassThrough();
+    // `storeUpload`'s pipeline reports a failure through `done`; a destroyed
+    // stream must not also raise an unhandled `error` event.
+    stream.on('error', () => undefined);
+
+    const session: UploadSession = {
+      stream,
+      done: this.files.storeUpload(prepared, stream),
+      received: 0,
+      timer: this.idleTimer(uploadId),
+    };
+    session.done.catch((error: unknown) => {
+      session.failure = error;
+    });
+
+    this.uploads.set(uploadId, session);
+    return { uploadId };
+  }
+
+  /** Writes one chunk, waiting for the disk to catch up before answering. */
+  private async writeChunk(request: FsUploadChunkRequest): Promise<{ readonly received: number }> {
+    const session = this.session(request.uploadId);
+    if (request.content.byteLength > FS_BRIDGE_CHUNK_BYTES) {
+      throw HttpError.badRequest(`A chunk may carry at most ${FS_BRIDGE_CHUNK_BYTES} bytes`);
+    }
+    this.throwIfFailed(request.uploadId, session);
+
+    const chunk = Buffer.from(request.content.buffer, request.content.byteOffset, request.content.byteLength);
+    if (!session.stream.write(chunk)) {
+      // Backpressure: answer once the chunk is on its way to disk, or once
+      // storing has failed — never leave the caller waiting on a dead stream.
+      await Promise.race([once(session.stream, 'drain').catch(() => undefined), session.done.catch(() => undefined)]);
+    }
+    this.throwIfFailed(request.uploadId, session);
+
+    session.received += chunk.length;
+    return { received: session.received };
+  }
+
+  private async commitUpload(uploadId: string): Promise<FileDetails> {
+    const session = this.session(uploadId);
+    session.stream.end();
+    try {
+      return await session.done;
+    } finally {
+      this.forget(uploadId);
+    }
+  }
+
+  /** Stops an upload and lets `storeUpload` discard what it wrote. Idempotent. */
+  private async abortUpload(uploadId: string): Promise<void> {
+    const session = this.uploads.get(uploadId);
+    if (!session) {
+      return;
+    }
+    this.forget(uploadId);
+    session.stream.destroy(FileSystemBridge.aborted('The upload was cancelled.'));
+    await session.done.catch(() => undefined);
+  }
+
+  private session(uploadId: string): UploadSession {
+    const session = this.uploads.get(uploadId);
+    if (!session) {
+      throw HttpError.notFound(`No upload in progress with id ${uploadId}`);
+    }
+    clearTimeout(session.timer);
+    session.timer = this.idleTimer(uploadId);
+    return session;
+  }
+
+  /** A failed upload is over: its session goes, and its reason is the answer. */
+  private throwIfFailed(uploadId: string, session: UploadSession): void {
+    if (session.failure !== undefined) {
+      this.forget(uploadId);
+      throw session.failure;
+    }
+  }
+
+  private forget(uploadId: string): void {
+    const session = this.uploads.get(uploadId);
+    if (session) {
+      clearTimeout(session.timer);
+      this.uploads.delete(uploadId);
+    }
+  }
+
+  /** A renderer that vanished mid-upload must not keep a temp file open forever. */
+  private idleTimer(uploadId: string): ReturnType<typeof setTimeout> {
+    const timer = setTimeout(() => {
+      this.logger.warn('abandoned upload aborted', { uploadId });
+      void this.abortUpload(uploadId);
+    }, UPLOAD_IDLE_MS);
+    timer.unref?.();
+    return timer;
+  }
+
+  private static aborted(message: string): HttpError {
+    return new HttpError(0, 'ABORTED', message);
   }
 
   private toFailure(error: unknown): FsBridgeFailure {
@@ -143,25 +347,39 @@ export class FileSystemBridge {
     }
 
     const { command } = value as { command?: unknown };
-    const path = FileSystemBridge.readString(value, 'path');
 
     switch (command) {
       case 'list':
-        return { command, path };
       case 'details':
-        return { command, path };
+        return { command, path: FileSystemBridge.readString(value, 'path') };
       case 'read': {
-        const maxBytes = FileSystemBridge.readOptionalCount(value, 'maxBytes');
-        return { command, path, ...(maxBytes === undefined ? {} : { maxBytes }) };
-      }
-      case 'upload':
+        const optional = {
+          offset: FileSystemBridge.readOptionalCount(value, 'offset'),
+          length: FileSystemBridge.readOptionalCount(value, 'length'),
+          maxBytes: FileSystemBridge.readOptionalCount(value, 'maxBytes'),
+        };
         return {
           command,
-          path,
+          path: FileSystemBridge.readString(value, 'path'),
+          ...Object.fromEntries(Object.entries(optional).filter(([, count]) => count !== undefined)),
+        };
+      }
+      case 'upload-begin':
+        return {
+          command,
+          path: FileSystemBridge.readString(value, 'path'),
           filename: FileSystemBridge.readString(value, 'filename'),
-          content: FileSystemBridge.readContent(value),
           overwrite: (value as { overwrite?: unknown }).overwrite === true,
         };
+      case 'upload-chunk':
+        return {
+          command,
+          uploadId: FileSystemBridge.readString(value, 'uploadId'),
+          content: FileSystemBridge.readContent(value),
+        };
+      case 'upload-commit':
+      case 'upload-abort':
+        return { command, uploadId: FileSystemBridge.readString(value, 'uploadId') };
       default:
         throw HttpError.badRequest(`Unknown bridge command: ${String(command)}`);
     }

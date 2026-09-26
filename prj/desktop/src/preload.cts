@@ -21,11 +21,30 @@ const { contextBridge, ipcRenderer } = electron;
 
 /** Must match `FsBridgeChannel.CHANNEL` and the frontend's `BRIDGE_VERSION`. */
 const FS_CHANNEL = 'tr-file:fs';
+/**
+ * Version 2 (PRD 003, §1): reads and uploads move in chunks, and downloads go
+ * through `save`. A page built for version 1 must not use this bridge.
+ */
+const FS_VERSION = 2;
 const VERSION = 1;
 
+/** Must match `SaveFileChannel`'s channel and progress event. */
+const SAVE_CHANNEL = 'tr-file:save';
+const SAVE_PROGRESS_EVENT = 'tr-file:save:progress';
+
 contextBridge.exposeInMainWorld('trFileBridge', {
-  version: VERSION,
+  version: FS_VERSION,
   invoke: (request: unknown): Promise<unknown> => ipcRenderer.invoke(FS_CHANNEL, request),
+  /**
+   * Downloads a file: the main process asks where with the native dialog and
+   * streams the copy. `cancel` stops one by the id the page gave it.
+   */
+  save: (request: unknown): Promise<unknown> => ipcRenderer.invoke(SAVE_CHANNEL, request),
+  onSaveProgress: (listener: (progress: unknown) => void): (() => void) => {
+    const handler = (_event: unknown, progress: unknown): void => listener(progress);
+    ipcRenderer.on(SAVE_PROGRESS_EVENT, handler);
+    return () => void ipcRenderer.removeListener(SAVE_PROGRESS_EVENT, handler);
+  },
 });
 
 /*

@@ -16,6 +16,7 @@ import { PanelFocusFeature } from './features/panel-focus.feature';
 import { PanelHistoryFeature } from './features/panel-history.feature';
 import { PanelKeyboardFeature } from './features/panel-keyboard.feature';
 import { PanelLayoutFeature } from './features/panel-layout.feature';
+import { PreviewRetentionFeature } from './features/preview-retention.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
 import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
@@ -94,6 +95,8 @@ export class WorkbenchService {
   readonly editorGroupsFt = new EditorGroupsFeature(this);
   /** File management: what folder and file tabs show, and navigating in them. */
   readonly fileBrowserFt = new FileBrowserFeature(this);
+  /** Frees cached file contents once nothing on screen shows them. */
+  readonly previewRetentionFt = new PreviewRetentionFeature(this);
   readonly detailsFt = new DetailsFeature(this);
   /** The panel key map; every binding it runs belongs to the features above. */
   readonly panelKeyboardFt = new PanelKeyboardFeature(this);

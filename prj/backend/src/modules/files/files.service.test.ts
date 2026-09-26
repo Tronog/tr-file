@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -94,6 +94,99 @@ describe('FilesService.listDirectory', () => {
 
   it('reports an escaping path as 403', async () => {
     await assertHttpStatus(() => service.listDirectory('../..'), 403);
+  });
+});
+
+/**
+ * PRD 003, §1 — natural order, and symlinks judged by what they lead to. A tree
+ * of its own, so the listing assertions above stay about theirs.
+ */
+describe('FilesService with symlinks and numbered names', () => {
+  let linkRoot: string;
+  let outside: string;
+  let links: FilesService;
+
+  before(async () => {
+    linkRoot = await mkdtemp(join(tmpdir(), 'tr-file-links-'));
+    outside = await mkdtemp(join(tmpdir(), 'tr-file-outside-'));
+    links = new FilesService(new FilePathResolver(linkRoot), Logger.create('error'), UPLOAD_LIMIT);
+
+    await mkdir(join(linkRoot, 'real'));
+    await writeFile(join(linkRoot, 'real', 'inside.txt'), 'inside');
+    for (const name of ['file10.txt', 'file2.txt', 'File1.txt']) {
+      await writeFile(join(linkRoot, name), name);
+    }
+    await symlink(join(linkRoot, 'real'), join(linkRoot, 'folder-link'));
+    await symlink(join(linkRoot, 'file2.txt'), join(linkRoot, 'file-link'));
+    await symlink(join(linkRoot, 'gone'), join(linkRoot, 'dangling'));
+    await symlink(outside, join(linkRoot, 'escape'));
+  });
+
+  after(async () => {
+    await rm(linkRoot, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  });
+
+  const entry = async (name: string) => {
+    const found = (await links.listDirectory('')).toJSON().entries.find((candidate) => candidate.name === name);
+    assert.ok(found !== undefined, `no entry named ${name}`);
+    return found;
+  };
+
+  it('sorts numbered names naturally, links to folders among the folders', async () => {
+    const names = (await links.listDirectory('')).toJSON().entries.map((candidate) => candidate.name);
+
+    assert.deepEqual(names, [
+      'folder-link',
+      'real',
+      'dangling',
+      'escape',
+      // Punctuation sorts before digits, as in every collation-aware file manager.
+      'file-link',
+      'File1.txt',
+      'file2.txt',
+      'file10.txt',
+    ]);
+  });
+
+  it('says what each link leads to', async () => {
+    assert.equal((await entry('folder-link')).targetType, 'directory');
+    assert.equal((await entry('file-link')).targetType, 'file');
+    // Nothing reachable: a dangling link, and one that leaves the root.
+    assert.equal((await entry('dangling')).targetType, null);
+    assert.equal((await entry('escape')).targetType, null);
+    // Anything that is not a link carries no target at all.
+    assert.equal('targetType' in (await entry('real')), false);
+  });
+
+  it('lists a folder through a link to it, keeping the link in the paths', async () => {
+    const dto = (await links.listDirectory('folder-link')).toJSON();
+
+    assert.equal(dto.path, 'folder-link');
+    assert.deepEqual(
+      dto.entries.map((candidate) => candidate.path),
+      ['folder-link/inside.txt'],
+    );
+  });
+
+  it('describes a link to a folder as one, with its contents counted', async () => {
+    const dto = (await links.getDetails('folder-link')).toJSON();
+
+    assert.equal(dto.type, 'symlink');
+    assert.equal(dto.targetType, 'directory');
+    assert.equal(dto.entryCount, 1);
+    assert.equal(dto.mimeType, null);
+  });
+
+  it('downloads a link to a file as the file, with its real size', async () => {
+    const target = await links.resolveDownload('file-link');
+
+    assert.equal(target.size, 'file2.txt'.length);
+  });
+
+  it('refuses to download a link to a folder, and to follow one out of the root', async () => {
+    await assertHttpStatus(() => links.resolveDownload('folder-link'), 400);
+    await assertHttpStatus(() => links.listDirectory('escape'), 403);
   });
 });
 

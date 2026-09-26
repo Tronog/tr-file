@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { FileSystemService } from './file-system.service';
-import { FsBridgeService } from './fs-bridge.service';
+import { BRIDGE_CHUNK_BYTES, FsBridgeService } from './fs-bridge.service';
 import { FsError } from './fs-error';
 import type { FsDetails, FsDirectoryListing } from './file-system.model';
 
@@ -36,19 +36,50 @@ type Sent = Record<string, unknown>;
 /** Stands in for the sandboxed preload's `window.trFileBridge`. */
 class FakeBridge {
   readonly sent: Sent[] = [];
+  readonly saves: Sent[] = [];
 
-  /** What the next `invoke` resolves with; a function may throw instead. */
+  /**
+   * What the next `invoke` resolves with. A function is called with the
+   * request, so one test can answer a conversation; it may throw instead.
+   */
   answer: unknown = { data: null };
 
-  readonly version = 1;
+  /** What `save` resolves with, by the same rules. */
+  saveAnswer: unknown = { data: { saved: false } };
+
+  readonly version = 2;
+
+  private progressListeners: ((progress: unknown) => void)[] = [];
 
   invoke = async (request: unknown): Promise<unknown> => {
     this.sent.push(request as Sent);
-    if (typeof this.answer === 'function') {
-      return (this.answer as () => unknown)();
-    }
-    return this.answer;
+    return typeof this.answer === 'function' ? (this.answer as (request: Sent) => unknown)(request as Sent) : this.answer;
   };
+
+  save = async (request: unknown): Promise<unknown> => {
+    this.saves.push(request as Sent);
+    return typeof this.saveAnswer === 'function'
+      ? (this.saveAnswer as (request: Sent) => unknown)(request as Sent)
+      : this.saveAnswer;
+  };
+
+  onSaveProgress = (listener: (progress: unknown) => void): (() => void) => {
+    this.progressListeners.push(listener);
+    return () => {
+      this.progressListeners = this.progressListeners.filter((candidate) => candidate !== listener);
+    };
+  };
+
+  /** What the main process pushes while a save streams. */
+  pushProgress(progress: unknown): void {
+    for (const listener of this.progressListeners) {
+      listener(progress);
+    }
+  }
+
+  get listening(): number {
+    return this.progressListeners.length;
+  }
 }
 
 function installBridge(bridge: FakeBridge | undefined): void {
@@ -106,57 +137,157 @@ describe('FsBridgeService', () => {
 
   it('reads a file as a blob, passing the caller’s size limit down', async () => {
     fake.answer = {
-      data: {
-        name: '001.md',
-        size: 7,
-        mimeType: 'text/markdown',
-        content: new TextEncoder().encode('# hello'),
-      },
+      data: { size: 7, mimeType: 'text/markdown', content: new TextEncoder().encode('# hello') },
     };
 
     await expect(fs.transferFt.readText('docs/prd/001.md', 1024)).resolves.toBe('# hello');
     // `maxBytes` travels with the command so the backend can refuse *first*.
     expect(fake.sent).toEqual([
-      { command: 'read', path: 'docs/prd/001.md', maxBytes: 1024 },
+      { command: 'read', path: 'docs/prd/001.md', offset: 0, length: BRIDGE_CHUNK_BYTES, maxBytes: 1024 },
     ]);
   });
 
-  /** An HTTP URL does not exist here, so the bytes become an object URL. */
-  it('wraps a file in an object URL to save it, and releases it again', async () => {
-    fake.answer = {
-      data: { name: 'a.bin', size: 2, mimeType: null, content: new Uint8Array([1, 2]) },
-    };
-    const created: string[] = [];
-    const revoked: string[] = [];
-    URL.createObjectURL = (blob: Blob | MediaSource) => {
-      const url = `blob:fake/${(blob as Blob).size}`;
-      created.push(url);
-      return url;
-    };
-    URL.revokeObjectURL = (url: string) => void revoked.push(url);
+  /** PRD 003, §1: no file crosses the channel whole. */
+  it('reads a large file chunk by chunk, asking from where the last one ended', async () => {
+    fake.answer = (request: Sent) => ({
+      data: {
+        size: 5,
+        mimeType: null,
+        content: new TextEncoder().encode(request['offset'] === 0 ? 'abc' : 'de'),
+      },
+    });
 
-    const target = await fs.transferFt.saveUrl('a.bin');
-    expect(target.url).toBe(created[0]);
+    const blob = await fs.transferFt.download('big.bin');
 
-    target.release();
-    expect(revoked).toEqual(created);
+    expect(await blob.text()).toBe('abcde');
+    expect(fake.sent.map((request) => request['offset'])).toEqual([0, 3]);
   });
 
-  it('uploads by handing the bytes over in one command', async () => {
-    fake.answer = { data: DETAILS };
-    const file = new File(['hi'], 'note.txt', { type: 'text/plain' });
+  describe('save()', () => {
+    it('asks the main process to save, and reports the bytes it wrote', async () => {
+      fake.saveAnswer = (request: Sent) => {
+        fake.pushProgress({ transferId: request['transferId'], loaded: 2, total: 4 });
+        fake.pushProgress({ transferId: 'someone-else', loaded: 4, total: 4 });
+        return { data: { saved: true, bytes: 4 } };
+      };
 
-    const upload = fs.transferFt.upload('docs', file, { overwrite: true });
-    await expect(upload.result).resolves.toEqual(DETAILS);
+      const download = fs.transferFt.save('docs/a.bin', 'a.bin');
+      await expect(download.result).resolves.toEqual({ outcome: 'saved', bytes: 4 });
 
-    const sent = fake.sent[0];
-    expect(sent['command']).toBe('upload');
-    expect(sent['path']).toBe('docs');
-    expect(sent['filename']).toBe('note.txt');
-    expect(sent['overwrite']).toBe(true);
-    expect(new TextDecoder().decode(sent['content'] as Uint8Array)).toBe('hi');
-    // One hand-off, so progress is start and finish rather than a curve.
-    expect(upload.progress()).toEqual({ loaded: 2, total: 2, percent: 100 });
+      expect(fake.saves[0]).toMatchObject({ command: 'save', path: 'docs/a.bin', name: 'a.bin' });
+      // Only its own transfer's progress, and the listener is gone afterwards.
+      expect(download.progress()).toEqual({ loaded: 2, total: 4, percent: 50 });
+      expect(fake.listening).toBe(0);
+      // Nothing was read into the page to do it.
+      expect(fake.sent).toEqual([]);
+    });
+
+    it('treats a dismissed Save dialog as a change of mind, not a failure', async () => {
+      fake.saveAnswer = { data: { saved: false } };
+
+      await expect(fs.transferFt.save('a.bin', 'a.bin').result).resolves.toEqual({ outcome: 'dismissed' });
+    });
+
+    it('passes on why a save failed', async () => {
+      fake.saveAnswer = { error: { code: 'NOT_FOUND', message: 'Path not found: a.bin', status: 404 } };
+
+      await expect(fs.transferFt.save('a.bin', 'a.bin').result).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('cancels by the id it gave the transfer', async () => {
+      let finish: (value: unknown) => void = () => undefined;
+      fake.saveAnswer = () => new Promise((resolve) => (finish = resolve));
+
+      const download = fs.transferFt.save('a.bin', 'a.bin');
+      download.cancel();
+
+      await expect(download.result).rejects.toMatchObject({ code: 'ABORTED' });
+      expect(fake.saves[1]).toEqual({ command: 'cancel', transferId: fake.saves[0]?.['transferId'] });
+      finish({ error: { code: 'ABORTED', message: 'cancelled', status: 0 } });
+    });
+  });
+
+  describe('upload()', () => {
+    /** Answers the begin / chunk / commit conversation the way the backend does. */
+    const answerUploads = (): void => {
+      let received = 0;
+      fake.answer = (request: Sent) => {
+        switch (request['command']) {
+          case 'upload-begin':
+            return { data: { uploadId: 'u1' } };
+          case 'upload-chunk':
+            received += (request['content'] as Uint8Array).byteLength;
+            return { data: { received } };
+          case 'upload-commit':
+            return { data: DETAILS };
+          default:
+            return { data: { aborted: true } };
+        }
+      };
+    };
+
+    it('begins, sends the file in chunks, and commits', async () => {
+      answerUploads();
+      const file = new File(['hi'], 'note.txt', { type: 'text/plain' });
+
+      const upload = fs.transferFt.upload('docs', file, { overwrite: true });
+      await expect(upload.result).resolves.toEqual(DETAILS);
+
+      expect(fake.sent.map((request) => request['command'])).toEqual(['upload-begin', 'upload-chunk', 'upload-commit']);
+      expect(fake.sent[0]).toEqual({ command: 'upload-begin', path: 'docs', filename: 'note.txt', overwrite: true });
+      expect(new TextDecoder().decode(fake.sent[1]?.['content'] as Uint8Array)).toBe('hi');
+      expect(upload.progress()).toEqual({ loaded: 2, total: 2, percent: 100 });
+    });
+
+    it('never sends more than one chunk’s worth at a time', async () => {
+      answerUploads();
+      const file = new File([new Uint8Array(BRIDGE_CHUNK_BYTES + 3)], 'big.bin');
+
+      await fs.transferFt.upload('', file).result;
+
+      const chunks = fake.sent.filter((request) => request['command'] === 'upload-chunk');
+      expect(chunks.map((chunk) => (chunk['content'] as Uint8Array).byteLength)).toEqual([BRIDGE_CHUNK_BYTES, 3]);
+    });
+
+    it('sends an empty file as a begin and a commit', async () => {
+      answerUploads();
+
+      await fs.transferFt.upload('', new File([], 'empty.txt')).result;
+
+      expect(fake.sent.map((request) => request['command'])).toEqual(['upload-begin', 'upload-commit']);
+    });
+
+    it('tells the backend to discard a cancelled upload, and sends no more', async () => {
+      let releaseChunk: (value: unknown) => void = () => undefined;
+      fake.answer = (request: Sent) => {
+        switch (request['command']) {
+          case 'upload-begin':
+            return { data: { uploadId: 'u1' } };
+          case 'upload-chunk':
+            // Held open, so the cancel lands while a chunk is in flight.
+            return new Promise((resolve) => (releaseChunk = resolve));
+          default:
+            return { data: { aborted: true } };
+        }
+      };
+
+      const upload = fs.transferFt.upload('', new File([new Uint8Array(BRIDGE_CHUNK_BYTES + 1)], 'big.bin'));
+      await vi.waitFor(() => expect(fake.sent.map((request) => request['command'])).toContain('upload-chunk'));
+      upload.cancel();
+      releaseChunk({ data: { received: BRIDGE_CHUNK_BYTES } });
+
+      await expect(upload.result).rejects.toMatchObject({ code: 'ABORTED' });
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(fake.sent.map((request) => request['command'])).toEqual(['upload-begin', 'upload-chunk', 'upload-abort']);
+    });
+
+    it('fails with the backend’s reason when begin is refused', async () => {
+      fake.answer = { error: { code: 'CONFLICT', message: 'Target already exists: note.txt', status: 409 } };
+
+      await expect(fs.transferFt.upload('', new File(['hi'], 'note.txt')).result).rejects.toMatchObject({
+        code: 'CONFLICT',
+      });
+    });
   });
 
   /**

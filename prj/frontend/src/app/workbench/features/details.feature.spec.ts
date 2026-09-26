@@ -317,14 +317,35 @@ describe('DetailsFeature', () => {
       }) as typeof document.createElement);
 
       workbench.detailsFt.runAction('download');
-      // The transport resolves the URL, so the anchor is clicked a microtask
-      // later; see `TransfersFeature.download` (PRD 001, §8.1).
+
+      // Only the first byte is asked for, so a refusal shows up as a failed
+      // row instead of disappearing into the browser (PRD 003, §1)...
+      const check = http.expectOne(downloadUrl('docs/notes.md'));
+      expect(check.request.headers.get('Range')).toBe('bytes=0-0');
+      expect(hrefs).toEqual([]);
+      check.flush(new Blob(['#']));
       await settled();
 
-      // A download is a browser transfer, not an `HttpClient` request.
+      // ...and the file itself is a browser transfer, not an `HttpClient` request.
       expect(hrefs).toEqual([downloadUrl('docs/notes.md')]);
       expect(names).toEqual(['notes.md']);
       http.expectNone(() => true);
+      expect(workbench.transfersFt.rows()[0]).toMatchObject({ name: 'notes.md ← docs/notes.md', statusLabel: 'sent to browser' });
+    });
+
+    it('shows a download the server refuses as a failed transfer', async () => {
+      await selectAndFlush('docs/notes.md');
+
+      workbench.detailsFt.runAction('download');
+      http
+        .expectOne(downloadUrl('docs/notes.md'))
+        .flush(new Blob([JSON.stringify(fsErrorBody('NOT_FOUND', 'Path not found: docs/notes.md'))]), {
+          status: 404,
+          statusText: 'Not Found',
+        });
+      await settled();
+
+      expect(workbench.transfersFt.rows()[0]).toMatchObject({ icon: 'alert-triangle', statusLabel: 'failed · not found' });
     });
 
     it('copies the entry path to the clipboard', async () => {

@@ -1,7 +1,7 @@
 import type { Stats } from 'node:fs';
 import { extname } from 'node:path';
 
-import { FileEntry, type FileEntryDto } from './file-entry.model.js';
+import { FileEntry, type FileEntryDto, type FileEntryTargetType } from './file-entry.model.js';
 
 /** A single read/write/execute triplet of the POSIX permission bits. */
 export interface PermissionTripletDto {
@@ -178,10 +178,14 @@ export class FileDetails {
   static fromStats(
     relativePath: string,
     stats: Stats,
-    extras: { symlinkTarget?: string | null; entryCount?: number | null } = {},
+    extras: {
+      symlinkTarget?: string | null;
+      entryCount?: number | null;
+      targetType?: FileEntryTargetType;
+    } = {},
   ): FileDetails {
     return new FileDetails({
-      entry: FileEntry.fromStats(relativePath, stats),
+      entry: FileEntry.fromStats(relativePath, stats, extras.targetType),
       accessedAt: stats.atime,
       changedAt: stats.ctime,
       mode: stats.mode,
@@ -205,7 +209,7 @@ export class FileDetails {
   }
 
   get mimeType(): string | null {
-    return this.entry.isDirectory ? null : FileDetails.guessMimeType(this.entry.name);
+    return this.entry.isFolderLike ? null : FileDetails.guessMimeType(this.entry.name);
   }
 
   /** The permission bits only, as four octal digits (e.g. `'0644'`). */

@@ -1,4 +1,5 @@
 import type { WorkbenchService } from '../workbench.service';
+import { isFolder } from '../../file-system/fs-entry-kind';
 
 /**
  * The link between the explorer and the panels.
@@ -33,10 +34,11 @@ export class ExplorerNavigationFeature {
 
   /**
    * The root is a directory the listing never describes (it has no entry of
-   * its own), so it is recognised by its empty path.
+   * its own), so it is recognised by its empty path. A link to a folder counts.
    */
   private isDirectory(path: string): boolean {
-    return path === '' || this.parent.fsDataFt.entryAt(path)?.type === 'directory';
+    const entry = this.parent.fsDataFt.entryAt(path);
+    return path === '' || (entry !== undefined && isFolder(entry));
   }
 
   private labelFor(path: string): string {

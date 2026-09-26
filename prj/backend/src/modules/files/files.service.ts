@@ -1,13 +1,19 @@
 import { randomBytes } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { lstat, readdir, readlink, rename, unlink } from 'node:fs/promises';
+import { lstat, readdir, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve as resolvePath, sep } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
 import { FilePathResolver, type ResolvedPath } from './file-path.resolver.js';
-import { DirectoryListing, FileDetails, FileEntry } from './models/index.js';
+import { DirectoryListing, FileDetails, FileEntry, type FileEntryTargetType } from './models/index.js';
+
+/**
+ * How many entries of one directory are `lstat`ed at once. Enough to keep a
+ * network mount busy, few enough never to exhaust file descriptors.
+ */
+const LISTING_CONCURRENCY = 64;
 
 /** Everything the download route needs to stream one file back. */
 export interface DownloadTarget {
@@ -30,6 +36,19 @@ export interface UploadRequest {
   readonly overwrite: boolean;
 }
 
+/**
+ * An upload that has passed every check that does not need its bytes: the
+ * directory exists, the name is safe, and the target may be written. Made by
+ * `prepareUpload`, consumed by `storeUpload`.
+ */
+export interface PreparedUpload {
+  /** Root-relative path the file will have. */
+  readonly relative: string;
+  readonly target: ResolvedPath;
+  readonly directory: ResolvedPath;
+  readonly name: string;
+}
+
 /** Browsing, downloading and uploading beneath the configured root. */
 export class FilesService {
   constructor(
@@ -43,34 +62,70 @@ export class FilesService {
     return this.resolver.rootPath;
   }
 
-  /** Lists the direct children of a directory. */
+  /**
+   * Lists the direct children of a directory — or of the directory a symlink
+   * leads to, which `resolveReal` has already proven to be inside the root.
+   *
+   * Entries are `lstat`ed in parallel, `LISTING_CONCURRENCY` at a time: one
+   * after another, a folder of ten thousand entries is ten thousand round
+   * trips before the first byte of the answer, which on a network mount is
+   * the difference between instant and minutes.
+   */
   async listDirectory(requestedPath: string | undefined): Promise<DirectoryListing> {
     const target = await this.resolver.resolveReal(requestedPath);
-    const stats = await this.lstatOrFail(target);
+    const stats = await this.statOrFail(target);
 
     if (!stats.isDirectory()) {
       throw HttpError.badRequest(`Not a directory: ${target.relative || '/'}`);
     }
 
     const dirents = await this.readdirOrFail(target);
-    const entries: FileEntry[] = [];
-
-    for (const dirent of dirents) {
-      const childAbsolute = join(target.absolute, dirent.name);
+    const entries = await mapLimited(dirents, LISTING_CONCURRENCY, (dirent) => {
       const childRelative =
         target.relative === '' ? dirent.name : `${target.relative}/${dirent.name}`;
-      try {
-        entries.push(FileEntry.fromStats(childRelative, await lstat(childAbsolute)));
-      } catch (error) {
-        // A racing unlink or an unreadable entry must not fail the whole listing.
-        this.logger.debug('skipped unreadable entry', {
-          path: childRelative,
-          reason: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
+      return this.describeChild(join(target.absolute, dirent.name), childRelative);
+    });
 
-    return new DirectoryListing(target.relative, entries).sorted();
+    return new DirectoryListing(
+      target.relative,
+      entries.filter((entry): entry is FileEntry => entry !== null),
+    ).sorted();
+  }
+
+  /** One listing entry, or `null` when it vanished or cannot be read. */
+  private async describeChild(absolute: string, relative: string): Promise<FileEntry | null> {
+    try {
+      const stats = await lstat(absolute);
+      return FileEntry.fromStats(
+        relative,
+        stats,
+        stats.isSymbolicLink() ? await this.linkTargetType(absolute) : undefined,
+      );
+    } catch (error) {
+      // A racing unlink or an unreadable entry must not fail the whole listing.
+      this.logger.debug('skipped unreadable entry', {
+        path: relative,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * What a symlink leads to, if that is inside the root: a link to a folder
+   * is opened like one, while a dangling link or one that leaves the root is
+   * `null` — the resolver would refuse to follow it anyway.
+   */
+  private async linkTargetType(absolute: string): Promise<FileEntryTargetType> {
+    try {
+      const real = await realpath(absolute);
+      if (this.resolver.toRootRelative(real) === null) {
+        return null;
+      }
+      return FileEntry.typeOf(await stat(real)) as FileEntryTargetType;
+    } catch {
+      return null;
+    }
   }
 
   /** Returns metadata for a single entry (file or directory). */
@@ -83,22 +138,29 @@ export class FilesService {
   async getDetails(requestedPath: string | undefined): Promise<FileDetails> {
     const target = await this.resolver.resolveReal(requestedPath);
     const stats = await this.lstatOrFail(target);
+    const targetType = stats.isSymbolicLink() ? await this.linkTargetType(target.absolute) : undefined;
+    const folder = stats.isDirectory() || targetType === 'directory';
 
     return FileDetails.fromStats(target.relative, stats, {
-      entryCount: stats.isDirectory() ? await this.countEntries(target) : null,
+      entryCount: folder ? await this.countEntries(target) : null,
       symlinkTarget: stats.isSymbolicLink() ? await this.readSymlinkTarget(target) : null,
+      ...(targetType === undefined ? {} : { targetType }),
     });
   }
 
-  /** Validates that a path is a downloadable regular file. */
+  /**
+   * Validates that a path is a downloadable regular file. A symlink is judged
+   * by what it leads to — its size, and whether it is a file at all — since
+   * `resolveReal` has already proven that to be inside the root.
+   */
   async resolveDownload(requestedPath: string | undefined): Promise<DownloadTarget> {
     const target = await this.resolver.resolveReal(requestedPath);
-    const stats = await this.lstatOrFail(target);
+    const stats = await this.statOrFail(target);
 
     if (stats.isDirectory()) {
       throw HttpError.badRequest(`Not a file: ${target.relative || '/'}`);
     }
-    if (!stats.isFile() && !stats.isSymbolicLink()) {
+    if (!stats.isFile()) {
       throw HttpError.badRequest(`Not a regular file: ${target.relative || '/'}`);
     }
 
@@ -119,8 +181,18 @@ export class FilesService {
    * upload can never leave a truncated file behind under the final name.
    */
   async saveUpload(request: UploadRequest): Promise<FileDetails> {
+    return this.storeUpload(await this.prepareUpload(request), request.content);
+  }
+
+  /**
+   * The checks an upload can fail before a single byte is sent — a missing
+   * directory, an unsafe name, a target that exists — so a caller that feeds
+   * the bytes in over time (the desktop bridge) can refuse up front rather
+   * than after the whole file has crossed.
+   */
+  async prepareUpload(request: Omit<UploadRequest, 'content'>): Promise<PreparedUpload> {
     const directory = await this.resolver.resolveReal(request.directoryPath);
-    const directoryStats = await this.lstatOrFail(directory);
+    const directoryStats = await this.statOrFail(directory);
     if (!directoryStats.isDirectory()) {
       throw HttpError.badRequest(`Not a directory: ${directory.relative || '/'}`);
     }
@@ -130,10 +202,15 @@ export class FilesService {
     const target = this.resolver.resolve(relative);
 
     await this.assertWritableTarget(target, request.overwrite);
+    return { relative, target, directory, name };
+  }
 
+  /** Streams the bytes of a prepared upload to disk; see `saveUpload`. */
+  async storeUpload(prepared: PreparedUpload, content: Readable): Promise<FileDetails> {
+    const { directory, name, target, relative } = prepared;
     const temporary = join(directory.absolute, `.${name}.${randomBytes(8).toString('hex')}.part`);
     try {
-      await this.writeLimited(request.content, temporary);
+      await this.writeLimited(content, temporary);
       await rename(temporary, target.absolute);
     } catch (error) {
       await this.discard(temporary);
@@ -255,6 +332,15 @@ export class FilesService {
     }
   }
 
+  /** Like `lstatOrFail`, but follows a symlink to what it points at. */
+  private async statOrFail(target: ResolvedPath) {
+    try {
+      return await stat(target.absolute);
+    } catch (error) {
+      throw FilesService.toHttpError(error, target);
+    }
+  }
+
   private async readdirOrFail(target: ResolvedPath) {
     try {
       return await readdir(target.absolute, { withFileTypes: true });
@@ -292,4 +378,28 @@ export class FilesService {
       error instanceof Error ? error.message : undefined,
     );
   }
+}
+
+/**
+ * `Promise.all(items.map(run))`, but with at most `limit` calls in flight.
+ * Results keep the order of `items`.
+ */
+async function mapLimited<T, R>(
+  items: readonly T[],
+  limit: number,
+  run: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await run(items[index] as T);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
 }

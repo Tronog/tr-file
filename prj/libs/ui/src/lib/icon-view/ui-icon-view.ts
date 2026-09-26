@@ -1,7 +1,27 @@
-import { Component, computed, input, output, viewChildren, type ElementRef } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  afterNextRender,
+  afterRenderEffect,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChildren,
+} from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
 import type { UiIconViewItem, UiPanelKey } from '../models';
+import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
+
+/** The grid's `gap` and `padding`, as the stylesheet sets them. */
+const GAP = 4;
+const PADDING = 10;
+
+/** One visual row of tiles, gap included, until one has been measured. */
+const DEFAULT_LINE_HEIGHT = 84;
 
 /**
  * The "large icons" view of a directory: an auto-filling grid of 96px tiles.
@@ -16,21 +36,33 @@ import type { UiIconViewItem, UiPanelKey } from '../models';
  * follows focus exactly as it does in the list view. The keys that mean
  * something to the workbench leave as a `UiPanelKey` for the app to decide,
  * again as in the list view.
+ *
+ * A long folder renders only the visual rows near the viewport (PRD 003, §1),
+ * as the list view does: a full-width spacer stands in above and below, and
+ * a key that moves off the rendered tiles scrolls there and focuses the tile
+ * once it exists.
  */
 @Component({
   selector: 'ui-icon-view',
   imports: [UiIcon],
   template: `
-    @for (item of items(); track item.id; let index = $index) {
+    @if (spaceAbove() > 0) {
+      <div class="spacer" aria-hidden="true" [style.height.px]="spaceAbove()"></div>
+    }
+    @for (item of visibleItems(); track item.id; let offset = $index) {
+      @let index = range().start + offset;
       <button
         #tile
         type="button"
         class="item"
         role="option"
+        [attr.data-item-id]="item.id"
         [class.is-selected]="item.selected"
         [attr.aria-selected]="item.selected ? 'true' : 'false'"
+        [attr.aria-posinset]="virtual() ? index + 1 : null"
+        [attr.aria-setsize]="virtual() ? items().length : null"
         [attr.aria-keyshortcuts]="keyShortcuts"
-        [attr.tabindex]="item.id === focusId() ? 0 : -1"
+        [attr.tabindex]="item.id === tabStopId() ? 0 : -1"
         [attr.title]="item.label"
         (click)="select.emit(item.id)"
         (dblclick)="activate.emit(item.id)"
@@ -39,6 +71,9 @@ import type { UiIconViewItem, UiPanelKey } from '../models';
         <ui-icon [name]="item.icon" [tint]="item.tint" size="xl" />
         <span class="item-label">{{ item.label }}</span>
       </button>
+    }
+    @if (spaceBelow() > 0) {
+      <div class="spacer" aria-hidden="true" [style.height.px]="spaceBelow()"></div>
     }
   `,
   styleUrl: './ui-icon-view.scss',
@@ -72,6 +107,86 @@ export class UiIconView {
   private readonly tiles = viewChildren<ElementRef<HTMLButtonElement>>('tile');
 
   private readonly typeahead = new UiTypeahead();
+
+  private readonly viewport = new UiVirtualViewport();
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly lineHeight = signal(DEFAULT_LINE_HEIGHT);
+  private readonly perLine = signal(1);
+  private readonly leading = signal(PADDING);
+
+  /** A tile a key moved to before it was rendered; focused once it is. */
+  private pendingFocusId: string | null = null;
+
+  protected readonly virtual = computed(() => this.items().length >= VIRTUAL_THRESHOLD);
+
+  /** The tiles rendered: all of them, or the visual rows near the viewport. */
+  protected readonly range = computed(() => {
+    const total = this.items().length;
+    if (!this.virtual()) {
+      return { start: 0, end: total };
+    }
+    return visibleRange({
+      total,
+      lineHeight: this.lineHeight(),
+      perLine: this.perLine(),
+      scrollTop: this.viewport.scrollTop(),
+      viewportHeight: this.viewport.viewportHeight(),
+      leading: this.leading(),
+    });
+  });
+
+  protected readonly visibleItems = computed(() => {
+    const { start, end } = this.range();
+    return this.items().slice(start, end);
+  });
+
+  /**
+   * Spacer heights for the visual rows not rendered. A spacer is itself a
+   * grid row, so the `gap` after it is part of what it stands in for.
+   */
+  protected readonly spaceAbove = computed(() =>
+    Math.max(0, (this.range().start / this.perLine()) * this.lineHeight() - GAP),
+  );
+  protected readonly spaceBelow = computed(() => {
+    const remaining = Math.ceil((this.items().length - this.range().end) / this.perLine());
+    return Math.max(0, remaining * this.lineHeight() - GAP);
+  });
+
+  /** The focused tile when it is rendered, else the first tile that is. */
+  protected readonly tabStopId = computed(() => {
+    const focusId = this.focusId();
+    const visible = this.visibleItems();
+    return visible.some((item) => item.id === focusId) ? focusId : (visible[0]?.id ?? null);
+  });
+
+  constructor() {
+    afterNextRender(() => this.viewport.attach(this.host));
+    inject(DestroyRef).onDestroy(() => this.viewport.dispose());
+
+    // After each render of a long folder: measure the layout the window is
+    // computed from — `auto-fill` decides the columns, not this component —
+    // and focus a tile a key moved to while it was off-screen.
+    afterRenderEffect(() => {
+      this.range();
+      if (!this.virtual()) {
+        return;
+      }
+      const columns = this.columns();
+      const tiles = this.tiles();
+      const first = tiles[0]?.nativeElement;
+      const nextLine = tiles[columns]?.nativeElement;
+      if (first !== undefined && nextLine !== undefined && nextLine.offsetTop > first.offsetTop) {
+        this.lineHeight.set(nextLine.offsetTop - first.offsetTop);
+      }
+      // Only a whole row of tiles says how many fit, and the window always
+      // starts on a row boundary, so the count holds for the full list.
+      if (tiles.length > columns) {
+        this.perLine.set(columns);
+      }
+      this.leading.set(this.viewport.offsetOf(this.host) + PADDING);
+      this.focusPending();
+    });
+  }
 
   protected onKeydown(event: KeyboardEvent, index: number): void {
     const items = this.items();
@@ -157,8 +272,28 @@ export class UiIconView {
       return;
     }
 
-    this.tiles()[clamped]?.nativeElement.focus();
+    if (this.virtual()) {
+      const line = Math.floor(clamped / this.perLine());
+      this.viewport.reveal(this.leading() + line * this.lineHeight(), this.lineHeight());
+    }
+    // By id, not by position: once the window has moved, the rendered tiles
+    // are the old window's until the next render.
+    this.pendingFocusId = item.id;
+    this.focusPending();
     this.select.emit(item.id);
+  }
+
+  /** Focuses the tile a key moved to, if it is rendered yet. */
+  private focusPending(): void {
+    const id = this.pendingFocusId;
+    if (id === null) {
+      return;
+    }
+    const tile = this.tiles().find((candidate) => candidate.nativeElement.dataset['itemId'] === id);
+    if (tile) {
+      tile.nativeElement.focus();
+      this.pendingFocusId = null;
+    }
   }
 
   /**

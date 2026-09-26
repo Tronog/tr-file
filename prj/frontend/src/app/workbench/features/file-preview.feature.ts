@@ -3,7 +3,9 @@ import { Marked } from 'marked';
 import type { UiDocumentModel, UiEmptyStateModel } from '@tr-file/ui';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import { FsError } from '../../file-system/fs-error';
+import { sniffText, type SniffResult, type TextEncoding } from '../../file-system/text-sniff';
 import type { WorkbenchService } from '../workbench.service';
+import { isFile } from '../../file-system/fs-entry-kind';
 
 /** Files past this size are not previewed; the user downloads them instead. */
 const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
@@ -12,9 +14,10 @@ const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mkd']);
 
 /**
- * Extensions that are certainly not text. Anything else is attempted and
- * rejected on sight of a NUL byte — a deny-list of the common binaries beats
- * an allow-list that would refuse every unfamiliar source file.
+ * Extensions that are certainly not text, refused without reading a byte.
+ * Only a shortcut: everything else is read and *looked at* (`sniffText`), so
+ * an unlisted binary format is recognised by its content rather than shown as
+ * garbage (PRD 003, §1).
  */
 const BINARY_EXTENSIONS = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'ico', 'bmp', 'tiff',
@@ -62,9 +65,39 @@ export class FilePreviewFeature {
     this.previews = signal<ReadonlyMap<string, PreviewState>>(new Map());
   }
 
-  /** The document for a path, or `undefined` when it is not previewable. */
+  /**
+   * The document for a path, or `undefined` when it is not previewable.
+   *
+   * An image's `src` is read from the shared cache as the document is asked
+   * for, never stored: the cache revokes URLs nobody is showing, and a stored
+   * one would outlive its blob. Evicted means not shown until `load` reads it
+   * again.
+   */
   documentFor(path: string): UiDocumentModel | undefined {
-    return this.previews().get(path)?.document;
+    const document = this.previews().get(path)?.document;
+    if (document?.kind !== 'image') {
+      return document;
+    }
+    const src = this.parent.images.urlFor(path);
+    return src === undefined ? undefined : { ...document, src };
+  }
+
+  /**
+   * Forgets every preview no tab is showing (PRD 003, §1). A text preview is
+   * up to `MAX_PREVIEW_BYTES` of string, and nothing else ever let one go.
+   */
+  retainOnly(paths: ReadonlySet<string>): void {
+    const stale = [...this.previews().keys()].filter((path) => !paths.has(path) && !this.pending.has(path));
+    if (stale.length === 0) {
+      return;
+    }
+    this.previews.update((cache) => {
+      const next = new Map(cache);
+      for (const path of stale) {
+        next.delete(path);
+      }
+      return next;
+    });
   }
 
   /** The placeholder to show instead of a document: too large, binary, failed. */
@@ -90,20 +123,29 @@ export class FilePreviewFeature {
   }
 
   /**
-   * A double-click in the explorer. Only files open a preview: a directory was
-   * already opened by the single click that preceded it, and opening it twice
-   * would be noise.
+   * A double-click in the explorer. Only files open a preview — links to files
+   * included: a directory, or a link to one, was already opened by the single
+   * click that preceded it, and opening it twice would be noise.
    */
   openFromExplorer(path: string): void {
-    const type = this.parent.fsDataFt.entryAt(path)?.type;
-    if (type === 'file' || type === 'symlink') {
+    const entry = this.parent.fsDataFt.entryAt(path);
+    if (entry !== undefined && isFile(entry)) {
       this.open(path);
     }
   }
 
-  /** Reads and renders a file unless it is cached or already in flight. */
+  /**
+   * Reads and renders a file unless it is cached or already in flight — or,
+   * for an image, unless the picture itself is still in the shared cache,
+   * which lets go of pictures nobody was showing.
+   */
   load(path: string): void {
-    if (this.pending.has(path) || this.previews().has(path)) {
+    if (this.pending.has(path)) {
+      return;
+    }
+    const cached = this.previews().get(path);
+    const evicted = cached?.document?.kind === 'image' && this.parent.images.urlFor(path) === undefined;
+    if (cached !== undefined && !evicted) {
       return;
     }
     void this.fetch(path, false);
@@ -131,8 +173,11 @@ export class FilePreviewFeature {
       if (this.parent.images.isImage(path)) {
         this.patch(path, await this.renderImage(path, force));
       } else {
-        const text = await this.parent.fileSystem.transferFt.readText(path, MAX_PREVIEW_BYTES);
-        this.patch(path, this.render(path, text));
+        const blob = await this.parent.fileSystem.transferFt.download(path, MAX_PREVIEW_BYTES);
+        if (blob.size > MAX_PREVIEW_BYTES) {
+          throw new FsError(`File is larger than the ${MAX_PREVIEW_BYTES} byte preview limit`, 413, 'PAYLOAD_TOO_LARGE');
+        }
+        this.patch(path, this.render(path, sniffText(new Uint8Array(await blob.arrayBuffer()))));
       }
     } catch (error) {
       const failure = FsError.from(error);
@@ -149,10 +194,9 @@ export class FilePreviewFeature {
     }
   }
 
-  /** Turns file text into a document, or into a notice if it is not text. */
-  private render(path: string, text: string): PreviewState {
-    // A NUL byte in the first few KB is the classic "this is not text" tell.
-    if (text.slice(0, 8192).includes('\0')) {
+  /** Turns file bytes into a document, or into a notice if they are not text. */
+  private render(path: string, sniffed: SniffResult): PreviewState {
+    if (sniffed.kind === 'binary') {
       return {
         status: 'refused',
         notice: {
@@ -163,7 +207,8 @@ export class FilePreviewFeature {
       };
     }
 
-    const meta = this.metaFor(path, text);
+    const { text, encoding } = sniffed;
+    const meta = this.metaFor(path, text, encoding);
     if (MARKDOWN_EXTENSIONS.has(this.extension(path))) {
       return {
         status: 'ready',
@@ -210,8 +255,9 @@ export class FilePreviewFeature {
       };
     }
 
+    // No `src` here: `documentFor` reads it from the cache, which owns it.
     const meta = this.imageMetaFor(path);
-    return { status: 'ready', document: { path, kind: 'image', src: url, ...(meta ? { meta } : {}) } };
+    return { status: 'ready', document: { path, kind: 'image', ...(meta ? { meta } : {}) } };
   }
 
   /** `'2.4 MB · PNG'`; the pixel size is only known once the viewer loads it. */
@@ -257,12 +303,19 @@ export class FilePreviewFeature {
     return undefined;
   }
 
-  /** `'2.4 KB · 91 lines'`, from what is actually known about the file. */
-  private metaFor(path: string, text: string): string | undefined {
+  /**
+   * `'2.4 KB · 91 lines'`, from what is actually known about the file — and
+   * its encoding when that is not UTF-8, since that is worth knowing.
+   */
+  private metaFor(path: string, text: string, encoding: TextEncoding): string | undefined {
     const entry = this.parent.fsDataFt.entryAt(path);
     const lines = text === '' ? 0 : text.split('\n').length;
     const size = entry ? this.parent.fileViewModel.formatBytes(entry.size) : undefined;
-    const parts = [size, `${lines} ${lines === 1 ? 'line' : 'lines'}`].filter(Boolean);
+    const parts = [
+      size,
+      `${lines} ${lines === 1 ? 'line' : 'lines'}`,
+      encoding === 'UTF-8' ? undefined : encoding,
+    ].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : undefined;
   }
 

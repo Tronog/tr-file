@@ -274,6 +274,179 @@ describe('FileBrowserFeature', () => {
     });
   });
 
+  /** PRD 003, §1 — a link to a folder behaves as the folder it leads to. */
+  describe('symlinked folders', () => {
+    const LINKED = [
+      fsEntry('shortcut', { type: 'symlink', targetType: 'directory', size: 12 }),
+      fsEntry('note-link', { type: 'symlink', targetType: 'file', size: 9 }),
+    ];
+
+    it('shows a link to a folder as a folder', async () => {
+      await start([...ROOT_ENTRIES, ...LINKED]);
+
+      expect(rowOf('group-root', 'shortcut')).toMatchObject({ icon: 'folder', cells: { size: '—', type: 'Folder link' } });
+      expect(rowOf('group-root', 'note-link')).toMatchObject({ icon: 'file', cells: { type: 'Link' } });
+    });
+
+    it('navigates into it rather than previewing it', async () => {
+      await start([...ROOT_ENTRIES, ...LINKED]);
+
+      workbench.fileBrowserFt.openEntry('group-root', 'shortcut');
+      http.expectOne(listUrl('shortcut')).flush(fsEnvelope(fsListing('shortcut', [fsEntry('shortcut/inside.txt')])));
+      await settled();
+
+      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('shortcut');
+      expect(workbench.editorGroupsFt.group('group-root')?.tabs).toHaveLength(1);
+      http.expectNone(downloadUrl('shortcut'));
+    });
+
+    it('opens in place in the tree view', async () => {
+      await start([...ROOT_ENTRIES, ...LINKED]);
+      workbench.fileBrowserFt.setView('group-root', 'tree');
+
+      expect(rowOf('group-root', 'shortcut')?.expandable).toBe(true);
+      workbench.fileBrowserFt.toggleEntry('group-root', 'shortcut');
+      http.expectOne(listUrl('shortcut')).flush(fsEnvelope(fsListing('shortcut', [])));
+      await settled();
+
+      expect(rowOf('group-root', 'shortcut')?.expanded).toBe(true);
+    });
+  });
+
+  /** PRD 002, §4.1 — folders open in place, with the details view's columns. */
+  describe('tree view', () => {
+    const DOCS_ENTRIES = [fsDirectory('docs/prd'), fsEntry('docs/NOTES.md', { size: 1200 })];
+
+    const treeRows = (groupId = 'group-root') =>
+      (workbench.fileBrowserFt.browser(groupId)?.rows ?? []).map((row) => ({
+        id: row.id,
+        depth: row.depth,
+        expanded: row.expanded,
+      }));
+
+    /** Starts on the root in tree view and opens `docs`, answering its listing. */
+    const openDocs = async (): Promise<void> => {
+      await start();
+      workbench.fileBrowserFt.setView('group-root', 'tree');
+      workbench.fileBrowserFt.toggleEntry('group-root', 'docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+    };
+
+    it('lists the folder as the top level of a tree, files included', async () => {
+      await start();
+
+      workbench.fileBrowserFt.setView('group-root', 'tree');
+
+      const browser = workbench.fileBrowserFt.browser('group-root');
+      expect(browser?.view).toBe('tree');
+      expect(browser?.columns.map((column) => column.key)).toEqual(['name', 'size', 'type', 'modified']);
+      expect(browser?.rows.map((row) => [row.id, row.depth, row.expandable])).toEqual([
+        ['docs', 0, true],
+        ['README.md', 0, false],
+        ['main.ts', 0, false],
+      ]);
+      expect(rowOf('group-root', 'README.md')?.cells).toMatchObject({ size: '3.4 KB', type: 'MD' });
+    });
+
+    it('opens a folder in place, fetching it, and shows its entries one level down', async () => {
+      await start();
+      workbench.fileBrowserFt.setView('group-root', 'tree');
+
+      workbench.fileBrowserFt.toggleEntry('group-root', 'docs');
+
+      // Open at once, spinning until the listing arrives.
+      expect(rowOf('group-root', 'docs')).toMatchObject({ expanded: true, busy: true, icon: 'folder-open' });
+
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+
+      expect(treeRows()).toEqual([
+        { id: 'docs', depth: 0, expanded: true },
+        { id: 'docs/prd', depth: 1, expanded: false },
+        { id: 'docs/NOTES.md', depth: 1, expanded: undefined },
+        { id: 'README.md', depth: 0, expanded: undefined },
+        { id: 'main.ts', depth: 0, expanded: undefined },
+      ]);
+      expect(rowOf('group-root', 'docs')?.busy).toBeUndefined();
+      // The panel is still on the root: opening in place is not navigating.
+      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('');
+    });
+
+    it('closes an open folder without fetching again', async () => {
+      await openDocs();
+
+      workbench.fileBrowserFt.toggleEntry('group-root', 'docs');
+      expect(treeRows().map((row) => row.id)).toEqual(['docs', 'README.md', 'main.ts']);
+
+      workbench.fileBrowserFt.toggleEntry('group-root', 'docs');
+      http.expectNone(listUrl('docs'));
+      expect(treeRows()).toHaveLength(5);
+    });
+
+    it('ignores a toggle on a file', async () => {
+      await start();
+      workbench.fileBrowserFt.setView('group-root', 'tree');
+
+      workbench.fileBrowserFt.toggleEntry('group-root', 'README.md');
+
+      http.expectNone(() => true);
+      expect(rowOf('group-root', 'README.md')?.expanded).toBeUndefined();
+    });
+
+    /** Entries inside an open folder are as selectable and openable as the rest. */
+    it('selects and opens entries inside an open folder', async () => {
+      await openDocs();
+
+      workbench.fileBrowserFt.selectEntry('group-root', 'docs/NOTES.md');
+      http.expectOne(detailsUrl('docs/NOTES.md')).flush(fsEnvelope(fsDetails('docs/NOTES.md')));
+      await settled();
+      expect(rowOf('group-root', 'docs/NOTES.md')).toMatchObject({ selected: true, focused: true, depth: 1 });
+
+      workbench.fileBrowserFt.openEntry('group-root', 'docs/prd');
+      http.expectOne(listUrl('docs/prd')).flush(fsEnvelope(fsListing('docs/prd', [])));
+      await settled();
+      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('docs/prd');
+    });
+
+    it('re-reads the open folders too on refresh', async () => {
+      await openDocs();
+
+      workbench.fileBrowserFt.runToolbarAction('group-root', 'refresh');
+
+      http.expectOne(listUrl('')).flush(fsEnvelope(fsListing('', ROOT_ENTRIES)));
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+    });
+
+    /** Two panels on one folder are two places to work, each with its own tree. */
+    it('keeps what is open per panel', async () => {
+      await openDocs();
+
+      workbench.editorGroupsFt.runAction('group-root', 'split-right');
+      const second = workbench.panelLayoutFt.groupIds()[1] as string;
+
+      expect(workbench.fileBrowserFt.browser(second)?.view).toBe('tree');
+      expect(treeRows(second).map((row) => row.id)).toEqual(['docs', 'README.md', 'main.ts']);
+      expect(treeRows()).toHaveLength(5);
+    });
+
+    it('opens nothing it is not showing', async () => {
+      await openDocs();
+      workbench.fileBrowserFt.setView('group-root', 'list');
+
+      // In the flat list `docs/NOTES.md` is not on screen, so it is not there to open.
+      workbench.fileBrowserFt.openEntry('group-root', 'docs/NOTES.md');
+
+      http.expectNone(() => true);
+      expect(workbench.fileBrowserFt.browser('group-root')?.rows.map((row) => row.id)).toEqual([
+        'docs',
+        'README.md',
+        'main.ts',
+      ]);
+    });
+  });
+
   describe('uploadInto()', () => {
     it('starts one upload per dropped file in the group directory', async () => {
       await start();

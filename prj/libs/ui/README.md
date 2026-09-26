@@ -179,6 +179,8 @@ entry would maximize the window.
 | `Enter` / `Space` / `Backspace` / `F5` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
 | `Alt`+`←` / `Alt`+`→` in a body | Emitted as `back` / `forward`; the app walks that panel's own trail |
 | `Alt`+`↑` in a body | Emitted as `up`; the app leaves the folder for its parent |
+| Tree view (`UiPanelView` `'tree'`) | The details table as a tree grid: same columns, folders open in place |
+| Twisty, or `→` / `←` on a tree row | Emits `toggle` (`UiFileBrowser.rowToggle`); `→` on an open folder steps into it, `←` on anything else steps out to its parent |
 | Double-click a file (browser gets a `document`) | The body becomes a read-only `UiDocumentView`: markdown or text, path and `Read-only` on a status line, no view switch |
 
 Closing the last group anywhere leaves a single empty group, so there is always
@@ -315,6 +317,22 @@ Two inputs exist for the asynchronous world the workbench now lives in:
 being fetched, and `UiPanelGroupModel.loading` lights a 2px indeterminate rail
 under the tab bar. Both are pure inputs — the library never knows what is being
 loaded, only that something is.
+
+## Long lists
+
+`UiFileList` (tree mode included) and `UiIconView` render only what is near the
+viewport once they hold `VIRTUAL_THRESHOLD` (200) entries or more; below that
+every entry is rendered, exactly as before. `UiVirtualViewport` follows the
+nearest scrolling ancestor — the panel body scrolls, not the list — and
+`visibleRange` turns its scroll position into a slice, counted in *lines*: a
+table row, or one visual row of tiles whose column count is measured from the
+layout. Spacers above and below keep the scrollbar the whole list's, and
+`aria-rowcount` / `aria-setsize` tell assistive tech the real size.
+
+Every key still reaches every entry: a move to one that is not rendered
+scrolls it in and focuses it after the next render, and the roving tab stop is
+always a rendered entry — the focused one when it is in view, else the first
+that is.
 
 ## Testing
 

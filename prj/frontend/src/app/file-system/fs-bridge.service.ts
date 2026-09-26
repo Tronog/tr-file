@@ -1,7 +1,14 @@
 import { Service, signal } from '@angular/core';
-import type { FsDetails, FsDirectoryListing, FsUpload, FsUploadProgress } from './file-system.model';
+import type {
+  FsDetails,
+  FsDirectoryListing,
+  FsDownload,
+  FsDownloadResult,
+  FsUpload,
+  FsUploadProgress,
+} from './file-system.model';
 import { FS_ABORTED, FsError } from './fs-error';
-import type { FsSaveUrl, FsTransport, FsUploadOptions } from './fs-transport';
+import type { FsTransport, FsUploadOptions } from './fs-transport';
 
 /**
  * What a bridge command answers with. Mirrors the backend's
@@ -24,6 +31,10 @@ interface FsBridgeApi {
   /** Contract version, so a stale preload can be recognised rather than used. */
   readonly version: number;
   invoke(request: unknown): Promise<unknown>;
+  /** Asks the main process to save a file where the user chooses. */
+  save(request: unknown): Promise<unknown>;
+  /** Progress of every save in flight; returns its own unsubscribe. */
+  onSaveProgress(listener: (progress: unknown) => void): () => void;
 }
 
 declare global {
@@ -33,16 +44,39 @@ declare global {
   }
 }
 
-/** The contract version this service speaks. */
-const BRIDGE_VERSION = 1;
+/**
+ * The contract version this service speaks. Version 2 (PRD 003, §1) moves
+ * reads and uploads in chunks and adds `save`; a preload still speaking 1
+ * is not used at all, rather than used wrongly.
+ */
+const BRIDGE_VERSION = 2;
 
-/** What the file's bytes come back as. */
+/**
+ * The most bytes one command carries; must match the backend's
+ * `FS_BRIDGE_CHUNK_BYTES`. It is what bounds the memory a transfer costs on
+ * either side of the channel, whatever the size of the file.
+ */
+export const BRIDGE_CHUNK_BYTES = 1024 * 1024;
+
+/** One chunk of a file, as the `read` command answers it. */
 interface FsReadResult {
-  readonly name: string;
   readonly size: number;
   readonly mimeType: string | null;
   /** Explicitly over a plain `ArrayBuffer`, which is what `Blob` accepts. */
   readonly content: Uint8Array<ArrayBuffer>;
+}
+
+/** What the main process says a finished save was. */
+interface FsSaveOutcome {
+  readonly saved: boolean;
+  readonly bytes?: number;
+}
+
+/** One progress push from the main process. */
+interface FsSaveProgress {
+  readonly transferId: string;
+  readonly loaded: number;
+  readonly total: number;
 }
 
 /**
@@ -62,10 +96,12 @@ interface FsReadResult {
  *   status numbers HTTP would have produced. The backend flattens them into
  *   data precisely so this stays true; nothing above has to ask which
  *   transport failed.
- * - **Uploads report start and finish, not a curve.** The bytes cross the
- *   channel in one hand-off, so there is no streaming progress to observe.
- *   That is honest rather than approximate: a fake curve would be worse than
- *   none, and a local copy is near-instant anyway.
+ * - **No file crosses whole** (PRD 003, §1). Reads and uploads move in
+ *   chunks of `BRIDGE_CHUNK_BYTES`, so a large file costs one chunk of memory
+ *   at a time rather than its size — twice, once on each side — and an upload
+ *   reports real progress and can be stopped part-way. A download is not
+ *   read here at all: the main process asks where to save it and streams it
+ *   there itself.
  */
 @Service()
 export class FsBridgeService implements FsTransport {
@@ -85,41 +121,114 @@ export class FsBridgeService implements FsTransport {
   }
 
   /**
-   * Unlike HTTP, `maxBytes` is enforced *before* the file is read, so an
+   * Reads a file chunk by chunk and assembles the chunks into one `Blob`.
+   *
+   * Unlike HTTP, `maxBytes` is enforced *before* anything is read, so an
    * oversized preview never occupies memory on either side of the channel.
    */
   async read(path: string, maxBytes?: number): Promise<Blob> {
-    const result = await this.invoke<FsReadResult>({
-      command: 'read',
-      path,
-      ...(maxBytes === undefined ? {} : { maxBytes }),
-    });
-    return new Blob([result.content], {
-      ...(result.mimeType === null ? {} : { type: result.mimeType }),
-    });
+    const parts: Uint8Array<ArrayBuffer>[] = [];
+    let offset = 0;
+    let size = 0;
+    let mimeType: string | null = null;
+
+    do {
+      const chunk = await this.invoke<FsReadResult>({
+        command: 'read',
+        path,
+        offset,
+        length: BRIDGE_CHUNK_BYTES,
+        ...(maxBytes === undefined ? {} : { maxBytes }),
+      });
+      ({ size, mimeType } = chunk);
+      if (chunk.content.byteLength === 0) {
+        // The file shrank while it was being read: what there is, is all.
+        break;
+      }
+      parts.push(chunk.content);
+      offset += chunk.content.byteLength;
+    } while (offset < size);
+
+    return new Blob(parts, mimeType === null ? {} : { type: mimeType });
   }
 
   /**
-   * There is no HTTP URL to hand the browser here, so the bytes are fetched
-   * and wrapped in an object URL. `release` revokes it — which is why
-   * `FsSaveUrl` carries a cleanup at all.
+   * Saves a file where the user chooses: the main process shows the native
+   * Save dialog and streams the copy, pushing progress back here as it goes.
+   * Dismissing the dialog is `dismissed`, not an error.
    */
-  async saveUrl(path: string): Promise<FsSaveUrl> {
-    const blob = await this.read(path);
-    const url = URL.createObjectURL(blob);
-    return { url, release: () => URL.revokeObjectURL(url) };
+  save(path: string, name: string): FsDownload {
+    const progress = signal<FsUploadProgress>({ loaded: 0, total: null, percent: null });
+    const transferId = `save-${crypto.randomUUID()}`;
+    const api = this.api;
+
+    let settled = false;
+    let fail: (error: FsError) => void = () => undefined;
+
+    const result = new Promise<FsDownloadResult>((resolve, reject) => {
+      fail = (error: FsError) => {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      };
+
+      if (api === undefined) {
+        fail(new FsError('The desktop bridge is not available.', 0, 'NETWORK_ERROR'));
+        return;
+      }
+
+      const unsubscribe = api.onSaveProgress((raw) => {
+        const update = raw as FsSaveProgress;
+        if (update.transferId === transferId) {
+          progress.set(toProgress(update.loaded, update.total));
+        }
+      });
+
+      void (async () => {
+        try {
+          const outcome = FsBridgeService.unwrap<FsSaveOutcome>(
+            await api.save({ command: 'save', transferId, path, name }),
+          );
+          if (settled) {
+            return;
+          }
+          settled = true;
+          resolve(
+            outcome.saved
+              ? { outcome: 'saved', ...(outcome.bytes === undefined ? {} : { bytes: outcome.bytes }) }
+              : { outcome: 'dismissed' },
+          );
+        } catch (error) {
+          fail(FsError.from(error));
+        } finally {
+          unsubscribe();
+        }
+      })();
+    });
+
+    return {
+      progress: progress.asReadonly(),
+      result,
+      cancel: () => {
+        void api?.save({ command: 'cancel', transferId });
+        fail(new FsError('The download was cancelled.', 0, FS_ABORTED));
+      },
+    };
   }
 
   /**
-   * Uploads one file by reading it and handing the bytes over in a single
-   * command. The returned handle keeps the shape of the HTTP one so callers
-   * are unchanged; `cancel` can only prevent the hand-off, since once the
-   * command is in flight there is nothing to abort.
+   * Uploads one file a chunk at a time: `upload-begin` (where anything that
+   * can be refused without the bytes is), one `upload-chunk` per slice of the
+   * file — read from disk only as it is sent — and `upload-commit`. Progress
+   * follows the chunks, and `cancel` stops the next one and tells the backend
+   * to discard what it has.
    */
   upload(directoryPath: string, file: File, options?: FsUploadOptions): FsUpload {
-    const progress = signal<FsUploadProgress>({ loaded: 0, total: file.size, percent: 0 });
+    const progress = signal<FsUploadProgress>(toProgress(0, file.size));
 
     let cancelled = false;
+    let uploadId: string | undefined;
     let settled = false;
     let fail: (error: FsError) => void = () => undefined;
 
@@ -133,26 +242,35 @@ export class FsBridgeService implements FsTransport {
 
       void (async () => {
         try {
-          const content = new Uint8Array(await file.arrayBuffer());
-          if (cancelled) {
-            return;
-          }
-
-          const details = await this.invoke<FsDetails>({
-            command: 'upload',
+          ({ uploadId } = await this.invoke<{ uploadId: string }>({
+            command: 'upload-begin',
             path: directoryPath,
             filename: file.name,
-            content,
             overwrite: options?.overwrite === true,
-          });
+          }));
+
+          for (let offset = 0; offset < file.size; offset += BRIDGE_CHUNK_BYTES) {
+            if (cancelled) {
+              return;
+            }
+            const content = new Uint8Array(await file.slice(offset, offset + BRIDGE_CHUNK_BYTES).arrayBuffer());
+            const { received } = await this.invoke<{ received: number }>({
+              command: 'upload-chunk',
+              uploadId,
+              content,
+            });
+            progress.set(toProgress(received, file.size));
+          }
 
           if (cancelled) {
             return;
           }
-          progress.set({ loaded: file.size, total: file.size, percent: 100 });
+          const details = await this.invoke<FsDetails>({ command: 'upload-commit', uploadId });
+          progress.set(toProgress(file.size, file.size));
           settled = true;
           resolve(details);
         } catch (error) {
+          this.abandon(uploadId);
           fail(FsError.from(error));
         }
       })();
@@ -163,9 +281,17 @@ export class FsBridgeService implements FsTransport {
       result,
       cancel: () => {
         cancelled = true;
+        this.abandon(uploadId);
         fail(new FsError('The upload was cancelled.', 0, FS_ABORTED));
       },
     };
+  }
+
+  /** Tells the backend to discard an upload; best effort, and idempotent there. */
+  private abandon(uploadId: string | undefined): void {
+    if (uploadId !== undefined) {
+      void this.invoke({ command: 'upload-abort', uploadId }).catch(() => undefined);
+    }
   }
 
   /* -- internals ---------------------------------------------------------- */
@@ -212,4 +338,9 @@ export class FsBridgeService implements FsTransport {
     }
     return answer.data;
   }
+}
+
+/** A progress value from what is known: `total` may be `0` for an empty file. */
+function toProgress(loaded: number, total: number): FsUploadProgress {
+  return { loaded, total, percent: total > 0 ? Math.round((loaded / total) * 100) : 100 };
 }

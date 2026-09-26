@@ -53,6 +53,17 @@ export interface UiFileRow {
   readonly focused?: boolean;
   /** Selected, but the owning group is not focused (dimmed selection). */
   readonly inactiveSelected?: boolean;
+  /**
+   * Nesting level below the listed folder, 0 based — only read when the list
+   * renders as a tree (`UiFileList.tree`). Drives indentation and `aria-level`.
+   */
+  readonly depth?: number;
+  /** A directory in a tree: the row gets a twisty. */
+  readonly expandable?: boolean;
+  /** An expandable row showing its children. */
+  readonly expanded?: boolean;
+  /** An expanded row whose contents are being fetched — the twisty spins. */
+  readonly busy?: boolean;
 }
 
 /** A tile in the grid ("large icons") view. */

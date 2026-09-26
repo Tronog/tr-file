@@ -81,6 +81,14 @@ export class FilesRoutes implements RouteModule {
           resolve();
           return;
         }
+        if (!res.headersSent && FilesRoutes.statusOf(error) === 416) {
+          // A range past the end — which for an empty file is any range — is
+          // the client's to handle, not a server error.
+          res.status(416).setHeader('Content-Range', `bytes */${target.size}`);
+          res.end();
+          resolve();
+          return;
+        }
         if (res.headersSent) {
           // The client aborted or the socket broke mid-stream: nothing can be
           // reported any more, so log and settle instead of crashing.
@@ -100,6 +108,13 @@ export class FilesRoutes implements RouteModule {
    * Parses the `multipart/form-data` body with busboy and hands the single
    * `file` part to the service as a stream, so nothing is ever buffered whole.
    */
+  /** The HTTP status `send` attached to an error, if any. */
+  private static statusOf(error: unknown): number | undefined {
+    const status = (error as { status?: unknown; statusCode?: unknown } | null)?.status ??
+      (error as { statusCode?: unknown } | null)?.statusCode;
+    return typeof status === 'number' ? status : undefined;
+  }
+
   private async receiveUpload(req: Request): Promise<FileDetails> {
     const contentType = req.headers['content-type'];
     if (contentType === undefined || !contentType.toLowerCase().startsWith('multipart/form-data')) {

@@ -16,7 +16,21 @@
 import type { DirectoryListingDto, FileDetailsDto } from '../files/models/index.js';
 
 /** Every operation the bridge offers. */
-export type FsBridgeCommand = 'list' | 'details' | 'read' | 'upload';
+export type FsBridgeCommand =
+  | 'list'
+  | 'details'
+  | 'read'
+  | 'upload-begin'
+  | 'upload-chunk'
+  | 'upload-commit'
+  | 'upload-abort';
+
+/**
+ * The most bytes one `read` or `upload-chunk` carries. Every command is
+ * structured-cloned across the channel, so this — not the file — bounds what
+ * either process holds at once (PRD 003, §1).
+ */
+export const FS_BRIDGE_CHUNK_BYTES = 1024 * 1024;
 
 /** List a directory. `''` is the files root. */
 export interface FsListRequest {
@@ -31,38 +45,78 @@ export interface FsDetailsRequest {
 }
 
 /**
- * Read a file's bytes.
+ * Read one chunk of a file: `length` bytes from `offset`, capped at
+ * `FS_BRIDGE_CHUNK_BYTES`. A caller wanting the whole file asks again from
+ * where the last chunk ended, until it has `size` bytes.
  *
- * `maxBytes` is refused *before* anything is read, which is the one place the
- * bridge is stricter than HTTP: an in-process caller gets the whole file as a
- * single buffer, so a cap is the only thing standing between a preview and a
- * gigabyte in memory.
+ * `maxBytes` is checked on every call, before anything is read: a caller
+ * that will not hold a file past a size says so, and an oversized one is
+ * refused before its first byte crosses.
  */
 export interface FsReadRequest {
   readonly command: 'read';
   readonly path: string;
+  readonly offset?: number;
+  readonly length?: number;
   readonly maxBytes?: number;
 }
 
-/** Store one file in a directory. `path` is the directory. */
-export interface FsUploadRequest {
-  readonly command: 'upload';
+/**
+ * Start storing one file in a directory. `path` is the directory. Everything
+ * that can be refused without the bytes — a missing directory, an unsafe
+ * name, a target that exists — is refused here, before any are sent.
+ */
+export interface FsUploadBeginRequest {
+  readonly command: 'upload-begin';
   readonly path: string;
   readonly filename: string;
-  readonly content: Uint8Array;
   readonly overwrite: boolean;
 }
 
-export type FsBridgeRequest = FsListRequest | FsDetailsRequest | FsReadRequest | FsUploadRequest;
+/** The next bytes of an upload, in order. */
+export interface FsUploadChunkRequest {
+  readonly command: 'upload-chunk';
+  readonly uploadId: string;
+  readonly content: Uint8Array;
+}
 
-/** A file's bytes, with the metadata the HTTP headers would have carried. */
+/** Every byte has been sent: finish the file and describe it. */
+export interface FsUploadCommitRequest {
+  readonly command: 'upload-commit';
+  readonly uploadId: string;
+}
+
+/** Give up on an upload; nothing it wrote is kept. */
+export interface FsUploadAbortRequest {
+  readonly command: 'upload-abort';
+  readonly uploadId: string;
+}
+
+export type FsBridgeRequest =
+  | FsListRequest
+  | FsDetailsRequest
+  | FsReadRequest
+  | FsUploadBeginRequest
+  | FsUploadChunkRequest
+  | FsUploadCommitRequest
+  | FsUploadAbortRequest;
+
+/** One chunk of a file, with the metadata the HTTP headers would have carried. */
 export interface FsReadResult {
   readonly path: string;
   readonly name: string;
+  /** Size of the whole file, not of this chunk. */
   readonly size: number;
   /** Guessed from the extension; `null` when unknown. */
   readonly mimeType: string | null;
+  /** Where in the file `content` starts. */
+  readonly offset: number;
   readonly content: Uint8Array;
+}
+
+/** An upload that has been accepted and is waiting for its bytes. */
+export interface FsUploadBeginResult {
+  readonly uploadId: string;
 }
 
 /** What each command answers with on success. */
@@ -70,7 +124,10 @@ export interface FsBridgeResults {
   readonly list: DirectoryListingDto;
   readonly details: FileDetailsDto;
   readonly read: FsReadResult;
-  readonly upload: FileDetailsDto;
+  readonly 'upload-begin': FsUploadBeginResult;
+  readonly 'upload-chunk': { readonly received: number };
+  readonly 'upload-commit': FileDetailsDto;
+  readonly 'upload-abort': { readonly aborted: true };
 }
 
 export interface FsBridgeSuccess<T> {

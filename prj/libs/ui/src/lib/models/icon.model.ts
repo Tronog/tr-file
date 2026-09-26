@@ -32,6 +32,7 @@ export type UiIconName =
   | 'sort'
   | 'filter'
   | 'list'
+  | 'list-tree'
   | 'terminal'
   | 'bell'
   | 'alert-circle'

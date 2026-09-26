@@ -1,4 +1,9 @@
-<table class="filelist">
+<table
+  class="filelist"
+  [class.is-tree]="tree()"
+  [attr.role]="tree() ? 'treegrid' : null"
+  [attr.aria-rowcount]="virtual() ? rows().length + 1 : null"
+>
   <caption class="visually-hidden">{{ label() }}</caption>
   <thead>
     <tr>
@@ -19,15 +24,28 @@
       }
     </tr>
   </thead>
-  <tbody>
-    @for (row of rows(); track row.id; let index = $index) {
+  <tbody #body>
+    <!-- A long listing renders only what is near the viewport; the spacers
+         stand in for the rest, so the scrollbar is the whole list's. -->
+    @if (spaceAbove() > 0) {
+      <tr class="spacer" aria-hidden="true" [style.height.px]="spaceAbove()">
+        <td [attr.colspan]="columns().length"></td>
+      </tr>
+    }
+    @for (row of visibleRows(); track row.id; let offset = $index) {
+      @let index = range().start + offset;
       <tr
         #rowElement
+        [attr.data-row-id]="row.id"
+        [attr.aria-rowindex]="virtual() ? index + 2 : null"
         [class.is-selected]="row.selected"
         [class.is-inactive-selected]="row.inactiveSelected"
         [class.is-focused]="row.focused"
         [attr.aria-selected]="row.selected || row.inactiveSelected ? 'true' : 'false'"
-        [attr.tabindex]="row.id === focusId() ? 0 : -1"
+        [attr.aria-level]="tree() ? (row.depth ?? 0) + 1 : null"
+        [attr.aria-expanded]="tree() && row.expandable ? (row.expanded ?? false) : null"
+        [attr.aria-busy]="tree() && row.busy ? 'true' : null"
+        [attr.tabindex]="row.id === tabStopId() ? 0 : -1"
         [attr.aria-keyshortcuts]="keyShortcuts"
         (click)="select.emit(row.id)"
         (dblclick)="activate.emit(row.id)"
@@ -40,7 +58,22 @@
             [class.align-end]="column.align === 'end'"
           >
             @if (first) {
-              <span class="name-cell">
+              <span class="name-cell" [style.padding-left.px]="tree() ? (row.depth ?? 0) * 16 : null">
+                @if (tree()) {
+                  <span
+                    class="twisty"
+                    [class.is-hidden]="!row.expandable"
+                    aria-hidden="true"
+                    (click)="onTwisty($event, row)"
+                    (dblclick)="onTwisty($event, row)"
+                  >
+                    @if (row.busy) {
+                      <i class="spinner"></i>
+                    } @else {
+                      <ui-icon [name]="row.expanded ? 'chevron-down' : 'chevron-right'" />
+                    }
+                  </span>
+                }
                 <ui-icon [name]="row.icon" [tint]="row.tint" />
                 <span
                   class="name"
@@ -56,6 +89,11 @@
             }
           </td>
         }
+      </tr>
+    }
+    @if (spaceBelow() > 0) {
+      <tr class="spacer" aria-hidden="true" [style.height.px]="spaceBelow()">
+        <td [attr.colspan]="columns().length"></td>
       </tr>
     }
   </tbody>

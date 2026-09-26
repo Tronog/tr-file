@@ -2,6 +2,7 @@ import { computed, signal, type WritableSignal } from '@angular/core';
 import type { UiIconAction, UiTreeNode } from '@tr-file/ui';
 import type { FsEntry } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
+import { isFolder } from '../../file-system/fs-entry-kind';
 
 /** The workspace root, which the backend addresses as the empty path. */
 const ROOT = '';
@@ -101,7 +102,7 @@ export class ExplorerFeature {
    */
   private collect(path: string, depth: number, rows: UiTreeNode[]): void {
     for (const entry of this.parent.fsDataFt.entries(path)) {
-      if (entry.type !== 'directory') {
+      if (!isFolder(entry)) {
         continue;
       }
       const expanded = this.expandedPaths().has(entry.path);
@@ -114,7 +115,7 @@ export class ExplorerFeature {
 
   private toRow(entry: FsEntry, depth: number, expanded: boolean): UiTreeNode {
     const files = this.parent.fileViewModel;
-    const expandable = entry.type === 'directory';
+    const expandable = isFolder(entry);
     const state = expandable ? this.parent.fsDataFt.listingState(entry.path) : undefined;
     const selected = entry.path === this.parent.selectedEntryId();
     const meta = state?.status === 'error' ? 'unreadable' : files.treeMeta(entry);

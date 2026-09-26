@@ -35,8 +35,11 @@ export interface UiDocumentModel {
   readonly meta?: string;
 }
 
-/** How a group renders its directory contents. */
-export type UiPanelView = 'list' | 'grid';
+/**
+ * How a group renders its directory contents: a details table, large icons, or
+ * the details table as a tree whose folders open in place.
+ */
+export type UiPanelView = 'list' | 'grid' | 'tree';
 
 /**
  * The shell of one editor group: its tab bar and the frame around a body.
