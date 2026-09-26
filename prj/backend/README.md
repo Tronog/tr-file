@@ -12,6 +12,7 @@ pnpm build      # tsc → dist/ (runtime only; tests are excluded)
 pnpm start      # node dist/main.js
 pnpm test       # node:test via tsx, straight from src/
 pnpm typecheck  # runtime sources + test sources
+pnpm hash-password  # reads a password on stdin, prints an AUTH_PASSWORD_HASH
 ```
 
 | Variable | Default | Meaning |
@@ -22,6 +23,43 @@ pnpm typecheck  # runtime sources + test sources
 | `UPLOAD_MAX_BYTES` | `536870912` (512 MiB) | Per-upload limit |
 | `LOG_LEVEL` | `debug` / `info` in production | Log verbosity |
 | `NODE_ENV` | `development` | Environment |
+| `AUTH_USERNAME` | unset | The one account allowed to sign in |
+| `AUTH_PASSWORD` / `AUTH_PASSWORD_HASH` | unset | Its password, plain or as made by `pnpm hash-password` (preferred) |
+| `AUTH_ENABLED` | see below | `false` runs with no login; `true` refuses to start without an account |
+| `AUTH_SESSION_IDLE_HOURS` | `12` | A session unused this long is signed out |
+
+## Signing in and CSRF (PRD 003, §2)
+
+**Signing in is on unless switched off.** With an account configured, every
+`/api` route but `/api/auth/*` and `/api/health` answers `401 UNAUTHORIZED`
+without a session. A production server with no account **refuses to start**;
+only `AUTH_ENABLED=false` (the desktop shell's default) or a development
+server with nothing configured runs open, and says so in its log.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/auth/session` | `{ required, authenticated, username }` — always answered |
+| POST | `/api/auth/login` | JSON `{ username, password }`; sets the session cookie |
+| POST | `/api/auth/logout` | Ends the session and clears the cookie |
+
+The session is a random 256-bit token in a `tr_file_session` cookie —
+`HttpOnly`, `SameSite=Strict`, `Secure` over HTTPS, and gone when the browser
+closes. Sessions live in memory: a restart signs everyone out. Wrong passwords
+are throttled (5 per client, 50 overall, per 15 minutes → `429
+TOO_MANY_REQUESTS`), and a wrong username costs the same time as a wrong
+password. The password is only ever compared as an scrypt hash.
+
+**Every write needs the `X-TR-File-Request: 1` header** — uploads, sign-in and
+sign-out now; delete and move later. A page on another site can make a browser
+send a `POST`, but not one with a custom header (that needs a CORS preflight
+this server never grants), so a request carrying it came from the app. Writes
+are also refused (`403 CSRF_REJECTED`) when `Sec-Fetch-Site` says another site
+sent them or `Origin` names another host — which is why nginx forwards
+`$http_host` and the Angular dev proxy keeps `changeOrigin: false`. Reads are
+unaffected. An API client other than the app has to send the header too.
+
+The bridge asks for the same account: with signing in on, a connection must
+send `login` before anything else is answered (see below).
 
 ## The bridge — the same API without HTTP (PRD 001, §8.1)
 
@@ -44,6 +82,13 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `upload-chunk` | `uploadId`, `content` | `{ received }` once the chunk is on its way to disk |
 | `upload-commit` | `uploadId` | the stored file's details |
 | `upload-abort` | `uploadId` | `{ aborted: true }`; the temp file is discarded |
+| `auth-status` | — | `{ required, authenticated, username }` for this connection |
+| `login` | `username`, `password` | signs this connection in; `401` / `429` as over HTTP |
+| `logout` | — | signs this connection out |
+
+`dispatch(request, session)` takes the connection's `FsBridgeSession` — on the
+desktop, one per window — and with signing in on refuses every file-system
+command (`UNAUTHORIZED`) until that session has signed in; so does `saveCopy`.
 
 Two rules follow from the channel it is reached through. Requests **are
 untrusted** — they come from a renderer, so every field is validated exactly as
@@ -85,6 +130,9 @@ Successful JSON responses are `{ "data": … }`; errors are
 | Status | `code` | When |
 | --- | --- | --- |
 | 400 | `BAD_REQUEST` | Malformed path, listing a file, downloading a directory, upload without a `file` part |
+| 401 | `UNAUTHORIZED` | No session, or a wrong username or password |
+| 403 | `CSRF_REJECTED` | A write without the `X-TR-File-Request` header, or from another site |
+| 429 | `TOO_MANY_REQUESTS` | Too many failed sign-ins |
 | 403 | `FORBIDDEN` | Path escapes `FILES_ROOT`, or the OS denies access |
 | 404 | `NOT_FOUND` | No such path |
 | 409 | `CONFLICT` | Upload target exists and `overwrite` is not `true` |

@@ -77,7 +77,11 @@ export class DesktopConfig {
    */
   readonly devServerUrl: URL | null;
 
+  /** The shell's own environment, kept for the settings passed on to the server. */
+  private readonly environmentEnv: NodeJS.ProcessEnv;
+
   private constructor(environment: DesktopEnvironment, paths: DesktopPaths) {
+    this.environmentEnv = environment.env;
     this.port = DesktopConfig.readPort(environment.env['TR_FILE_PORT']);
     // An unpackaged app is by definition someone working on it; `TR_FILE_DEV`
     // overrides that in both directions, so a packaged build can be debugged
@@ -112,6 +116,30 @@ export class DesktopConfig {
       PORT: String(this.port),
       FILES_ROOT: this.filesRoot,
       LOG_LEVEL: this.development ? 'debug' : 'info',
+      ...this.authEnv(),
+    };
+  }
+
+  /**
+   * Signing in, which the desktop leaves off by default (PRD 003, §2): the
+   * app runs as the user, over files the user can already open. Setting
+   * `TR_FILE_AUTH_USERNAME` with `TR_FILE_AUTH_PASSWORD` (or
+   * `TR_FILE_AUTH_PASSWORD_HASH`) turns it on — the window then asks for them
+   * before the bridge answers anything.
+   */
+  private authEnv(): NodeJS.ProcessEnv {
+    const env = this.environmentEnv;
+    const username = env['TR_FILE_AUTH_USERNAME']?.trim() ?? '';
+    if (username === '') {
+      return { AUTH_ENABLED: 'false' };
+    }
+    return {
+      AUTH_ENABLED: 'true',
+      AUTH_USERNAME: username,
+      ...(env['TR_FILE_AUTH_PASSWORD'] === undefined ? {} : { AUTH_PASSWORD: env['TR_FILE_AUTH_PASSWORD'] }),
+      ...(env['TR_FILE_AUTH_PASSWORD_HASH'] === undefined
+        ? {}
+        : { AUTH_PASSWORD_HASH: env['TR_FILE_AUTH_PASSWORD_HASH'] }),
     };
   }
 

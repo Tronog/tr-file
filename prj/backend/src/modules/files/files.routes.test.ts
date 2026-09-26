@@ -28,7 +28,8 @@ function multipart(parts: readonly { field: string; filename: string; body: stri
 }
 
 async function upload(query: string, form: FormData): Promise<Response> {
-  return fetch(`${base}/upload${query}`, { method: 'POST', body: form });
+  // Every write carries the CSRF header, as the frontend's does (PRD 003, §2).
+  return fetch(`${base}/upload${query}`, { method: 'POST', body: form, headers: { 'X-TR-File-Request': '1' } });
 }
 
 async function errorCodeOf(response: Response): Promise<string> {
@@ -175,7 +176,7 @@ describe('POST /api/fs/upload', () => {
 
     const notMultipart = await fetch(`${base}/upload`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'X-TR-File-Request': '1' },
       body: '{}',
     });
     assert.equal(notMultipart.status, 400);

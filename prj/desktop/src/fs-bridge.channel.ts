@@ -3,6 +3,8 @@ import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { FileSystemBridge, FsBridgeResponse } from '@tr-file/backend/bridge';
 import type { Logger } from '@tr-file/backend/core';
 
+import type { BridgeSessions } from './bridge-sessions.js';
+
 /** Must match the preload's `CHANNEL` and the frontend's expectation. */
 const CHANNEL = 'tr-file:fs';
 
@@ -32,6 +34,7 @@ export class FsBridgeChannel {
     private readonly bridge: FileSystemBridge,
     private readonly origin: string,
     private readonly logger: Logger,
+    private readonly sessions: BridgeSessions,
   ) {}
 
   /** Starts answering commands. Idempotent. */
@@ -45,7 +48,7 @@ export class FsBridgeChannel {
         this.logger.warn('bridge command refused', { url: event.senderFrame?.url ?? 'unknown' });
         return REFUSED;
       }
-      return this.bridge.dispatch(request);
+      return this.bridge.dispatch(request, this.sessions.for(event.sender));
     });
 
     this.registered = true;

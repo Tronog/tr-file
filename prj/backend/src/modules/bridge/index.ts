@@ -7,6 +7,7 @@ export type {
   FsBridgeRequest,
   FsBridgeResponse,
   FsBridgeResults,
+  FsBridgeSession,
   FsBridgeSuccess,
   FsDetailsRequest,
   FsListRequest,

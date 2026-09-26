@@ -5,6 +5,7 @@ import { DesktopConfig } from './desktop.config.js';
 import { DesktopStack } from './desktop.stack.js';
 import { waitForDevServer } from './dev-server.js';
 import { FsBridgeChannel } from './fs-bridge.channel.js';
+import { BridgeSessions } from './bridge-sessions.js';
 import { MainWindow } from './main-window.js';
 import { SaveFileChannel } from './save-file.channel.js';
 import { WindowControlsChannel } from './window-controls.channel.js';
@@ -79,12 +80,14 @@ class DesktopApplication {
 
       // Before the window, not after: the bundle may ask for a listing on its
       // very first frame, and a command that arrives with no handler rejects.
-      this.channel = new FsBridgeChannel(this.stack.bridge, page.origin, this.stack.log);
+      // One sign-in per window, shared by the command and save channels.
+      const sessions = new BridgeSessions();
+      this.channel = new FsBridgeChannel(this.stack.bridge, page.origin, this.stack.log, sessions);
       this.channel.register();
 
       // Downloads leave through the main process, which asks where to save
       // them and streams the copy (PRD 003, §1).
-      this.saveChannel = new SaveFileChannel(this.stack.bridge, page.origin, this.stack.log);
+      this.saveChannel = new SaveFileChannel(this.stack.bridge, page.origin, this.stack.log, sessions);
       this.saveChannel.register();
 
       // The window draws its own buttons now (§8.2), so the channel that acts

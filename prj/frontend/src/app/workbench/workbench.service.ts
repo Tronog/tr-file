@@ -22,6 +22,7 @@ import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
+import { AuthService } from '../auth/auth.service';
 
 /**
  * The workbench's common state, and the seam every feature talks through.
@@ -48,6 +49,9 @@ export class WorkbenchService {
    * and by the details sidebar, so the same image is fetched once.
    */
   readonly images = inject(ImageSourceService);
+
+  /** Who is signed in, if anyone has to be (PRD 003, §2). */
+  readonly auth = inject(AuthService);
 
   /**
    * Seed for the parts of the workbench no backend owns yet — the menus, the

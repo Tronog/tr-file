@@ -2,3 +2,10 @@
   display: block;
   height: 100%;
 }
+
+.unreachable {
+  margin: 0;
+  padding: 16px;
+  color: var(--vsc-git-conflict);
+  font-size: var(--vsc-font-size);
+}

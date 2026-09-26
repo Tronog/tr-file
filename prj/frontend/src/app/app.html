@@ -1,1 +1,14 @@
-<router-outlet />
+@switch (auth.view()) {
+  @case ('signed-in') {
+    <router-outlet />
+  }
+  @case ('open') {
+    <router-outlet />
+  }
+  @case ('signed-out') {
+    <app-login />
+  }
+  @case ('unreachable') {
+    <p class="unreachable" role="alert">Could not reach the server: {{ auth.error() }}</p>
+  }
+}

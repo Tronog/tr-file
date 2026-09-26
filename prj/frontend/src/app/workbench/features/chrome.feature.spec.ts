@@ -44,6 +44,38 @@ describe('ChromeFeature', () => {
     await settled();
   };
 
+  /** PRD 003, §2 — the account button is how a signed-in user signs out. */
+  describe('the account button', () => {
+    const account = () => workbench.chromeFt.activityBottomItems().find((item) => item.id === 'account');
+
+    const signIn = async (): Promise<void> => {
+      const started = workbench.auth.start();
+      http.expectOne('/api/auth/session').flush({ data: { required: true, authenticated: true, username: 'ana' } });
+      await started;
+    };
+
+    it('is plain Account when nobody has to sign in', async () => {
+      const started = workbench.auth.start();
+      http.expectOne('/api/auth/session').flush({ data: { required: false, authenticated: true, username: null } });
+      await started;
+
+      expect(account()?.label).toBe('Account');
+      workbench.chromeFt.selectActivity('account');
+      http.expectNone('/api/auth/logout');
+    });
+
+    it('names who is signed in, and signs them out', async () => {
+      await signIn();
+      expect(account()?.label).toBe('Sign out ana');
+
+      workbench.chromeFt.selectActivity('account');
+      http.expectOne('/api/auth/logout').flush({ data: { required: true, authenticated: false, username: null } });
+      await settled();
+
+      expect(workbench.auth.view()).toBe('signed-out');
+    });
+  });
+
   it('names the workspace and reports a clean session', () => {
     expect(leading('root')).toMatchObject({ label: workbench.mockWorkbench.workspaceName, accent: true });
     expect(leading('problems')).toMatchObject({ label: 'No problems', icon: 'check' });

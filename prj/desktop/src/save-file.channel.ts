@@ -3,6 +3,8 @@ import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebConten
 import type { FileSystemBridge, FsBridgeResponse } from '@tr-file/backend/bridge';
 import type { Logger } from '@tr-file/backend/core';
 
+import type { BridgeSessions } from './bridge-sessions.js';
+
 /** Must match the preload's channel and the frontend's expectation. */
 const CHANNEL = 'tr-file:save';
 
@@ -59,6 +61,7 @@ export class SaveFileChannel {
     private readonly bridge: FileSystemBridge,
     private readonly origin: string,
     private readonly logger: Logger,
+    private readonly sessions: BridgeSessions,
   ) {}
 
   /** Starts answering requests. Idempotent. */
@@ -107,6 +110,13 @@ export class SaveFileChannel {
     path: string,
     name: string,
   ): Promise<FsBridgeResponse<SaveOutcome>> {
+    // Asked before the dialog: a window that has not signed in gets no dialog.
+    const session = this.sessions.for(sender);
+    const status = await this.bridge.dispatch({ command: 'auth-status' }, session);
+    if ('data' in status && !(status.data as { authenticated: boolean }).authenticated) {
+      return { error: { code: 'UNAUTHORIZED', message: 'Sign in to continue', status: 401 } };
+    }
+
     const window = BrowserWindow.fromWebContents(sender);
     const options = { defaultPath: name, title: `Save ${name}` };
     const choice = window === null ? await dialog.showSaveDialog(options) : await dialog.showSaveDialog(window, options);
@@ -131,7 +141,7 @@ export class SaveFileChannel {
             sender.send(SAVE_PROGRESS_EVENT, { transferId, loaded, total } satisfies SaveProgress);
           }
         },
-      });
+      }, session);
       return 'error' in result ? result : { data: { saved: true, bytes: result.data.bytes } };
     } finally {
       this.running.delete(transferId);

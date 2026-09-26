@@ -14,6 +14,10 @@ services:
       HOST: 0.0.0.0
       PORT: 4310
       FILES_ROOT: /data
+      # Unset, a development server runs without a login (and says so in its
+      # log); set both to try the sign-in screen (PRD 003, §2).
+      AUTH_USERNAME: ${AUTH_USERNAME:-}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
     ports:
       - "4310:4310"
     volumes:

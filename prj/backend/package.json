@@ -19,6 +19,7 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test src/**/*.test.ts",
+    "hash-password": "tsx src/tools/hash-password.ts",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "clean": "rm -rf dist"

@@ -13,6 +13,7 @@
  * side learning a second dialect.
  */
 
+import type { AuthStatusDto } from '../auth/auth.model.js';
 import type { DirectoryListingDto, FileDetailsDto } from '../files/models/index.js';
 
 /** Every operation the bridge offers. */
@@ -23,7 +24,20 @@ export type FsBridgeCommand =
   | 'upload-begin'
   | 'upload-chunk'
   | 'upload-commit'
-  | 'upload-abort';
+  | 'upload-abort'
+  | 'auth-status'
+  | 'login'
+  | 'logout';
+
+/**
+ * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
+ * one window. The channel owns it and hands it to every `dispatch` from that
+ * window; the bridge only reads and updates it. A connection starts signed
+ * out, and only matters when signing in is switched on.
+ */
+export interface FsBridgeSession {
+  username: string | null;
+}
 
 /**
  * The most bytes one `read` or `upload-chunk` carries. Every command is
@@ -92,7 +106,25 @@ export interface FsUploadAbortRequest {
   readonly uploadId: string;
 }
 
+/** Whether this connection must sign in, and whether it has. */
+export interface FsAuthStatusRequest {
+  readonly command: 'auth-status';
+}
+
+export interface FsLoginRequest {
+  readonly command: 'login';
+  readonly username: string;
+  readonly password: string;
+}
+
+export interface FsLogoutRequest {
+  readonly command: 'logout';
+}
+
 export type FsBridgeRequest =
+  | FsAuthStatusRequest
+  | FsLoginRequest
+  | FsLogoutRequest
   | FsListRequest
   | FsDetailsRequest
   | FsReadRequest
@@ -128,6 +160,9 @@ export interface FsBridgeResults {
   readonly 'upload-chunk': { readonly received: number };
   readonly 'upload-commit': FileDetailsDto;
   readonly 'upload-abort': { readonly aborted: true };
+  readonly 'auth-status': AuthStatusDto;
+  readonly login: AuthStatusDto;
+  readonly logout: AuthStatusDto;
 }
 
 export interface FsBridgeSuccess<T> {

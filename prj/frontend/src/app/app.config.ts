@@ -3,9 +3,10 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
+import { csrfInterceptor, sessionExpiryInterceptor } from './file-system/fs-http.interceptors';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -17,6 +18,8 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     // Deliberately the default XHR backend, not `withFetch()`: Angular's fetch
     // backend emits no upload-progress events, which FsTransferFeature needs.
-    provideHttpClient(),
+    // Every write carries the CSRF header, and a 401 sends the app back to the
+    // sign-in screen (PRD 003, §2).
+    provideHttpClient(withInterceptors([csrfInterceptor, sessionExpiryInterceptor])),
   ],
 };

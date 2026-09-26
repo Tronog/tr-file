@@ -41,7 +41,8 @@
   <ui-activity-bar
     uiSlot="activity"
     [items]="chrome.activityItems()"
-    [bottomItems]="chrome.activityBottomItems"
+    [bottomItems]="chrome.activityBottomItems()"
+    (select)="chrome.selectActivity($event)"
   />
 
   <!-- left sidebar: the directory tree -->

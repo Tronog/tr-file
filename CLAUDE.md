@@ -112,7 +112,12 @@ refuses early. Downloads are rows in the Transfers panel like uploads. Lists and
 200+ entries render only what is near the viewport (`UiVirtualViewport` in the library).
 
 # Backend
-Refer to `docs/ai/EXPRESS.md`. The file-system API lives at `/api/fs`
+Refer to `docs/ai/EXPRESS.md`. Every `/api` route but `/api/auth/*` and `/api/health`
+needs a session when an account is configured (`AUTH_USERNAME` + `AUTH_PASSWORD[_HASH]`);
+a production server refuses to start without one. Every write needs the
+`X-TR-File-Request: 1` header (CSRF) — the frontend's `csrfInterceptor` adds it — and the
+frontend shows `auth/login` until `AuthService` says there is a session (PRD 003, §2).
+The file-system API lives at `/api/fs`
 (listing, details, download, upload) — see `prj/backend/README.md` for the
 endpoint reference, the error codes and the `FILES_ROOT` confinement rules. The same
 API is reachable without HTTP through `App.bridge`, for the desktop shell. Its
@@ -121,12 +126,14 @@ frontend client is `prj/frontend/src/app/file-system/`, where `FsHttpService` an
 
 # Desktop
 `prj/desktop` is the Electron app that runs the whole stack in one process — see
-`prj/desktop/README.md`. It does not spawn the backend: `DesktopStack` mounts
-`new App(...)` from `@tr-file/backend` as middleware beside `express.static` over the
-frontend build, on a loopback port the OS picks, and the window loads that. It is
-therefore what `docker/nginx/default.conf` is in production. `pnpm --filter
-@tr-file/desktop test` boots the real stack over HTTP with no desktop session, because
-`DesktopConfig` and `DesktopStack` import no `electron`.
+`prj/desktop/README.md`. It does not spawn the backend: `DesktopStack` constructs
+`new App(...)` from `@tr-file/backend` in-process and serves only the frontend build
+over `express.static`, on a loopback port the OS picks, with a `Host` check; the window
+loads that. It serves **no `/api`** (PRD 003, §2) — the window's data goes over the
+bridge, and an HTTP API would only let other local programs in. `pnpm --filter
+@tr-file/desktop test` boots the real stack with no desktop session, because
+`DesktopConfig` and `DesktopStack` import no `electron`. Signing in is off on the desktop
+unless `TR_FILE_AUTH_USERNAME` (with a password) is set.
 
 In development the window can load `ng serve` instead of the bundle: `TR_FILE_DEV_SERVER`
 names it, `pnpm dev` at the root sets it, and the shell waits for that server and falls back

@@ -6,12 +6,14 @@ import { PassThrough } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
+import type { AuthService } from '../auth/index.js';
 import type { FileDetails, FilesService } from '../files/index.js';
 import {
   FS_BRIDGE_CHUNK_BYTES,
   type FsBridgeFailure,
   type FsBridgeRequest,
   type FsBridgeResponse,
+  type FsBridgeSession,
   type FsReadRequest,
   type FsReadResult,
   type FsUploadBeginRequest,
@@ -57,7 +59,11 @@ export interface FsSaveCopyOptions {
  *    clone boundary loses its type, its code and usually its message, so a
  *    failure is flattened into the same `{ error: { code, message } }` shape
  *    HTTP would have sent — plus the status that shape would have had.
- * 3. **No file crosses whole** (PRD 003, §1). Reads and uploads move in
+ * 3. **It asks for the same account HTTP does** (PRD 003, §2). When signing
+ *    in is on, a connection's `FsBridgeSession` must have signed in before
+ *    any file-system command is answered; the check is here, not in the
+ *    channel, so no caller of the bridge can forget it.
+ * 4. **No file crosses whole** (PRD 003, §1). Reads and uploads move in
  *    chunks of at most `FS_BRIDGE_CHUNK_BYTES`, so neither process ever holds
  *    more than one of them for a transfer — the HTTP side streams, and this
  *    one must not be the place a large file costs its size twice.
@@ -69,19 +75,29 @@ export class FileSystemBridge {
   constructor(
     private readonly files: FilesService,
     private readonly logger: Logger,
+    private readonly auth: AuthService,
   ) {}
 
-  /** Runs one command. Never throws; a failure is part of the answer. */
-  async dispatch(request: unknown): Promise<FsBridgeResponse> {
+  /** A connection that has not signed in; the channel keeps one per window. */
+  static openSession(): FsBridgeSession {
+    return { username: null };
+  }
+
+  /**
+   * Runs one command for `session`. Never throws; a failure is part of the
+   * answer. Without a session the command is treated as coming from a
+   * connection that never signed in.
+   */
+  async dispatch(request: unknown, session: FsBridgeSession = FileSystemBridge.openSession()): Promise<FsBridgeResponse> {
     const startedAt = performance.now();
     try {
       const parsed = FileSystemBridge.parse(request);
-      const data = await this.run(parsed);
+      const data = await this.run(parsed, session);
       // The HTTP side logs every request through `RequestLoggerMiddleware`;
       // the bridge would otherwise be a silent second door into the same API.
       this.logger.debug('command', {
         command: parsed.command,
-        ...('path' in parsed ? { path: parsed.path } : { uploadId: parsed.uploadId }),
+        ...('path' in parsed ? { path: parsed.path } : 'uploadId' in parsed ? { uploadId: parsed.uploadId } : {}),
         durationMs: Number((performance.now() - startedAt).toFixed(3)),
       });
       return { data };
@@ -103,8 +119,10 @@ export class FileSystemBridge {
     path: string,
     destination: string,
     options: FsSaveCopyOptions = {},
+    session: FsBridgeSession = FileSystemBridge.openSession(),
   ): Promise<FsBridgeResponse<{ readonly bytes: number }>> {
     try {
+      this.assertSignedIn(session);
       const target = await this.files.resolveDownload(path);
       let loaded = 0;
       const report = options.onProgress;
@@ -134,7 +152,23 @@ export class FileSystemBridge {
     }
   }
 
-  private async run(request: FsBridgeRequest): Promise<unknown> {
+  private async run(request: FsBridgeRequest, session: FsBridgeSession): Promise<unknown> {
+    switch (request.command) {
+      case 'auth-status':
+        return this.statusOf(session);
+      case 'login':
+        session.username = null;
+        await this.auth.signIn(request.username, request.password, 'bridge');
+        session.username = request.username;
+        return this.statusOf(session);
+      case 'logout':
+        session.username = null;
+        return this.statusOf(session);
+      default:
+        break;
+    }
+
+    this.assertSignedIn(session);
     switch (request.command) {
       case 'list':
         return (await this.files.listDirectory(request.path)).toJSON();
@@ -311,6 +345,23 @@ export class FileSystemBridge {
     return timer;
   }
 
+  /**
+   * The bridge keeps no tokens: a connection is signed in by `login` itself,
+   * so the session only has to remember who — and forgets on `logout`.
+   */
+  private statusOf(session: FsBridgeSession) {
+    if (!this.auth.required) {
+      return this.auth.status(undefined);
+    }
+    return { required: true, authenticated: session.username !== null, username: session.username };
+  }
+
+  private assertSignedIn(session: FsBridgeSession): void {
+    if (this.auth.required && session.username === null) {
+      throw HttpError.unauthorized('Sign in to continue');
+    }
+  }
+
   private static aborted(message: string): HttpError {
     return new HttpError(0, 'ABORTED', message);
   }
@@ -349,6 +400,15 @@ export class FileSystemBridge {
     const { command } = value as { command?: unknown };
 
     switch (command) {
+      case 'auth-status':
+      case 'logout':
+        return { command };
+      case 'login':
+        return {
+          command,
+          username: FileSystemBridge.readString(value, 'username'),
+          password: FileSystemBridge.readString(value, 'password'),
+        };
       case 'list':
       case 'details':
         return { command, path: FileSystemBridge.readString(value, 'path') };

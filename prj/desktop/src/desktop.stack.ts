@@ -17,15 +17,22 @@ const VERSION = process.env['npm_package_version'] ?? '0.1.0';
  *
  * In Docker the two halves are separate containers with nginx in front
  * (`prj/docker/nginx/default.conf`); on the desktop there is no room for a
- * third process, so this class *is* that nginx: one loopback HTTP server that
- * serves the Angular bundle, hands `/api` to the backend's own Express app and
- * falls back to `index.html` for the router's deep links. The backend is not
- * spawned — it is constructed, which is why a crash in it is a rejected
- * promise here rather than a dead child nobody notices.
+ * third process, so this class stands in for that nginx: one loopback HTTP
+ * server that serves the Angular bundle and falls back to `index.html` for the
+ * router's deep links. The backend is not spawned — it is constructed, which
+ * is why a crash in it is a rejected promise here rather than a dead child
+ * nobody notices.
+ *
+ * It serves **no API** (PRD 003, §2). The window reaches the backend over the
+ * IPC bridge (`bridge`), so the HTTP API would only have been a way in for
+ * everyone else: any local program, or a web page that found the port, could
+ * have read and written the user's files. `/api` answers 404, and a request
+ * whose `Host` is not this server's own loopback address — a DNS-rebinding
+ * page — is refused before anything is served.
  *
  * Two things follow from running on loopback with an OS-assigned port: no
- * other machine can reach the file system this exposes, and no two copies of
- * the app can collide over a port. Neither is an accident.
+ * other machine can reach it, and no two copies of the app can collide over a
+ * port. Neither is an accident.
  */
 export class DesktopStack {
   private server: HttpServer | null = null;
@@ -51,10 +58,10 @@ export class DesktopStack {
   /**
    * The backend, reachable without HTTP (PRD 001, §8.1).
    *
-   * The desktop's renderer uses this instead of the API the same process is
-   * serving a few lines above — same `FilesService`, one structured clone
-   * instead of a round trip through the loopback stack. The static half of the
-   * server stays: the bundle still has to be loaded from somewhere.
+   * The desktop's renderer uses this instead of HTTP — same `FilesService`,
+   * one structured clone instead of a round trip through the loopback stack,
+   * and no socket anyone else could connect to. The static half of the server
+   * stays: the bundle still has to be loaded from somewhere.
    */
   get bridge(): FileSystemBridge {
     if (this.api === null) {
@@ -92,9 +99,10 @@ export class DesktopStack {
 
     const appConfig = AppConfig.fromEnv(this.config.serverEnv());
     const api = new App(appConfig, this.logger.child({ service: 'tr-file-backend' }), VERSION);
-    const server = createServer(this.compose(api, appConfig.apiPrefix));
+    let port = 0;
+    const server = createServer(this.compose(appConfig.apiPrefix, () => port));
 
-    const port = await this.listen(server);
+    port = await this.listen(server);
     this.server = server;
     this.api = api;
     this.url = new URL(`http://${this.config.host}:${port}/`);
@@ -128,20 +136,29 @@ export class DesktopStack {
   }
 
   /**
-   * The request pipeline: fingerprinted assets, then the API, then the SPA.
+   * The request pipeline: the `Host` check, fingerprinted assets, the closed
+   * API prefix, then the SPA.
    *
-   * The order is the whole design. Static comes first so a real file always
-   * wins; the API gate comes next because the backend answers its own 404s
-   * (in JSON, which is what the frontend client expects) and must therefore
-   * never see a request that was meant for the router; the fallback is last
-   * and deliberately only answers reads, so a stray `POST /nowhere` still
-   * fails instead of quietly receiving a page.
+   * The order is the whole design. The `Host` check comes first so a page on
+   * another name that resolves here gets nothing at all; static comes next so
+   * a real file always wins; the API prefix is answered with a JSON 404 so a
+   * stale bundle that tries HTTP fails plainly instead of parsing a page; and
+   * the fallback is last and deliberately only answers reads, so a stray
+   * `POST /nowhere` still fails instead of quietly receiving a page.
    */
-  private compose(api: App, apiPrefix: string): Express {
+  private compose(apiPrefix: string, port: () => number): Express {
     const shell = express();
     const indexHtml = join(this.config.staticRoot, 'index.html');
 
     shell.disable('x-powered-by');
+    shell.use((request: Request, response: Response, next: NextFunction) => {
+      const allowed = [`${this.config.host}:${port()}`, `localhost:${port()}`];
+      if (!allowed.includes(request.headers.host ?? '')) {
+        response.status(421).type('text/plain').send('Misdirected request');
+        return;
+      }
+      next();
+    });
     shell.use(
       express.static(this.config.staticRoot, {
         index: false,
@@ -158,7 +175,9 @@ export class DesktopStack {
 
     shell.use((request: Request, response: Response, next: NextFunction) => {
       if (request.path === apiPrefix || request.path.startsWith(`${apiPrefix}/`)) {
-        api.instance(request, response, next);
+        response.status(404).json({
+          error: { code: 'NOT_FOUND', message: 'The desktop app serves no HTTP API; its window uses the bridge.' },
+        });
         return;
       }
       next();

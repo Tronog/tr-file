@@ -1,4 +1,6 @@
-import { Service, signal } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
+import type { AuthStatus } from '../auth/auth.model';
+import { SessionExpiryService } from '../auth/session-expiry.service';
 import type {
   FsDetails,
   FsDirectoryListing,
@@ -106,6 +108,8 @@ interface FsSaveProgress {
 @Service()
 export class FsBridgeService implements FsTransport {
   readonly kind = 'desktop' as const;
+
+  private readonly expiry = inject(SessionExpiryService);
 
   /** Whether this app is running inside the desktop shell at all. */
   get isAvailable(): boolean {
@@ -287,6 +291,21 @@ export class FsBridgeService implements FsTransport {
     };
   }
 
+  /* -- signing in (PRD 003, §2) ------------------------------------------- */
+
+  /** Off unless the desktop was started with an account; see `DesktopConfig`. */
+  async authStatus(): Promise<AuthStatus> {
+    return this.invoke<AuthStatus>({ command: 'auth-status' });
+  }
+
+  async login(username: string, password: string): Promise<AuthStatus> {
+    return this.invoke<AuthStatus>({ command: 'login', username, password });
+  }
+
+  async logout(): Promise<AuthStatus> {
+    return this.invoke<AuthStatus>({ command: 'logout' });
+  }
+
   /** Tells the backend to discard an upload; best effort, and idempotent there. */
   private abandon(uploadId: string | undefined): void {
     if (uploadId !== undefined) {
@@ -324,7 +343,16 @@ export class FsBridgeService implements FsTransport {
       throw FsError.from(error);
     }
 
-    return FsBridgeService.unwrap<T>(response);
+    try {
+      return FsBridgeService.unwrap<T>(response);
+    } catch (error) {
+      // A refused sign-in is its own answer; anything else refused for want
+      // of one means the window has to sign in (again).
+      if (error instanceof FsError && error.code === 'UNAUTHORIZED' && (request as { command?: string }).command !== 'login') {
+        this.expiry.report();
+      }
+      throw error;
+    }
   }
 
   private static unwrap<T>(response: unknown): T {

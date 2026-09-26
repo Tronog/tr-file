@@ -1,0 +1,30 @@
+<main class="login">
+  <form class="card" novalidate (submit)="onSubmit($event)" aria-labelledby="login-title">
+    <h1 id="login-title" class="title">tr-file</h1>
+    <p class="subtitle">Sign in to browse your files.</p>
+
+    <label class="field">
+      <span class="label">Username</span>
+      <input type="text" autocomplete="username" autocapitalize="off" spellcheck="false" [formField]="credentials.username" />
+    </label>
+    @if (credentials.username().touched() && credentials.username().invalid()) {
+      <p class="field-error">{{ credentials.username().errors()[0]?.message }}</p>
+    }
+
+    <label class="field">
+      <span class="label">Password</span>
+      <input type="password" autocomplete="current-password" [formField]="credentials.password" />
+    </label>
+    @if (credentials.password().touched() && credentials.password().invalid()) {
+      <p class="field-error">{{ credentials.password().errors()[0]?.message }}</p>
+    }
+
+    @if (auth.error(); as error) {
+      <p class="error" role="alert">{{ error }}</p>
+    }
+
+    <button type="submit" class="submit" [disabled]="auth.busy()">
+      {{ auth.busy() ? 'Signing in…' : 'Sign in' }}
+    </button>
+  </form>
+</main>

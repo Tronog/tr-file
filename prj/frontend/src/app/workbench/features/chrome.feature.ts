@@ -14,7 +14,6 @@ export class ChromeFeature {
   readonly commandLabel: string;
   readonly commandKeys: readonly string[];
   readonly titleBarActions: readonly UiIconAction[];
-  readonly activityBottomItems: readonly UiActivityItem[];
   readonly sidebarMoreActions: readonly UiIconAction[];
 
   constructor(private readonly parent: WorkbenchService) {
@@ -23,8 +22,27 @@ export class ChromeFeature {
     this.commandLabel = mock.commandLabel;
     this.commandKeys = mock.commandKeys;
     this.titleBarActions = mock.titleBarActions;
-    this.activityBottomItems = mock.activityBottomItems;
     this.sidebarMoreActions = mock.sidebarMoreActions;
+  }
+
+  /**
+   * Account and settings. While someone is signed in the account button says
+   * who, and is how they sign out (PRD 003, §2).
+   */
+  readonly activityBottomItems = computed<readonly UiActivityItem[]>(() => {
+    const auth = this.parent.auth;
+    return this.parent.mockWorkbench.activityBottomItems.map((item) =>
+      item.id === 'account' && auth.canSignOut()
+        ? { ...item, label: `Sign out ${auth.username() ?? ''}`.trim() }
+        : item,
+    );
+  });
+
+  /** A click in the activity bar. Only the account button acts yet (the rest is PRD 003, §3). */
+  selectActivity(id: string): void {
+    if (id === 'account' && this.parent.auth.canSignOut()) {
+      void this.parent.auth.signOut();
+    }
   }
 
   readonly activityItems = computed<readonly UiActivityItem[]>(() => {

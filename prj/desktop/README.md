@@ -39,6 +39,14 @@ Two ways to see the frontend, and the difference is worth knowing:
 | `TR_FILE_DEVTOOLS` | off | Open the dev tools with the window |
 | `TR_FILE_DEV_SERVER` | unset | Angular dev server to load instead of the bundle; ignored unless `TR_FILE_DEV` |
 
+| `TR_FILE_AUTH_USERNAME` | unset | Turns signing in on: the window asks for this account before the bridge answers anything |
+| `TR_FILE_AUTH_PASSWORD` / `TR_FILE_AUTH_PASSWORD_HASH` | unset | Its password, plain or as made by `pnpm --filter backend hash-password` |
+
+Signing in is **off by default** on the desktop (PRD 003, §2): the app runs as
+the user, over files the user can already open. With an account set, each
+window has its own bridge session (`BridgeSessions`), shared by the command and
+save channels, and starts signed out.
+
 `HOST` and `PORT` are deliberately *not* read here: the server is configured
 from `DesktopConfig.serverEnv()`, not from the user's shell, so nothing in the
 environment can move it off loopback.
@@ -47,33 +55,34 @@ environment can move it off loopback.
 
 ```
 BrowserWindow ──http──▶ 127.0.0.1:<port>   (DesktopStack)   ← the bundle only
+    │                     ├── Host check       → 421 unless 127.0.0.1:<port> / localhost:<port>
     │                     ├── express.static   → frontend/dist/…/browser
-    │                     ├── /api/**          → new App(...)  (@tr-file/backend)
+    │                     ├── /api/**          → 404, JSON: there is no HTTP API
     │                     └── GET fallback     → index.html
     └──ipc───▶ FsBridgeChannel ──▶ App.bridge ──▶ FilesService   ← all the data
 ```
 
 Under Docker these are three things — two containers and nginx in front
 (`prj/docker/nginx/default.conf`). Here there is no room for a third process,
-so `DesktopStack` *is* that nginx, and the backend is **constructed, not
-spawned**: `new App(config, logger, version).instance` is mounted as ordinary
-Express middleware. A backend that fails to start is therefore a rejected
+so `DesktopStack` stands in for that nginx, and the backend is **constructed,
+not spawned**: `new App(config, logger, version)` is built in-process and only
+its `bridge` is used. A backend that fails to start is therefore a rejected
 promise the main process can show in a dialog, rather than a dead child nobody
 notices. It is also why `@tr-file/backend` gained an `exports` map — the pieces
 the shell composes are named, not reached for by deep path.
 
 The middleware order is the design:
 
-1. **Static first**, so a real file always wins. The bundle is fingerprinted and
+1. **The `Host` check**, so a page on another name that resolves to 127.0.0.1 —
+   DNS rebinding — gets nothing at all.
+2. **Static**, so a real file always wins. The bundle is fingerprinted and
    served `immutable`; `index.html` names those fingerprints and is `no-store`.
-2. **The API gate**, because the backend answers its own 404s in JSON — which is
-   what the frontend client parses — so it must never see a request meant for
-   the Angular router.
-3. **The SPA fallback**, last, and for `GET`/`HEAD` only: a stray `POST /nowhere`
+3. **The closed API prefix.** Since the window's data goes over the bridge, an
+   HTTP API here would only have been a way in for every *other* local program,
+   or a web page that found the port (PRD 003, §2). `/api/**` answers a JSON 404,
+   so a stale bundle that tries HTTP fails plainly.
+4. **The SPA fallback**, last, and for `GET`/`HEAD` only: a stray `POST /nowhere`
    should fail rather than quietly receive a page.
-
-Because the API and the app share one origin, there is no CORS, no dev proxy and
-no configured API base URL — the frontend's plain `/api/fs` requests just work.
 
 ## No HTTP for data (PRD 001, §8.1)
 
@@ -170,7 +179,8 @@ Only `main.ts`, `main-window.ts`, `fs-bridge.channel.ts` and the preload import
 `electron`. Everything Electron knows
 reaches `DesktopConfig` as a plain `DesktopEnvironment`, which is what lets the
 whole stack be booted and tested by `pnpm test` with no desktop session at all —
-`src/desktop.stack.test.ts` starts the real thing and talks to it over HTTP.
+`src/desktop.stack.test.ts` starts the real thing, checks over HTTP that it
+serves the bundle and no API, and reaches the files through its bridge.
 
 ## Security
 

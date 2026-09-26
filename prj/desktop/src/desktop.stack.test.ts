@@ -71,22 +71,43 @@ describe('the desktop stack', () => {
     assert.match(response.headers.get('cache-control') ?? '', /immutable/);
   });
 
-  it('serves the file-system API from the same origin', async () => {
-    const response = await fetch(`${base}/api/fs/list?path=`);
-    const body = (await response.json()) as { data: { entries: { name: string }[] } };
+  /**
+   * PRD 003, §2: the window uses the bridge, so an HTTP API would only be a
+   * way in for every other local program — or a page that found the port.
+   */
+  it('serves no file-system API over HTTP', async () => {
+    const listing = await fetch(`${base}/api/fs/list?path=`);
+    const body = (await listing.json()) as { error?: { code?: string } };
+    assert.equal(listing.status, 404);
+    assert.equal(body.error?.code, 'NOT_FOUND');
 
-    assert.equal(response.status, 200);
-    assert.deepEqual(
-      body.data.entries.map((entry) => entry.name).sort(),
-      ['README.md', 'docs'],
-    );
+    const form = new FormData();
+    form.append('file', new Blob(['x']), 'planted.txt');
+    const upload = await fetch(`${base}/api/fs/upload?path=`, { method: 'POST', body: form });
+    assert.equal(upload.status, 404);
   });
 
-  it('confines the API to the configured files root', async () => {
-    const response = await fetch(`${base}/api/fs/list?path=${encodeURIComponent('../..')}`);
+  it('still reaches the files through the bridge', async () => {
+    const response = await stack.bridge.dispatch({ command: 'list', path: '' });
 
-    // The backend's own confinement rule, reached through the desktop shell.
-    assert.equal(response.status, 403);
+    assert.ok('data' in response);
+  });
+
+  /** A page on another name that resolves to 127.0.0.1 — DNS rebinding. */
+  it('refuses a request addressed to any host but its own', async () => {
+    const port = new URL(base).port;
+    const { request } = await import('node:http');
+    const status = await new Promise<number>((resolve, reject) => {
+      request({ host: '127.0.0.1', port, path: '/main-ABCD1234.js', headers: { host: `attacker.example:${port}` } }, (response) => {
+        response.resume();
+        resolve(response.statusCode ?? 0);
+      })
+        .on('error', reject)
+        .end();
+    });
+
+    assert.equal(status, 421);
+    assert.equal((await fetch(`${base.replace('127.0.0.1', 'localhost')}/main-ABCD1234.js`)).status, 200);
   });
 
   /** The Angular router owns these paths; the server must not claim them. */
@@ -120,6 +141,34 @@ describe('DesktopConfig', () => {
     const config = DesktopConfig.resolve(environment({ TR_FILE_STATIC_ROOT: staticRoot }));
 
     assert.equal(config.filesRoot, filesRoot);
+  });
+
+  /** PRD 003, §2: optional on the desktop, and off unless an account is named. */
+  it('leaves signing in off unless an account is named', () => {
+    const plain = DesktopConfig.resolve(environment({ TR_FILE_STATIC_ROOT: staticRoot, AUTH_USERNAME: 'ignored' }));
+    assert.equal(plain.serverEnv()['AUTH_ENABLED'], 'false');
+
+    const locked = DesktopConfig.resolve(
+      environment({ TR_FILE_STATIC_ROOT: staticRoot, TR_FILE_AUTH_USERNAME: 'ana', TR_FILE_AUTH_PASSWORD: 'secret' }),
+    );
+    assert.equal(locked.serverEnv()['AUTH_ENABLED'], 'true');
+    assert.equal(locked.serverEnv()['AUTH_USERNAME'], 'ana');
+    assert.equal(locked.serverEnv()['AUTH_PASSWORD'], 'secret');
+  });
+
+  it('starts a production desktop without an account, since signing in is optional there', async () => {
+    const config = DesktopConfig.resolve(
+      environment({ TR_FILE_STATIC_ROOT: staticRoot, FILES_ROOT: filesRoot, TR_FILE_DEV: '0' }),
+    );
+    const shipped = new DesktopStack(config, SILENT);
+    try {
+      await shipped.start();
+      const status = await shipped.bridge.dispatch({ command: 'auth-status' });
+      assert.ok('data' in status);
+      assert.deepEqual(status.data, { required: false, authenticated: true, username: null });
+    } finally {
+      await shipped.stop();
+    }
   });
 
   it('keeps the server on loopback whatever the shell says', () => {

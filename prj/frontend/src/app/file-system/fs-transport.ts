@@ -1,3 +1,4 @@
+import type { AuthStatus } from '../auth/auth.model';
 import type { FsDetails, FsDirectoryListing, FsDownload, FsUpload } from './file-system.model';
 
 /**
@@ -53,4 +54,12 @@ export interface FsTransport {
 
   /** Uploads one file into `directoryPath`, reporting progress as it goes. */
   upload(directoryPath: string, file: File, options?: FsUploadOptions): FsUpload;
+
+  /** Whether the backend asks to sign in, and whether this session has (PRD 003, §2). */
+  authStatus(): Promise<AuthStatus>;
+
+  /** Signs in; rejects with `UNAUTHORIZED` or `TOO_MANY_REQUESTS`. */
+  login(username: string, password: string): Promise<AuthStatus>;
+
+  logout(): Promise<AuthStatus>;
 }

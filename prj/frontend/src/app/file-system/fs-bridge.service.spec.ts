@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { FileSystemService } from './file-system.service';
+import { SessionExpiryService } from '../auth/session-expiry.service';
 import { BRIDGE_CHUNK_BYTES, FsBridgeService } from './fs-bridge.service';
 import { FsError } from './fs-error';
 import type { FsDetails, FsDirectoryListing } from './file-system.model';
@@ -287,6 +288,34 @@ describe('FsBridgeService', () => {
       await expect(fs.transferFt.upload('', new File(['hi'], 'note.txt')).result).rejects.toMatchObject({
         code: 'CONFLICT',
       });
+    });
+  });
+
+  /** PRD 003, §2 — signing in goes over the bridge too, when the desktop asks for it. */
+  describe('signing in', () => {
+    it('asks, signs in and signs out with bridge commands', async () => {
+      fake.answer = { data: { required: true, authenticated: true, username: 'ana' } };
+
+      await fs.transport.authStatus();
+      await fs.transport.login('ana', 'secret');
+      await fs.transport.logout();
+
+      expect(fake.sent).toEqual([
+        { command: 'auth-status' },
+        { command: 'login', username: 'ana', password: 'secret' },
+        { command: 'logout' },
+      ]);
+    });
+
+    it('reports a command refused for want of a session, but not a refused sign-in', async () => {
+      const expiry = TestBed.inject(SessionExpiryService);
+      fake.answer = { error: { code: 'UNAUTHORIZED', message: 'Sign in to continue', status: 401 } };
+
+      await fs.transport.login('ana', 'nope').catch(() => undefined);
+      expect(expiry.expired()).toBe(0);
+
+      await fs.readFt.list('').catch(() => undefined);
+      expect(expiry.expired()).toBe(1);
     });
   });
 

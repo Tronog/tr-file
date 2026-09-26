@@ -17,6 +17,14 @@ export class HttpError extends Error {
     return new HttpError(400, 'BAD_REQUEST', message, details);
   }
 
+  static unauthorized(message: string, details?: unknown): HttpError {
+    return new HttpError(401, 'UNAUTHORIZED', message, details);
+  }
+
+  static tooManyRequests(message: string, details?: unknown): HttpError {
+    return new HttpError(429, 'TOO_MANY_REQUESTS', message, details);
+  }
+
   static forbidden(message: string, details?: unknown): HttpError {
     return new HttpError(403, 'FORBIDDEN', message, details);
   }

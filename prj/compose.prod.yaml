@@ -14,6 +14,11 @@ services:
       HOST: 0.0.0.0
       PORT: 4310
       FILES_ROOT: /data
+      # Signing in is required (PRD 003, §2); the backend will not start
+      # without an account. Prefer a hash: `pnpm --filter backend hash-password`.
+      AUTH_USERNAME: ${AUTH_USERNAME:?set AUTH_USERNAME to the account allowed to sign in}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
+      AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:-}
     expose:
       - "4310"
     volumes:

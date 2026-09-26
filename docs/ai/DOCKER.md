@@ -12,6 +12,13 @@ for you).
 | `prj/compose.dev.yaml` | development — source bind-mounted, ports published directly |
 | `prj/compose.prod.yaml` | production — only nginx is published, backend stays internal |
 
+Production requires an account (PRD 003, §2): `pnpm docker:prod` fails at once
+unless `AUTH_USERNAME` is set, together with `AUTH_PASSWORD_HASH` (preferred —
+`pnpm --filter backend hash-password`) or `AUTH_PASSWORD`, e.g. in `prj/.env`.
+Development runs without a login unless both `AUTH_USERNAME` and
+`AUTH_PASSWORD` are set. nginx forwards `Host` as `$http_host` (port included),
+which the backend's CSRF check relies on.
+
 ## Build context
 
 Both Dockerfiles are built **from the workspace root (`prj/`)**, not from their

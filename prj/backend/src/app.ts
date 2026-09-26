@@ -2,12 +2,14 @@ import express, { type Express } from 'express';
 
 import { AppConfig } from './config/index.js';
 import {
+  CsrfMiddleware,
   ErrorMiddleware,
   Logger,
   NotFoundMiddleware,
   RequestLoggerMiddleware,
   type RouteModule,
 } from './core/index.js';
+import { AuthRoutes, AuthService, SessionMiddleware } from './modules/auth/index.js';
 import { FileSystemBridge } from './modules/bridge/index.js';
 import { FilePathResolver, FilesRoutes, FilesService } from './modules/files/index.js';
 import { HealthRoutes, HealthService } from './modules/health/index.js';
@@ -29,6 +31,12 @@ export class App {
    */
   readonly bridge: FileSystemBridge;
 
+  /**
+   * Who may use the API (PRD 003, §2). Shared by the HTTP routes and the
+   * bridge, so both ask for the same account and neither is a way around it.
+   */
+  readonly auth: AuthService;
+
   private readonly filesService: FilesService;
   private readonly filesLogger: Logger;
 
@@ -43,7 +51,15 @@ export class App {
       this.filesLogger,
       this.config.uploadMaxBytes,
     );
-    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger);
+    this.auth = new AuthService(
+      this.config.auth,
+      this.config.sessionIdleMs,
+      this.logger.child({ module: 'auth' }),
+    );
+    if (!this.auth.required) {
+      this.logger.warn('signing in is switched off: anyone who can reach this server can use it');
+    }
+    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger, this.auth);
 
     this.instance = express();
     this.configure();
@@ -58,6 +74,10 @@ export class App {
     this.instance.use(express.json({ limit: '1mb' }));
     this.instance.use(express.urlencoded({ extended: true }));
     this.instance.use(new RequestLoggerMiddleware(this.logger).handle());
+    // Ahead of every module: no write gets through from another site, and no
+    // request at all without a session when signing in is on (PRD 003, §2).
+    this.instance.use(this.config.apiPrefix, new CsrfMiddleware().handle());
+    this.instance.use(this.config.apiPrefix, new SessionMiddleware(this.auth).handle());
   }
 
   private createModules(): readonly RouteModule[] {
@@ -65,6 +85,7 @@ export class App {
 
     return [
       new HealthRoutes(healthService),
+      new AuthRoutes(this.auth),
       new FilesRoutes(this.filesService, this.filesLogger),
     ];
   }

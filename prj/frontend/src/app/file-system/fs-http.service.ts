@@ -9,7 +9,7 @@ import {
   type HttpResourceRef,
 } from '@angular/common/http';
 import { Injector, Service, inject, signal, type Signal } from '@angular/core';
-import { firstValueFrom, type Subscription } from 'rxjs';
+import { firstValueFrom, type Observable, type Subscription } from 'rxjs';
 import type {
   FsDetails,
   FsDirectoryListing,
@@ -19,6 +19,7 @@ import type {
   FsUpload,
   FsUploadProgress,
 } from './file-system.model';
+import type { AuthStatus } from '../auth/auth.model';
 import { FS_ABORTED, FsError } from './fs-error';
 import type { FsTransport, FsUploadOptions } from './fs-transport';
 
@@ -225,6 +226,31 @@ export class FsHttpService implements FsTransport {
         fail(new FsError('The upload was cancelled.', 0, FS_ABORTED));
       },
     };
+  }
+
+  /* -- signing in (PRD 003, §2) ------------------------------------------- */
+
+  /** The session cookie is `HttpOnly`: only the server can say whether there is one. */
+  async authStatus(): Promise<AuthStatus> {
+    return this.request<AuthStatus>(this.http.get<FsEnvelope<AuthStatus>>('/api/auth/session'));
+  }
+
+  async login(username: string, password: string): Promise<AuthStatus> {
+    return this.request<AuthStatus>(
+      this.http.post<FsEnvelope<AuthStatus>>('/api/auth/login', { username, password }),
+    );
+  }
+
+  async logout(): Promise<AuthStatus> {
+    return this.request<AuthStatus>(this.http.post<FsEnvelope<AuthStatus>>('/api/auth/logout', {}));
+  }
+
+  private async request<T>(response: Observable<FsEnvelope<T>>): Promise<T> {
+    try {
+      return (await firstValueFrom(response)).data;
+    } catch (error) {
+      throw FsError.from(error);
+    }
   }
 
   /* -- reactive readers --------------------------------------------------- */
