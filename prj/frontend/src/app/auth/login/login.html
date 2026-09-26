@@ -1,7 +1,11 @@
 <main class="login">
   <form class="card" novalidate (submit)="onSubmit($event)" aria-labelledby="login-title">
     <h1 id="login-title" class="title">tr-file</h1>
-    <p class="subtitle">Sign in to browse your files.</p>
+    @if (connection.label(); as server) {
+      <p class="subtitle">Sign in to {{ server }} to browse its files.</p>
+    } @else {
+      <p class="subtitle">Sign in to browse your files.</p>
+    }
 
     <label class="field">
       <span class="label">Username</span>

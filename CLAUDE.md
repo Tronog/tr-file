@@ -118,7 +118,23 @@ commands are filtered by `command-palette/fuzzy-match.ts`, and a command that ne
 turns the box into an input box (`InputStep`: `validate` as you type, `accept` does the work
 and returns why it could not). *Go: Jump to Folder…* takes an absolute path within the
 workspace and checks it is a folder before showing it; *Remote: Connect to Remote Server…*
-parses `[user:password@]host:port` (`remote-target.ts`) and, until PRD 006, only says so.
+is a pick list (`PickStep`) of the servers `SavedServersFeature` keeps in `localStorage`
+(`tr-file.remote-servers.v1`) — user, host and port, **never the password** — with edit
+(`F2`) and remove (`Shift`+`Delete`) on each row and *Add New Remote Server…* below.
+Addresses are `[http(s)://][user[:password]@]host:port` (`remote-target.ts`). Picking or
+adding one connects the window to that server (PRD 006, §1) through `RemoteConnectionService`
+— desktop only — and, once connected, keeps it and reloads the window against it.
+
+**Remote servers (PRD 006, §1).** The desktop connects to another tr-file server's REST API
+from its *main process* — a page cannot: CORS, the `SameSite=Strict` cookie and the CSRF
+check all stop it. `RemoteBackend` (`prj/desktop/src/remote-backend.ts`) answers the very
+bridge commands `FileSystemBridge` does, over HTTP (chunked reads by `Range`, one streamed
+multipart `POST` per upload, the session cookie and CSRF header kept by the client), and
+`BridgeSessions` routes each window's commands to the local bridge or its remote server;
+`connect` / `disconnect` / `connection-status` are bridge commands too. The renderer's
+transport does not change; `WorkbenchService.backend` follows the connection, the status
+bar names the server, a remote that needs signing in shows the normal sign-in screen, and
+Go › Local Computer disconnects.
 
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a

@@ -8,8 +8,9 @@ import {
   output,
   viewChild,
 } from '@angular/core';
+import { UiIcon } from '../icon/ui-icon';
 import { UiProgress } from '../progress/ui-progress';
-import type { UiQuickInputMessage, UiQuickPickItem } from '../models';
+import type { UiQuickInputMessage, UiQuickPickButton, UiQuickPickButtonEvent, UiQuickPickItem } from '../models';
 
 let nextId = 0;
 
@@ -30,13 +31,17 @@ interface LabelPart {
  * `aria-activedescendant`. The mouse picks a row with a click. Leaving it — a
  * click elsewhere, focus moving away — closes it too, as VS Code's does.
  *
+ * A row may carry buttons — edit, remove — shown on the active row and the one
+ * under the pointer; each can have a keyboard `shortcut` that works on the
+ * active row, since focus stays in the field. Pressing one is `itemButton`.
+ *
  * Render-only: the application filters the list, tracks the active row,
  * validates the value and decides what accepting means. `busy` draws the thin
  * progress bar along its top while an answer is being worked out.
  */
 @Component({
   selector: 'ui-quick-input',
-  imports: [UiProgress],
+  imports: [UiIcon, UiProgress],
   templateUrl: './ui-quick-input.html',
   styleUrl: './ui-quick-input.scss',
   host: {
@@ -66,6 +71,8 @@ export class UiQuickInput {
   /** `Enter`, or a click on a row (which is made active first). */
   readonly accept = output<void>();
   readonly dismiss = output<void>();
+  /** A row's button, pressed or reached by its shortcut. */
+  readonly itemButton = output<UiQuickPickButtonEvent>();
 
   protected readonly listId = `ui-quick-input-list-${(nextId += 1)}`;
 
@@ -113,6 +120,14 @@ export class UiQuickInput {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
+    const shortcut = this.shortcutButton(event);
+    if (shortcut !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.itemButton.emit(shortcut);
+      return;
+    }
+
     switch (event.key) {
       case 'ArrowDown':
       case 'ArrowUp':
@@ -130,6 +145,32 @@ export class UiQuickInput {
     }
     event.preventDefault();
     event.stopPropagation();
+  }
+
+  /** A row button: its own action, not a pick of the row. */
+  protected onButton(event: MouseEvent, item: UiQuickPickItem, button: UiQuickPickButton): void {
+    event.stopPropagation();
+    this.itemButton.emit({ itemId: item.id, buttonId: button.id });
+  }
+
+  protected buttonTitle(button: UiQuickPickButton): string {
+    return button.shortcut ? `${button.label} (${button.shortcut})` : button.label;
+  }
+
+  /** The active row's button whose shortcut this key is, if any. */
+  private shortcutButton(event: KeyboardEvent): UiQuickPickButtonEvent | null {
+    const item = this.items().find((candidate) => candidate.id === this.activeId());
+    const chord = [
+      event.ctrlKey ? 'Ctrl' : '',
+      event.altKey ? 'Alt' : '',
+      event.shiftKey ? 'Shift' : '',
+      event.metaKey ? 'Meta' : '',
+      event.key,
+    ]
+      .filter(Boolean)
+      .join('+');
+    const button = item?.buttons?.find((candidate) => candidate.shortcut === chord);
+    return item !== undefined && button !== undefined ? { itemId: item.id, buttonId: button.id } : null;
   }
 
   protected onPick(item: UiQuickPickItem): void {

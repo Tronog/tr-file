@@ -67,10 +67,50 @@ describe('ChromeFeature', () => {
       ]);
     });
 
-    it('checks whichever computer the workbench talks to', () => {
-      workbench.backend.set('remote');
+    /** PRD 006, §1: on a remote server, Remote Computer is checked and Local Computer disconnects. */
+    describe('on a remote server', () => {
+      let sent: Record<string, unknown>[];
+      let reloads: number;
 
-      expect(go()?.items?.map((item) => item.checked)).toEqual([false, true]);
+      beforeEach(async () => {
+        sent = [];
+        reloads = 0;
+        Object.defineProperty(window, 'trFileBridge', {
+          configurable: true,
+          writable: true,
+          value: {
+            version: 2,
+            invoke: async (request: Record<string, unknown>) => {
+              sent.push(request);
+              return request['command'] === 'connection-status'
+                ? { data: { connected: true, scheme: 'http', host: 'nas.local', port: 4310, user: 'ana' } }
+                : { data: { connected: false } };
+            },
+            save: async () => ({ data: { saved: false } }),
+            onSaveProgress: () => () => undefined,
+          },
+        });
+        vi.spyOn(workbench.connection, 'reload').mockImplementation(() => (reloads += 1));
+        await workbench.connection.load();
+      });
+
+      afterEach(() => {
+        Object.defineProperty(window, 'trFileBridge', { configurable: true, writable: true, value: undefined });
+      });
+
+      it('checks Remote Computer, and names the server in the status bar', () => {
+        expect(workbench.backend()).toBe('remote');
+        expect(go()?.items?.map((item) => item.checked)).toEqual([false, true]);
+        expect(workbench.chromeFt.statusLeadingItems()[0]).toMatchObject({ label: 'ana@nas.local:4310', icon: 'cloud' });
+      });
+
+      it('disconnects with Local Computer, and starts over on this computer', async () => {
+        workbench.chromeFt.runMenuItem({ menuId: 'go', itemId: 'go.local' });
+        await vi.waitFor(() => expect(reloads).toBe(1));
+
+        expect(sent.at(-1)).toEqual({ command: 'disconnect' });
+        expect(workbench.backend()).toBe('local');
+      });
     });
 
     it('opens one menu at a time, and closes', () => {
@@ -101,9 +141,10 @@ describe('ChromeFeature', () => {
       const palette = workbench.commandPaletteFt;
       expect(go()?.open).toBe(false);
       expect(palette.isOpen()).toBe(true);
-      expect(palette.showList()).toBe(false);
+      // The saved servers to pick from, and a row to add one (PRD 009, §1).
+      expect(palette.showList()).toBe(true);
       expect(palette.label()).toBe('Connect to remote server');
-      expect(palette.placeholder()).toBe('[user:password@]host:port');
+      expect(palette.items().at(-1)?.label).toBe('Add New Remote Server…');
     });
   });
 

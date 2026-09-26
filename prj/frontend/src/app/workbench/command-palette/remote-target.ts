@@ -3,9 +3,14 @@
  *
  * Typed as `[user:password@]host:port`, where the host is an IPv4 address, a
  * host name, or an IPv6 address in brackets: `10.0.0.5:22`,
- * `ana:secret@files.example.com:2222`, `[::1]:8022`.
+ * `ana:secret@files.example.com:2222`, `[::1]:8022`. The password may be left
+ * out — `ana@files.example.com:2222` — which is how a saved server, whose
+ * password is never kept, is written back. A leading `https://` (or
+ * `http://`) says how to reach it; without one, port 443 means HTTPS.
  */
 export interface RemoteTarget {
+  /** `https` when asked for, or on port 443; `http` otherwise. */
+  readonly scheme: 'http' | 'https';
   readonly user: string | null;
   readonly password: string | null;
   readonly host: string;
@@ -18,9 +23,16 @@ const IPV6 = /^\[[0-9a-f:.]+\]$/i;
 
 /** The target, or a sentence saying what is wrong with the text. */
 export function parseRemoteTarget(raw: string): RemoteTarget | string {
-  const text = raw.trim();
+  let text = raw.trim();
   if (text === '') {
     return 'Enter a server as [user:password@]host:port';
+  }
+  const schemeMatch = /^(https?):\/\//i.exec(text);
+  const explicit = schemeMatch ? (schemeMatch[1]?.toLowerCase() as 'http' | 'https') : null;
+  if (schemeMatch) {
+    text = text.slice(schemeMatch[0].length);
+  } else if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) {
+    return 'Only http:// and https:// servers can be connected to';
   }
 
   // The last `@` ends the credentials, so a password may contain one.
@@ -30,11 +42,12 @@ export function parseRemoteTarget(raw: string): RemoteTarget | string {
   if (at !== -1) {
     const credentials = text.slice(0, at);
     const colon = credentials.indexOf(':');
-    if (colon <= 0 || colon === credentials.length - 1) {
-      return 'Credentials go before the @ as user:password';
+    const name = colon === -1 ? credentials : credentials.slice(0, colon);
+    if (name === '' || (colon !== -1 && colon === credentials.length - 1)) {
+      return 'Credentials go before the @ as user:password, or just user';
     }
-    user = credentials.slice(0, colon);
-    password = credentials.slice(colon + 1);
+    user = name;
+    password = colon === -1 ? null : credentials.slice(colon + 1);
   }
 
   const address = text.slice(at + 1);
@@ -52,12 +65,16 @@ export function parseRemoteTarget(raw: string): RemoteTarget | string {
   if (!isHost(host)) {
     return host === '' ? 'Add a host before the port' : `'${host}' is not a host name or an IP address`;
   }
-  return { user, password, host, port };
+  return { scheme: explicit ?? (port === 443 ? 'https' : 'http'), user, password, host, port };
 }
 
-/** `user@host:port`, never with the password. */
-export function describeRemoteTarget(target: RemoteTarget): string {
-  return `${target.user === null ? '' : `${target.user}@`}${target.host}:${target.port}`;
+/**
+ * `user@host:port`, never with the password — with `https://` in front when
+ * HTTPS was asked for on a port that would not have implied it.
+ */
+export function describeRemoteTarget(target: Pick<RemoteTarget, 'user' | 'host' | 'port'> & { scheme?: 'http' | 'https' }): string {
+  const scheme = target.scheme === 'https' && target.port !== 443 ? 'https://' : target.scheme === 'http' && target.port === 443 ? 'http://' : '';
+  return `${scheme}${target.user === null ? '' : `${target.user}@`}${target.host}:${target.port}`;
 }
 
 function isHost(host: string): boolean {

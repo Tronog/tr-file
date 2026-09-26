@@ -44,10 +44,29 @@
         (pointermove)="item.id === activeId() ? null : activeChange.emit(item.id)"
         (click)="onPick(item)"
       >
+        @if (item.icon) {
+          <ui-icon class="row-icon" [name]="item.icon" />
+        }
         <!-- One line: the label keeps its spaces, so the template must not add any. -->
         <span class="row-label">@for (part of parts(item); track $index) {<span [class.hl]="part.match">{{ part.text }}</span>}</span>
         @if (item.description) {
           <span class="row-description">{{ item.description }}</span>
+        }
+        @if (item.buttons?.length) {
+          <span class="row-buttons">
+            @for (button of item.buttons; track button.id) {
+              <button
+                type="button"
+                class="row-button"
+                tabindex="-1"
+                [attr.aria-label]="buttonTitle(button)"
+                [attr.title]="buttonTitle(button)"
+                (click)="onButton($event, item, button)"
+              >
+                <ui-icon [name]="button.icon" />
+              </button>
+            }
+          </span>
         }
         @if (item.keys?.length) {
           <span class="row-keys" aria-hidden="true">

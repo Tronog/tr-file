@@ -69,9 +69,8 @@ export class ChromeFeature {
   /**
    * An entry of the main menu was chosen; the menu closes either way.
    *
-   * - **Go › Local Computer** (§1.2) — this computer's backend, the default.
-   *   It is the only one there is until PRD 006, so there is nothing to
-   *   switch; it is already in effect.
+   * - **Go › Local Computer** (§1.2) — this computer's backend, the default:
+   *   disconnects from a remote server, if the window is on one.
    * - **Go › Remote Computer…** (§1.3) — the command palette, straight at
    *   *Connect to Remote Server*.
    */
@@ -79,7 +78,7 @@ export class ChromeFeature {
     this.openMenuId.set(null);
     switch (selection.itemId) {
       case 'go.local':
-        this.parent.backend.set('local');
+        void this.parent.connection.disconnect();
         break;
       case 'go.remote':
         this.parent.commandPaletteFt.run('remote.connect');
@@ -161,13 +160,22 @@ export class ChromeFeature {
     const problems = this.parent.fsDataFt.errors().length;
     const transfers = this.parent.transfersFt.activeCount();
     const items: UiStatusItem[] = [
-      {
-        id: 'root',
-        label: this.parent.mockWorkbench.workspaceName,
-        icon: 'desktop',
-        accent: true,
-        title: 'Workspace served by the backend',
-      },
+      // VS Code's remote indicator: which computer the files are on (PRD 006, §1).
+      this.parent.connection.connected()
+        ? {
+            id: 'root',
+            label: this.parent.connection.label() ?? 'Remote',
+            icon: 'cloud',
+            accent: true,
+            title: 'Connected to a remote server — Go › Local Computer to disconnect',
+          }
+        : {
+            id: 'root',
+            label: this.parent.mockWorkbench.workspaceName,
+            icon: 'desktop',
+            accent: true,
+            title: 'Workspace served by the backend',
+          },
       {
         id: 'problems',
         label: problems === 0 ? 'No problems' : `${problems} ${problems === 1 ? 'problem' : 'problems'}`,

@@ -1,4 +1,4 @@
-import { inject, Service, signal } from '@angular/core';
+import { computed, inject, Service, signal } from '@angular/core';
 import { DesktopWindowService } from '../desktop/desktop-window.service';
 import { FileSystemService } from '../file-system/file-system.service';
 import { ImageSourceService } from '../file-system/image-source.service';
@@ -25,6 +25,8 @@ import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.servic
 import { AuthService } from '../auth/auth.service';
 import { ModalService } from '../modal/modal.service';
 import { CommandPaletteFeature } from './features/command-palette.feature';
+import { SavedServersFeature } from './features/saved-servers.feature';
+import { RemoteConnectionService } from '../file-system/remote-connection.service';
 
 /**
  * The workbench's common state, and the seam every feature talks through.
@@ -75,12 +77,15 @@ export class WorkbenchService {
   /** Dot-files are hidden until the status bar says otherwise. */
   readonly showHidden = signal(false);
 
+  /** Where the backend is: this computer's, or a remote server (PRD 006, §1). */
+  readonly connection = inject(RemoteConnectionService);
+
   /**
    * Which backend the workbench is talking to (PRD 008, §1.2–1.3): this
    * computer's — the desktop's own, or the server that served the page — or a
-   * remote server. Always `local` until connecting to one exists (PRD 006).
+   * remote server (PRD 006).
    */
-  readonly backend = signal<'local' | 'remote'>('local');
+  readonly backend = computed<'local' | 'remote'>(() => (this.connection.connected() ? 'remote' : 'local'));
 
   readonly leftSidebarWidth = signal(this.mockWorkbench.layout.leftSidebarWidth);
   readonly rightSidebarWidth = signal(this.mockWorkbench.layout.rightSidebarWidth);
@@ -127,6 +132,8 @@ export class WorkbenchService {
   readonly resizeFt = new WorkbenchResizeFeature(this);
   /** The frameless window's own buttons and drag region. */
   readonly windowControlsFt = new WindowControlsFeature(this);
+  /** Remote servers kept on this machine, for *Connect to Remote Server* (PRD 009, §1). */
+  readonly savedServersFt = new SavedServersFeature();
   /** The command palette: `Ctrl`+`Shift`+`P` (PRD 009, §1). */
   readonly commandPaletteFt = new CommandPaletteFeature(this);
 

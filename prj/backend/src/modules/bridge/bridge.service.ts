@@ -366,7 +366,8 @@ export class FileSystemBridge {
     return new HttpError(0, 'ABORTED', message);
   }
 
-  private toFailure(error: unknown): FsBridgeFailure {
+  /** A thrown error as the flattened failure a caller gets; see rule 2 above. */
+  toFailure(error: unknown): FsBridgeFailure {
     if (error instanceof HttpError) {
       return {
         error: {
@@ -391,8 +392,10 @@ export class FileSystemBridge {
   /**
    * Narrows an untrusted value to a request, rejecting with the same
    * `BAD_REQUEST` an HTTP caller would have received for a malformed query.
+   * Public so a client speaking the same commands to a remote server (the
+   * desktop's `RemoteBackend`, PRD 006) validates them exactly as this does.
    */
-  private static parse(value: unknown): FsBridgeRequest {
+  static parse(value: unknown): FsBridgeRequest {
     if (typeof value !== 'object' || value === null) {
       throw HttpError.badRequest('A bridge request must be an object');
     }

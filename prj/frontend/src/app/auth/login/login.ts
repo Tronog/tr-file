@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormField, form, required, submit } from '@angular/forms/signals';
 import { AuthService } from '../auth.service';
+import { RemoteConnectionService } from '../../file-system/remote-connection.service';
 
 interface Credentials {
   username: string;
@@ -20,6 +21,8 @@ interface Credentials {
 })
 export class Login {
   protected readonly auth = inject(AuthService);
+  /** On a remote server, the screen says which one it is signing in to (PRD 006, §1). */
+  protected readonly connection = inject(RemoteConnectionService);
 
   protected readonly model = signal<Credentials>({ username: '', password: '' });
 

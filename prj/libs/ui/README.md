@@ -347,7 +347,10 @@ message (a hint in blue, a problem in red). Focus stays in the field — it is a
 `combobox` whose list is announced through `aria-activedescendant` — so `↑`/`↓`
 move the active row (wrapping), `Enter` emits `accept`, `Escape` emits
 `dismiss` and hands focus back, and focus leaving the box dismisses it too.
-Rows carry optional `highlights` (drawn bold in the link blue) and key chips;
+Rows carry optional `highlights` (drawn bold in the link blue), an `icon`, key
+chips, and `buttons` — VS Code's row actions, shown on the active row and the
+one under the pointer, each with an optional `shortcut` (e.g. `F2`,
+`Shift+Delete`) that works on the active row, reported as `itemButton`;
 `busy` draws a progress rail along the top. It filters nothing and decides
 nothing: in the app the command palette (`CommandPaletteFeature`) owns the
 list, the matching and what accepting means.

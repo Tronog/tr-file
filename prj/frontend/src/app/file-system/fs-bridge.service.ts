@@ -60,6 +60,26 @@ const BRIDGE_VERSION = 2;
  */
 export const BRIDGE_CHUNK_BYTES = 1024 * 1024;
 
+/** Where a remote server is, as the main process is asked to connect to it. */
+export interface RemoteServerAddress {
+  readonly scheme: 'http' | 'https';
+  readonly host: string;
+  readonly port: number;
+  readonly user: string | null;
+  readonly password: string | null;
+}
+
+/** Which backend a window talks to — never the password. */
+export type RemoteConnectionStatus =
+  | { readonly connected: false }
+  | {
+      readonly connected: true;
+      readonly scheme: 'http' | 'https';
+      readonly host: string;
+      readonly port: number;
+      readonly user: string | null;
+    };
+
 /** One chunk of a file, as the `read` command answers it. */
 interface FsReadResult {
   readonly size: number;
@@ -289,6 +309,26 @@ export class FsBridgeService implements FsTransport {
         fail(new FsError('The upload was cancelled.', 0, FS_ABORTED));
       },
     };
+  }
+
+  /* -- remote servers (PRD 006, §1) --------------------------------------- */
+
+  /**
+   * Points this window at a remote tr-file server: the main process checks
+   * it, signs in with the credentials if there are any, and from then on
+   * sends this window's commands there. The password is not kept.
+   */
+  async connect(target: RemoteServerAddress): Promise<RemoteConnectionStatus> {
+    return this.invoke<RemoteConnectionStatus>({ command: 'connect', ...target });
+  }
+
+  /** Back to the local backend. */
+  async disconnect(): Promise<RemoteConnectionStatus> {
+    return this.invoke<RemoteConnectionStatus>({ command: 'disconnect' });
+  }
+
+  async connectionStatus(): Promise<RemoteConnectionStatus> {
+    return this.invoke<RemoteConnectionStatus>({ command: 'connection-status' });
   }
 
   /* -- signing in (PRD 003, §2) ------------------------------------------- */

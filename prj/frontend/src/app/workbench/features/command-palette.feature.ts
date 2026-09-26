@@ -1,9 +1,10 @@
 import { computed, signal } from '@angular/core';
-import type { UiQuickInputMessage, UiQuickPickItem } from '@tr-file/ui';
+import type { UiQuickInputMessage, UiQuickPickButtonEvent, UiQuickPickItem } from '@tr-file/ui';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import { FsError } from '../../file-system/fs-error';
 import { fuzzyMatch } from '../command-palette/fuzzy-match';
-import { describeRemoteTarget, parseRemoteTarget } from '../command-palette/remote-target';
+import { describeRemoteTarget, parseRemoteTarget, type RemoteTarget } from '../command-palette/remote-target';
+import type { SavedServer } from './saved-servers.feature';
 import type { WorkbenchService } from '../workbench.service';
 
 /** One command the palette offers. */
@@ -22,6 +23,7 @@ export interface PaletteCommand {
  * answers with why it could not, or `null` when it is done.
  */
 interface InputStep {
+  readonly kind: 'input';
   readonly label: string;
   readonly placeholder: string;
   /** What to type, shown under the field until there is something wrong with it. */
@@ -30,6 +32,26 @@ interface InputStep {
   readonly validate: (value: string) => string | null;
   readonly accept: (value: string) => Promise<string | null>;
 }
+
+/**
+ * A choice a command asks for — VS Code's quick pick: a list of its own,
+ * filtered as the commands are, whose rows may carry buttons (edit, remove).
+ * Either may move the palette on to another step, or close it.
+ */
+interface PickStep {
+  readonly kind: 'pick';
+  readonly label: string;
+  readonly placeholder: string;
+  readonly items: () => readonly UiQuickPickItem[];
+  /** May work asynchronously — connecting — and answer why it could not. */
+  readonly accept: (itemId: string) => void | Promise<string | null>;
+  readonly button: (event: UiQuickPickButtonEvent) => void;
+}
+
+type Step = InputStep | PickStep;
+
+/** The pick list's row for a new server; saved servers are listed above it. */
+const ADD_SERVER = 'remote.add';
 
 /**
  * The command palette (PRD 009, §1), VS Code's: `Ctrl`+`Shift`+`P`, `F1` or
@@ -46,7 +68,7 @@ export class CommandPaletteFeature {
   private readonly opened = signal(false);
   private readonly text = signal('');
   private readonly active = signal<string | null>(null);
-  private readonly asking = signal<InputStep | null>(null);
+  private readonly asking = signal<Step | null>(null);
   private readonly problem = signal<string | null>(null);
   private readonly working = signal(false);
 
@@ -65,32 +87,36 @@ export class CommandPaletteFeature {
     },
   ];
 
-  /** Whether the box is listing commands, rather than asking for a value. */
-  readonly showList = computed(() => this.asking() === null);
+  /** Whether the box shows a list — the commands, or a command's choices — rather than asking for a value. */
+  readonly showList = computed(() => this.asking()?.kind !== 'input');
 
   readonly label = computed(() => this.asking()?.label ?? 'Command palette');
 
   readonly placeholder = computed(() => this.asking()?.placeholder ?? 'Type the name of a command to run');
 
-  /** The commands matching what was typed, best first, with the matches highlighted. */
+  /**
+   * What the list shows, filtered by what was typed, best first, with the
+   * matches highlighted: the commands, or the choices of the command asking.
+   */
   readonly items = computed<readonly UiQuickPickItem[]>(() => {
-    if (this.asking() !== null) {
+    const step = this.asking();
+    if (step?.kind === 'input') {
       return [];
     }
+    const rows: readonly UiQuickPickItem[] =
+      step?.kind === 'pick'
+        ? step.items()
+        : this.commands.map((command) => ({
+            id: command.id,
+            label: `${command.category}: ${command.label}`,
+            ...(command.keys ? { keys: command.keys } : {}),
+          }));
     const query = this.text();
-    return this.commands
-      .map((command, order) => {
-        const label = `${command.category}: ${command.label}`;
-        return { command, label, order, match: fuzzyMatch(query, label) };
-      })
+    return rows
+      .map((row, order) => ({ row, order, match: fuzzyMatch(query, row.label) }))
       .filter((entry) => entry.match !== null)
       .sort((a, b) => (b.match?.score ?? 0) - (a.match?.score ?? 0) || a.order - b.order)
-      .map(({ command, label, match }) => ({
-        id: command.id,
-        label,
-        ...(command.keys ? { keys: command.keys } : {}),
-        ...(match && match.ranges.length > 0 ? { highlights: match.ranges } : {}),
-      }));
+      .map(({ row, match }) => (match && match.ranges.length > 0 ? { ...row, highlights: match.ranges } : row));
   });
 
   /** A problem with the value, or — in an input box — what to type. */
@@ -100,7 +126,7 @@ export class CommandPaletteFeature {
       return { severity: 'error', text: problem };
     }
     const step = this.asking();
-    return step === null ? null : { severity: 'info', text: step.prompt };
+    return step?.kind === 'input' ? { severity: 'info', text: step.prompt } : null;
   });
 
   constructor(private readonly parent: WorkbenchService) {}
@@ -152,10 +178,18 @@ export class CommandPaletteFeature {
   setQuery(value: string): void {
     this.text.set(value);
     const step = this.asking();
-    if (step === null) {
-      this.active.set(this.items()[0]?.id ?? null);
-    } else {
+    if (step?.kind === 'input') {
       this.problem.set(value === '' ? null : step.validate(value));
+    } else {
+      this.active.set(this.items()[0]?.id ?? null);
+    }
+  }
+
+  /** A row's button — edit or remove a saved server. */
+  itemButton(event: UiQuickPickButtonEvent): void {
+    const step = this.asking();
+    if (step?.kind === 'pick') {
+      step.button(event);
     }
   }
 
@@ -168,6 +202,26 @@ export class CommandPaletteFeature {
     const step = this.asking();
     if (step === null) {
       this.commands.find((command) => command.id === this.active())?.run();
+      return;
+    }
+    if (step.kind === 'pick') {
+      const id = this.active();
+      if (id === null || this.working()) {
+        return;
+      }
+      this.problem.set(null);
+      const answer = step.accept(id);
+      if (answer instanceof Promise) {
+        this.working.set(true);
+        try {
+          const failed = await answer;
+          if (failed !== null && this.asking() === step) {
+            this.problem.set(failed);
+          }
+        } finally {
+          this.working.set(false);
+        }
+      }
       return;
     }
     if (this.working()) {
@@ -197,12 +251,12 @@ export class CommandPaletteFeature {
     }
   }
 
-  /** Turns the box into an input box for `step`. */
-  private ask(step: InputStep): void {
+  /** Turns the box into an input box, or a list of `step`'s own. */
+  private ask(step: Step): void {
     this.asking.set(step);
     this.problem.set(null);
-    this.text.set(step.value ?? '');
-    this.active.set(null);
+    this.text.set(step.kind === 'input' ? (step.value ?? '') : '');
+    this.active.set(step.kind === 'pick' ? (this.items()[0]?.id ?? null) : null);
   }
 
   /* -- the commands -------------------------------------------------------- */
@@ -215,6 +269,7 @@ export class CommandPaletteFeature {
   private jumpToFolder(): InputStep {
     const current = this.parent.editorGroupsFt.pathOf(this.parent.activeGroupId());
     return {
+      kind: 'input',
       label: 'Jump to folder',
       placeholder: '/path/to/folder',
       prompt: "Enter an absolute path, e.g. /docs/prd. Press 'Enter' to go there or 'Escape' to cancel.",
@@ -252,32 +307,124 @@ export class CommandPaletteFeature {
   }
 
   /**
-   * Asks for a server as `[user:password@]host:port`. Connecting is PRD 006:
-   * for now the address is checked and acknowledged, never kept, and the
-   * password is never shown back.
+   * The servers kept on this machine to pick from, and a row to add one — VS
+   * Code's *Connect to Host…*. A saved row carries edit (`F2`) and remove
+   * (`Shift`+`Delete`); the list stays open while it is edited.
    */
-  private connectToRemote(): InputStep {
+  private connectToRemote(): PickStep {
+    const saved = this.parent.savedServersFt;
     return {
+      kind: 'pick',
       label: 'Connect to remote server',
+      placeholder: 'Select a saved server, or add a new one',
+      items: () => [
+        ...saved.servers().map((server) => ({
+          id: server.id,
+          icon: 'cloud' as const,
+          label: describeRemoteTarget(server),
+          ...(server.lastUsedAt === null ? {} : { description: 'recently used' }),
+          buttons: [
+            { id: 'edit', icon: 'pencil' as const, label: 'Edit server', shortcut: 'F2' },
+            { id: 'remove', icon: 'trash' as const, label: 'Remove server', shortcut: 'Shift+Delete' },
+          ],
+        })),
+        { id: ADD_SERVER, icon: 'plus' as const, label: 'Add New Remote Server…' },
+      ],
+      accept: (itemId) => {
+        if (itemId === ADD_SERVER) {
+          this.ask(this.addServer());
+          return;
+        }
+        const server = saved.find(itemId);
+        // No password was kept: a server that wants one shows its sign-in screen.
+        return server === undefined ? Promise.resolve(null) : this.connectTo({ ...server, scheme: server.scheme ?? (server.port === 443 ? 'https' : 'http'), password: null }, server.id);
+      },
+      button: ({ itemId, buttonId }) => {
+        const server = saved.find(itemId);
+        if (server === undefined) {
+          return;
+        }
+        if (buttonId === 'edit') {
+          this.ask(this.editServer(server));
+        } else if (buttonId === 'remove') {
+          saved.remove(itemId);
+          // Stay on the list, on the row that took its place.
+          if (this.active() === itemId || !this.items().some((item) => item.id === this.active())) {
+            this.active.set(this.items()[0]?.id ?? null);
+          }
+        }
+      },
+    };
+  }
+
+  /** Asks for a new server as `[user:password@]host:port`, connects, and keeps it once connected. */
+  private addServer(): InputStep {
+    return {
+      kind: 'input',
+      label: 'Add remote server',
       placeholder: '[user:password@]host:port',
       prompt: "Enter a server as [user:password@]ip:port or [user:password@]hostname:port. Press 'Enter' to connect or 'Escape' to cancel.",
-      validate: (value) => {
-        const target = parseRemoteTarget(value);
-        return typeof target === 'string' ? target : null;
-      },
+      validate: CommandPaletteFeature.validateTarget,
       accept: async (value) => {
         const target = parseRemoteTarget(value);
         if (typeof target === 'string') {
           return target;
         }
-        this.close();
-        await this.parent.modal.message({
-          severity: 'info',
-          message: 'Remote connections are not available yet',
-          detail: `tr-file will connect to ${describeRemoteTarget(target)}${target.password === null ? '' : ' with the password given'} once remote servers are supported.`,
-        });
+        return this.connectTo(target, null);
+      },
+    };
+  }
+
+  /** Changes a saved server's address, then goes back to the list. */
+  private editServer(server: SavedServer): InputStep {
+    return {
+      kind: 'input',
+      label: 'Edit remote server',
+      placeholder: '[user:password@]host:port',
+      prompt: "Change the server's address, as [user@]host:port. Its password is asked for when connecting, never kept. Press 'Enter' to save or 'Escape' to cancel.",
+      value: describeRemoteTarget(server),
+      validate: CommandPaletteFeature.validateTarget,
+      accept: async (value) => {
+        const target = parseRemoteTarget(value);
+        if (typeof target === 'string') {
+          return target;
+        }
+        this.parent.savedServersFt.update(server.id, target);
+        this.ask(this.connectToRemote());
+        this.active.set(server.id);
         return null;
       },
     };
+  }
+
+  /**
+   * Connects the window to a server (PRD 006, §1); on success keeps it in the
+   * saved list — never with its password — and starts the window over against
+   * it. Answers why not, when it could not, and the palette stays open to say so.
+   */
+  private async connectTo(target: RemoteTarget, savedId: string | null): Promise<string | null> {
+    const failed = await this.parent.connection.connect({
+      scheme: target.scheme,
+      host: target.host,
+      port: target.port,
+      user: target.user,
+      password: target.password,
+    });
+    if (failed !== null) {
+      return failed;
+    }
+    if (savedId === null) {
+      this.parent.savedServersFt.use(target);
+    } else {
+      this.parent.savedServersFt.touch(savedId);
+    }
+    this.close();
+    this.parent.connection.reload();
+    return null;
+  }
+
+  private static validateTarget(value: string): string | null {
+    const target = parseRemoteTarget(value);
+    return typeof target === 'string' ? target : null;
   }
 }

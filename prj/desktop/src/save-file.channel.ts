@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 
-import type { FileSystemBridge, FsBridgeResponse } from '@tr-file/backend/bridge';
+import type { FsBridgeResponse } from '@tr-file/backend/bridge';
 import type { Logger } from '@tr-file/backend/core';
 
 import type { BridgeSessions } from './bridge-sessions.js';
@@ -44,7 +44,8 @@ type SaveRequest =
  * no such URL, and building one out of the file's bytes would put the whole
  * file in the renderer's memory first. So the main process does it instead:
  * it asks where to save with the native dialog — the user, not the page,
- * picks the destination — and then `FileSystemBridge.saveCopy` streams the
+ * picks the destination — and then the window's backend (local, or the remote
+ * server it is connected to) streams the
  * file there, never holding more than a chunk of it.
  *
  * The renderer names each transfer, so progress can be pushed back against
@@ -58,7 +59,6 @@ export class SaveFileChannel {
   private readonly running = new Map<string, AbortController>();
 
   constructor(
-    private readonly bridge: FileSystemBridge,
     private readonly origin: string,
     private readonly logger: Logger,
     private readonly sessions: BridgeSessions,
@@ -111,9 +111,8 @@ export class SaveFileChannel {
     name: string,
   ): Promise<FsBridgeResponse<SaveOutcome>> {
     // Asked before the dialog: a window that has not signed in gets no dialog.
-    const session = this.sessions.for(sender);
-    const status = await this.bridge.dispatch({ command: 'auth-status' }, session);
-    if ('data' in status && !(status.data as { authenticated: boolean }).authenticated) {
+    // A window on a remote server asks it, and saves from it (PRD 006, §1).
+    if (!(await this.sessions.authenticated(sender))) {
       return { error: { code: 'UNAUTHORIZED', message: 'Sign in to continue', status: 401 } };
     }
 
@@ -129,7 +128,7 @@ export class SaveFileChannel {
     let lastPush = 0;
 
     try {
-      const result = await this.bridge.saveCopy(path, choice.filePath, {
+      const result = await this.sessions.saveCopy(sender, path, choice.filePath, {
         signal: controller.signal,
         onProgress: (loaded, total) => {
           const now = Date.now();
@@ -141,7 +140,7 @@ export class SaveFileChannel {
             sender.send(SAVE_PROGRESS_EVENT, { transferId, loaded, total } satisfies SaveProgress);
           }
         },
-      }, session);
+      });
       return 'error' in result ? result : { data: { saved: true, bytes: result.data.bytes } };
     } finally {
       this.running.delete(transferId);

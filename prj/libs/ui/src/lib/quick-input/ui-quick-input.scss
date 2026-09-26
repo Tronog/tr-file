@@ -111,6 +111,46 @@
   font-weight: 600;
 }
 
+.row-icon {
+  flex: none;
+  color: var(--vsc-fg-muted);
+}
+
+.row.is-active .row-icon {
+  color: var(--vsc-fg-bright);
+}
+
+/* Row actions, as in VS Code: only on the active row and the one under the pointer. */
+.row-buttons {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+  visibility: hidden;
+}
+
+.row:hover .row-buttons,
+.row.is-active .row-buttons {
+  visibility: visible;
+}
+
+.row-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--vsc-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+  }
+}
+
 .row-description {
   color: var(--vsc-fg-muted);
   font-size: var(--vsc-font-size-sm);

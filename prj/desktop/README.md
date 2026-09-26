@@ -128,6 +128,43 @@ it. The destination comes from the dialog, never from the page. The preload
 exposes this as `trFileBridge.save` / `onSaveProgress`, and the bridge contract
 is version 2 — a page expecting version 1 does not use it.
 
+## Remote servers (PRD 006, §1)
+
+A window can work on another computer's files: a tr-file server running there
+headless — the same backend, the same REST API the web version uses. The
+command palette's *Connect to Remote Server* asks for
+`[http(s)://][user[:password]@]host:port`.
+
+```
+Angular ─ FsBridgeService ─ ipc ─ FsBridgeChannel ─ BridgeSessions ─┬─ App.bridge ─ FilesService   (this computer)
+                                                                     └─ RemoteBackend ─ https ─▶ /api (remote server)
+```
+
+The page could not do this itself: another origin needs CORS the server does
+not grant, would not get the server's `SameSite=Strict` session cookie, and is
+refused by its CSRF check. So the main process does it, and the page is none
+the wiser — `RemoteBackend` answers **the same bridge commands** as the local
+bridge, over HTTP:
+
+| Command | Over HTTP |
+| --- | --- |
+| `list`, `details` | `GET /api/fs/list`, `/api/fs/details` |
+| `read` | `GET /api/fs/download` with `Range` — one chunk; the size from `Content-Range` |
+| `upload-begin` / `-chunk` / `-commit` / `-abort` | One streamed multipart `POST /api/fs/upload`; a taken name is checked for first |
+| `auth-status`, `login`, `logout` | `/api/auth/*`; the session cookie is kept by the client |
+| `saveCopy` | `GET /api/fs/download`, streamed to the chosen file |
+
+Every write carries the CSRF header; the server's refusals come back with its
+own code and status, and an unreachable server as `NETWORK_ERROR`.
+`BridgeSessions` keeps each window's connection and routes its commands, and
+answers `connect` (check it is a tr-file server, sign in when credentials are
+given), `disconnect` and `connection-status`. The password signs in once and is
+kept nowhere; a server that needs signing in without one shows the window's
+normal sign-in screen. The window reloads after connecting or disconnecting —
+the connection survives the reload — so everything is read afresh. HTTPS is
+used when asked for (`https://`) or on port 443; plain HTTP otherwise, which
+on anything but a trusted network sends the password in the clear.
+
 ## No window decorations (PRD 001, §8.2)
 
 The window has no frame: the Angular title bar *is* the title bar, drag region

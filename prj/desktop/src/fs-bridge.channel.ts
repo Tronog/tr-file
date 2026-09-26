@@ -1,6 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 
-import type { FileSystemBridge, FsBridgeResponse } from '@tr-file/backend/bridge';
+import type { FsBridgeResponse } from '@tr-file/backend/bridge';
 import type { Logger } from '@tr-file/backend/core';
 
 import type { BridgeSessions } from './bridge-sessions.js';
@@ -18,7 +18,9 @@ const REFUSED: FsBridgeResponse = {
  *
  * This is the desktop's replacement for the HTTP layer, and it is deliberately
  * the thinnest thing that can be called one: check who is asking, hand the
- * command to `FileSystemBridge`, return what it says. No business logic lives
+ * command to the window's backend — the local `FileSystemBridge`, or the
+ * remote server it is connected to (`BridgeSessions`, PRD 006) — and return
+ * what it says. No business logic lives
  * here, and none may — the moment this file starts interpreting commands, the
  * desktop and the server have two different file-system APIs.
  *
@@ -31,7 +33,6 @@ export class FsBridgeChannel {
   private registered = false;
 
   constructor(
-    private readonly bridge: FileSystemBridge,
     private readonly origin: string,
     private readonly logger: Logger,
     private readonly sessions: BridgeSessions,
@@ -48,7 +49,9 @@ export class FsBridgeChannel {
         this.logger.warn('bridge command refused', { url: event.senderFrame?.url ?? 'unknown' });
         return REFUSED;
       }
-      return this.bridge.dispatch(request, this.sessions.for(event.sender));
+      // Local backend or remote server, and the connection commands themselves:
+      // all decided per window, in `BridgeSessions` (PRD 006, §1).
+      return this.sessions.dispatch(event.sender, request);
     });
 
     this.registered = true;
