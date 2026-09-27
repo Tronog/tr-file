@@ -112,12 +112,13 @@ describe('GitFeature', () => {
   it('asks nothing of git before it is started', () => {
     TestBed.tick();
     http.expectNone((request) => request.url.startsWith('/api/git'));
-    expect(git().notice()).toBeNull();
+    expect(git().visible()).toBe(false);
     expect(git().scm()).toBeNull();
   });
 
   it("shows the active folder's repository: branch, sync, the changes by group and the log", async () => {
     await started();
+    expect(git().visible()).toBe(true);
     const scm = git().scm();
     expect(scm?.branch).toBe('main');
     expect(scm?.sync).toBe('1↓ 2↑');
@@ -145,7 +146,9 @@ describe('GitFeature', () => {
     request.flush(fsEnvelope(status('plain', null)));
     await settled();
     expect(git().scm()).toBeNull();
-    expect(git().notice()).toBe('This folder is not in a git repository.');
+    // No repository, no Git pane (PRD 011, §2.1); the palette can still make one.
+    expect(git().visible()).toBe(false);
+    expect(workbench.commandsFt.isEnabled('git.init')).toBe(true);
     expect(git().canInit()).toBe(true);
 
     void git().init();
@@ -165,7 +168,7 @@ describe('GitFeature', () => {
     http.expectOne(gitUrl('info')).flush(fsEnvelope({ available: false, version: null, reason: 'Git is not installed on this computer.' }));
     await settled();
     http.expectNone((request) => request.url.startsWith('/api/git/status'));
-    expect(git().notice()).toBe('Git is not installed on this computer.');
+    expect(git().visible()).toBe(false);
     expect(git().canInit()).toBe(false);
     expect(workbench.commandsFt.isEnabled('git.init')).toBe(false);
   });

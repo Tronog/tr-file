@@ -89,7 +89,8 @@ const TOUCHES_FILES: ReadonlySet<FsGitWriteAction> = new Set<FsGitWriteAction>([
  * repository, and turns them into the `UiScmModel` the library's
  * `UiSourceControl` draws. Every change goes through `FsGitFeature` and
  * answers with the repository's new status. Git is optional: where the
- * backend has none, the pane says so and nothing else asks.
+ * backend has none, or the folder is in no repository, there is no pane —
+ * *Git: Initialize Repository* in the palette makes one.
  *
  * It follows the active panel on its own: when the folder shown changes, the
  * status is read again — keeping the old one on screen until the new one
@@ -168,23 +169,12 @@ export class GitFeature {
     () => this.available() && this.statusState() !== null && this.repository() === null && this.folder() !== null && !this.busy(),
   );
 
-  /** What the pane says when it has no repository to show. */
-  readonly notice = computed<string | null>(() => {
-    const info = this.infoState();
-    if (info === null) {
-      return this.started() ? 'Looking for git…' : null;
-    }
-    if (!info.available) {
-      return info.reason ?? 'Git is not available.';
-    }
-    if (this.statusState() === null) {
-      return this.problem() ?? 'Reading the repository…';
-    }
-    if (this.repository() === null) {
-      return this.problem() ?? 'This folder is not in a git repository.';
-    }
-    return null;
-  });
+  /**
+   * Whether the Git pane is there at all (PRD 011, §2.1): only while the
+   * folder shown is in a repository. Git missing, switched off, or no
+   * repository — the sidebar simply has no Git pane.
+   */
+  readonly visible = computed(() => this.repository() !== null);
 
   /** The pane header's buttons. */
   readonly paneActions = computed<readonly UiIconAction[]>(() => {

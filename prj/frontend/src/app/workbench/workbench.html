@@ -330,6 +330,32 @@
     [class.is-stale]="details.stale()"
     [attr.aria-busy]="details.stale() ? 'true' : null"
   >
+    <!-- Git (PRD 011, §1–2.1): at the top, and only while the folder shown is in a repository. -->
+    @if (git.scm(); as scm) {
+      <ui-pane
+        class="git-pane"
+        title="Git"
+        [expanded]="panes.isExpanded('git')"
+        [actions]="git.paneActions()"
+        (toggle)="panes.toggle('git')"
+        (actionSelect)="git.runPaneAction($event)"
+        (actionAt)="$event.id === 'more' && contextMenu.openGitMenu($event.x, $event.y)"
+      >
+        <ui-source-control
+          [scm]="scm"
+          (messageChange)="git.setMessage($event)"
+          (commit)="git.commit()"
+          (branchSelect)="git.pickBranch()"
+          (syncSelect)="git.sync()"
+          (groupToggle)="git.toggleGroup($event)"
+          (groupAction)="git.groupAction($event)"
+          (itemOpen)="git.openChange($event)"
+          (itemAction)="git.itemAction($event)"
+          (moreCommits)="git.moreCommits()"
+        />
+      </ui-pane>
+    }
+
     @if (details.error(); as message) {
       <p class="sidebar-note" role="alert">{{ message }}</p>
     } @else if (details.loading() && !details.hasDetails()) {
@@ -362,44 +388,13 @@
       <ui-pane
         title="Actions"
         [expanded]="panes.isExpanded('open-with')"
+        [grow]="true"
         (toggle)="panes.toggle('open-with')"
       >
         <ui-action-list [items]="details.actions()" (select)="details.runAction($event)" />
       </ui-pane>
     }
 
-    <!-- Git (PRD 011, §1): the repository the active panel's folder is in, whatever is selected. -->
-    <ui-pane
-      title="Git"
-      [expanded]="panes.isExpanded('git')"
-      [actions]="git.paneActions()"
-      [grow]="true"
-      (toggle)="panes.toggle('git')"
-      (actionSelect)="git.runPaneAction($event)"
-      (actionAt)="$event.id === 'more' && contextMenu.openGitMenu($event.x, $event.y)"
-    >
-      @if (git.scm(); as scm) {
-        <ui-source-control
-          [scm]="scm"
-          (messageChange)="git.setMessage($event)"
-          (commit)="git.commit()"
-          (branchSelect)="git.pickBranch()"
-          (syncSelect)="git.sync()"
-          (groupToggle)="git.toggleGroup($event)"
-          (groupAction)="git.groupAction($event)"
-          (itemOpen)="git.openChange($event)"
-          (itemAction)="git.itemAction($event)"
-          (moreCommits)="git.moreCommits()"
-        />
-      } @else if (git.notice(); as notice) {
-        <p class="sidebar-note">{{ notice }}</p>
-        @if (git.canInit()) {
-          <div class="git-init">
-            <button uiButton type="button" (click)="git.init()">Initialize Repository</button>
-          </div>
-        }
-      }
-    </ui-pane>
   </ui-sidebar>
 
   <ui-status-bar

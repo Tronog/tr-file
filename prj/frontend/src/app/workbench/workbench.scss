@@ -44,12 +44,17 @@
   font-size: var(--vsc-font-size-sm);
 }
 
-/* The Git pane's one button, where a folder is in no repository (PRD 011, §1). */
-.git-init {
-  padding: 2px 14px 8px;
+/*
+ * The Git pane sits above the details (PRD 011, §2.1) and takes the room its
+ * changes need — up to a point, past which it scrolls on its own and leaves
+ * the rest of the sidebar to the details below.
+ */
+.git-pane {
+  flex: none;
 
-  button {
-    width: 100%;
+  ui-source-control {
+    max-height: 45vh;
+    overflow: auto;
   }
 }
 

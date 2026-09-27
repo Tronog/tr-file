@@ -150,8 +150,8 @@ Go › Local Computer disconnects.
 **Git (PRD 011, §1)** is optional — the backend's `git` module (`/api/git`, the bridge's `git`
 command, `RemoteBackend` maps it) runs the system's `git`, and says so when there is none; a
 production server needs `GIT_ENABLED=true`, the desktop turns it on. A folder is in a repository
-when it or a folder above it inside the root holds a `.git`. The right sidebar's **Git** pane is
-`GitFeature`: it follows the active panel's folder (an `effect`, started by the `Workbench`
+when it or a folder above it inside the root holds a `.git`. The right sidebar's **Git** pane — at its top, and there only while the folder shown is in a
+repository (§2.1) — is `GitFeature`: it follows the active panel's folder (an `effect`, started by the `Workbench`
 component, never by `WorkbenchService.start`, so specs ask nothing of git), keeps the status, log
 and a draft message per repository, and builds the `UiScmModel` the library's `UiSourceControl`
 draws — stage, unstage, discard (asked first), commit (offering to stage all), sync/pull/push/
