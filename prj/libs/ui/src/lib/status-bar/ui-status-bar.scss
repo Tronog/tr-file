@@ -66,22 +66,25 @@
 
 /* -- function keys (PRD 004, §2) ------------------------------------------- */
 
+// Midnight Commander's bottom line: a plain number, then its label as a solid
+// cyan block of the same width for every key, the keys flush against each
+// other — `1Help  2Menu  3View`. Monospace, so the blocks line up as they do
+// in a terminal.
 .function-keys {
   display: flex;
   grid-column: 2;
-  align-items: center;
+  align-items: stretch;
+  align-self: stretch;
   min-width: 0;
-  padding: 0 8px;
   overflow: hidden;
+  font-family: var(--vsc-font-mono);
 }
 
 .function-key {
   display: inline-flex;
   flex: none;
-  gap: 3px;
-  align-items: center;
-  height: var(--vsc-statusbar-height);
-  padding: 0 5px;
+  align-items: stretch;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
@@ -89,31 +92,41 @@
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover:not(:disabled) {
-    background: var(--vsc-hover-bg);
+  &:hover:not(:disabled) .function-key-label {
+    background: var(--vsc-function-key-hover-bg);
   }
 
   &:disabled {
-    opacity: 0.45;
     cursor: default;
+
+    .function-key-label {
+      opacity: 0.5;
+    }
   }
 }
 
 .function-key-number {
-  color: var(--vsc-fg-muted);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 2ch;
+  padding-left: 1ch;
+  color: var(--vsc-fg);
   font-variant-numeric: tabular-nums;
 }
 
 .function-key-label {
-  padding: 0 4px;
-  border-radius: 2px;
-  background: var(--vsc-hover-bg);
+  display: inline-flex;
+  align-items: center;
+  min-width: 6ch;
+  padding-right: 1ch;
+  background: var(--vsc-function-key-bg);
+  color: var(--vsc-function-key-fg);
 }
 
 // Where the bar is too narrow for the strip and the items both, the items win:
 // the strip only repeats keys the keyboard already has.
-@container (max-width: 820px) {
+@container (max-width: 1100px) {
   .function-keys {
     display: none;
   }

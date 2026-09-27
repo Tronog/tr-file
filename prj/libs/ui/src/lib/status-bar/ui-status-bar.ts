@@ -16,7 +16,8 @@ import type { UiFunctionKey, UiStatusItem } from '../models/chrome.model';
  * themselves are the application's to bind; a click only reports the key's
  * `id`. Pressing one does not take focus, so it acts on the panel the
  * keyboard was in, and the strip is not a tab stop: the keys it stands for
- * are the keyboard way to it. It gives way first when the bar is narrow.
+ * are the keyboard way to it. It is drawn as Midnight Commander draws it — a number, then a cyan label
+ * block — and gives way first when the bar is narrow.
  */
 @Component({
   selector: 'ui-status-bar',

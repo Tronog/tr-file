@@ -38,6 +38,12 @@
   --vsc-accent: #0078d4;
   --vsc-accent-hover: #026ec1;
   --vsc-accent-fg: #ffffff;
+
+  /* Midnight Commander's key bar (PRD 004, §2): its cyan label blocks, with dark
+     text on them (7:1), and a lighter cyan under the pointer. */
+  --vsc-function-key-bg: #2aa1b3;
+  --vsc-function-key-hover-bg: #3fbdd0;
+  --vsc-function-key-fg: #000000;
   --vsc-focus-border: #0078d4;
   /* VS Code's `textLink.foreground`. The accent (#0078d4) is a control colour:
      at ~3.6:1 on the editor background it fails AA as body text. */
