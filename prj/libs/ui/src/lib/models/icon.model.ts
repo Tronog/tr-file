@@ -52,6 +52,8 @@ export type UiIconName =
   | 'upload'
   | 'star'
   | 'arrow-up'
+  | 'arrow-left'
+  | 'arrow-right'
   | 'sync'
   | 'database'
   | 'menu'
@@ -64,7 +66,17 @@ export type UiIconName =
   | 'zoom-out'
   | 'zoom-actual'
   | 'arrows-minimize'
-  | 'arrows-maximize';
+  | 'arrows-maximize'
+  | 'home'
+  | 'device-hdd'
+  | 'usb'
+  | 'photo'
+  | 'music'
+  | 'movie'
+  | 'file-text'
+  | 'history'
+  | 'archive'
+  | 'network';
 
 /** Icon sizes used across the workbench (16px is VS Code's list/tab size). */
 export type UiIconSize = 'sm' | 'md' | 'lg' | 'xl';

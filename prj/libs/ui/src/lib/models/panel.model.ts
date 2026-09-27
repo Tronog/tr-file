@@ -76,6 +76,22 @@ export interface UiFileBrowserModel {
   readonly showViewSwitch?: boolean;
   /** Placeholder of the toolbar filter box; omit to hide the box. */
   readonly searchPlaceholder?: string;
+  /** What the filter box holds (PRD 003, §5); the listing is already filtered by it. */
+  readonly filterText?: string;
+  /**
+   * The folder as a path someone can type — `/docs/prd` — shown when the path
+   * bar is edited (PRD 003, §5). Omit it and the path bar cannot be edited.
+   */
+  readonly location?: string;
+  /** The listing can be sorted by clicking its column headers. */
+  readonly sortable?: boolean;
+  /**
+   * Bump to put the keyboard in the filter box — a menu's *Filter Folder*,
+   * where `Ctrl`+`F` in the panel does it itself. Any change is one request.
+   */
+  readonly filterFocus?: number;
+  /** Bump to turn the path bar into a text field, as `Ctrl`+`L` does. */
+  readonly locationEdit?: number;
   readonly columns: readonly UiFileColumn[];
   readonly rows: readonly UiFileRow[];
   readonly items: readonly UiIconViewItem[];

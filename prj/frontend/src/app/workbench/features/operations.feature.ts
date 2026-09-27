@@ -3,6 +3,7 @@ import type { UiProgressDialogModel, UiTransfer } from '@tr-file/ui';
 import type {
   FsConflictPolicy,
   FsOperationJob,
+  FsOperationRequest,
   FsOperationsInfo,
 } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
@@ -26,10 +27,16 @@ interface OperationRecord {
    * first poll gets one, once. Closing it sends the job to the background.
    */
   readonly windowed: boolean;
+  /**
+   * Who asked for it: the user — recorded with Undo once it ends — or Undo
+   * itself, which is not (PRD 003, §5).
+   */
+  readonly origin: 'user' | 'undo';
 }
 
 /**
- * File operations (PRD 005, §1): copy, move, move to trash and empty trash.
+ * File operations (PRD 005, §1): copy, move, move to trash and empty trash —
+ * and, since PRD 003 §5, delete for good and restore from the trash.
  *
  * All of them run on the backend, as jobs — the local one or a remote server,
  * whichever the window is on; on the desktop against its own machine, trash is
@@ -149,6 +156,165 @@ export class OperationsFeature {
     }
   }
 
+  /**
+   * Deletes a panel's selection for good — `Shift`+`Delete` (PRD 003, §5) —
+   * once the user has said yes; see `trashSelection` for `entryId`.
+   */
+  async deleteSelection(groupId = this.parent.activeGroupId(), entryId: string | null = null): Promise<void> {
+    const paths = this.selectionOf(groupId, entryId);
+    if (paths.length === 0) {
+      await this.nothingSelected('delete');
+      return;
+    }
+    await this.deletePermanently(paths);
+  }
+
+  /** Deletes `paths` for good, skipping the trash — after asking, always. */
+  async deletePermanently(paths: readonly string[]): Promise<void> {
+    const single = paths.length === 1;
+    const confirmed = await this.parent.modal.confirm({
+      severity: 'warning',
+      message: single
+        ? `Are you sure you want to permanently delete '${OperationsFeature.nameOf(paths[0] as string)}'?`
+        : `Are you sure you want to permanently delete these ${paths.length} items?`,
+      detail: [...(single ? [] : [OperationsFeature.listNames(paths)]), 'This action is irreversible!'].join('\n\n'),
+      confirmLabel: 'Delete',
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'delete', paths }), paths);
+    } catch (error) {
+      await this.refused('delete', FsError.from(error));
+    }
+  }
+
+  /**
+   * Moves `paths` to the trash without asking — Undo of something the user
+   * just made, which is theirs to take back. Resolves once the job has started.
+   */
+  async trashQuietly(paths: readonly string[]): Promise<void> {
+    this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'trash', paths }), paths, 'undo');
+  }
+
+  /** Puts trashed entries back where they came from — Undo of a move to the trash. */
+  async restore(ids: readonly string[]): Promise<void> {
+    this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'restore', ids }), [], 'undo');
+  }
+
+  /**
+   * Copies or moves `sources` — a context menu's entries, say — asking where
+   * to, as *Copy To…* and *Move To…* do for a selection.
+   */
+  async transferPaths(kind: 'copy' | 'move', sources: readonly string[], groupId = this.parent.activeGroupId()): Promise<void> {
+    if (sources.length === 0) {
+      await this.nothingSelected(kind);
+      return;
+    }
+    const what = sources.length === 1 ? `'${OperationsFeature.nameOf(sources[0] as string)}'` : `${sources.length} items`;
+    const answer = await this.parent.modal.prompt({
+      message: `${kind === 'copy' ? 'Copy' : 'Move'} ${what} to:`,
+      label: 'Destination folder',
+      value: `/${this.defaultDestination(groupId)}`,
+      confirmLabel: kind === 'copy' ? 'Copy' : 'Move',
+      validate: (value) => (value.trim() === '' ? 'Type the folder to put them in, from / up.' : null),
+    });
+    if (answer === null) {
+      return;
+    }
+    await this.transfer(kind, sources, OperationsFeature.cleanPath(answer));
+  }
+
+  /* -- archives (PRD 003, §6) ------------------------------------------------ */
+
+  /**
+   * *Compress…*: a zip of `sources` in the folder they are in, named after
+   * the one entry — or after the folder, for several — as the user confirms.
+   */
+  async compress(sources: readonly string[], groupId = this.parent.activeGroupId()): Promise<boolean> {
+    if (sources.length === 0) {
+      await this.nothingSelected('compress');
+      return false;
+    }
+    const folder = OperationsFeature.parentOf(sources[0] as string);
+    const suggested = sources.length === 1 ? OperationsFeature.nameOf(sources[0] as string) : OperationsFeature.nameOf(folder) || 'Archive';
+    const stem = suggested.replace(/\.zip$/i, '');
+    const what = sources.length === 1 ? `'${OperationsFeature.nameOf(sources[0] as string)}'` : `${sources.length} items`;
+    const answer = await this.parent.modal.prompt({
+      message: `Compress ${what} to a zip archive in '/${folder}':`,
+      label: 'Archive name',
+      value: `${stem}.zip`,
+      selection: [0, stem.length],
+      confirmLabel: 'Compress',
+      validate: (value) => (value.trim() === '' ? 'Name the archive.' : /[/\\]/.test(value) ? 'A name cannot contain / or \\.' : null),
+    });
+    if (answer === null) {
+      return false;
+    }
+    const name = answer.trim();
+    this.parent.editorGroupsFt.focus(groupId);
+    return this.startWithConflicts('compress', folder, (conflict) => ({
+      kind: 'compress',
+      sources,
+      destination: folder,
+      name: /\.zip$/i.test(name) ? name : `${name}.zip`,
+      conflict,
+    }));
+  }
+
+  /**
+   * *Extract Here* / *Extract To…*: a zip's contents into `destination` —
+   * its one top entry straight in, or everything into a folder named after
+   * it, so an archive of loose files never scatters them. Without a
+   * destination the user is asked, starting from the archive's own folder.
+   */
+  async extract(path: string, destination?: string): Promise<boolean> {
+    let into = destination;
+    if (into === undefined) {
+      const answer = await this.parent.modal.prompt({
+        message: `Extract '${OperationsFeature.nameOf(path)}' to:`,
+        label: 'Destination folder',
+        value: `/${OperationsFeature.parentOf(path)}`,
+        confirmLabel: 'Extract',
+        validate: (value) => (value.trim() === '' ? 'Type the folder to extract into, from / up.' : null),
+      });
+      if (answer === null) {
+        return false;
+      }
+      into = OperationsFeature.cleanPath(answer);
+    }
+    const target = into;
+    return this.startWithConflicts('extract', target, (conflict) => ({ kind: 'extract', path, destination: target, conflict }));
+  }
+
+  /** Starts a job that may meet a taken name, asking about it once as copies do. */
+  private async startWithConflicts(
+    action: 'compress' | 'extract',
+    destination: string,
+    request: (conflict: FsConflictPolicy) => FsOperationRequest,
+  ): Promise<boolean> {
+    let conflict: FsConflictPolicy = 'fail';
+    for (;;) {
+      try {
+        this.track(await this.parent.fileSystem.operationsFt.start(request(conflict)), []);
+        return true;
+      } catch (error) {
+        const failure = FsError.from(error);
+        if (failure.code === 'CONFLICT' && conflict === 'fail') {
+          const decision = await this.askAboutConflicts(OperationsFeature.conflictsOf(failure), destination);
+          if (decision === null) {
+            return false;
+          }
+          conflict = decision;
+          continue;
+        }
+        await this.refused(action, failure);
+        return false;
+      }
+    }
+  }
+
   /** Deletes everything in the trash, for good — after asking. */
   async emptyTrash(): Promise<void> {
     const info = await this.info();
@@ -209,8 +375,8 @@ export class OperationsFeature {
     };
   }
 
-  private track(job: FsOperationJob, removes: readonly string[]): void {
-    this.records.update((records) => [{ job, removes, cancelling: false, windowed: false }, ...records]);
+  private track(job: FsOperationJob, removes: readonly string[], origin: OperationRecord['origin'] = 'user'): void {
+    this.records.update((records) => [{ job, removes, cancelling: false, windowed: false, origin }, ...records]);
     if (job.state !== 'running') {
       this.finished(this.find(job.id) as OperationRecord);
       return;
@@ -285,6 +451,15 @@ export class OperationsFeature {
     if (record.job.state === 'failed' && !record.windowed) {
       this.parent.bottomPanelFt.select('progress');
     }
+    if (record.origin === 'user') {
+      void this.recordUndo(record.job);
+    }
+  }
+
+  /** What a job did goes on Undo's stack — restorable from the trash only where the trash says so. */
+  private async recordUndo(job: FsOperationJob): Promise<void> {
+    const canRestore = job.kind === 'trash' ? (await this.info()).canRestore === true : false;
+    this.parent.undoFt.recordJob(job, canRestore);
   }
 
   private forgetRemoved(removed: readonly string[]): void {
@@ -328,24 +503,8 @@ export class OperationsFeature {
 
   /* -- asking --------------------------------------------------------------- */
 
-  private async transferSelection(kind: 'copy' | 'move', groupId: string): Promise<void> {
-    const sources = this.selectionOf(groupId, null);
-    if (sources.length === 0) {
-      await this.nothingSelected(kind);
-      return;
-    }
-    const what = sources.length === 1 ? `'${OperationsFeature.nameOf(sources[0] as string)}'` : `${sources.length} items`;
-    const answer = await this.parent.modal.prompt({
-      message: `${kind === 'copy' ? 'Copy' : 'Move'} ${what} to:`,
-      label: 'Destination folder',
-      value: `/${this.defaultDestination(groupId)}`,
-      confirmLabel: kind === 'copy' ? 'Copy' : 'Move',
-      validate: (value) => (value.trim() === '' ? 'Type the folder to put them in, from / up.' : null),
-    });
-    if (answer === null) {
-      return;
-    }
-    await this.transfer(kind, sources, OperationsFeature.cleanPath(answer));
+  private transferSelection(kind: 'copy' | 'move', groupId: string): Promise<void> {
+    return this.transferPaths(kind, this.selectionOf(groupId, null), groupId);
   }
 
   /** What a panel has selected, for copying, cutting or trashing; see `trashSelection`. */
@@ -439,7 +598,7 @@ export class OperationsFeature {
 
   private toRow(record: OperationRecord): UiTransfer {
     const job = record.job;
-    const icon = job.kind === 'copy' ? 'copy' : job.kind === 'move' ? 'cut' : 'trash';
+    const icon = job.kind === 'copy' ? 'copy' : job.kind === 'move' ? 'cut' : job.kind === 'restore' ? 'sync' : 'trash';
     switch (job.state) {
       case 'done':
         return {

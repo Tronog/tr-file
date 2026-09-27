@@ -31,6 +31,21 @@ export interface UiEntryDrop {
   readonly copy: boolean;
 }
 
+/**
+ * Files from outside the page dropped on a `UiFileBrowser` or a
+ * `UiPanelGroup` (PRD 003, §6) — from the system's file manager, or, on the
+ * desktop, entries of this app dragged as files. `entries` are the dropped
+ * items as the browser's file-system entries, read during the drop — the only
+ * moment they can be — so a folder can be walked; `files` has the same items
+ * as `File`s. `target` and `copy` are as a `UiEntryDrop`'s.
+ */
+export interface UiFilesDrop {
+  readonly files: readonly File[];
+  readonly entries: readonly FileSystemEntry[];
+  readonly target: string | null;
+  readonly copy: boolean;
+}
+
 /** Identifies the tab being dragged and where it came from. */
 export interface UiTabDragData {
   readonly tabId: string;
@@ -80,6 +95,10 @@ export type UiPanelCommand =
   | 'back'
   | 'forward'
   | 'delete'
+  | 'delete-permanently'
+  | 'rename'
+  | 'new-folder'
+  | 'undo'
   | 'copy'
   | 'cut'
   | 'paste';
@@ -95,6 +114,18 @@ export interface UiPanelKey {
   readonly command: UiPanelCommand;
   /** `null` when the body lists nothing — `up` and `refresh` still apply. */
   readonly entryId: string | null;
+}
+
+/**
+ * A right-click — or `Shift`+`F10`, or the context-menu key — on something
+ * that has a menu of its own (PRD 003, §5). `(x, y)` is where the menu should
+ * open, in viewport pixels; `target` is what was pressed on: an entry's id,
+ * or `null` for a listing's blank space. The menu is the application's.
+ */
+export interface UiContextMenuRequest {
+  readonly target: string | null;
+  readonly x: number;
+  readonly y: number;
 }
 
 /**

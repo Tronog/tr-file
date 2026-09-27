@@ -100,3 +100,18 @@ ui-sidebar.is-stale ui-pane {
   opacity: 0.55;
   transition-delay: 0.2s;
 }
+
+/* The Search view (PRD 003, §5): the box, what it searches, and the results. */
+.search-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.search-box {
+  margin: 8px 12px 0;
+}
+
+.search-scope {
+  padding-bottom: 0;
+}

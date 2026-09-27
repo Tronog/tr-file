@@ -44,6 +44,16 @@ export class FsDataFeature {
    */
   private readonly staleListings = new Set<string>();
 
+  /** The read in flight for each path, so a caller can wait for the listing it asked for. */
+  private readonly inflight = new Map<string, Promise<void>>();
+
+  /**
+   * Listings no longer watched for changes (PRD 003, §5): kept, so going back
+   * to one shows it at once, but read again when it is next asked for — it
+   * may have changed while nobody was looking.
+   */
+  private readonly expired = new Set<string>();
+
   constructor(private readonly parent: WorkbenchService) {
     this.listings = signal<ReadonlyMap<string, FsListingState>>(new Map());
     this.details = signal<ReadonlyMap<string, FsDetailsState>>(new Map());
@@ -99,19 +109,37 @@ export class FsDataFeature {
    * the previous error may have been a restart or a blip.
    */
   ensureListing(path: string): void {
+    if (this.expired.delete(path) && this.listings().has(path)) {
+      void this.reloadListing(path);
+      return;
+    }
     if (this.pendingListings.has(path) || this.isSettled(this.listings().get(path))) {
       return;
     }
     void this.fetchListing(path);
   }
 
-  /** Re-fetches a directory even when it is cached (the Refresh action). */
-  reloadListing(path: string): void {
-    if (this.pendingListings.has(path)) {
+  /**
+   * Re-fetches a directory even when it is cached (the Refresh action).
+   * Resolves once the listing on screen is one read after this was asked —
+   * for a caller that wants to select something the read will bring.
+   */
+  reloadListing(path: string): Promise<void> {
+    this.expired.delete(path);
+    const running = this.inflight.get(path);
+    if (running !== undefined) {
       this.staleListings.add(path);
-      return;
+      // The read after this one is started as this one ends; wait for that.
+      return running.then(() => this.inflight.get(path));
     }
-    void this.fetchListing(path);
+    return this.fetchListing(path);
+  }
+
+  /** A listing nobody watches any more is read again the next time it is shown; see `expired`. */
+  expire(path: string): void {
+    if (this.listings().has(path)) {
+      this.expired.add(path);
+    }
   }
 
   /**
@@ -120,7 +148,7 @@ export class FsDataFeature {
    */
   invalidateListing(path: string): void {
     if (this.listings().has(path)) {
-      this.reloadListing(path);
+      void this.reloadListing(path);
     }
   }
 
@@ -129,7 +157,18 @@ export class FsDataFeature {
    * `loading` with a `listing` — so every view goes from the old listing
    * straight to the new one instead of through an empty frame.
    */
-  private async fetchListing(path: string): Promise<void> {
+  private fetchListing(path: string): Promise<void> {
+    const read = this.readListing(path);
+    this.inflight.set(path, read);
+    void read.finally(() => {
+      if (this.inflight.get(path) === read) {
+        this.inflight.delete(path);
+      }
+    });
+    return read;
+  }
+
+  private async readListing(path: string): Promise<void> {
     this.pendingListings.add(path);
     const previous = this.listings().get(path)?.listing;
     this.patchListing(path, { status: 'loading', ...(previous ? { listing: previous } : {}) });

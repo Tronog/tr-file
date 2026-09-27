@@ -120,8 +120,12 @@ describe('FileClipboardFeature and entry drops', () => {
 
     it('drives the Edit menu', () => {
       const edit = () => workbench.chromeFt.menuItems().find((menu) => menu.id === 'edit')?.items ?? [];
+      const clipboardRows = () =>
+        edit()
+          .filter((item) => ['edit.cut', 'edit.copy', 'edit.paste'].includes(item.id))
+          .map((item) => [item.id, !!item.disabled]);
       select();
-      expect(edit().map((item) => [item.id, !!item.disabled])).toEqual([
+      expect(clipboardRows()).toEqual([
         ['edit.cut', true],
         ['edit.copy', true],
         ['edit.paste', true],
@@ -129,7 +133,7 @@ describe('FileClipboardFeature and entry drops', () => {
 
       select('a.txt');
       workbench.chromeFt.runMenuItem({ menuId: 'edit', itemId: 'edit.copy' });
-      expect(edit().every((item) => !item.disabled)).toBe(true);
+      expect(clipboardRows().every(([, disabled]) => !disabled)).toBe(true);
       expect(clipboard().clipboard()?.mode).toBe('copy');
     });
   });

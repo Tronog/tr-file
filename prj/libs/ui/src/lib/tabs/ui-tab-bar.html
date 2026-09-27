@@ -33,6 +33,7 @@
         [attr.title]="tab.label"
         (click)="onActivate(tab.id)"
         (dblclick)="tabDoubleClick.emit(tab.id)"
+        (contextmenu)="onTabContextMenu($event, tab.id)"
       >
         <ui-icon [name]="tab.icon" [tint]="tab.tint" />
         <span class="tab-label">{{ tab.label }}</span>

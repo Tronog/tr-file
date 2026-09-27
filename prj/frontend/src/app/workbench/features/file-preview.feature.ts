@@ -25,6 +25,10 @@ const BINARY_EXTENSIONS = new Set([
   'mp3', 'mp4', 'wav', 'ogg', 'webm', 'mov', 'avi', 'mkv', 'flac',
   'woff', 'woff2', 'ttf', 'otf', 'eot',
   'so', 'dll', 'dylib', 'exe', 'bin', 'wasm', 'class', 'o', 'a',
+  // Documents with applications of their own (PRD 003, §5): opened there, not shown as bytes.
+  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'odg', 'epub', 'mobi',
+  'pages', 'numbers', 'key', 'psd', 'ai', 'sketch', 'heic', 'tif',
+  'iso', 'dmg', 'deb', 'rpm', 'msi', 'apk', 'appimage', 'sqlite', 'sqlite3', 'db',
 ]);
 
 type PreviewStatus = 'loading' | 'ready' | 'refused' | 'error';
@@ -110,6 +114,16 @@ export class FilePreviewFeature {
   }
 
   /**
+   * Whether the app can show a file itself, as far as is known before reading
+   * it: not a known binary or document format, not too large (PRD 003, §5).
+   * What cannot be shown is opened with an application that can instead.
+   * A file that turns out binary only once read still gets its notice.
+   */
+  canPreview(path: string): boolean {
+    return this.refuse(path) === undefined;
+  }
+
+  /**
    * Opens a file in the active group as a new tab, and reads it.
    *
    * A file already open there is simply activated, which is what makes
@@ -119,6 +133,8 @@ export class FilePreviewFeature {
     const groupId = this.parent.activeGroupId();
     this.parent.select(path);
     this.parent.fileBrowserFt.openFile(groupId, path, this.nameOf(path));
+    // The tree lists folders only, so opening a file reveals the one it is in (§9.1.2).
+    this.parent.explorerFt.reveal(path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
     this.load(path);
   }
 
@@ -204,7 +220,7 @@ export class FilePreviewFeature {
         notice: {
           icon: 'file',
           title: 'Binary file not shown',
-          hint: 'Download it to open it in another application.',
+          hint: this.elsewhereHint(),
         },
       };
     }
@@ -290,7 +306,7 @@ export class FilePreviewFeature {
       return {
         icon: 'file',
         title: 'Binary file not shown',
-        hint: 'Download it to open it in another application.',
+        hint: this.elsewhereHint(),
       };
     }
 
@@ -319,6 +335,11 @@ export class FilePreviewFeature {
       encoding === 'UTF-8' ? undefined : encoding,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : undefined;
+  }
+
+  /** Where to go with a file the app does not show: the toolbar's open button. */
+  private elsewhereHint(): string {
+    return `${this.parent.systemOpenFt.openLabel()} (in the toolbar) opens it in another application.`;
   }
 
   private patch(path: string, state: PreviewState): void {

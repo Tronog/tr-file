@@ -137,10 +137,12 @@ describe('the desktop stack', () => {
 });
 
 describe('DesktopConfig', () => {
-  it('browses the home directory when nothing names a root', () => {
+  /** PRD 003, §6: the whole file system — the home folder is where the window starts. */
+  it('browses the whole file system when nothing names a root', () => {
     const config = DesktopConfig.resolve(environment({ TR_FILE_STATIC_ROOT: staticRoot }));
 
-    assert.equal(config.filesRoot, filesRoot);
+    assert.equal(config.filesRoot, '/');
+    assert.equal(config.serverEnv()['FILES_ROOT'], '/');
   });
 
   /** PRD 003, §2: optional on the desktop, and off unless an account is named. */

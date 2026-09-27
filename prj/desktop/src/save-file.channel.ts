@@ -34,6 +34,8 @@ export interface SaveProgress {
 
 type SaveRequest =
   | { readonly command: 'save'; readonly transferId: string; readonly path: string; readonly name: string }
+  /** A folder, or a selection, as one zip (PRD 003, §6). */
+  | { readonly command: 'save-zip'; readonly transferId: string; readonly paths: readonly string[]; readonly name: string }
   | { readonly command: 'cancel'; readonly transferId: string };
 
 /**
@@ -84,7 +86,7 @@ export class SaveFileChannel {
         this.running.get(parsed.transferId)?.abort();
         return { data: { cancelled: true } };
       }
-      return this.save(event.sender, parsed.transferId, parsed.path, parsed.name);
+      return this.save(event.sender, parsed.transferId, parsed.command === 'save' ? parsed.path : parsed.paths, parsed.name);
     });
 
     this.registered = true;
@@ -107,7 +109,8 @@ export class SaveFileChannel {
   private async save(
     sender: WebContents,
     transferId: string,
-    path: string,
+    /** One file, or — for a zip — the entries it holds. */
+    path: string | readonly string[],
     name: string,
   ): Promise<FsBridgeResponse<SaveOutcome>> {
     // Asked before the dialog: a window that has not signed in gets no dialog.
@@ -128,11 +131,12 @@ export class SaveFileChannel {
     let lastPush = 0;
 
     try {
-      const result = await this.sessions.saveCopy(sender, path, choice.filePath, {
+      const options = {
         signal: controller.signal,
-        onProgress: (loaded, total) => {
+        // A zip's total is not known ahead: `total` is 0 until it is done.
+        onProgress: (loaded: number, total: number) => {
           const now = Date.now();
-          if (loaded < total && now - lastPush < PROGRESS_INTERVAL_MS) {
+          if ((total === 0 || loaded < total) && now - lastPush < PROGRESS_INTERVAL_MS) {
             return;
           }
           lastPush = now;
@@ -140,7 +144,11 @@ export class SaveFileChannel {
             sender.send(SAVE_PROGRESS_EVENT, { transferId, loaded, total } satisfies SaveProgress);
           }
         },
-      });
+      };
+      const result =
+        typeof path === 'string'
+          ? await this.sessions.saveCopy(sender, path, choice.filePath, options)
+          : await this.sessions.saveZip(sender, path, choice.filePath, options);
       return 'error' in result ? result : { data: { saved: true, bytes: result.data.bytes } };
     } finally {
       this.running.delete(transferId);
@@ -151,7 +159,7 @@ export class SaveFileChannel {
     if (typeof request !== 'object' || request === null) {
       return null;
     }
-    const { command, transferId, path, name } = request as Record<string, unknown>;
+    const { command, transferId, path, paths, name } = request as Record<string, unknown>;
     if (typeof transferId !== 'string' || transferId === '') {
       return null;
     }
@@ -160,6 +168,15 @@ export class SaveFileChannel {
     }
     if (command === 'save' && typeof path === 'string' && typeof name === 'string') {
       return { command, transferId, path, name };
+    }
+    if (
+      command === 'save-zip' &&
+      Array.isArray(paths) &&
+      paths.length > 0 &&
+      paths.every((one): one is string => typeof one === 'string') &&
+      typeof name === 'string'
+    ) {
+      return { command, transferId, paths, name };
     }
     return null;
   }

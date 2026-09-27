@@ -151,7 +151,7 @@ export interface FsDownload {
 
 /* -- file operations (PRD 005, §1) ------------------------------------------ */
 
-export type FsOperationKind = 'copy' | 'move' | 'trash' | 'empty-trash';
+export type FsOperationKind = 'copy' | 'move' | 'trash' | 'empty-trash' | 'delete' | 'restore' | 'compress' | 'extract';
 
 export type FsOperationState = 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -166,7 +166,36 @@ export type FsOperationRequest =
       readonly conflict: FsConflictPolicy;
     }
   | { readonly kind: 'trash'; readonly paths: readonly string[] }
-  | { readonly kind: 'empty-trash' };
+  /** Deleted for good, not moved to the trash (PRD 003, §5). */
+  | { readonly kind: 'delete'; readonly paths: readonly string[] }
+  /** Trashed entries put back where they came from, by the ids a trash job reported. */
+  | { readonly kind: 'restore'; readonly ids: readonly string[] }
+  | { readonly kind: 'empty-trash' }
+  /** A zip of `sources` as `destination/name` (PRD 003, §6). */
+  | {
+      readonly kind: 'compress';
+      readonly sources: readonly string[];
+      readonly destination: string;
+      readonly name: string;
+      readonly conflict: FsConflictPolicy;
+    }
+  /** A zip extracted into `destination`: its one top entry, or a folder named after it. */
+  | {
+      readonly kind: 'extract';
+      readonly path: string;
+      readonly destination: string;
+      readonly conflict: FsConflictPolicy;
+    };
+
+/**
+ * One entry a job has dealt with: a copy's source and the copy it made, a
+ * move's old and new path, a trashed entry and the id it can be restored by,
+ * a restored id and where it went back to. What Undo reads (PRD 003, §5).
+ */
+export interface FsOperationOutcome {
+  readonly source: string;
+  readonly target: string;
+}
 
 /** A background job on the backend, as `GET /api/ops/jobs/:id` answers. */
 export interface FsOperationJob {
@@ -185,9 +214,95 @@ export interface FsOperationJob {
   readonly error: { readonly code: string; readonly message: string } | null;
   /** Folders whose listing the job changed, root-relative. */
   readonly affected: readonly string[];
+  /** What became of each entry, as far as the job got; absent from a server that predates it. */
+  readonly outcome?: readonly FsOperationOutcome[];
 }
 
 /** Whose trash a trashed entry goes to: the server's own, or the desktop's system trash. */
 export interface FsOperationsInfo {
   readonly trash: 'server' | 'system';
+  /** Whether trashed entries can be put back from the app — the server's own trash can. */
+  readonly canRestore?: boolean;
+}
+
+/* -- search and watching (PRD 003, §5) ------------------------------------- */
+
+/** `GET /api/fs/search`: entries under `path` whose names match `query`, shallowest first. */
+export interface FsSearchResult {
+  readonly path: string;
+  readonly query: string;
+  readonly entries: readonly FsEntry[];
+  /** The search stopped early — at the result limit, or its time or size budget. */
+  readonly truncated: boolean;
+  /** How many entries were looked at. */
+  readonly scanned: number;
+}
+
+/**
+ * `POST /api/fs/watch`: the folders among those watched that changed since
+ * the last ask. A `watchId` the server did not know comes back new, with every
+ * folder in `changed` — it cannot say what was missed.
+ */
+export interface FsWatchResult {
+  readonly watchId: string;
+  readonly changed: readonly string[];
+}
+
+/* -- places and archives (PRD 003, §6) ------------------------------------- */
+
+/** What a place is: which icon it gets, and where the Places pane puts it. */
+export type FsPlaceKind =
+  | 'root'
+  | 'home'
+  | 'desktop'
+  | 'documents'
+  | 'downloads'
+  | 'pictures'
+  | 'music'
+  | 'videos'
+  | 'drive'
+  | 'removable'
+  | 'network';
+
+export interface FsPlace {
+  readonly id: string;
+  readonly label: string;
+  readonly kind: FsPlaceKind;
+  /** Root-relative folder. */
+  readonly path: string;
+}
+
+/** `GET /api/fs/places`: where a session starts, and what the Places pane lists. */
+export interface FsPlaces {
+  /** Root-relative; `''` is the root. */
+  readonly home: string;
+  readonly places: readonly FsPlace[];
+}
+
+/** One entry of a folder inside a zip. `path` is inside the archive. */
+export interface FsArchiveEntry {
+  readonly name: string;
+  readonly path: string;
+  readonly type: 'file' | 'directory' | 'symlink';
+  readonly size: number;
+  readonly modifiedAt: string | null;
+}
+
+/** `GET /api/archive/list`: one folder of a zip. */
+export interface FsArchiveListing {
+  readonly path: string;
+  readonly inner: string;
+  readonly entries: readonly FsArchiveEntry[];
+  /** Entries whose names would reach outside the archive — never listed or extracted. */
+  readonly unsafe: number;
+}
+
+/** Files on the system clipboard, as this window can paste them (desktop only). */
+export interface FsClipboardFiles {
+  /** Root-relative paths of the files this window's root holds. */
+  readonly paths: readonly string[];
+  /** They were cut in the system's file manager, rather than copied. */
+  readonly cut: boolean;
+  /** Files on the clipboard this window cannot reach: outside its root, or on another computer. */
+  readonly outside: number;
 }

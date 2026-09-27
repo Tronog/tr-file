@@ -11,7 +11,7 @@ import {
 import { UiIcon } from '../icon/ui-icon';
 import { UiIconButton } from '../controls/ui-icon-button';
 import { UI_TAB_MIME } from '../models';
-import type { UiIconAction, UiTab, UiTabDragData, UiTabMove, UiTabReorder } from '../models';
+import type { UiContextMenuRequest, UiIconAction, UiTab, UiTabDragData, UiTabMove, UiTabReorder } from '../models';
 
 /** Where the insertion bar sits, and which tab a drop would land in front of. */
 interface TabDropMarker {
@@ -113,6 +113,9 @@ export class UiTabBar {
   readonly close = output<string>();
   readonly actionSelect = output<string>();
 
+  /** A tab's context menu was asked for — right-click, `Shift`+`F10`, the menu key (PRD 003, §5). */
+  readonly tabContextMenu = output<UiContextMenuRequest>();
+
   /** A tab — possibly from another group — was dropped on this bar. */
   readonly tabDrop = output<UiTabReorder>();
 
@@ -161,6 +164,11 @@ export class UiTabBar {
   }
 
   /** Middle click closes a tab, as in VS Code. */
+  protected onTabContextMenu(event: MouseEvent, id: string): void {
+    event.preventDefault();
+    this.tabContextMenu.emit({ target: id, x: event.clientX, y: event.clientY });
+  }
+
   protected onAuxClick(event: MouseEvent, id: string): void {
     if (event.button !== 1) {
       return;
@@ -239,6 +247,13 @@ export class UiTabBar {
 
     const current = this.currentIndex(event.target);
     if (current < 0) {
+      return;
+    }
+
+    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      event.preventDefault();
+      this.tabContextMenu.emit({ target: tabs[current].id, x: rect.left + 8, y: rect.bottom });
       return;
     }
 

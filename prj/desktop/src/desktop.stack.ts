@@ -5,6 +5,7 @@ import { App } from '@tr-file/backend/app';
 import type { FileSystemBridge } from '@tr-file/backend/bridge';
 import { AppConfig } from '@tr-file/backend/config';
 import { Logger } from '@tr-file/backend/core';
+import type { PlacesProvider } from '@tr-file/backend/files';
 import type { TrashProvider } from '@tr-file/backend/operations';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 
@@ -45,11 +46,14 @@ export class DesktopStack {
   /**
    * @param trash The system trash for a files root (PRD 005, §1). `main.ts`
    *   passes the shell's; without one — in tests — the backend keeps its own.
+   * @param places The home folder, the user's folders and the mounts
+   *   (PRD 003, §6); without them the root is the only place.
    */
   constructor(
     private readonly config: DesktopConfig,
     logger?: Logger,
     private readonly trash?: (filesRoot: string) => TrashProvider,
+    private readonly places?: PlacesProvider,
   ) {
     this.logger =
       logger ??
@@ -106,6 +110,7 @@ export class DesktopStack {
     const appConfig = AppConfig.fromEnv(this.config.serverEnv());
     const api = new App(appConfig, this.logger.child({ service: 'tr-file-backend' }), VERSION, {
       ...(this.trash === undefined ? {} : { trash: this.trash(appConfig.filesRoot) }),
+      ...(this.places === undefined ? {} : { places: this.places }),
     });
     let port = 0;
     const server = createServer(this.compose(appConfig.apiPrefix, () => port));
@@ -131,6 +136,7 @@ export class DesktopStack {
       return;
     }
 
+    this.api?.close();
     this.server = null;
     this.url = null;
     this.api = null;

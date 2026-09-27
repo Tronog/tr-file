@@ -28,6 +28,11 @@ export class FsTransferFeature {
     return this.parent.transport.save(path, name);
   }
 
+  /** Saves a folder, or a selection, as one zip `name` (PRD 003, §6). */
+  saveZip(paths: readonly string[], name: string): FsDownload {
+    return this.parent.transport.saveZip(paths, name);
+  }
+
   /**
    * Fetches a file's bytes, for in-app use (a preview, an editor buffer).
    *

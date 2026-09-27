@@ -260,10 +260,10 @@ describe('FilePreviewFeature', () => {
     /** PRD 003, §1 — no extension list knows every binary format. */
     it('refuses an unlisted binary format by looking at its bytes', async () => {
       await start();
-      await open('report.docx', 'PK\u0003\u0004\u0014\u0000\u0006\u0000word/document.xml');
+      await open('report.blob', 'PK\u0003\u0004\u0014\u0000\u0006\u0000word/document.xml');
 
-      expect(workbench.filePreviewFt.documentFor('report.docx')).toBeUndefined();
-      expect(workbench.filePreviewFt.noticeFor('report.docx')).toMatchObject({ title: 'Binary file not shown' });
+      expect(workbench.filePreviewFt.documentFor('report.blob')).toBeUndefined();
+      expect(workbench.filePreviewFt.noticeFor('report.blob')).toMatchObject({ title: 'Binary file not shown' });
     });
 
     it('shows a legacy Latin text file in its own code page, and says so', async () => {

@@ -54,6 +54,20 @@
   }
 }
 
+/*
+ * A picture of the file (PRD 003, §6), in the icon's place: never taller than
+ * the icon it replaces, so tiles with and without one line up — and a long
+ * folder's rows, measured from the tiles, keep one height.
+ */
+.item-thumbnail {
+  display: block;
+  width: 64px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 /* Stands in for visual rows that are not rendered, across every column. */
 .spacer {
   grid-column: 1 / -1;

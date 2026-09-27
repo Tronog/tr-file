@@ -21,7 +21,9 @@ import type { WorkbenchService } from '../workbench.service';
  * chrome offers it yet — as is `Ctrl`+`Enter`, which opens an entry in a panel
  * that does not exist until the key is pressed (§6.2.5). `Delete` moves the
  * selection to the trash, after asking (PRD 005, §1), and `Ctrl`+`C` / `X` /
- * `V` are the clipboard (§2).
+ * `V` are the clipboard (§2). PRD 003, §5 adds `Shift`+`Delete` (delete for
+ * good, after asking), `F2` (rename), `Ctrl`+`Shift`+`N` (new folder) and
+ * `Ctrl`+`Z` (undo) — each the same command its menu entry runs.
  */
 export class PanelKeyboardFeature {
   constructor(private readonly parent: WorkbenchService) {}
@@ -95,6 +97,29 @@ export class PanelKeyboardFeature {
       case 'delete':
         // Asks first, always (PRD 005, §1); the rows it takes away are re-read when it ends.
         void this.parent.operationsFt.trashSelection(groupId, key.entryId);
+        break;
+
+      // PRD 003, §5: `Shift`+`Delete`, `F2`, `Ctrl`+`Shift`+`N`, `Ctrl`+`Z`.
+      case 'delete-permanently':
+        void this.parent.operationsFt.deleteSelection(groupId, key.entryId);
+        break;
+
+      case 'rename':
+        if (key.entryId !== null) {
+          void this.parent.fileEditFt.rename(key.entryId, groupId);
+        }
+        break;
+
+      case 'new-folder': {
+        const folder = this.parent.editorGroupsFt.stateOf(groupId)?.path;
+        if (folder !== undefined) {
+          void this.parent.fileEditFt.createFolder(folder, groupId);
+        }
+        break;
+      }
+
+      case 'undo':
+        void this.parent.undoFt.undo();
         break;
     }
   }

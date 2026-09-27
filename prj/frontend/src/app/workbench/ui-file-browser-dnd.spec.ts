@@ -4,6 +4,7 @@ import {
   UiFileBrowser,
   type UiEntryDrop,
   type UiFileBrowserModel,
+  type UiFilesDrop,
   type UiPanelKey,
   type UiSelectionChange,
 } from '@tr-file/ui';
@@ -147,11 +148,45 @@ describe('UiFileBrowser drag and drop and clipboard', () => {
     expect(drops).toEqual([]);
   });
 
-  it('ignores drags that are not entries — a tab, files from the desktop', () => {
+  it('ignores drags that are neither entries nor files — a tab', () => {
     const transfer = new FakeTransfer();
-    transfer.setData('Files', '');
+    transfer.setData('application/x-tr-file-tab', '{}');
 
     expect(drag('dragover', rowEl('docs'), transfer).defaultPrevented).toBe(false);
+  });
+
+  /** PRD 003, §6: files from the system land in the folder they are dropped on — a row, or the listing's own. */
+  it('takes files from outside onto a folder, or into the listed folder, as a files drop', () => {
+    const files: UiFilesDrop[] = [];
+    fixture.componentInstance.filesDrop.subscribe((drop) => files.push(drop));
+    const file = new File(['x'], 'x.txt');
+    const transfer = Object.assign(new FakeTransfer(), {
+      files: [file],
+      items: [{ kind: 'file', webkitGetAsEntry: () => ({ name: 'x.txt', isFile: true, isDirectory: false }) }],
+    });
+    transfer.setData('Files', '');
+
+    expect(drag('dragover', rowEl('docs'), transfer).defaultPrevented).toBe(true);
+    expect(rowEl('docs').classList).toContain('is-drop-target');
+    drag('drop', rowEl('docs'), transfer, { ctrlKey: true });
+    drag('drop', rowEl('a.txt'), transfer);
+
+    expect(files.map((drop) => [drop.target, drop.copy, drop.files.length, drop.entries.length])).toEqual([
+      ['docs', true, 1, 1],
+      [null, false, 1, 1],
+    ]);
+    expect(drops).toEqual([]);
+  });
+
+  it('hands a drag to the system instead, when the drag is to be native', () => {
+    const started: (readonly string[])[] = [];
+    fixture.componentRef.setInput('nativeDrag', true);
+    fixture.componentInstance.nativeDragStart.subscribe((paths) => started.push(paths));
+    const transfer = new FakeTransfer();
+
+    expect(drag('dragstart', rowEl('a.txt'), transfer).defaultPrevented).toBe(true);
+    expect(started).toEqual([['a.txt', 'b.txt']]);
+    expect(transfer.types).toEqual([]);
   });
 
   it('takes no drop where the listing does not say it may', () => {

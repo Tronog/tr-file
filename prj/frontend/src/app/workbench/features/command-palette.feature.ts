@@ -60,9 +60,9 @@ const ADD_SERVER = 'remote.add';
  * turns the same box into an input box, and it closes once the answer has
  * been acted on.
  *
- * The commands are a list here for now; PRD 003 §4 asks for one command table
- * the menus, the palette and the shortcuts all read, and this is where it
- * will be read from.
+ * Besides its own two, the commands are the workbench's table
+ * (`CommandsFeature`), which the menus, the context menus and the keys read
+ * too (PRD 003, §4); only those that apply to the active panel are listed.
  */
 export class CommandPaletteFeature {
   private readonly opened = signal(false);
@@ -77,25 +77,35 @@ export class CommandPaletteFeature {
   readonly activeId = this.active.asReadonly();
   readonly busy = this.working.asReadonly();
 
-  readonly commands: readonly PaletteCommand[] = [
-    { id: 'go.jumpToFolder', category: 'Go', label: 'Jump to Folder…', run: () => this.ask(this.jumpToFolder()) },
-    { id: 'files.copyTo', category: 'File', label: 'Copy To…', run: () => this.closeAnd(() => this.parent.operationsFt.copySelection()) },
-    { id: 'files.moveTo', category: 'File', label: 'Move To…', run: () => this.closeAnd(() => this.parent.operationsFt.moveSelection()) },
-    {
-      id: 'files.trash',
-      category: 'File',
-      label: 'Move to Trash',
-      keys: ['Delete'],
-      run: () => this.closeAnd(() => this.parent.operationsFt.trashSelection()),
-    },
-    { id: 'files.emptyTrash', category: 'File', label: 'Empty Trash…', run: () => this.closeAnd(() => this.parent.operationsFt.emptyTrash()) },
-    {
-      id: 'remote.connect',
-      category: 'Remote',
-      label: 'Connect to Remote Server…',
-      run: () => this.ask(this.connectToRemote()),
-    },
-  ];
+  /**
+   * What the palette lists: *Jump to Folder…* and *Connect to Remote
+   * Server…*, which ask in the box itself, and every command of the
+   * workbench's table (PRD 003, §4–5) — run on the active panel, the box
+   * closed first so a command that asks in a modal window has the screen.
+   */
+  get commands(): readonly PaletteCommand[] {
+    const table = this.parent.commandsFt;
+    const target = table.activeTarget();
+    return [
+      { id: 'go.jumpToFolder', category: 'Go', label: 'Jump to Folder…', run: () => this.ask(this.jumpToFolder()) },
+      ...table
+        .paletteCommands()
+        .filter((command) => command.enabled(target))
+        .map((command) => ({
+          id: command.id,
+          category: command.category,
+          label: command.label(target),
+          ...(command.keybinding ? { keys: command.keybinding.split('+') } : {}),
+          run: () => this.closeAnd(async () => table.run(command.id, target)),
+        })),
+      {
+        id: 'remote.connect',
+        category: 'Remote',
+        label: 'Connect to Remote Server…',
+        run: () => this.ask(this.connectToRemote()),
+      },
+    ];
+  }
 
   /** Whether the box shows a list — the commands, or a command's choices — rather than asking for a value. */
   readonly showList = computed(() => this.asking()?.kind !== 'input');
@@ -314,7 +324,7 @@ export class CommandPaletteFeature {
         }
 
         const groupId = this.parent.activeGroupId();
-        const label = path === '' ? this.parent.mockWorkbench.workspaceName : (path.split('/').at(-1) ?? path);
+        const label = path === '' ? this.parent.workspaceName() : (path.split('/').at(-1) ?? path);
         this.parent.fileBrowserFt.openFolder(groupId, path, label);
         this.parent.panelFocusFt.focusBody(groupId);
         return null;

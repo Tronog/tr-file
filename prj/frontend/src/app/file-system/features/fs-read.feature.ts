@@ -1,5 +1,5 @@
 import type { FileSystemService } from '../file-system.service';
-import type { FsDetails, FsDirectoryListing } from '../file-system.model';
+import type { FsArchiveListing, FsDetails, FsDirectoryListing, FsPlaces, FsSearchResult, FsWatchResult } from '../file-system.model';
 
 /**
  * Reading the file system: directory listings and entry details.
@@ -23,5 +23,28 @@ export class FsReadFeature {
   /** Describes one file or directory in full. */
   async details(path: string): Promise<FsDetails> {
     return this.parent.transport.details(path);
+  }
+
+  /**
+   * Entries under `path` whose names match `query`, shallowest first
+   * (PRD 003, §5) — a substring, or a glob when it has `*` or `?`.
+   */
+  async search(path: string, query: string, limit?: number): Promise<FsSearchResult> {
+    return this.parent.transport.search(path, query, limit);
+  }
+
+  /** Where a session starts, and what the Places pane lists (PRD 003, §6). */
+  async places(): Promise<FsPlaces> {
+    return this.parent.transport.places();
+  }
+
+  /** One folder of a zip (PRD 003, §6); `inner` `''` is its top. */
+  async archive(path: string, inner: string): Promise<FsArchiveListing> {
+    return this.parent.transport.archiveList(path, inner);
+  }
+
+  /** Which of `paths` changed since the watch last asked; see `FsTransport.watch`. */
+  async watch(watchId: string | null, paths: readonly string[]): Promise<FsWatchResult> {
+    return this.parent.transport.watch(watchId, paths);
   }
 }

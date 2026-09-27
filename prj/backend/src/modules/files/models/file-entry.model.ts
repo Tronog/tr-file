@@ -1,5 +1,5 @@
 import type { Stats } from 'node:fs';
-import { basename } from 'node:path';
+import { posix } from 'node:path';
 
 export type FileEntryType = 'file' | 'directory' | 'symlink' | 'other';
 
@@ -59,7 +59,7 @@ export class FileEntry {
    */
   static fromStats(relativePath: string, stats: Stats, targetType?: FileEntryTargetType): FileEntry {
     return new FileEntry({
-      name: relativePath === '' ? '' : basename(relativePath),
+      name: relativePath === '' ? '' : posix.basename(relativePath),
       path: relativePath,
       type: FileEntry.typeOf(stats),
       size: stats.size,

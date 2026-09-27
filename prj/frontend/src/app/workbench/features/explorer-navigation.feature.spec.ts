@@ -197,4 +197,74 @@ describe('ExplorerNavigationFeature', () => {
       expect(crumbs()).toBe('tr-file');
     });
   });
+
+  /** PRD 001, §9.1.2 — the tree follows what a panel *opens*, not what it selects. */
+  describe('the tree following the panels', () => {
+    const highlighted = () => workbench.explorerFt.nodes().filter((node) => node.selected).map((node) => node.id);
+    const group = () => workbench.activeGroupId();
+
+    it('stays where it is when an entry is selected in a panel', async () => {
+      await start();
+
+      workbench.fileBrowserFt.setSelection(group(), { selected: ['docs'], focused: 'docs' });
+      http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDirectoryDetails('docs')));
+      await settled();
+
+      expect(highlighted()).toEqual([]);
+      // The details sidebar still follows the click.
+      expect(workbench.selectedEntryId()).toBe('docs');
+    });
+
+    it('highlights a folder opened in a panel, opening the folders above it', async () => {
+      await start();
+      workbench.fileBrowserFt.openEntry(group(), 'docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+      expect(highlighted()).toEqual(['docs']);
+
+      workbench.fileBrowserFt.openEntry(group(), 'docs/prd');
+      http.expectOne(listUrl('docs/prd')).flush(fsEnvelope(fsListing('docs/prd', [])));
+      await settled();
+
+      expect(workbench.explorerFt.isExpanded('docs')).toBe(true);
+      expect(workbench.explorerFt.isExpanded('docs/prd')).toBe(false);
+      expect(highlighted()).toEqual(['docs/prd']);
+    });
+
+    it('follows the panel back and forward through its history, and up', async () => {
+      await start();
+      workbench.fileBrowserFt.openEntry(group(), 'docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+      workbench.fileBrowserFt.openEntry(group(), 'docs/prd');
+      http.expectOne(listUrl('docs/prd')).flush(fsEnvelope(fsListing('docs/prd', [])));
+      await settled();
+
+      workbench.panelHistoryFt.back(group());
+      expect(highlighted()).toEqual(['docs']);
+      workbench.panelHistoryFt.forward(group());
+      expect(highlighted()).toEqual(['docs/prd']);
+      workbench.fileBrowserFt.navigateUp(group());
+      expect(highlighted()).toEqual(['docs']);
+    });
+
+    it('reveals the folder a file is in when the file is opened', async () => {
+      await start();
+      workbench.fileBrowserFt.openEntry(group(), 'docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', DOCS_ENTRIES)));
+      await settled();
+      workbench.explorerFt.select('prj');
+
+      workbench.fileBrowserFt.openEntry(group(), 'docs/NOTES.md');
+      // The preview's bytes, and the details sidebar's description of the file.
+      http.match(() => true).forEach((request) =>
+        request.request.responseType === 'blob'
+          ? request.flush(new Blob(['notes']))
+          : request.flush(fsEnvelope(fsDetails('docs/NOTES.md'))),
+      );
+      await settled();
+
+      expect(highlighted()).toEqual(['docs']);
+    });
+  });
 });

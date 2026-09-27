@@ -44,8 +44,11 @@ export class EditorGroupsFeature {
   private groupSeq = 0;
 
   constructor(private readonly parent: WorkbenchService) {
-    this.groups = signal(parent.mockWorkbench.layout.groups);
-    this.groupSeq = parent.mockWorkbench.layout.groups.length;
+    this.groups = signal(parent.layout.groups);
+    // Past every id already in use — tabs are named after it too — since a
+    // restored session's may have gaps (PRD 003, §6).
+    const ids = parent.layout.groups.flatMap((group) => [group.id, ...group.tabs.map((tab) => tab.id)]);
+    this.groupSeq = Math.max(parent.layout.groups.length, ...ids.map((id) => Number(/group-(\d+)$/.exec(id)?.[1] ?? 0)));
   }
 
   /** Every group's state, for the content features that render them. */
@@ -325,6 +328,8 @@ export class EditorGroupsFeature {
     switch (PANEL_CONTENT[tab.kind]) {
       case 'files':
         return this.parent.fileBrowserFt;
+      case 'archive':
+        return this.parent.archiveBrowserFt;
     }
   }
 

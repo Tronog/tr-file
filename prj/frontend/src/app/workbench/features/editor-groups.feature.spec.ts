@@ -68,8 +68,8 @@ describe('EditorGroupsFeature', () => {
 
       expect(workbench.editorGroupsFt.group('group-root')?.loading).toBeUndefined();
       const browser = workbench.fileBrowserFt.browser('group-root');
-      expect(browser?.rows.map((row) => row.id)).toEqual(['docs', 'README.md', 'main.ts']);
-      expect(browser?.items.map((item) => item.id)).toEqual(['docs', 'README.md', 'main.ts']);
+      expect(browser?.rows.map((row) => row.id)).toEqual(['docs', 'main.ts', 'README.md']);
+      expect(browser?.items.map((item) => item.id)).toEqual(['docs', 'main.ts', 'README.md']);
       expect(browser?.summary).toBe('3 items');
       expect(browser?.columns.map((column) => column.key)).toEqual(['name', 'size', 'type', 'modified']);
       expect(rowOf('group-root', 'README.md')?.cells).toMatchObject({
@@ -157,8 +157,8 @@ describe('EditorGroupsFeature', () => {
       // Both groups show the same cached directory, fetched once.
       expect(workbench.fileBrowserFt.browser(newGroupId)?.rows.map((row) => row.id)).toEqual([
         'docs',
-        'README.md',
         'main.ts',
+        'README.md',
       ]);
     });
 

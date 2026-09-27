@@ -223,6 +223,7 @@ describe('trash', () => {
       contains: () => false,
       trash: async (_absolute, relative) => {
         seen.push(relative);
+        return null;
       },
       empty: async (progress) => progress(1, null),
     }));
@@ -231,7 +232,9 @@ describe('trash', () => {
 
     assert.equal(job.state, 'done');
     assert.deepEqual(seen, ['docs/b.md']);
-    assert.deepEqual(service.info, { trash: 'system' });
+    assert.deepEqual(job.outcome, [], 'no id, so nothing to restore by');
+    assert.deepEqual(service.info, { trash: 'system', canRestore: false });
+    assert.equal((await refused(service.start({ kind: 'restore', ids: ['x'] }))).status, 400);
   });
 
   it('reports a failure as the job’s end, not a throw', async () => {
@@ -261,5 +264,137 @@ describe('jobs', () => {
     const job = await settled(await service.start({ kind: 'trash', paths: ['a.txt'] }));
 
     assert.equal(service.cancel(job.id).state, 'done');
+  });
+});
+
+describe('outcome (PRD 003, §5)', () => {
+  it('pairs each copied entry with its copy, leaving out what was skipped', async () => {
+    await writeFile(join(root, 'target', 'a.txt'), 'old');
+
+    const kept = await settled(
+      await service.start({ kind: 'copy', sources: ['a.txt', 'docs'], destination: 'target', conflict: 'rename' }),
+    );
+    assert.deepEqual(kept.outcome, [
+      { source: 'a.txt', target: 'target/a copy.txt' },
+      { source: 'docs', target: 'target/docs' },
+    ]);
+
+    const skipped = await settled(
+      await service.start({ kind: 'copy', sources: ['a.txt'], destination: 'target', conflict: 'skip' }),
+    );
+    assert.deepEqual(skipped.outcome, []);
+  });
+
+  it('pairs each moved entry with where it is now', async () => {
+    const job = await settled(
+      await service.start({ kind: 'move', sources: ['docs/b.md', 'a.txt'], destination: 'target', conflict: 'fail' }),
+    );
+
+    assert.deepEqual(job.outcome, [
+      { source: 'docs/b.md', target: 'target/b.md' },
+      { source: 'a.txt', target: 'target/a.txt' },
+    ]);
+  });
+
+  it('starts every job with an empty outcome', async () => {
+    const job = await service.start({ kind: 'empty-trash' });
+    assert.deepEqual(job.outcome, []);
+  });
+});
+
+describe('delete (PRD 003, §5)', () => {
+  it('removes entries for good, a folder with everything in it', async () => {
+    const job = await settled(await service.start({ kind: 'delete', paths: ['a.txt', 'docs'] }));
+
+    assert.equal(job.state, 'done');
+    assert.equal(job.kind, 'delete');
+    assert.equal(job.totalItems, 2);
+    assert.equal(job.doneItems, 2);
+    assert.deepEqual(job.affected, ['']);
+    assert.deepEqual(job.outcome, []);
+    assert.deepEqual((await readdir(root)).sort(), ['target']);
+    await assert.rejects(readdir(join(root, SERVER_TRASH_DIR, 'files')), 'nothing went to the trash');
+  });
+
+  it('removes a link, never what it leads to', async () => {
+    await symlink('docs', join(root, 'link'));
+
+    await settled(await service.start({ kind: 'delete', paths: ['link'] }));
+
+    assert.deepEqual((await readdir(join(root, 'docs'))).sort(), ['b.md', 'deep']);
+    await assert.rejects(lstat(join(root, 'link')));
+  });
+
+  it('refuses the root, the trash and what is not there, before anything is deleted', async () => {
+    assert.equal((await refused(service.start({ kind: 'delete', paths: [''] }))).status, 400);
+    assert.equal((await refused(service.start({ kind: 'delete', paths: [SERVER_TRASH_DIR] }))).status, 403);
+    assert.equal((await refused(service.start({ kind: 'delete', paths: ['a.txt', 'nope'] }))).status, 404);
+    assert.equal((await refused(service.start({ kind: 'delete', paths: [] }))).status, 400);
+    assert.equal(await readFile(join(root, 'a.txt'), 'utf8'), 'alpha');
+  });
+});
+
+describe('restore (PRD 003, §5)', () => {
+  async function trashed(...paths: string[]): Promise<string[]> {
+    const job = await settled(await service.start({ kind: 'trash', paths }));
+    assert.equal(job.state, 'done');
+    assert.deepEqual(
+      job.outcome.map((pair) => pair.source),
+      paths,
+    );
+    return job.outcome.map((pair) => pair.target);
+  }
+
+  it('says it can restore from the server trash', () => {
+    assert.deepEqual(service.info, { trash: 'server', canRestore: true });
+  });
+
+  it('puts trashed entries back where they were, by the ids the trash job gave', async () => {
+    const ids = await trashed('a.txt', 'docs/deep');
+
+    const job = await settled(await service.start({ kind: 'restore', ids }));
+
+    assert.equal(job.state, 'done');
+    assert.equal(job.kind, 'restore');
+    assert.equal(await readFile(join(root, 'a.txt'), 'utf8'), 'alpha');
+    assert.equal((await readFile(join(root, 'docs', 'deep', 'c.bin'))).length, 4096);
+    assert.deepEqual(job.outcome, [
+      { source: ids[0], target: 'a.txt' },
+      { source: ids[1], target: 'docs/deep' },
+    ]);
+    assert.deepEqual([...job.affected].sort(), ['', 'docs']);
+    assert.deepEqual(await readdir(join(root, SERVER_TRASH_DIR, 'files')), []);
+    assert.deepEqual(await readdir(join(root, SERVER_TRASH_DIR, 'info')), []);
+  });
+
+  it('keeps both when the name has been taken since', async () => {
+    const [id] = await trashed('a.txt');
+    await writeFile(join(root, 'a.txt'), 'newer');
+
+    const job = await settled(await service.start({ kind: 'restore', ids: [id as string] }));
+
+    assert.deepEqual(job.outcome, [{ source: id, target: 'a copy.txt' }]);
+    assert.equal(await readFile(join(root, 'a.txt'), 'utf8'), 'newer');
+    assert.equal(await readFile(join(root, 'a copy.txt'), 'utf8'), 'alpha');
+  });
+
+  it('makes the folder again when it has gone', async () => {
+    const [id] = await trashed('docs/deep/c.bin');
+    await rm(join(root, 'docs'), { recursive: true });
+
+    const job = await settled(await service.start({ kind: 'restore', ids: [id as string] }));
+
+    assert.equal(job.state, 'done');
+    assert.equal((await readFile(join(root, 'docs', 'deep', 'c.bin'))).length, 4096);
+  });
+
+  it('answers 404 for an id the trash does not have, and never reads outside it', async () => {
+    const [id] = await trashed('a.txt');
+
+    assert.equal((await refused(service.start({ kind: 'restore', ids: [id as string, 'nope'] }))).status, 404);
+    assert.equal((await refused(service.start({ kind: 'restore', ids: ['../info'] }))).status, 404);
+    assert.equal((await refused(service.start({ kind: 'restore', ids: ['..'] }))).status, 404);
+    assert.equal((await refused(service.start({ kind: 'restore', ids: [] }))).status, 400);
+    await assert.rejects(readFile(join(root, 'a.txt')), 'nothing was restored');
   });
 });

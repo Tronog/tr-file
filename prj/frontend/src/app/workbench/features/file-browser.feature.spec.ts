@@ -133,14 +133,12 @@ describe('FileBrowserFeature', () => {
   });
 
   describe('runToolbarAction()', () => {
-    it('offers the three toolbar actions of an open group', async () => {
+    it('offers Back, Forward, Up, Refresh, New File, New Folder and Upload — at the root, with nowhere to go back or up to', async () => {
       await start();
 
-      expect(workbench.fileBrowserFt.browser('group-root')?.toolbarActions.map((action) => action.id)).toEqual([
-        'up',
-        'refresh',
-        'upload',
-      ]);
+      const actions = workbench.fileBrowserFt.browser('group-root')?.toolbarActions ?? [];
+      expect(actions.map((action) => action.id)).toEqual(['back', 'forward', 'up', 'refresh', 'new-file', 'new-folder', 'upload']);
+      expect(actions.filter((action) => action.disabled).map((action) => action.id)).toEqual(['back', 'forward', 'up']);
     });
 
     it('up walks the group to the parent directory', async () => {
@@ -375,8 +373,8 @@ describe('FileBrowserFeature', () => {
       expect(browser?.columns.map((column) => column.key)).toEqual(['name', 'size', 'type', 'modified']);
       expect(browser?.rows.map((row) => [row.id, row.depth, row.expandable])).toEqual([
         ['docs', 0, true],
-        ['README.md', 0, false],
         ['main.ts', 0, false],
+        ['README.md', 0, false],
       ]);
       expect(rowOf('group-root', 'README.md')?.cells).toMatchObject({ size: '3.4 KB', type: 'MD' });
     });
@@ -397,8 +395,8 @@ describe('FileBrowserFeature', () => {
         { id: 'docs', depth: 0, expanded: true },
         { id: 'docs/prd', depth: 1, expanded: false },
         { id: 'docs/NOTES.md', depth: 1, expanded: undefined },
-        { id: 'README.md', depth: 0, expanded: undefined },
         { id: 'main.ts', depth: 0, expanded: undefined },
+        { id: 'README.md', depth: 0, expanded: undefined },
       ]);
       expect(rowOf('group-root', 'docs')?.busy).toBeUndefined();
       // The panel is still on the root: opening in place is not navigating.
@@ -409,7 +407,7 @@ describe('FileBrowserFeature', () => {
       await openDocs();
 
       workbench.fileBrowserFt.toggleEntry('group-root', 'docs');
-      expect(treeRows().map((row) => row.id)).toEqual(['docs', 'README.md', 'main.ts']);
+      expect(treeRows().map((row) => row.id)).toEqual(['docs', 'main.ts', 'README.md']);
 
       workbench.fileBrowserFt.toggleEntry('group-root', 'docs');
       http.expectNone(listUrl('docs'));
@@ -459,7 +457,7 @@ describe('FileBrowserFeature', () => {
       const second = workbench.panelLayoutFt.groupIds()[1] as string;
 
       expect(workbench.fileBrowserFt.browser(second)?.view).toBe('tree');
-      expect(treeRows(second).map((row) => row.id)).toEqual(['docs', 'README.md', 'main.ts']);
+      expect(treeRows(second).map((row) => row.id)).toEqual(['docs', 'main.ts', 'README.md']);
       expect(treeRows()).toHaveLength(5);
     });
 
@@ -473,8 +471,8 @@ describe('FileBrowserFeature', () => {
       http.expectNone(() => true);
       expect(workbench.fileBrowserFt.browser('group-root')?.rows.map((row) => row.id)).toEqual([
         'docs',
-        'README.md',
         'main.ts',
+        'README.md',
       ]);
     });
   });

@@ -29,6 +29,12 @@ export class AppConfig {
   readonly logLevel: LogLevel;
   /** Absolute path all file-system operations are confined to. */
   readonly filesRoot: string;
+  /**
+   * Every drive is reachable (PRD 003, §6): `FILES_ROOT` is `/` on Windows,
+   * which has no one root — so the root is the list of drives, and
+   * `filesRoot` means nothing. Always `false` elsewhere, where `/` is a folder.
+   */
+  readonly allDrives: boolean;
   /** Hard ceiling, in bytes, for the body of a single uploaded file. */
   readonly uploadMaxBytes: number;
   /**
@@ -43,7 +49,7 @@ export class AppConfig {
   /** A session nobody uses for this long is signed out. */
   readonly sessionIdleMs: number;
 
-  private constructor(env: NodeJS.ProcessEnv) {
+  private constructor(env: NodeJS.ProcessEnv, platform: NodeJS.Platform) {
     this.nodeEnv = AppConfig.readEnum<NodeEnv>(
       env['NODE_ENV'],
       ['development', 'production', 'test'],
@@ -57,14 +63,16 @@ export class AppConfig {
       ['debug', 'info', 'warn', 'error'],
       this.nodeEnv === 'production' ? 'info' : 'debug',
     );
-    this.filesRoot = resolve(env['FILES_ROOT']?.trim() || process.cwd());
+    const filesRoot = env['FILES_ROOT']?.trim() || process.cwd();
+    this.allDrives = platform === 'win32' && (filesRoot === '/' || filesRoot === '\\');
+    this.filesRoot = resolve(filesRoot);
     this.uploadMaxBytes = AppConfig.readByteSize(env['UPLOAD_MAX_BYTES'], 512 * 1024 * 1024);
     this.auth = AppConfig.readAuth(env, this.nodeEnv);
     this.sessionIdleMs = AppConfig.readHours(env['AUTH_SESSION_IDLE_HOURS'], 12) * 60 * 60 * 1000;
   }
 
-  static fromEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
-    return new AppConfig(env);
+  static fromEnv(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): AppConfig {
+    return new AppConfig(env, platform);
   }
 
   get isProduction(): boolean {

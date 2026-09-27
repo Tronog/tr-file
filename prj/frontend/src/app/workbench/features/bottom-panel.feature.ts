@@ -106,6 +106,19 @@ export class BottomPanelFeature {
     this.collapsed.set(false);
   }
 
+  /** The tab showing, for the session to remember (PRD 003, §6). */
+  activeTab(): string {
+    return this.activeTabId();
+  }
+
+  /** Puts the panel back as a restored session had it. */
+  restore(tab: string, collapsed: boolean): void {
+    if (['transfers', 'progress', 'problems'].includes(tab)) {
+      this.activeTabId.set(tab);
+    }
+    this.collapsed.set(collapsed);
+  }
+
   /** The collapse toggle: the tab bar stays, the body goes. */
   toggleCollapsed(): void {
     this.collapsed.update((collapsed) => !collapsed);

@@ -1,19 +1,40 @@
-<nav [attr.aria-label]="label()">
-  <ol class="crumbs">
-    @for (item of items(); track item.id; let last = $last) {
-      <li class="crumb-item">
-        <button type="button" class="crumb" (click)="select.emit(item.id)">
-          @if (item.icon; as icon) {
-            <ui-icon [name]="icon" />
+@if (editing()) {
+  <div class="location-bar">
+    <input
+      #field
+      class="location"
+      type="text"
+      spellcheck="false"
+      autocomplete="off"
+      aria-label="Location"
+      [value]="location() ?? ''"
+      (keydown)="onFieldKeydown($event)"
+      (blur)="onFieldBlur()"
+    />
+  </div>
+} @else {
+  <nav [attr.aria-label]="label()" [class.is-editable]="location() !== undefined" (click)="onBarClick($event)">
+    <ol class="crumbs">
+      @for (item of items(); track item.id; let last = $last) {
+        <li class="crumb-item">
+          <button type="button" class="crumb" (click)="select.emit(item.id)">
+            @if (item.icon; as icon) {
+              <ui-icon [name]="icon" />
+            }
+            <span class="crumb-label">{{ item.label }}</span>
+          </button>
+          @if (!last) {
+            <span class="crumb-sep" aria-hidden="true">
+              <ui-icon name="chevron-right" />
+            </span>
           }
-          <span class="crumb-label">{{ item.label }}</span>
-        </button>
-        @if (!last) {
-          <span class="crumb-sep" aria-hidden="true">
-            <ui-icon name="chevron-right" />
-          </span>
-        }
-      </li>
+        </li>
+      }
+    </ol>
+    @if (location() !== undefined) {
+      <button type="button" class="edit" title="Edit path (Ctrl+L)" aria-label="Edit path" (click)="edit()">
+        <ui-icon name="pencil" />
+      </button>
     }
-  </ol>
-</nav>
+  </nav>
+}

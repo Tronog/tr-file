@@ -1,5 +1,8 @@
 export { FilesRoutes } from './files.routes.js';
-export { FilesService } from './files.service.js';
-export type { DownloadTarget, UploadRequest } from './files.service.js';
+export { FilesService, SEARCH_LIMITS } from './files.service.js';
+export type { DownloadTarget, LocalPath, UploadRequest } from './files.service.js';
+export { PlacesService } from './places.service.js';
 export { FilePathResolver, ResolvedPath } from './file-path.resolver.js';
+export { WatchService, WATCH_MAX_PATHS } from './watch.service.js';
+export type { WatchResultDto, WatchServiceOptions } from './watch.service.js';
 export * from './models/index.js';

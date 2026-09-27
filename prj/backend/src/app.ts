@@ -9,9 +9,18 @@ import {
   RequestLoggerMiddleware,
   type RouteModule,
 } from './core/index.js';
+import { ArchiveRoutes, ArchiveService } from './modules/archive/index.js';
 import { AuthRoutes, AuthService, SessionMiddleware } from './modules/auth/index.js';
 import { FileSystemBridge } from './modules/bridge/index.js';
-import { FilePathResolver, FilesRoutes, FilesService } from './modules/files/index.js';
+import {
+  FilePathResolver,
+  FilesRoutes,
+  FilesService,
+  NO_PLACES,
+  PlacesService,
+  WatchService,
+  type PlacesProvider,
+} from './modules/files/index.js';
 import { HealthRoutes, HealthService } from './modules/health/index.js';
 import {
   OperationsRoutes,
@@ -29,6 +38,12 @@ export interface AppOptions {
    * system's.
    */
   readonly trash?: TrashProvider;
+  /**
+   * The home folder, the user's folders, drives and mounts (PRD 003, §6).
+   * A server has none and lists only its root; the desktop, whose root is
+   * the whole file system, hands in the system's.
+   */
+  readonly places?: PlacesProvider;
 }
 
 /**
@@ -57,7 +72,16 @@ export class App {
   /** Copy, move, trash and empty trash, as background jobs (PRD 005, §1); shared like `auth`. */
   readonly operations: OperationsService;
 
+  /**
+   * Auto-refresh (PRD 003, §5): which folders on a client's screen changed.
+   * Shared by the route and the bridge, like `auth`; holds `fs.watch`
+   * watchers, so `close` stops it.
+   */
+  readonly watches: WatchService;
+
   private readonly filesService: FilesService;
+  private readonly places: PlacesService;
+  private readonly archives: ArchiveService;
   private readonly filesLogger: Logger;
 
   constructor(
@@ -69,9 +93,15 @@ export class App {
     this.filesLogger = this.logger.child({ module: 'files' });
     const trash = options.trash ?? new ServerTrash(this.config.filesRoot);
     // One resolver for every module: the server's own trash is out of reach of all of them.
-    const resolver = new FilePathResolver(this.config.filesRoot, trash.kind === 'server' ? [SERVER_TRASH_DIR] : []);
+    const reserved = trash.kind === 'server' ? [SERVER_TRASH_DIR] : [];
+    const resolver = this.config.allDrives
+      ? FilePathResolver.drives(reserved)
+      : new FilePathResolver(this.config.filesRoot, reserved);
     this.filesService = new FilesService(resolver, this.filesLogger, this.config.uploadMaxBytes);
-    this.operations = new OperationsService(resolver, trash, this.logger.child({ module: 'operations' }));
+    this.watches = new WatchService(resolver, this.filesLogger);
+    this.places = new PlacesService(resolver, options.places ?? NO_PLACES, this.filesLogger);
+    this.archives = new ArchiveService(resolver, this.filesLogger);
+    this.operations = new OperationsService(resolver, trash, this.logger.child({ module: 'operations' }), this.archives);
     this.auth = new AuthService(
       this.config.auth,
       this.config.sessionIdleMs,
@@ -80,12 +110,20 @@ export class App {
     if (!this.auth.required) {
       this.logger.warn('signing in is switched off: anyone who can reach this server can use it');
     }
-    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger, this.auth, this.operations);
+    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger, this.auth, this.operations, this.watches, this.places, this.archives);
 
     this.instance = express();
     this.configure();
     this.mountModules(this.createModules());
     this.mountErrorHandling();
+  }
+
+  /**
+   * Releases what outlives a request: the folder watchers. None of it keeps
+   * the process alive, but a host that stops serving should let go of it.
+   */
+  close(): void {
+    this.watches.close();
   }
 
   private configure(): void {
@@ -107,8 +145,9 @@ export class App {
     return [
       new HealthRoutes(healthService),
       new AuthRoutes(this.auth),
-      new FilesRoutes(this.filesService, this.filesLogger),
+      new FilesRoutes(this.filesService, this.filesLogger, this.watches, this.places),
       new OperationsRoutes(this.operations),
+      new ArchiveRoutes(this.archives, this.filesLogger),
     ];
   }
 

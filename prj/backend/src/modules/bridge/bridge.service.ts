@@ -6,8 +6,9 @@ import { PassThrough } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
+import type { ArchiveService } from '../archive/index.js';
 import type { AuthService } from '../auth/index.js';
-import type { FileDetails, FilesService } from '../files/index.js';
+import { WATCH_MAX_PATHS, type FileDetails, type FilesService, type PlacesService, type WatchService } from '../files/index.js';
 import { parseOperationRequest, type OperationsService } from '../operations/index.js';
 import {
   FS_BRIDGE_CHUNK_BYTES,
@@ -15,6 +16,7 @@ import {
   type FsBridgeRequest,
   type FsBridgeResponse,
   type FsBridgeSession,
+  type FsLocalPath,
   type FsReadRequest,
   type FsReadResult,
   type FsUploadBeginRequest,
@@ -78,6 +80,9 @@ export class FileSystemBridge {
     private readonly logger: Logger,
     private readonly auth: AuthService,
     private readonly operations: OperationsService,
+    private readonly watches: WatchService,
+    private readonly placesService: PlacesService,
+    private readonly archives: ArchiveService,
   ) {}
 
   /** A connection that has not signed in; the channel keeps one per window. */
@@ -105,7 +110,14 @@ export class FileSystemBridge {
             ? { uploadId: parsed.uploadId }
             : 'jobId' in parsed
               ? { jobId: parsed.jobId }
-              : {}),
+              : 'watchId' in parsed
+                ? { watchId: parsed.watchId, paths: parsed.paths.length }
+                : 'paths' in parsed
+                  ? { paths: parsed.paths.length }
+                  : 'ids' in parsed
+                    ? { ids: parsed.ids.length }
+                    : {}),
+        ...('to' in parsed ? { to: parsed.to } : {}),
         durationMs: Number((performance.now() - startedAt).toFixed(3)),
       });
       return { data };
@@ -155,6 +167,87 @@ export class FileSystemBridge {
 
       this.logger.debug('saved copy', { path, bytes: loaded });
       return { data: { bytes: loaded } };
+    } catch (error: unknown) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Streams a zip of `paths` to `destination` — how a folder, or a
+   * selection, is downloaded on the desktop (PRD 003, §6) — answering the
+   * way `saveCopy` does, and for the same reason not a command. `onProgress`
+   * counts the bytes of the files read; the total is not known ahead.
+   */
+  async saveZip(
+    paths: readonly string[],
+    destination: string,
+    options: FsSaveCopyOptions = {},
+    session: FsBridgeSession = FileSystemBridge.openSession(),
+  ): Promise<FsBridgeResponse<{ readonly bytes: number }>> {
+    try {
+      this.assertSignedIn(session);
+      const zip = await this.archives.zipSources(paths);
+      const output = createWriteStream(destination);
+      let loaded = 0;
+      try {
+        await this.archives.writeZip(zip, output, {
+          ...(options.signal === undefined ? {} : { signal: options.signal }),
+          onBytes: (bytes) => {
+            loaded += bytes;
+            options.onProgress?.(loaded, 0);
+          },
+        });
+      } catch (error) {
+        output.destroy();
+        await rm(destination, { force: true });
+        throw options.signal?.aborted ? FileSystemBridge.aborted('The download was cancelled.') : error;
+      }
+      this.logger.debug('saved zip', { paths: paths.length, bytes: loaded });
+      return { data: { bytes: loaded } };
+    } catch (error: unknown) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Where an entry is on this machine, answered the way `dispatch` does —
+   * for the desktop shell to open it with the system's default app or show
+   * it in the system's file manager (PRD 003, §5).
+   *
+   * Not a command, for the reason `saveCopy` is not: the answer is a host
+   * path, which is the main process's business and never the renderer's. The
+   * same sign-in, resolver and root confinement as every command apply, and
+   * an entry that is not there is a `404`.
+   */
+  async localPath(
+    path: string,
+    session: FsBridgeSession = FileSystemBridge.openSession(),
+  ): Promise<FsBridgeResponse<FsLocalPath>> {
+    try {
+      this.assertSignedIn(session);
+      return { data: await this.files.localPath(path) };
+    } catch (error: unknown) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Where host paths are in the root, answered the way `dispatch` does: each
+   * one's root-relative path, or `null` for one outside the root or not there
+   * (PRD 003, §6). For the desktop shell, which is handed host paths by the
+   * system — files copied in another file manager, files dropped on the
+   * window — and must say which of them this root can reach.
+   *
+   * Not a command either: the paths come from the operating system, never
+   * from a renderer, and the answer is only what a listing would show.
+   */
+  async fromLocalPaths(
+    absolute: readonly string[],
+    session: FsBridgeSession = FileSystemBridge.openSession(),
+  ): Promise<FsBridgeResponse<readonly (string | null)[]>> {
+    try {
+      this.assertSignedIn(session);
+      return { data: await Promise.all(absolute.map((path) => this.files.fromLocalPath(path))) };
     } catch (error: unknown) {
       return this.toFailure(error);
     }
@@ -211,6 +304,39 @@ export class FileSystemBridge {
         return this.operations.status(request.jobId);
       case 'op-cancel':
         return this.operations.cancel(request.jobId);
+      case 'op-delete':
+        return this.operations.start({ kind: 'delete', paths: request.paths });
+      case 'op-restore':
+        return this.operations.start({ kind: 'restore', ids: request.ids });
+      case 'rename':
+        return (await this.files.rename(request.path, request.to)).toJSON();
+      case 'mkdir':
+        return (await this.files.createFolder(request.path, request.name)).toJSON();
+      case 'create-file':
+        return (await this.files.createFile(request.path, request.name)).toJSON();
+      case 'search':
+        return (await this.files.search(request.path, request.query, request.limit)).toJSON();
+      case 'watch':
+        return this.watches.watch(request.watchId, request.paths);
+      case 'places':
+        return this.placesService.places();
+      case 'archive-list':
+        return this.archives.list(request.path, request.inner);
+      case 'op-compress':
+        return this.operations.start({
+          kind: 'compress',
+          sources: request.sources,
+          destination: request.destination,
+          name: request.name,
+          conflict: request.conflict,
+        });
+      case 'op-extract':
+        return this.operations.start({
+          kind: 'extract',
+          path: request.path,
+          destination: request.destination,
+          conflict: request.conflict,
+        });
     }
   }
 
@@ -471,7 +597,28 @@ export class FileSystemBridge {
         return { command, uploadId: FileSystemBridge.readString(value, 'uploadId') };
       case 'op-info':
       case 'op-empty-trash':
+      case 'places':
         return { command };
+      case 'archive-list':
+        return {
+          command,
+          path: FileSystemBridge.readString(value, 'path'),
+          inner: FileSystemBridge.readString(value, 'inner'),
+        };
+      case 'op-compress': {
+        const parsed = parseOperationRequest('compress', value);
+        if (parsed.kind !== 'compress') {
+          throw HttpError.internal();
+        }
+        return { command, sources: parsed.sources, destination: parsed.destination, name: parsed.name, conflict: parsed.conflict };
+      }
+      case 'op-extract': {
+        const parsed = parseOperationRequest('extract', value);
+        if (parsed.kind !== 'extract') {
+          throw HttpError.internal();
+        }
+        return { command, path: parsed.path, destination: parsed.destination, conflict: parsed.conflict };
+      }
       case 'op-copy':
       case 'op-move': {
         const parsed = parseOperationRequest(command === 'op-copy' ? 'copy' : 'move', value);
@@ -487,6 +634,47 @@ export class FileSystemBridge {
       case 'op-status':
       case 'op-cancel':
         return { command, jobId: FileSystemBridge.readString(value, 'jobId') };
+      case 'op-delete': {
+        const parsed = parseOperationRequest('delete', value);
+        return { command, paths: parsed.kind === 'delete' ? parsed.paths : [] };
+      }
+      case 'op-restore': {
+        const parsed = parseOperationRequest('restore', value);
+        return { command, ids: parsed.kind === 'restore' ? parsed.ids : [] };
+      }
+      case 'rename':
+        return {
+          command,
+          path: FileSystemBridge.readString(value, 'path'),
+          to: FileSystemBridge.readString(value, 'to'),
+        };
+      case 'mkdir':
+      case 'create-file':
+        return {
+          command,
+          path: FileSystemBridge.readString(value, 'path'),
+          name: FileSystemBridge.readString(value, 'name'),
+        };
+      case 'search': {
+        const limit = FileSystemBridge.readOptionalCount(value, 'limit');
+        return {
+          command,
+          path: FileSystemBridge.readString(value, 'path'),
+          query: FileSystemBridge.readString(value, 'query'),
+          ...(limit === undefined ? {} : { limit }),
+        };
+      }
+      case 'watch': {
+        const watchId = (value as { watchId?: unknown }).watchId ?? null;
+        if (watchId !== null && typeof watchId !== 'string') {
+          throw HttpError.badRequest('Bridge request field "watchId" must be a string or null');
+        }
+        const paths = FileSystemBridge.readStrings(value, 'paths');
+        if (paths.length > WATCH_MAX_PATHS) {
+          throw HttpError.badRequest(`At most ${WATCH_MAX_PATHS} folders can be watched at once`);
+        }
+        return { command, watchId, paths };
+      }
       default:
         throw HttpError.badRequest(`Unknown bridge command: ${String(command)}`);
     }
@@ -496,6 +684,14 @@ export class FileSystemBridge {
     const raw = (value as Record<string, unknown>)[field];
     if (typeof raw !== 'string') {
       throw HttpError.badRequest(`Bridge request field "${field}" must be a string`);
+    }
+    return raw;
+  }
+
+  private static readStrings(value: object, field: string): string[] {
+    const raw = (value as Record<string, unknown>)[field];
+    if (!Array.isArray(raw) || !raw.every((item): item is string => typeof item === 'string')) {
+      throw HttpError.badRequest(`Bridge request field "${field}" must be an array of strings`);
     }
     return raw;
   }

@@ -282,24 +282,30 @@ describe('OperationsFeature', () => {
       expect(confirm).toHaveBeenCalledTimes(1);
     });
 
-    it('the File menu is disabled but for Empty Trash while nothing is selected', () => {
+    it('the File menu’s operations are disabled while nothing is selected, but Empty Trash', () => {
+      const operations = ['file.copyTo', 'file.moveTo', 'file.trash', 'file.delete', 'file.emptyTrash'];
+      const rows = () =>
+        (workbench.chromeFt.menuItems().find((menu) => menu.id === 'file')?.items ?? [])
+          .filter((item) => operations.includes(item.id))
+          .map((item) => [item.id, item.disabled === true]);
       select();
-      const file = workbench.chromeFt.menuItems().find((menu) => menu.id === 'file');
 
-      expect(file?.items?.map((item) => [item.id, item.disabled === true])).toEqual([
+      expect(rows()).toEqual([
         ['file.copyTo', true],
         ['file.moveTo', true],
         ['file.trash', true],
+        ['file.delete', true],
         ['file.emptyTrash', false],
       ]);
 
       select('docs/a.txt');
-      expect(workbench.chromeFt.menuItems().find((menu) => menu.id === 'file')?.items?.some((item) => item.disabled)).toBe(false);
+      expect(rows().some(([, disabled]) => disabled)).toBe(false);
     });
 
-    it('the palette offers the four commands', () => {
+    it('the palette offers the operations that apply', () => {
+      select('docs/a.txt');
       expect(workbench.commandPaletteFt.commands.map((command) => command.id)).toEqual(
-        expect.arrayContaining(['files.copyTo', 'files.moveTo', 'files.trash', 'files.emptyTrash']),
+        expect.arrayContaining(['file.copyTo', 'file.moveTo', 'file.trash', 'file.delete', 'file.emptyTrash']),
       );
     });
   });

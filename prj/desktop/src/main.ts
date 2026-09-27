@@ -1,14 +1,23 @@
-import { app, dialog, shell } from 'electron';
+import { join } from 'node:path';
+
+import { app, BrowserWindow, dialog, shell, type MessageBoxOptions } from 'electron';
 
 import { installAppMenu } from './app-menu.js';
 import { DesktopConfig } from './desktop.config.js';
 import { DesktopStack } from './desktop.stack.js';
+import { DragOutChannel } from './drag-out.channel.js';
+import { electronClipboard } from './electron-clipboard.js';
 import { waitForDevServer } from './dev-server.js';
 import { FsBridgeChannel } from './fs-bridge.channel.js';
 import { BridgeSessions } from './bridge-sessions.js';
+import type { DesktopShell } from './desktop-shell.js';
 import { MainWindow } from './main-window.js';
 import { SaveFileChannel } from './save-file.channel.js';
+import { SettingsChannel } from './settings.channel.js';
+import { SettingsStore } from './settings-store.js';
+import { SystemClipboard } from './system-clipboard.js';
 import { ShellTrash } from './shell-trash.js';
+import { SystemPlaces } from './system-places.js';
 import { WindowControlsChannel } from './window-controls.channel.js';
 
 /**
@@ -34,6 +43,12 @@ class DesktopApplication {
     this.config,
     undefined,
     (filesRoot) => new ShellTrash(filesRoot, { trashItem: (path) => shell.trashItem(path) }),
+    // Home, the user's folders and every mount, for the Places pane (PRD 003, §6).
+    new SystemPlaces({
+      platform: process.platform,
+      home: app.getPath('home'),
+      userFolder: (name) => app.getPath(name as Parameters<typeof app.getPath>[0]),
+    }),
   );
 
   private window: MainWindow | null = null;
@@ -42,6 +57,33 @@ class DesktopApplication {
   private channel: FsBridgeChannel | null = null;
   private windowChannel: WindowControlsChannel | null = null;
   private saveChannel: SaveFileChannel | null = null;
+  private settingsChannel: SettingsChannel | null = null;
+  private dragChannel: DragOutChannel | null = null;
+  private sessions: BridgeSessions | null = null;
+
+  /**
+   * The operating system's shell, for *Open* and *Show in Folder* (PRD 003,
+   * §5). Asking before a program runs is a native dialog in this process —
+   * the page is never the one that says yes.
+   */
+  private readonly shell: DesktopShell = {
+    openPath: (path) => shell.openPath(path),
+    showItemInFolder: (path) => shell.showItemInFolder(path),
+    confirmRun: async (name) => {
+      const options: MessageBoxOptions = {
+        type: 'warning',
+        message: `'${name}' is a program. Opening it will run it.`,
+        detail: 'Only run programs you trust.',
+        buttons: ['Run', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      };
+      const parent = BrowserWindow.getFocusedWindow();
+      const { response } = parent === null ? await dialog.showMessageBox(options) : await dialog.showMessageBox(parent, options);
+      return response === 0;
+    },
+  };
 
   /**
    * Starts the app, unless another copy already owns the lock — in which case
@@ -87,7 +129,11 @@ class DesktopApplication {
       // Before the window, not after: the bundle may ask for a listing on its
       // very first frame, and a command that arrives with no handler rejects.
       // One sign-in per window, shared by the command and save channels.
-      const sessions = new BridgeSessions(this.stack.bridge, this.stack.log);
+      const sessions = new BridgeSessions(this.stack.bridge, this.stack.log, this.shell, {
+        // Files copied in the system's file manager paste here, and the other way round (PRD 003, §6).
+        clipboard: new SystemClipboard(electronClipboard),
+      });
+      this.sessions = sessions;
       this.channel = new FsBridgeChannel(page.origin, this.stack.log, sessions);
       this.channel.register();
 
@@ -95,6 +141,19 @@ class DesktopApplication {
       // them and streams the copy (PRD 003, §1).
       this.saveChannel = new SaveFileChannel(page.origin, this.stack.log, sessions);
       this.saveChannel.register();
+
+      // What the page remembers between sessions (PRD 003, §6): its origin is
+      // new on every start, so a file in the user-data folder remembers instead.
+      this.settingsChannel = new SettingsChannel(
+        page.origin,
+        this.stack.log,
+        new SettingsStore(join(app.getPath('userData'), 'settings.json')),
+      );
+      this.settingsChannel.register();
+
+      // Entries dragged out of a panel into another app (PRD 003, §6).
+      this.dragChannel = new DragOutChannel(page.origin, this.stack.log, sessions);
+      this.dragChannel.register();
 
       // The window draws its own buttons now (§8.2), so the channel that acts
       // on them has to exist before the first frame asks for its state.
@@ -165,8 +224,11 @@ class DesktopApplication {
     this.channel?.dispose();
     this.windowChannel?.dispose();
     this.saveChannel?.dispose();
-    void this.stack
-      .stop()
+    this.settingsChannel?.dispose();
+    this.dragChannel?.dispose();
+    // Copies of remote files opened with an app here (PRD 003, §5) go with the app.
+    void (this.sessions?.cleanUp() ?? Promise.resolve())
+      .then(() => this.stack.stop())
       .catch(() => undefined)
       .then(() => app.exit(0));
   }

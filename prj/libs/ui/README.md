@@ -109,6 +109,36 @@ Icons are a `<symbol>` sprite (`UiIconSprite`, rendered once by `UiWorkbench`);
 `UiIcon` references symbols by a name from the `UiIconName` union, so a typo is
 a compile error rather than an empty box.
 
+## What every file manager has (PRD 003, §5)
+
+The library reports these; what they do is the application's.
+
+- **Sorting.** `UiFileList` with `sortable` draws its headers as buttons that
+  report `sort` with the column's key; the column carrying `sort` shows the
+  order. `UiFileBrowserModel.sortable` turns it on for a browser, which
+  re-emits `sortChange`.
+- **Keys.** `F2` is the `rename` panel key and `Shift`+`Delete`
+  `delete-permanently`, in the list and the grid. `UiFileBrowser` adds
+  `Ctrl`+`Z` (`undo`) and `Ctrl`+`Shift`+`N` (`new-folder`) — never inside a
+  text field — and the mouse's back and forward buttons as `back` / `forward`.
+- **Filter box.** Given `searchPlaceholder`, the toolbar shows
+  `UiSearchField` holding `filterText`; typing is `filterChange`. `Ctrl`+`F`
+  goes there, `Escape` empties it (and, empty, leaves it), `↓` / `Enter` go
+  back to the listing. `UiSearchField.focusToken` asks for focus the way
+  `focusBody` does.
+- **Address bar.** Given `location` (`/docs/prd`), `UiBreadcrumbs` turns into
+  a text field on a click on its blank space, its pencil button, or
+  `Ctrl`+`L`; `Enter` is `pathSubmit`, `Escape` or leaving the field puts the
+  crumbs back, and focus returns where it was.
+- **Requests from a menu.** `filterFocus` and `locationEdit` on the model are
+  tokens: bump one to focus the filter box or edit the path, as the keys do.
+- **Context menus.** A right-click, `Shift`+`F10` or the menu key reports a
+  `UiContextMenuRequest` (`target`, viewport `x`/`y`): `UiFileBrowser.contextMenu`
+  (an entry — selected first if it was not — or `null` for blank space; a
+  document keeps the browser's own menu), `UiTree.contextMenu` and
+  `UiTabBar` / `UiPanelGroup.tabContextMenu`. `UiContextMenu`, when `fixed`
+  and opening from its top-left corner, moves back inside the viewport.
+
 ## Deviations from the mockup
 
 1. **No Tabler.** `docs/ai/VSCODE-UI.md` makes Tabler the house UI kit, and the
@@ -363,6 +393,20 @@ listing, and — as everywhere else — decides nothing about what they do:
   `copy` when `Ctrl` or `Alt` was held — a move otherwise, as in VS Code).
 - Rows and tiles marked **`cut`** are drawn faded, as file managers draw what
   waits to be moved.
+- **Files from outside** (PRD 003, §6) — the system's file manager, or a
+  native drag of this app's — are taken the same way, onto a folder row or the
+  listing's blank space when `dropFolder`, and reported as `filesDrop`
+  (`UiFilesDrop`: the `File`s, their `FileSystemEntry`s read during the drop
+  so a folder can be walked, `target`, `copy`); the group around the browser
+  does not hear of them. `UiPanelGroup` reports the same shape as `filesDrop`
+  beside `fileDrop`.
+- **`nativeDrag`** makes a drag the system's: the browser cancels the page's
+  drag and emits `nativeDragStart` with the sources, for the application to
+  hand to the operating system (the desktop's `webContents.startDrag`).
+- **Thumbnails**: a tile with `thumbnail` (any `<img>` URL) draws it in the
+  icon's place, the same height; `UiIconView.shown` — `itemsShown` on the
+  browser — reports the tiles rendered whenever that set changes, so the
+  application reads pictures only for what is on screen.
 
 ## Quick input (PRD 009, §1)
 

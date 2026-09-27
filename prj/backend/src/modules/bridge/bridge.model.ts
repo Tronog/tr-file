@@ -13,8 +13,10 @@
  * side learning a second dialect.
  */
 
+import type { ArchiveListingDto } from '../archive/archive.model.js';
 import type { AuthStatusDto } from '../auth/auth.model.js';
-import type { DirectoryListingDto, FileDetailsDto } from '../files/models/index.js';
+import type { DirectoryListingDto, FileDetailsDto, FileEntryType, PlacesDto, SearchResultDto } from '../files/models/index.js';
+import type { WatchResultDto } from '../files/watch.service.js';
 import type { ConflictPolicy, OperationJobDto, OperationsInfoDto } from '../operations/operation.model.js';
 
 /** Every operation the bridge offers. */
@@ -35,7 +37,18 @@ export type FsBridgeCommand =
   | 'op-trash'
   | 'op-empty-trash'
   | 'op-status'
-  | 'op-cancel';
+  | 'op-cancel'
+  | 'rename'
+  | 'mkdir'
+  | 'create-file'
+  | 'search'
+  | 'watch'
+  | 'op-delete'
+  | 'op-restore'
+  | 'places'
+  | 'archive-list'
+  | 'op-compress'
+  | 'op-extract';
 
 /**
  * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
@@ -158,7 +171,84 @@ export interface FsOpJobRequest {
   readonly jobId: string;
 }
 
+/**
+ * Things every file manager has (PRD 003, §5) — the commands `/api/fs`
+ * answers as `rename`, `mkdir`, `create`, `search` and `watch`.
+ */
+
+/** Rename or move one entry; `to` is the full root-relative path it will have. */
+export interface FsRenameRequest {
+  readonly command: 'rename';
+  readonly path: string;
+  readonly to: string;
+}
+
+/** Make an empty folder (`mkdir`) or file (`create-file`) called `name` in the folder `path`. */
+export interface FsCreateRequest {
+  readonly command: 'mkdir' | 'create-file';
+  readonly path: string;
+  readonly name: string;
+}
+
+/** Find entries by name beneath the folder `path`. */
+export interface FsSearchRequest {
+  readonly command: 'search';
+  readonly path: string;
+  readonly query: string;
+  readonly limit?: number;
+}
+
+/** Which of the folders on screen changed since the session's last call; `null` starts a session. */
+export interface FsWatchRequest {
+  readonly command: 'watch';
+  readonly watchId: string | null;
+  readonly paths: readonly string[];
+}
+
+export interface FsOpDeleteRequest {
+  readonly command: 'op-delete';
+  readonly paths: readonly string[];
+}
+
+export interface FsOpRestoreRequest {
+  readonly command: 'op-restore';
+  readonly ids: readonly string[];
+}
+
+/** Where to start, and the Places pane (PRD 003, §6) — `GET /api/fs/places`. */
+export interface FsPlacesRequest {
+  readonly command: 'places';
+}
+
+/** One folder of a zip (PRD 003, §6) — `GET /api/archive/list`. */
+export interface FsArchiveListRequest {
+  readonly command: 'archive-list';
+  readonly path: string;
+  readonly inner: string;
+}
+
+/** *Compress* — `POST /api/ops/compress`. */
+export interface FsOpCompressRequest {
+  readonly command: 'op-compress';
+  readonly sources: readonly string[];
+  readonly destination: string;
+  readonly name: string;
+  readonly conflict: ConflictPolicy;
+}
+
+/** *Extract* — `POST /api/ops/extract`. */
+export interface FsOpExtractRequest {
+  readonly command: 'op-extract';
+  readonly path: string;
+  readonly destination: string;
+  readonly conflict: ConflictPolicy;
+}
+
 export type FsBridgeRequest =
+  | FsArchiveListRequest
+  | FsOpCompressRequest
+  | FsOpExtractRequest
+  | FsPlacesRequest
   | FsAuthStatusRequest
   | FsLoginRequest
   | FsLogoutRequest
@@ -173,7 +263,13 @@ export type FsBridgeRequest =
   | FsOpTransferRequest
   | FsOpTrashRequest
   | FsOpEmptyTrashRequest
-  | FsOpJobRequest;
+  | FsOpJobRequest
+  | FsRenameRequest
+  | FsCreateRequest
+  | FsSearchRequest
+  | FsWatchRequest
+  | FsOpDeleteRequest
+  | FsOpRestoreRequest;
 
 /** One chunk of a file, with the metadata the HTTP headers would have carried. */
 export interface FsReadResult {
@@ -191,6 +287,21 @@ export interface FsReadResult {
 /** An upload that has been accepted and is waiting for its bytes. */
 export interface FsUploadBeginResult {
   readonly uploadId: string;
+}
+
+/**
+ * Where an entry is on this machine — for the desktop shell only, to hand it
+ * to the operating system (`FileSystemBridge.localPath`). Never a command: a
+ * host path is not the renderer's business.
+ */
+export interface FsLocalPath {
+  /** Absolute host path of the entry itself; a link is not followed. */
+  readonly absolute: string;
+  readonly name: string;
+  /** What it is, a link judged by what it leads to. */
+  readonly type: FileEntryType;
+  /** A regular file with an execute bit set. */
+  readonly executable: boolean;
 }
 
 /** What each command answers with on success. */
@@ -212,6 +323,17 @@ export interface FsBridgeResults {
   readonly 'op-empty-trash': OperationJobDto;
   readonly 'op-status': OperationJobDto;
   readonly 'op-cancel': OperationJobDto;
+  readonly rename: FileDetailsDto;
+  readonly mkdir: FileDetailsDto;
+  readonly 'create-file': FileDetailsDto;
+  readonly search: SearchResultDto;
+  readonly watch: WatchResultDto;
+  readonly 'op-delete': OperationJobDto;
+  readonly 'op-restore': OperationJobDto;
+  readonly places: PlacesDto;
+  readonly 'archive-list': ArchiveListingDto;
+  readonly 'op-compress': OperationJobDto;
+  readonly 'op-extract': OperationJobDto;
 }
 
 export interface FsBridgeSuccess<T> {

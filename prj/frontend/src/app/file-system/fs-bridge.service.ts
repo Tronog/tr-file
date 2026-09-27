@@ -6,11 +6,16 @@ import type {
   FsDirectoryListing,
   FsDownload,
   FsDownloadResult,
+  FsArchiveListing,
+  FsClipboardFiles,
   FsOperationJob,
+  FsPlaces,
   FsOperationRequest,
   FsOperationsInfo,
+  FsSearchResult,
   FsUpload,
   FsUploadProgress,
+  FsWatchResult,
 } from './file-system.model';
 import { FS_ABORTED, FsError } from './fs-error';
 import type { FsTransport, FsUploadOptions } from './fs-transport';
@@ -40,6 +45,10 @@ interface FsBridgeApi {
   save(request: unknown): Promise<unknown>;
   /** Progress of every save in flight; returns its own unsubscribe. */
   onSaveProgress(listener: (progress: unknown) => void): () => void;
+  /** Starts the system's drag of entries, by root-relative path (PRD 003, §6). */
+  startDrag?(paths: readonly string[]): void;
+  /** Where dropped files are in the root; answers like `invoke`. */
+  localPaths?(files: readonly File[]): Promise<unknown>;
 }
 
 declare global {
@@ -185,6 +194,15 @@ export class FsBridgeService implements FsTransport {
    * Dismissing the dialog is `dismissed`, not an error.
    */
   save(path: string, name: string): FsDownload {
+    return this.saveVia({ command: 'save', path, name });
+  }
+
+  /** A zip of the entries, saved where the user chooses (PRD 003, §6); its size is known only at the end. */
+  saveZip(paths: readonly string[], name: string): FsDownload {
+    return this.saveVia({ command: 'save-zip', paths: [...paths], name });
+  }
+
+  private saveVia(request: { readonly command: 'save' | 'save-zip'; readonly name: string } & Record<string, unknown>): FsDownload {
     const progress = signal<FsUploadProgress>({ loaded: 0, total: null, percent: null });
     const transferId = `save-${crypto.randomUUID()}`;
     const api = this.api;
@@ -208,14 +226,15 @@ export class FsBridgeService implements FsTransport {
       const unsubscribe = api.onSaveProgress((raw) => {
         const update = raw as FsSaveProgress;
         if (update.transferId === transferId) {
-          progress.set(toProgress(update.loaded, update.total));
+          // A zip's total is not known until it is written: loaded, but no percentage.
+          progress.set(update.total > 0 ? toProgress(update.loaded, update.total) : { loaded: update.loaded, total: null, percent: null });
         }
       });
 
       void (async () => {
         try {
           const outcome = FsBridgeService.unwrap<FsSaveOutcome>(
-            await api.save({ command: 'save', transferId, path, name }),
+            await api.save({ ...request, transferId }),
           );
           if (settled) {
             return;
@@ -312,6 +331,88 @@ export class FsBridgeService implements FsTransport {
         fail(new FsError('The upload was cancelled.', 0, FS_ABORTED));
       },
     };
+  }
+
+  /* -- changing names, making entries (PRD 003, §5) ------------------------ */
+
+  async rename(path: string, to: string): Promise<FsDetails> {
+    return this.invoke<FsDetails>({ command: 'rename', path, to });
+  }
+
+  async createFolder(parent: string, name: string): Promise<FsDetails> {
+    return this.invoke<FsDetails>({ command: 'mkdir', path: parent, name });
+  }
+
+  async createFile(parent: string, name: string): Promise<FsDetails> {
+    return this.invoke<FsDetails>({ command: 'create-file', path: parent, name });
+  }
+
+  async search(path: string, query: string, limit?: number): Promise<FsSearchResult> {
+    return this.invoke<FsSearchResult>({ command: 'search', path, query, ...(limit === undefined ? {} : { limit }) });
+  }
+
+  async watch(watchId: string | null, paths: readonly string[]): Promise<FsWatchResult> {
+    return this.invoke<FsWatchResult>({ command: 'watch', watchId, paths: [...paths] });
+  }
+
+  /* -- places and archives (PRD 003, §6) ----------------------------------- */
+
+  async places(): Promise<FsPlaces> {
+    return this.invoke<FsPlaces>({ command: 'places' });
+  }
+
+  async archiveList(path: string, inner: string): Promise<FsArchiveListing> {
+    return this.invoke<FsArchiveListing>({ command: 'archive-list', path, inner });
+  }
+
+  /* -- the user's own computer (PRD 003, §5) -------------------------------- */
+
+  /** The main process can reach the system's shell — for files on this computer. */
+  readonly systemShell = true;
+
+  /** And its clipboard and drags (PRD 003, §6) — for files on this computer, again. */
+  readonly systemFiles = true;
+
+  async readClipboard(): Promise<FsClipboardFiles> {
+    return this.invoke<FsClipboardFiles>({ command: 'clipboard-read' });
+  }
+
+  async writeClipboard(paths: readonly string[], cut: boolean): Promise<void> {
+    await this.invoke({ command: 'clipboard-write', paths: [...paths], cut });
+  }
+
+  /** The main process starts it — for entries on this computer; it knows which window is where. */
+  startDrag(paths: readonly string[]): boolean {
+    const start = this.api?.startDrag;
+    if (start === undefined) {
+      return false;
+    }
+    start([...paths]);
+    return true;
+  }
+
+  async localPaths(files: readonly File[]): Promise<readonly (string | null)[]> {
+    const api = this.api;
+    if (api?.localPaths === undefined || files.length === 0) {
+      return files.map(() => null);
+    }
+    try {
+      return FsBridgeService.unwrap<readonly (string | null)[]>(await api.localPaths([...files]));
+    } catch {
+      return files.map(() => null);
+    }
+  }
+
+  /**
+   * The main process opens it with its default application — a copy of it,
+   * for a file on a remote server — and asks first when it is a program.
+   */
+  async openExternally(path: string): Promise<boolean> {
+    return (await this.invoke<{ opened: boolean }>({ command: 'shell-open', path })).opened;
+  }
+
+  async reveal(path: string): Promise<void> {
+    await this.invoke<{ revealed: true }>({ command: 'shell-reveal', path });
   }
 
   /* -- remote servers (PRD 006, §1) --------------------------------------- */

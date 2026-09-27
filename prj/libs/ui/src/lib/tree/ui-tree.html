@@ -19,6 +19,7 @@
       [attr.tabindex]="node.id === tabStopId() ? 0 : -1"
       (click)="activate.emit(node.id)"
       (dblclick)="open.emit(node.id)"
+      (contextmenu)="onRowContextMenu($event, node)"
     >
       <span class="indent" aria-hidden="true">
         @for (guide of node.guides; track $index) {

@@ -23,6 +23,7 @@ export class ExplorerNavigationFeature {
    */
   open(path: string): void {
     this.parent.select(path);
+    this.parent.explorerFt.select(path);
 
     if (!this.isDirectory(path)) {
       return;
@@ -42,6 +43,6 @@ export class ExplorerNavigationFeature {
   }
 
   private labelFor(path: string): string {
-    return path === '' ? this.parent.mockWorkbench.workspaceName : (path.split('/').at(-1) ?? path);
+    return path === '' ? this.parent.workspaceName() : (path.split('/').at(-1) ?? path);
   }
 }

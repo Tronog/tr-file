@@ -107,7 +107,11 @@ interface MarqueeDrag {
         (dblclick)="activate.emit(item.id)"
         (keydown)="onKeydown($event, index)"
       >
-        <ui-icon [name]="item.icon" [tint]="item.tint" size="xl" />
+        @if (item.thumbnail; as thumbnail) {
+          <img class="item-thumbnail" alt="" draggable="false" decoding="async" [src]="thumbnail" />
+        } @else {
+          <ui-icon [name]="item.icon" [tint]="item.tint" size="xl" />
+        }
         <span class="item-label">{{ item.label }}</span>
       </button>
     }
@@ -159,6 +163,16 @@ export class UiIconView {
   /** A key whose meaning is the application's; see `UiPanelKey`. */
   readonly command = output<UiPanelKey>();
 
+  /**
+   * The tiles now rendered, by id, each time that set changes — all of them,
+   * or the rows near the viewport of a long folder. What an application
+   * making thumbnails needs to know: which pictures are worth reading now.
+   */
+  readonly shown = output<readonly string[]>();
+
+  /** The set `shown` last reported. */
+  private shownKey: string | null = null;
+
   /** The one tile that is keyboard reachable (roving tabindex). */
   protected readonly focusId = computed(() => {
     const items = this.items();
@@ -167,7 +181,7 @@ export class UiIconView {
   });
 
   /** Keys documented on every tile, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace Delete F5 PageUp PageDown Home End';
+  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete F2 F5 PageUp PageDown Home End';
 
   private readonly tiles = viewChildren<ElementRef<HTMLButtonElement>>('tile');
 
@@ -232,6 +246,16 @@ export class UiIconView {
   constructor() {
     afterNextRender(() => this.viewport.attach(this.host));
     inject(DestroyRef).onDestroy(() => this.viewport.dispose());
+
+    // After render, so what is reported is what is on screen.
+    afterRenderEffect(() => {
+      const ids = this.visibleItems().map((item) => item.id);
+      const key = ids.join('\n');
+      if (key !== this.shownKey) {
+        this.shownKey = key;
+        this.shown.emit(ids);
+      }
+    });
 
     // After each render of a long folder: measure the layout the window is
     // computed from — `auto-fill` decides the columns, not this component —
@@ -316,7 +340,10 @@ export class UiIconView {
         this.command.emit({ command: 'refresh', entryId: item.id });
         break;
       case 'Delete':
-        this.command.emit({ command: 'delete', entryId: item.id });
+        this.command.emit({ command: event.shiftKey ? 'delete-permanently' : 'delete', entryId: item.id });
+        break;
+      case 'F2':
+        this.command.emit({ command: 'rename', entryId: item.id });
         break;
       default: {
         if (!isTypeaheadKey(event)) {

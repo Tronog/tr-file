@@ -19,7 +19,7 @@ pnpm hash-password  # reads a password on stdin, prints an AUTH_PASSWORD_HASH
 | --- | --- | --- |
 | `HOST` / `PORT` | `0.0.0.0` / `4310` | Listen address |
 | `API_PREFIX` | `/api` | Mount prefix for every module |
-| `FILES_ROOT` | `process.cwd()` | Absolute path all file access is confined to |
+| `FILES_ROOT` | `process.cwd()` | Absolute path all file access is confined to; `/` on Windows means every drive (PRD 003, §6) |
 | `UPLOAD_MAX_BYTES` | `536870912` (512 MiB) | Per-upload limit |
 | `LOG_LEVEL` | `debug` / `info` in production | Log verbosity |
 | `NODE_ENV` | `development` | Environment |
@@ -85,11 +85,20 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `auth-status` | — | `{ required, authenticated, username }` for this connection |
 | `login` | `username`, `password` | signs this connection in; `401` / `429` as over HTTP |
 | `logout` | — | signs this connection out |
-| `op-info` | — | `GET /api/ops/info`: `{ trash: 'server' \| 'system' }` |
+| `rename` | `path`, `to` | the entry at `to` — as `POST /api/fs/rename` |
+| `mkdir`, `create-file` | `path`, `name` | the new folder / empty file — as `POST /api/fs/mkdir` / `create` |
+| `search` | `path`, `query`, `limit?` | `GET /api/fs/search`'s answer |
+| `watch` | `watchId` (string or `null`), `paths` | `{ watchId, changed }` — as `POST /api/fs/watch` |
+| `op-info` | — | `GET /api/ops/info`: `{ trash: 'server' \| 'system', canRestore }` |
 | `op-copy`, `op-move` | `sources`, `destination`, `conflict` | the job, started — as `POST /api/ops/copy` / `move` |
-| `op-trash` | `paths` | the job, started |
+| `op-trash`, `op-delete` | `paths` | the job, started |
+| `op-restore` | `ids` | the job, started |
 | `op-empty-trash` | — | the job, started |
 | `op-status`, `op-cancel` | `jobId` | the job as it stands; `op-cancel` stops it first |
+| `places` | — | `GET /api/fs/places`'s answer |
+| `archive-list` | `path`, `inner` | `GET /api/archive/list`'s answer |
+| `op-compress` | `sources`, `destination`, `name`, `conflict` | the job, started — as `POST /api/ops/compress` |
+| `op-extract` | `path`, `destination`, `conflict` | the job, started — as `POST /api/ops/extract` |
 
 `dispatch(request, session)` takes the connection's `FsBridgeSession` — on the
 desktop, one per window — and with signing in on refuses every file-system
@@ -115,6 +124,14 @@ from a renderer. `bridge.saveCopy(path, destination, { onProgress, signal })`
 streams a file to a path the desktop shell got from its native Save dialog,
 and removes the partial file if it fails or is aborted.
 
+Nor is `bridge.localPath(path, session)` (PRD 003, §5): it answers
+`{ absolute, name, type, executable }` — where an entry is on this machine,
+what it is (a link judged by what it leads to), and whether it is a file with
+an execute bit — for the desktop shell to open it with the system's default
+app or show it in the file manager. A host path is the main process's
+business, never the renderer's; sign-in, the resolver and `404` apply as for
+any command.
+
 ## `/api/fs` — file-system access (PRD 001, §7)
 
 Paths are **root-relative POSIX, no leading slash**; an omitted or empty `path`
@@ -126,21 +143,27 @@ path reaches the file system.
 | --- | --- | --- |
 | GET | `/api/fs/list?path=` | Directory listing: folders (and links to folders) first, then the rest, in natural order (`file2` before `file10`) |
 | GET | `/api/fs/details?path=` | Full metadata for one entry |
-| GET | `/api/fs/download?path=` | Stream a file (`Accept-Ranges`, `Content-Disposition: attachment`); a range past the end — any range on an empty file — is `416` |
+| GET | `/api/fs/places` | `{ home, places: [{ id, label, kind, path }] }`: where a session starts, and the Places pane (PRD 003, §6) |
+| GET | `/api/fs/download?path=&inline=` | Stream a file (`Accept-Ranges`, `Content-Disposition: attachment`, or `inline` for `inline=true`); a range past the end — any range on an empty file — is `416` |
 | POST | `/api/fs/upload?path=&overwrite=` | Upload one file, `multipart/form-data`, field `file` |
+| POST | `/api/fs/rename` | JSON `{ path, to }`; `to` is the full new path. `200`, the entry's details |
+| POST | `/api/fs/mkdir` | JSON `{ path, name }`: an empty folder in `path`. `201`, its details |
+| POST | `/api/fs/create` | JSON `{ path, name }`: an empty file in `path`. `201`, its details |
+| GET | `/api/fs/search?path=&query=&limit=` | `{ path, query, entries, truncated, scanned }`: entries named like `query` beneath `path` |
+| POST | `/api/fs/watch` | JSON `{ watchId, paths }` → `{ watchId, changed }`: which of those folders changed since the last call |
 
 Successful JSON responses are `{ "data": … }`; errors are
 `{ "error": { "code", "message", "details"? } }`.
 
 | Status | `code` | When |
 | --- | --- | --- |
-| 400 | `BAD_REQUEST` | Malformed path, listing a file, downloading a directory, upload without a `file` part |
+| 400 | `BAD_REQUEST` | Malformed path or body, listing a file, downloading a directory, upload without a `file` part, a bad name, renaming the root or a folder into itself, renaming across disks, an empty search, more than 256 watched folders |
 | 401 | `UNAUTHORIZED` | No session, or a wrong username or password |
 | 403 | `CSRF_REJECTED` | A write without the `X-TR-File-Request` header, or from another site |
 | 429 | `TOO_MANY_REQUESTS` | Too many failed sign-ins |
 | 403 | `FORBIDDEN` | Path escapes `FILES_ROOT`, reaches into the server's trash, or the OS denies access |
 | 404 | `NOT_FOUND` | No such path |
-| 409 | `CONFLICT` | Upload target exists and `overwrite` is not `true`; a copy or move with `conflict: 'fail'` onto taken names (`details.conflicts`) |
+| 409 | `CONFLICT` | Upload target exists and `overwrite` is not `true`; a rename, new folder or new file onto a taken name; a copy or move with `conflict: 'fail'` onto taken names (`details.conflicts`) |
 | 413 | `PAYLOAD_TOO_LARGE` | Upload exceeds `UPLOAD_MAX_BYTES` |
 | 500 | `INTERNAL_ERROR` | Anything else |
 
@@ -166,12 +189,112 @@ Notes worth knowing before you call it:
 - **Listings `lstat` in parallel**, 64 entries at a time, so a large folder or
   a network mount is not one syscall round trip per entry.
 
+Since PRD 003, §5 — the things every file manager has:
+
+- **Rename** takes the entry as itself: a symlink is renamed as a link, never
+  followed. `to` is the whole new path, so the same call moves an entry to
+  another folder (Undo of a move uses it). Refused: the root on either side,
+  anything reserved (`403`), a folder into itself (`400`), a missing folder
+  (`404`) or one that is a file (`400`), an unsafe name (`400`), and a taken
+  name (`409`) — unless it is the same entry, which is a case-only rename on a
+  case-insensitive disk. Across file systems it is a `400`: that is a move,
+  with progress, and `/api/ops/move` does it.
+- **New folder / new file** check the name as an upload does; the file is
+  opened with `wx`, so a name taken in the meantime is a `409`, never a
+  truncated file.
+- **Search** is case-insensitive; a query with `*` or `?` is a glob over the
+  whole name, anything else a substring (an empty one is a `400`). The walk is
+  breadth-first, so shallow matches come first, reads 16 folders at a time,
+  never walks into a linked folder (a link is still matched, with its
+  `targetType`), skips the server's trash, and passes over folders it cannot
+  read. `limit` defaults to 500 and is clamped to 2000; the search stops and
+  says `truncated: true` at the limit, after 200 000 entries or after 10
+  seconds. `scanned` is how many entries it looked at.
+- **Watch** is auto-refresh by polling — the frontend calls it every couple of
+  seconds with the folders it shows. `watchId: null` starts a session; each
+  call replaces the session's folders (at most 256; paths that are not a
+  folder in the root are passed over) and answers the ones that changed since
+  the previous call, as they were asked. An id the server does not know — it
+  restarted, or the session sat idle for 60 s — starts a new session and
+  answers *every* folder as changed, since changes may have been missed.
+  Folders are watched with `fs.watch` (not recursive: a listing only shows
+  direct children), shared between sessions and closed with the last one; a
+  watcher that fails, or a folder deleted and made again, counts as a change.
+  Where the system has no watcher to give (the inotify limit), the folder's
+  `mtime` + `ctime` are compared on each call instead. `App.close()` stops
+  every watcher.
+- **`inline=true`** (the exact string) serves `Content-Disposition: inline`
+  with the same file name, so a browser tab shows a PDF, an image or a video
+  instead of saving it, always with `X-Content-Type-Options: nosniff`. It is
+  the app's own origin, with the session cookie, so anything that can run
+  script as a document — HTML, XHTML, SVG, XML — or whose type is unknown also
+  gets `Content-Security-Policy: sandbox`: inert, with an opaque origin.
+
 The frontend client for this API is `prj/frontend/src/app/file-system/`
 (`FileSystemService` plus its read and transfer feature classes).
 
+## The whole file system, and places (PRD 003, §6)
+
+`FILES_ROOT` may be `/`: the desktop's default, where the root is the whole
+machine. The resolver does not add a second separator to a root that ends in
+one, so `/home/me` is inside `/`. On Windows, where there is no one root,
+`FILES_ROOT=/` (or `\`) makes the root **the list of drives**
+(`FilePathResolver.drives()`): a path's first segment is a drive —
+`C:/Users/me` is `C:\Users\me` — the root lists the drives that answer, and
+a drive itself, like the root, cannot be renamed, moved or trashed
+(`isRoot`). A colon after the drive (a drive-relative path, an NTFS stream)
+is a `400`, and nothing leaves the drive it names. Searching the whole of `/`
+never walks into `/proc`, `/sys`, `/dev` or `/run`.
+
+`GET /api/fs/places` answers where a session starts (`home`, root-relative)
+and the places to list: the root first — named by the host, "Files" on a
+server — then whatever the `PlacesProvider` `App` was given names (the
+desktop's home, user folders, drives and mounts), each proven to be a folder
+inside the root, host paths never disclosed. A server has no provider and
+lists its root alone.
+
+`FileSystemBridge.fromLocalPaths(absolute[])` — like `localPath`, a method for
+the desktop shell, never a command — answers the root-relative path of each
+host path the operating system handed it (a file dropped on the window, a
+file on the system clipboard), or `null`.
+
+## `/api/archive` — zips (PRD 003, §6)
+
+The `archive` module: a dependency-free streaming zip writer and a
+random-access reader (`src/modules/archive/zip/`, ZIP64 both ways, deflate
+and store, CRC and size checked as entries are read), and `ArchiveService`
+over them.
+
+| Method | Path | Answers with |
+| --- | --- | --- |
+| `GET` | `/api/archive/list?path=&inner=` | `{ path, inner, entries: [{ name, path, type, size, modifiedAt }], unsafe }` — one folder of a zip, folders first; folders only deeper entries name are listed too |
+| `GET` | `/api/archive/zip?path=a&path=b[&name=]` | the entries as one zip, streamed as it is written (chunked, no length): how a folder, or a selection, is downloaded |
+
+Compress and extract are jobs, at `/api/ops` beside the others:
+
+- **`POST /api/ops/compress`** `{ sources, destination, name, conflict }`: a
+  zip of the sources as `destination/name`, folders with everything in them
+  and links as links. Written to a hidden `.name.<rand>.part` and renamed
+  into place when complete, so a cancelled compress leaves nothing. Refused:
+  the root, two sources of one name, a zip written into what it zips.
+- **`POST /api/ops/extract`** `{ path, destination, conflict }`: an archive
+  with one entry at its top is extracted straight into `destination`; one
+  with several goes into a folder named after the archive, so loose files
+  never scatter. `conflict` applies to that one top name, as a copy's does.
+  An archive's names are never trusted: an entry that would land outside the
+  folder it is extracted into — `..`, an absolute path, a drive — is skipped
+  and counted, every file is written new (`wx`), links are made last and only
+  when they lead somewhere inside what was extracted, and a folder that turns
+  out to lead elsewhere on disk is not written into. Modes (without set-id
+  bits) and times are kept. Encrypted archives are refused.
+
+Both report `outcome` — the first source and the zip made, the archive and
+what it made at the top — which Undo trashes.
+
 ## `/api/ops` — file operations (PRD 005, §1)
 
-Copy, move, move to trash and empty trash, in `src/modules/operations`. Each is
+Copy, move, move to trash and empty trash, in `src/modules/operations` — and,
+since PRD 003 §5, delete for good and restore from the trash. Each is
 a **background job**: starting one checks everything that can be checked before
 a file is touched and answers `202` with the job at once; the client asks for it
 again to see how far it has got — the frontend asks once a second, so progress
@@ -179,19 +302,27 @@ costs one small message a second however fast the job runs — and may cancel it
 
 | Method | Path | Body | Answers with |
 | --- | --- | --- | --- |
-| `GET` | `/api/ops/info` | — | `{ trash: 'server' \| 'system' }` |
+| `GET` | `/api/ops/info` | — | `{ trash: 'server' \| 'system', canRestore }` |
 | `POST` | `/api/ops/copy`, `/api/ops/move` | `{ sources: string[], destination, conflict? }` | `202`, the job |
-| `POST` | `/api/ops/trash` | `{ paths: string[] }` | `202`, the job |
+| `POST` | `/api/ops/trash`, `/api/ops/delete` | `{ paths: string[] }` | `202`, the job |
+| `POST` | `/api/ops/restore` | `{ ids: string[] }` | `202`, the job |
 | `POST` | `/api/ops/empty-trash` | — | `202`, the job |
 | `GET` | `/api/ops/jobs/:id` | — | the job |
 | `POST` | `/api/ops/jobs/:id/cancel` | — | the job; one that has ended stays as it ended |
 
 A job is `{ id, kind, state, title, startedAt, finishedAt, totalBytes, doneBytes,
-totalItems, doneItems, current, skipped, error, affected }`: `state` is
+totalItems, doneItems, current, skipped, error, affected, outcome }`: `kind` is
+`copy`, `move`, `trash`, `empty-trash`, `delete`, `restore`, `compress` or `extract`; `state` is
 `running`, `done`, `failed` or `cancelled`; the totals are `null` while unknown;
 `error` is `{ code, message }` when it failed; `affected` names the folders
 whose listings it changed, for a client to read again. Finished jobs are kept
 for ten minutes.
+
+`outcome` is what Undo needs: `{ source, target }` pairs, filled in as the
+top-level entries are done — a copy's source and the copy made of it, a
+move's source and where it is now, a trashed entry and the id the trash can
+restore it by (only when the trash hands one out), a restored id and the path
+it is back at. Skipped entries have none; delete and empty trash have none.
 
 - **`conflict`** says what to do with a name that is taken at the destination:
   `fail` (the default) refuses before anything is done with `409` and
@@ -206,10 +337,23 @@ for ten minutes.
   the OS allows. **Moves** are a `rename`, or a copy then delete across file
   systems.
 - **Cancelling** stops the job between two chunks: what was fully copied
-  stays, the file being written is removed.
+  stays, the file being written is removed. Trash, delete and restore stop
+  between two entries.
+- **Delete** removes entries for good (`rm`, recursively; a link as a link).
+  It is refused up front as trash is: the root, anything in the trash
+  (emptying it is how that goes), and anything that is not there (`404`).
 - **The trash** is a `TrashProvider`. A server keeps its own: `.tr-file-trash`
   in the root, laid out as the freedesktop.org trash is (`files/` and, beside
   each entry, `info/<name>.json` saying where it came from and when). The
   resolver reserves that name, so it is in no listing and no `/api/fs` or
   `/api/ops` path can reach into it. The desktop hands `App` the system trash
   instead (`new App(config, logger, version, { trash })`; see `prj/desktop`).
+- **Restore** puts trashed entries back by id — a `TrashProvider` that can
+  (`originOf` + `restore`) says so as `canRestore`. The server's trash can: an
+  id is the entry's name under `files/`, and its `info/<id>.json` says where it
+  came from. A folder that has gone since is made again (the deepest one still
+  there is proven inside the root first); a name taken since keeps both, as
+  `name copy.ext`, the way a copy's `rename` does. The record goes with the
+  entry. A trash that cannot restore (the desktop's system trash — the user's
+  own file manager restores from it) refuses with `400`; an unknown id is a
+  `404`, before anything is moved.

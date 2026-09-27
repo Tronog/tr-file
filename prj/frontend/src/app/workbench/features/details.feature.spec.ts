@@ -258,22 +258,27 @@ describe('DetailsFeature', () => {
   });
 
   describe('actions', () => {
-    it('offers a download for a file', async () => {
+    it('offers a download, opening it elsewhere and renaming for a file', async () => {
       await selectAndFlush('README.md');
 
+      // No Reveal in a browser: there is no file manager to show it in (PRD 003, §5).
       expect(workbench.detailsFt.actions().map((action) => action.id)).toEqual([
         'download',
+        'open-external',
+        'rename',
         'copy-path',
         'refresh',
       ]);
+      expect(workbench.detailsFt.actions()[1]?.label).toBe('Open in New Browser Tab');
     });
 
-    it('offers opening and uploading for a directory', async () => {
+    it('offers opening, uploading and renaming for a directory', async () => {
       await selectAndFlush('docs', fsDirectoryDetails('docs'));
 
       expect(workbench.detailsFt.actions().map((action) => action.id)).toEqual([
         'open',
         'upload',
+        'rename',
         'copy-path',
         'refresh',
       ]);

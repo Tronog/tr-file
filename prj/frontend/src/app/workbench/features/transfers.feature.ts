@@ -23,6 +23,12 @@ interface UploadBatch {
   queue: Promise<unknown>;
 }
 
+/** One file of a folder being uploaded: the folder it goes in, relative to where the upload lands. */
+interface TreeFile {
+  readonly folder: string;
+  readonly file: File;
+}
+
 /** One transfer the workbench is tracking, live progress included. */
 interface TransferRecord {
   readonly id: string;
@@ -83,11 +89,151 @@ export class TransfersFeature {
     }
   }
 
+  /**
+   * What was dropped on a panel (PRD 003, §6): plain files are uploaded as
+   * they are; a dropped *folder* is walked and uploaded with everything in
+   * it, its folders made first.
+   */
+  uploadDropped(directoryPath: string, files: readonly File[], entries: readonly FileSystemEntry[]): void {
+    if (!entries.some((entry) => entry.isDirectory)) {
+      this.uploadFiles(directoryPath, files);
+      return;
+    }
+    void TransfersFeature.walk(entries).then(
+      ({ folders, files: found }) => this.uploadTree(directoryPath, folders, found),
+      async (error: unknown) =>
+        this.parent.modal.message({
+          severity: 'error',
+          message: 'Could not read the dropped folder.',
+          detail: error instanceof Error ? error.message : String(error),
+        }),
+    );
+  }
+
+  /**
+   * A folder chosen in the folder picker: its files, each with the path
+   * under the chosen folder the browser gives it (`webkitRelativePath`).
+   */
+  uploadFolder(directoryPath: string, files: readonly File[]): void {
+    const folders = new Set<string>();
+    const found: TreeFile[] = [];
+    for (const file of files) {
+      const relative = (file.webkitRelativePath || file.name).split('/').filter(Boolean);
+      const folder = relative.slice(0, -1).join('/');
+      for (let depth = 1; depth <= relative.length - 1; depth += 1) {
+        folders.add(relative.slice(0, depth).join('/'));
+      }
+      found.push({ folder, file });
+    }
+    void this.uploadTree(directoryPath, [...folders], found);
+  }
+
+  /**
+   * Makes the folders of a tree — shallowest first; one that is there
+   * already is used as it is, as file managers merge — then uploads each
+   * file into its folder as one batch, so taken names are asked about once
+   * "for all". Files under a folder that could not be made are not sent.
+   */
+  private async uploadTree(directoryPath: string, folders: readonly string[], files: readonly TreeFile[]): Promise<void> {
+    const join = (folder: string): string =>
+      folder === '' ? directoryPath : directoryPath === '' ? folder : `${directoryPath}/${folder}`;
+    const failed: string[] = [];
+    const sorted = [...new Set(folders)].sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
+    for (const folder of sorted) {
+      if (failed.some((bad) => folder === bad || folder.startsWith(`${bad}/`))) {
+        continue;
+      }
+      const at = folder.lastIndexOf('/');
+      const parent = join(at === -1 ? '' : folder.slice(0, at));
+      const name = folder.slice(at + 1);
+      try {
+        await this.parent.fileSystem.editFt.createFolder(parent, name);
+      } catch (error) {
+        const failure = FsError.from(error);
+        const there = failure.code === 'CONFLICT' ? await this.isFolder(join(folder)) : false;
+        if (!there) {
+          failed.push(folder);
+        }
+      }
+    }
+    // The top folders are new in the folder the upload lands in.
+    this.parent.fsDataFt.invalidateListing(directoryPath);
+
+    const sendable = files.filter(({ folder }) => !failed.some((bad) => folder === bad || folder.startsWith(`${bad}/`)));
+    const batch: UploadBatch = { size: sendable.length, forAll: null, queue: Promise.resolve() };
+    for (const { folder, file } of sendable) {
+      this.startUpload(join(folder), file, batch);
+    }
+    if (failed.length > 0) {
+      await this.parent.modal.message({
+        severity: 'error',
+        message:
+          failed.length === 1
+            ? `Could not make the folder '${failed[0]}', so what goes in it was not uploaded.`
+            : `Could not make ${failed.length} folders, so what goes in them was not uploaded.`,
+        detail: 'A file of the same name may be in the way, or the folder cannot be written to.',
+      });
+    }
+  }
+
+  private async isFolder(path: string): Promise<boolean> {
+    try {
+      return (await this.parent.fileSystem.readFt.details(path)).type === 'directory';
+    } catch {
+      return false;
+    }
+  }
+
+  /** Every folder and file under dropped entries, as paths relative to where they were dropped. */
+  private static async walk(entries: readonly FileSystemEntry[]): Promise<{ folders: string[]; files: TreeFile[] }> {
+    const folders: string[] = [];
+    const files: TreeFile[] = [];
+    const visit = async (entry: FileSystemEntry, folder: string): Promise<void> => {
+      if (entry.isFile) {
+        const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
+        files.push({ folder, file });
+        return;
+      }
+      if (!entry.isDirectory) {
+        return;
+      }
+      const path = folder === '' ? entry.name : `${folder}/${entry.name}`;
+      folders.push(path);
+      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      // A reader answers a batch at a time, and an empty batch when it is done.
+      for (;;) {
+        const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
+        if (batch.length === 0) {
+          break;
+        }
+        for (const child of batch) {
+          await visit(child, path);
+        }
+      }
+    };
+    for (const entry of entries) {
+      await visit(entry, '');
+    }
+    return { folders, files };
+  }
+
   /** Saves a file to the user's disk, tracked as a row like any upload. */
   download(path: string, name: string): void {
+    this.track(this.parent.fileSystem.transferFt.save(path, name), path, name);
+  }
+
+  /**
+   * Saves a folder, or several entries, as one zip (PRD 003, §6) — a row
+   * like any download, its size counted as it is written.
+   */
+  downloadZip(paths: readonly string[], name: string): void {
+    const from = paths.length === 1 ? (paths[0] as string) : `${paths.length} items`;
+    this.track(this.parent.fileSystem.transferFt.saveZip(paths, name), from, name);
+  }
+
+  private track(download: FsDownload, path: string, name: string): void {
     this.sequence += 1;
     const id = `download-${this.sequence}`;
-    const download: FsDownload = this.parent.fileSystem.transferFt.save(path, name);
 
     this.records.update((records) => [
       {
@@ -301,11 +447,14 @@ export class TransfersFeature {
           cancellable: true,
           progress: progress.percent,
           statusLabel:
-            progress.percent === null
-              ? upload
-                ? 'uploading…'
-                : 'starting…'
-              : `${progress.percent}% · ${files.formatBytes(progress.loaded)}`,
+            progress.percent !== null
+              ? `${progress.percent}% · ${files.formatBytes(progress.loaded)}`
+              : progress.loaded > 0
+                ? // A zip's size is known only when it is done: what has gone so far.
+                  `${files.formatBytes(progress.loaded)} so far`
+                : upload
+                  ? 'uploading…'
+                  : 'starting…',
         };
     }
   }

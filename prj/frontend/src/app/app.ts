@@ -4,7 +4,6 @@ import { AuthService } from './auth/auth.service';
 import { Login } from './auth/login/login';
 import { ModalHost } from './modal/modal-host';
 import { ModalService } from './modal/modal.service';
-import { RemoteConnectionService } from './file-system/remote-connection.service';
 
 /**
  * The shell around every screen: the workbench once there is a session — or
@@ -21,12 +20,9 @@ import { RemoteConnectionService } from './file-system/remote-connection.service
 export class App {
   protected readonly auth = inject(AuthService);
   protected readonly modal = inject(ModalService);
-  private readonly connection = inject(RemoteConnectionService);
-
   constructor() {
     // Which backend this window talks to — its own, or a remote server
-    // (PRD 006, §1) — is asked for alongside whether to sign in.
-    void this.connection.load();
+    // (PRD 006, §1) — is known already: the app initializer asked.
     void this.auth.start();
   }
 }

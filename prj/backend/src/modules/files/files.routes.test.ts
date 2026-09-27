@@ -191,3 +191,144 @@ describe('POST /api/fs/upload', () => {
     assert.equal(await errorCodeOf(response), 'FORBIDDEN');
   });
 });
+
+/** PRD 003, §5 — a JSON write, with the CSRF header every write carries. */
+function postJson(path: string, body: unknown): Promise<Response> {
+  return fetch(`${base}${path}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json', 'X-TR-File-Request': '1' },
+  });
+}
+
+describe('GET /api/fs/download?inline=true', () => {
+  it('serves inline, keeping the file name, and never sniffed', async () => {
+    await writeFile(join(root, 'photo.png'), 'not really a png');
+
+    const response = await fetch(`${base}/download?path=photo.png&inline=true`);
+    await response.arrayBuffer();
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-disposition'), `inline; filename="photo.png"; filename*=UTF-8''photo.png`);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('content-security-policy'), null);
+  });
+
+  it('sandboxes what could run script, and what it cannot name', async () => {
+    await writeFile(join(root, 'page.html'), '<script>alert(1)</script>');
+    await writeFile(join(root, 'drawing.svg'), '<svg/>');
+    await writeFile(join(root, 'mystery.qqq'), '?');
+
+    for (const name of ['page.html', 'drawing.svg', 'mystery.qqq']) {
+      const response = await fetch(`${base}/download?path=${name}&inline=true`);
+      await response.arrayBuffer();
+      assert.equal(response.headers.get('content-security-policy'), 'sandbox', name);
+      assert.match(response.headers.get('content-disposition') ?? '', /^inline;/);
+    }
+  });
+
+  it('is an attachment for anything but the exact string "true"', async () => {
+    for (const inline of ['1', 'TRUE', 'yes', '']) {
+      const response = await fetch(`${base}/download?path=page.html&inline=${inline}`);
+      await response.arrayBuffer();
+      assert.match(response.headers.get('content-disposition') ?? '', /^attachment;/, inline);
+    }
+  });
+});
+
+describe('POST /api/fs/rename, /mkdir, /create', () => {
+  it('makes a folder and a file with 201, and renames with 200', async () => {
+    const folder = await postJson('/mkdir', { path: '', name: 'made' });
+    assert.equal(folder.status, 201);
+    assert.equal(((await folder.json()) as { data: { path: string; type: string } }).data.type, 'directory');
+
+    const file = await postJson('/create', { path: 'made', name: 'empty.md' });
+    assert.equal(file.status, 201);
+    assert.equal(((await file.json()) as { data: { path: string } }).data.path, 'made/empty.md');
+
+    const renamed = await postJson('/rename', { path: 'made/empty.md', to: 'made/full.md' });
+    assert.equal(renamed.status, 200);
+    assert.equal(((await renamed.json()) as { data: { path: string } }).data.path, 'made/full.md');
+    assert.equal(await readFile(join(root, 'made', 'full.md'), 'utf8'), '');
+  });
+
+  it('answers 409 for a taken name and 400 for a malformed body', async () => {
+    const taken = await postJson('/create', { path: 'made', name: 'full.md' });
+    assert.equal(taken.status, 409);
+    assert.equal(await errorCodeOf(taken), 'CONFLICT');
+
+    assert.equal((await postJson('/rename', { path: 'made/full.md' })).status, 400);
+    assert.equal((await postJson('/mkdir', { path: '', name: 3 })).status, 400);
+    assert.equal((await postJson('/rename', { path: 'made', to: 'made/inner' })).status, 400);
+  });
+
+  it('needs the CSRF header', async () => {
+    const response = await fetch(`${base}/mkdir`, {
+      method: 'POST',
+      body: JSON.stringify({ path: '', name: 'sneaky' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    assert.equal(response.status, 403);
+  });
+});
+
+describe('GET /api/fs/search', () => {
+  it('answers matches with the walk’s bookkeeping', async () => {
+    const response = await fetch(`${base}/search?path=&query=${encodeURIComponent('*.md')}`);
+    const body = (await response.json()) as {
+      data: { path: string; query: string; entries: { path: string }[]; truncated: boolean; scanned: number };
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(body.data.query, '*.md');
+    assert.deepEqual(body.data.entries.map((entry) => entry.path), ['made/full.md']);
+    assert.equal(body.data.truncated, false);
+    assert.ok(body.data.scanned > 0);
+  });
+
+  it('clamps a big limit and refuses a bad one or an empty query', async () => {
+    assert.equal((await fetch(`${base}/search?query=a&limit=999999`)).status, 200);
+    assert.equal((await fetch(`${base}/search?query=a&limit=0`)).status, 400);
+    assert.equal((await fetch(`${base}/search?query=a&limit=ten`)).status, 400);
+    assert.equal((await fetch(`${base}/search?query=%20`)).status, 400);
+    assert.equal((await fetch(`${base}/search`)).status, 400);
+  });
+
+  it('truncates at the limit', async () => {
+    const response = await fetch(`${base}/search?query=.&limit=1`);
+    const body = (await response.json()) as { data: { entries: unknown[]; truncated: boolean } };
+
+    assert.equal(body.data.entries.length, 1);
+    assert.equal(body.data.truncated, true);
+  });
+});
+
+describe('POST /api/fs/watch', () => {
+  it('opens a session, then reports a change in a watched folder', async () => {
+    const first = (await (await postJson('/watch', { watchId: null, paths: ['made'] })).json()) as {
+      data: { watchId: string; changed: string[] };
+    };
+    assert.deepEqual(first.data.changed, []);
+
+    await writeFile(join(root, 'made', 'fresh.txt'), 'x');
+
+    const deadline = Date.now() + 3000;
+    let changed: string[] = [];
+    while (!changed.includes('made') && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const next = (await (await postJson('/watch', { watchId: first.data.watchId, paths: ['made'] })).json()) as {
+        data: { watchId: string; changed: string[] };
+      };
+      assert.equal(next.data.watchId, first.data.watchId);
+      changed = next.data.changed;
+    }
+    assert.deepEqual(changed, ['made']);
+  });
+
+  it('refuses a malformed body and too many folders', async () => {
+    assert.equal((await postJson('/watch', { watchId: 5, paths: [] })).status, 400);
+    assert.equal((await postJson('/watch', { paths: 'made' })).status, 400);
+    assert.equal((await postJson('/watch', { paths: Array.from({ length: 257 }, () => 'made') })).status, 400);
+    assert.equal((await postJson('/watch', { paths: [] })).status, 200);
+  });
+});

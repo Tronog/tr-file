@@ -19,7 +19,7 @@ export class PanelLayoutFeature {
   private readonly maximized = signal<string | null>(null);
 
   constructor(parent: WorkbenchService) {
-    this.tree = signal(parent.mockWorkbench.layout.grid);
+    this.tree = signal(parent.layout.grid);
   }
 
   /** The layout rendered by `ui-panel-grid`. */

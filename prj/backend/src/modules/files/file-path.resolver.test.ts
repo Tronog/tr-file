@@ -57,3 +57,51 @@ describe('FilePathResolver', () => {
     assert.equal(resolver.toRootRelative('/etc/passwd'), null);
   });
 });
+
+describe('FilePathResolver over the whole file system (PRD 003, §6)', () => {
+  it('resolves beneath / without a doubled separator', () => {
+    const resolver = new FilePathResolver('/');
+    assert.equal(resolver.resolve('home/me').absolute, '/home/me');
+    assert.equal(resolver.resolve('home/me').relative, 'home/me');
+    assert.equal(resolver.resolve('').absolute, '/');
+    assert.equal(resolver.toRootRelative('/media/usb'), 'media/usb');
+    assert.equal(resolver.toRootRelative('/'), '');
+    assert.equal(resolver.resolve('../..').relative, '');
+  });
+});
+
+describe('FilePathResolver.drives (PRD 003, §6)', () => {
+  const resolver = FilePathResolver.drives();
+
+  it('has the list of drives as its root, which is nothing on disk', () => {
+    const root = resolver.resolve('');
+    assert.equal(root.absolute, '');
+    assert.equal(root.relative, '');
+    assert.equal(resolver.isRoot(''), true);
+    assert.equal(resolver.isRoot('C:'), true);
+    assert.equal(resolver.isRoot('C:/Users'), false);
+  });
+
+  it('maps the first segment to a drive', () => {
+    assert.equal(resolver.resolve('C:').absolute, 'C:\\');
+    assert.equal(resolver.resolve('c:/Users/me').absolute, 'C:\\Users\\me');
+    assert.equal(resolver.resolve('c:/Users/me').relative, 'C:/Users/me');
+    assert.equal(resolver.resolve('D:\\Photos\\2024').relative, 'D:/Photos/2024');
+  });
+
+  it('stays on the drive for traversal', () => {
+    assert.equal(resolver.resolve('C:/../../Windows').relative, 'C:/Windows');
+  });
+
+  it('refuses what is not a drive, and a colon after one', () => {
+    assert.throws(() => resolver.resolve('Users'), (error: unknown) => error instanceof HttpError && error.status === 404);
+    assert.throws(() => resolver.resolve('C:/D:/x'), (error: unknown) => error instanceof HttpError && error.status === 400);
+    assert.throws(() => resolver.resolve('C:/a.txt:stream'), (error: unknown) => error instanceof HttpError && error.status === 400);
+  });
+
+  it('reports host paths on any drive, and nothing else', () => {
+    assert.equal(resolver.toRootRelative('d:\\Music\\'), 'D:/Music');
+    assert.equal(resolver.toRootRelative('E:\\'), 'E:');
+    assert.equal(resolver.toRootRelative('\\\\server\\share\\x'), null);
+  });
+});

@@ -24,7 +24,9 @@ import { UI_TAB_MIME } from '../models';
  */
 export const UI_LOADING_RAIL_DELAY_MS = 150;
 import type {
+  UiContextMenuRequest,
   UiDropZone,
+  UiFilesDrop,
   UiPanelGroupModel,
   UiTabDragData,
   UiTabDrop,
@@ -126,6 +128,9 @@ export class UiPanelGroup {
   /** A tab was double-clicked; see `UiTabBar.tabDoubleClick`. */
   readonly tabDoubleClick = output<string>();
 
+  /** A tab's context menu was asked for; see `UiTabBar.tabContextMenu`. */
+  readonly tabContextMenu = output<UiContextMenuRequest>();
+
   /**
    * A press landed on the body's blank space — below the last row, beside the
    * tiles, on the "no folder opened" placeholder (PRD 001, §6.3.1). Nothing
@@ -148,6 +153,14 @@ export class UiPanelGroup {
 
   /** OS files were dropped on the group's body. Never emitted empty. */
   readonly fileDrop = output<readonly File[]>();
+
+  /**
+   * The same drop as `fileDrop`, with what `fileDrop` cannot carry
+   * (PRD 003, §6): the dropped items as file-system entries, read during the
+   * drop, so a dropped *folder* can be walked; and whether `Ctrl` or `Alt`
+   * was held. `target` is always `null` — the group's folder.
+   */
+  readonly filesDrop = output<UiFilesDrop>();
 
   /** Any pointer press inside the group asks the application to focus it. */
   readonly focusRequest = output<void>();
@@ -427,6 +440,10 @@ export class UiPanelGroup {
       const files = transfer && this.acceptFiles() ? Array.from(transfer.files) : [];
       if (files.length > 0) {
         this.fileDrop.emit(files);
+        const entries = Array.from(transfer?.items ?? [])
+          .map((item) => (item.kind === 'file' ? item.webkitGetAsEntry?.() : null))
+          .filter((entry): entry is FileSystemEntry => entry !== null && entry !== undefined);
+        this.filesDrop.emit({ files, entries, target: null, copy: event.ctrlKey || event.altKey });
       }
 
       return;

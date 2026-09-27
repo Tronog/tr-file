@@ -3,11 +3,26 @@ import { Router, type Request, type Response } from 'express';
 import type { Readable } from 'node:stream';
 
 import { HttpError, asyncHandler, type Logger, type RouteModule } from '../../core/index.js';
-import type { FilesService } from './files.service.js';
+import { SEARCH_LIMITS, type FilesService } from './files.service.js';
 import type { FileDetails } from './models/index.js';
+import type { PlacesService } from './places.service.js';
+import type { WatchService } from './watch.service.js';
 
 /** Name of the single multipart part carrying the uploaded file. */
 const UPLOAD_FIELD = 'file';
+
+/**
+ * Types that run script when a browser opens them as a document. Shown inline
+ * they are served on the app's own origin, with its session cookie — so they
+ * get `Content-Security-Policy: sandbox`: inert, and an opaque origin.
+ */
+const ACTIVE_TYPES: ReadonlySet<string> = new Set([
+  'text/html',
+  'application/xhtml+xml',
+  'image/svg+xml',
+  'application/xml',
+  'text/xml',
+]);
 
 /** Listener for events that must be observed but carry no useful action. */
 const ignore = (): void => {};
@@ -26,6 +41,8 @@ export class FilesRoutes implements RouteModule {
   constructor(
     private readonly filesService: FilesService,
     private readonly logger: Logger,
+    private readonly watches: WatchService,
+    private readonly placesService: PlacesService,
   ) {
     this.router = Router();
     this.register();
@@ -41,12 +58,86 @@ export class FilesRoutes implements RouteModule {
       }),
     );
 
+    // GET /api/fs/places — where to start, and the Places pane (PRD 003, §6).
+    this.router.get(
+      '/places',
+      asyncHandler(async (_req, res) => {
+        res.json({ data: await this.placesService.places() });
+      }),
+    );
+
     // GET /api/fs/details?path=... — full metadata for a single entry.
     this.router.get(
       '/details',
       asyncHandler(async (req, res) => {
         const details = await this.filesService.getDetails(FilesRoutes.readPath(req));
         res.json({ data: details.toJSON() });
+      }),
+    );
+
+    // GET /api/fs/search?path=&query=&limit= — find entries by name beneath a folder.
+    this.router.get(
+      '/search',
+      asyncHandler(async (req, res) => {
+        const result = await this.filesService.search(
+          FilesRoutes.readPath(req),
+          FilesRoutes.readQueryString(req, 'query') ?? '',
+          FilesRoutes.readLimit(req),
+        );
+        res.json({ data: result.toJSON() });
+      }),
+    );
+
+    // POST /api/fs/rename { path, to } — rename or move one entry.
+    this.router.post(
+      '/rename',
+      asyncHandler(async (req, res) => {
+        const details = await this.filesService.rename(
+          FilesRoutes.readBodyString(req, 'path'),
+          FilesRoutes.readBodyString(req, 'to'),
+        );
+        res.json({ data: details.toJSON() });
+      }),
+    );
+
+    // POST /api/fs/mkdir { path, name } — make an empty folder.
+    this.router.post(
+      '/mkdir',
+      asyncHandler(async (req, res) => {
+        const details = await this.filesService.createFolder(
+          FilesRoutes.readBodyString(req, 'path'),
+          FilesRoutes.readBodyString(req, 'name'),
+        );
+        res.status(201).json({ data: details.toJSON() });
+      }),
+    );
+
+    // POST /api/fs/create { path, name } — make an empty file.
+    this.router.post(
+      '/create',
+      asyncHandler(async (req, res) => {
+        const details = await this.filesService.createFile(
+          FilesRoutes.readBodyString(req, 'path'),
+          FilesRoutes.readBodyString(req, 'name'),
+        );
+        res.status(201).json({ data: details.toJSON() });
+      }),
+    );
+
+    // POST /api/fs/watch { watchId, paths } — which of these folders changed since last time.
+    this.router.post(
+      '/watch',
+      asyncHandler(async (req, res) => {
+        const body = FilesRoutes.body(req);
+        const watchId = body['watchId'] ?? null;
+        if (watchId !== null && typeof watchId !== 'string') {
+          throw HttpError.badRequest('"watchId" must be a string or null');
+        }
+        const paths = body['paths'];
+        if (!Array.isArray(paths) || !paths.every((path): path is string => typeof path === 'string')) {
+          throw HttpError.badRequest('"paths" must be an array of paths');
+        }
+        res.json({ data: await this.watches.watch(watchId, paths) });
       }),
     );
 
@@ -70,9 +161,19 @@ export class FilesRoutes implements RouteModule {
 
   private async sendDownload(req: Request, res: Response): Promise<void> {
     const target = await this.filesService.resolveDownload(FilesRoutes.readPath(req));
+    const inline = FilesRoutes.readQueryString(req, 'inline') === 'true';
 
     res.setHeader('Content-Type', target.mimeType ?? 'application/octet-stream');
-    res.setHeader('Content-Disposition', FilesRoutes.contentDisposition(target.name));
+    res.setHeader('Content-Disposition', FilesRoutes.contentDisposition(target.name, inline ? 'inline' : 'attachment'));
+    if (inline) {
+      // Shown in a tab (PRD 003, §5), a file is a document on the app's own
+      // origin: the browser must take its type as given, and anything that
+      // could run script is sandboxed — no script, and an opaque origin.
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      if (target.mimeType === null || ACTIVE_TYPES.has(target.mimeType)) {
+        res.setHeader('Content-Security-Policy', 'sandbox');
+      }
+    }
 
     await new Promise<void>((resolve, reject) => {
       // `dotfiles: 'allow'` because hidden files are ordinary content here.
@@ -198,25 +299,56 @@ export class FilesRoutes implements RouteModule {
   }
 
   /**
-   * `attachment` with both a sanitised ASCII fallback and the RFC 5987 form,
-   * so non-ASCII names survive in modern clients without breaking old ones.
+   * `attachment` — or `inline`, to be shown in a tab — with both a sanitised
+   * ASCII fallback and the RFC 5987 form, so non-ASCII names survive in
+   * modern clients without breaking old ones.
    */
-  private static contentDisposition(name: string): string {
+  static contentDisposition(name: string, disposition: 'attachment' | 'inline'): string {
     const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
     const encoded = encodeURIComponent(name).replace(
       /['()*!]/g,
       (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
     );
-    return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+    return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
   }
 
   private static readPath(req: Request): string | undefined {
-    const value = req.query['path'];
+    return FilesRoutes.readQueryString(req, 'path');
+  }
+
+  private static readQueryString(req: Request, name: string): string | undefined {
+    const value = req.query[name];
     if (value === undefined) {
       return undefined;
     }
     if (typeof value !== 'string') {
-      throw HttpError.badRequest('Query parameter "path" must be a single string value');
+      throw HttpError.badRequest(`Query parameter "${name}" must be a single string value`);
+    }
+    return value;
+  }
+
+  /** `limit` of a search: a whole number of at least 1, clamped to the most allowed. */
+  private static readLimit(req: Request): number {
+    const value = FilesRoutes.readQueryString(req, 'limit');
+    if (value === undefined || value === '') {
+      return SEARCH_LIMITS.defaultResults;
+    }
+    if (!/^\d+$/.test(value) || Number(value) < 1) {
+      throw HttpError.badRequest('Query parameter "limit" must be a whole number of at least 1');
+    }
+    return Math.min(Number(value), SEARCH_LIMITS.maxResults);
+  }
+
+  /** A JSON body, or an empty one: `express.json()` leaves anything else unparsed. */
+  private static body(req: Request): Record<string, unknown> {
+    const body: unknown = req.body;
+    return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+  }
+
+  private static readBodyString(req: Request, field: string): string {
+    const value = FilesRoutes.body(req)[field];
+    if (typeof value !== 'string') {
+      throw HttpError.badRequest(`"${field}" must be a string`);
     }
     return value;
   }

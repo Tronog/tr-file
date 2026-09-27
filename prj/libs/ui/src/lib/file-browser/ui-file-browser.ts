@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal, viewChild, type ElementRef } from '@angular/core';
+import { Component, afterRenderEffect, computed, input, output, signal, viewChild, type ElementRef } from '@angular/core';
 import { UiBreadcrumbs } from '../breadcrumbs/ui-breadcrumbs';
 import { UiSearchField } from '../controls/ui-search-field';
 import { UiSegmented, type UiSegmentedOption } from '../controls/ui-segmented';
@@ -10,8 +10,10 @@ import { UiPanelBody } from '../panel-group/ui-panel-body';
 import { UiPanelToolbar } from '../panel-toolbar/ui-panel-toolbar';
 import {
   UI_ENTRY_MIME,
+  type UiContextMenuRequest,
   type UiEntryDrop,
   type UiFileBrowserModel,
+  type UiFilesDrop,
   type UiPanelCommand,
   type UiPanelKey,
   type UiPanelView,
@@ -50,7 +52,16 @@ const CLIPBOARD_KEYS: Readonly<Record<string, UiPanelCommand>> = { c: 'copy', x:
  *
  * Entries can be dragged — onto a folder in the listing, or to another
  * browser, onto a folder there or its blank space — and a drop is reported as
- * a `UiEntryDrop`. The drag is one for the page's own drag and drop, typed
+ * a `UiEntryDrop`.
+ *
+ * PRD 003, §5 adds what every file manager has, each reported rather than
+ * acted on: `contextMenu` for a right-click (or `Shift`+`F10`) on an entry or
+ * on blank space — an entry that was not selected is selected first, as file
+ * managers do; `sortChange` from the column headers when `sortable`;
+ * `filterChange` from the toolbar's filter box (`Ctrl`+`F` goes there,
+ * `Escape` clears it, `↓` goes back to the listing); `pathSubmit` from the
+ * path bar made editable by `location` (`Ctrl`+`L`); and the mouse's own
+ * back and forward buttons, as `back` / `forward` panel keys. The drag is one for the page's own drag and drop, typed
  * `UI_ENTRY_MIME`, so it passes between panels and nothing else takes it.
  */
 @Component({
@@ -68,7 +79,7 @@ const CLIPBOARD_KEYS: Readonly<Record<string, UiPanelCommand>> = { c: 'copy', x:
   ],
   templateUrl: './ui-file-browser.html',
   styleUrl: './ui-file-browser.scss',
-  host: { '(keydown)': 'onKeydown($event)' },
+  host: { '(keydown)': 'onKeydown($event)', '(mouseup)': 'onMouseUp($event)' },
 })
 export class UiFileBrowser {
   readonly browser = input.required<UiFileBrowserModel>();
@@ -93,6 +104,40 @@ export class UiFileBrowser {
   /** Entries were dropped here — from this browser or another (PRD 005, §2). */
   readonly entryDrop = output<UiEntryDrop>();
 
+  /**
+   * Dragging an entry hands it to the operating system rather than to the
+   * page (PRD 003, §6): the application starts a drag of *files* on
+   * `nativeDragStart`, which other applications take — and which comes back
+   * here as a `filesDrop` when dropped on a panel. The desktop, on its own
+   * computer, sets it; a browser cannot drag files out.
+   */
+  readonly nativeDrag = input(false);
+
+  /** A drag of these entries began, for the application to hand to the system; see `nativeDrag`. */
+  readonly nativeDragStart = output<readonly string[]>();
+
+  /**
+   * Files from outside the page were dropped on a folder here, or on the
+   * blank space of the listing (PRD 003, §6). The group around the browser
+   * does not hear of them.
+   */
+  readonly filesDrop = output<UiFilesDrop>();
+
+  /** The grid's tiles now on screen; see `UiIconView.shown`. */
+  readonly itemsShown = output<readonly string[]>();
+
+  /** A column header asked for the listing to be sorted by its key (PRD 003, §5). */
+  readonly sortChange = output<string>();
+
+  /** What the filter box now holds. */
+  readonly filterChange = output<string>();
+
+  /** A path typed into the path bar, confirmed with `Enter`. */
+  readonly pathSubmit = output<string>();
+
+  /** A right-click, `Shift`+`F10` or the menu key, on an entry or on blank space. */
+  readonly contextMenu = output<UiContextMenuRequest>();
+
   /** The folder a drag is over, lit in the list or grid. */
   protected readonly dropTargetId = signal<string | null>(null);
 
@@ -103,6 +148,29 @@ export class UiFileBrowser {
   private dragging: ReadonlySet<string> | null = null;
 
   private readonly bodyElement = viewChild.required<ElementRef<HTMLElement>>('body');
+  private readonly pathBar = viewChild(UiBreadcrumbs);
+  private readonly filterField = viewChild(UiSearchField);
+
+  /** The request tokens last answered; see `filterFocus` and `locationEdit`. */
+  private seenFilterFocus: number | undefined;
+  private seenLocationEdit: number | undefined;
+
+  constructor() {
+    // After render, so the box and the bar exist; the first value seen is
+    // where the model started, not a request.
+    afterRenderEffect(() => {
+      const filterFocus = this.browser().filterFocus ?? 0;
+      const locationEdit = this.browser().locationEdit ?? 0;
+      if (this.seenFilterFocus !== undefined && filterFocus !== this.seenFilterFocus) {
+        this.filterField()?.focus();
+      }
+      if (this.seenLocationEdit !== undefined && locationEdit !== this.seenLocationEdit) {
+        this.pathBar()?.edit();
+      }
+      this.seenFilterFocus = filterFocus;
+      this.seenLocationEdit = locationEdit;
+    });
+  }
 
   protected readonly viewOptions: readonly UiSegmentedOption[] = [
     { id: 'list', label: 'List view', icon: 'list' },
@@ -155,7 +223,7 @@ export class UiFileBrowser {
    * around it, which claims the other `Ctrl` chords.
    */
   protected onKeydown(event: KeyboardEvent): void {
-    if (this.onClipboardKey(event)) {
+    if (this.onClipboardKey(event) || this.onChordKey(event) || this.onMenuKey(event)) {
       return;
     }
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.key !== 'Enter') {
@@ -251,6 +319,100 @@ export class UiFileBrowser {
     return true;
   }
 
+  /**
+   * The chords of PRD 003, §5 that are about the listing as a whole, from
+   * anywhere in the browser: `Ctrl`+`F` to the filter box, `Ctrl`+`L` to the
+   * path bar, `Ctrl`+`Z` to undo, `Ctrl`+`Shift`+`N` for a new folder. None
+   * is claimed inside a text field, where `Ctrl`+`Z` is the field's own.
+   */
+  private onChordKey(event: KeyboardEvent): boolean {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || UiFileBrowser.isTextField(event.target)) {
+      return false;
+    }
+    const key = event.key.toLowerCase();
+    const listing = !this.document();
+    if (!event.shiftKey && key === 'f' && listing && this.browser().searchPlaceholder !== undefined) {
+      this.filterField()?.focus();
+    } else if (!event.shiftKey && key === 'l' && this.browser().location !== undefined) {
+      this.pathBar()?.edit();
+    } else if (!event.shiftKey && key === 'z' && listing) {
+      this.command.emit({ command: 'undo', entryId: null });
+    } else if (event.shiftKey && key === 'n' && listing) {
+      this.command.emit({ command: 'new-folder', entryId: null });
+    } else {
+      return false;
+    }
+    event.preventDefault();
+    return true;
+  }
+
+  /** `Shift`+`F10` or the menu key: the context menu of the entry focus is on, beside it. */
+  private onMenuKey(event: KeyboardEvent): boolean {
+    const menuKey = event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
+    if (!menuKey || event.ctrlKey || event.altKey || event.metaKey || this.document() || UiFileBrowser.isTextField(event.target)) {
+      return false;
+    }
+    const anchor = document.activeElement instanceof HTMLElement ? document.activeElement : this.bodyElement().nativeElement;
+    const rect = anchor.getBoundingClientRect();
+    this.contextMenu.emit({ target: this.focusedEntry(), x: rect.left + 16, y: rect.top + Math.min(rect.height, 22) });
+    event.preventDefault();
+    return true;
+  }
+
+  /**
+   * A right-click in the body. On an entry that is not part of the selection,
+   * that entry alone is selected first — the menu is about what was clicked.
+   * A document keeps the browser's own menu, for copying its text.
+   */
+  protected onContextMenu(event: MouseEvent): void {
+    if (this.document()) {
+      return;
+    }
+    event.preventDefault();
+    const id = UiFileBrowser.entryIdAt(event.target);
+    if (id !== null) {
+      const entry = this.entries().find((candidate) => candidate.id === id);
+      if (entry !== undefined && !entry.selected && !entry.inactiveSelected) {
+        this.selectionChange.emit({ selected: [id], focused: id });
+      }
+    }
+    this.contextMenu.emit({ target: id, x: event.clientX, y: event.clientY });
+  }
+
+  /** The mouse's back and forward buttons walk the panel's history, as in any file manager. */
+  protected onMouseUp(event: MouseEvent): void {
+    if (event.button === 3 || event.button === 4) {
+      event.preventDefault();
+      this.command.emit({ command: event.button === 3 ? 'back' : 'forward', entryId: null });
+    }
+  }
+
+  /**
+   * Keys in the filter box: `Escape` empties it (and, once empty, leaves it),
+   * `↓` and `Enter` go back to the listing it filters.
+   */
+  protected onFilterKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      if ((this.browser().filterText ?? '') !== '') {
+        this.filterChange.emit('');
+      } else {
+        this.focusListing();
+      }
+    } else if (event.key === 'ArrowDown' || event.key === 'Enter') {
+      this.focusListing();
+    } else {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /** The listing's tab stop — the cursor's row or tile — or the body itself when it lists nothing. */
+  private focusListing(): void {
+    const body = this.bodyElement().nativeElement;
+    (body.querySelector<HTMLElement>('[tabindex="0"]') ?? body).focus();
+  }
+
   /* -- drag and drop (PRD 005, §2) ------------------------------------------- */
 
   /**
@@ -272,16 +434,31 @@ export class UiFileBrowser {
       this.selectionChange.emit({ selected: [id], focused: id });
     }
 
+    this.dragging = new Set(sources);
+    if (this.nativeDrag()) {
+      // The system's drag, not the page's: it is the one other apps can take.
+      event.preventDefault();
+      this.nativeDragStart.emit(sources);
+      return;
+    }
     transfer.setData(UI_ENTRY_MIME, JSON.stringify({ sources }));
     transfer.effectAllowed = 'copyMove';
     if (sources.length > 1) {
       UiFileBrowser.countImage(transfer, sources.length);
     }
-    this.dragging = new Set(sources);
   }
 
   protected onDragOver(event: DragEvent): void {
     const transfer = event.dataTransfer;
+    if (transfer !== null && UiFileBrowser.carriesFiles(transfer) && this.browser().dropFolder) {
+      // Files from outside: onto a folder under the pointer, or into the listed one.
+      const target = this.dropTargetAt(event, true);
+      event.preventDefault();
+      transfer.dropEffect = this.nativeDrag() ? (UiFileBrowser.copies(event) ? 'copy' : 'move') : 'copy';
+      this.dropTargetId.set(target ?? null);
+      this.bodyDropTarget.set(target === null);
+      return;
+    }
     if (transfer === null || !Array.from(transfer.types).includes(UI_ENTRY_MIME)) {
       return;
     }
@@ -304,10 +481,30 @@ export class UiFileBrowser {
       return;
     }
     this.clearDropTarget();
+    if (this.nativeDrag()) {
+      // A system drag ends with no `dragend` here; leaving is as good a sign as any.
+      this.dragging = null;
+    }
   }
 
   protected onDrop(event: DragEvent): void {
     const transfer = event.dataTransfer;
+    if (transfer !== null && UiFileBrowser.carriesFiles(transfer) && this.browser().dropFolder) {
+      const target = this.dropTargetAt(event, true) ?? null;
+      this.clearDropTarget();
+      this.dragging = null;
+      event.preventDefault();
+      event.stopPropagation();
+      // The entries only exist while the drop event does: read them now.
+      const entries = Array.from(transfer.items)
+        .map((item) => (item.kind === 'file' ? item.webkitGetAsEntry?.() : null))
+        .filter((entry): entry is FileSystemEntry => entry !== null && entry !== undefined);
+      const files = Array.from(transfer.files);
+      if (files.length > 0 || entries.length > 0) {
+        this.filesDrop.emit({ files, entries, target, copy: UiFileBrowser.copies(event) });
+      }
+      return;
+    }
     if (transfer === null || !Array.from(transfer.types).includes(UI_ENTRY_MIME)) {
       return;
     }
@@ -335,7 +532,7 @@ export class UiFileBrowser {
    * own target; and within one browser the blank space is a target only for a
    * copy, since moving entries to the folder they are in does nothing.
    */
-  private dropTargetAt(event: DragEvent): string | null | undefined {
+  private dropTargetAt(event: DragEvent, files = false): string | null | undefined {
     if (this.document()) {
       return undefined;
     }
@@ -347,7 +544,14 @@ export class UiFileBrowser {
     if (!this.browser().dropFolder) {
       return undefined;
     }
-    return this.dragging === null || UiFileBrowser.copies(event) ? null : undefined;
+    // Files from outside may be anything, from anywhere: the listed folder takes them.
+    return files || this.dragging === null || UiFileBrowser.copies(event) ? null : undefined;
+  }
+
+  /** A drag of files from outside the page — the system's file manager, or a native drag of ours. */
+  private static carriesFiles(transfer: DataTransfer): boolean {
+    const types = Array.from(transfer.types);
+    return types.includes('Files') && !types.includes(UI_ENTRY_MIME);
   }
 
   private clearDropTarget(): void {

@@ -112,6 +112,6 @@ export class PanelHistoryFeature {
 
   /** The workspace name at the root, else the folder's own name. */
   private labelFor(path: string): string {
-    return path === '' ? this.parent.mockWorkbench.workspaceName : (path.split('/').at(-1) ?? path);
+    return path === '' ? this.parent.workspaceName() : (path.split('/').at(-1) ?? path);
   }
 }

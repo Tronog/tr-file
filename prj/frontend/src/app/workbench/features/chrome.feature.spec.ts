@@ -54,15 +54,45 @@ describe('ChromeFeature', () => {
       expect(menus().every((menu) => !menu.open)).toBe(true);
     });
 
-    it('holds a placeholder in every menu but File, Edit and Go', () => {
-      for (const menu of menus().filter((candidate) => !['go', 'file', 'edit'].includes(candidate.id))) {
-        expect(menu.items).toEqual([{ id: 'todo', label: 'Todo', disabled: true }]);
+    /** PRD 003, §5 — every menu is made of the command table's commands; none holds a placeholder. */
+    it('holds commands in every menu, labelled and keyed by the command table', () => {
+      for (const menu of menus()) {
+        expect(menu.items?.length).toBeGreaterThan(0);
+        expect(menu.items?.some((item) => item.id === 'todo')).toBe(false);
       }
+      const rename = menus().find((menu) => menu.id === 'file')?.items?.find((item) => item.id === 'file.rename');
+      expect(rename).toMatchObject({ label: 'Rename…', keybinding: 'F2', disabled: true, separatorBefore: true });
     });
 
-    it('offers Local Computer, checked by default, and Remote Computer in Go', () => {
-      expect(go()?.items).toEqual([
-        { id: 'go.local', label: 'Local Computer', checked: true },
+    it('checks the active panel’s view and sort in View', async () => {
+      await startRoot();
+      const view = () => menus().find((menu) => menu.id === 'view')?.items ?? [];
+      const checked = () => view().filter((item) => item.checked).map((item) => item.id);
+      expect(checked()).toEqual(['view.list', 'view.sort.name']);
+
+      workbench.chromeFt.runMenuItem({ menuId: 'view', itemId: 'view.sort.size' });
+      workbench.chromeFt.runMenuItem({ menuId: 'view', itemId: 'view.sortDescending' });
+      workbench.chromeFt.runMenuItem({ menuId: 'view', itemId: 'view.grid' });
+
+      expect(checked()).toEqual(['view.grid', 'view.sort.size', 'view.sortDescending']);
+      expect(workbench.chromeFt.statusTrailingItems().find((item) => item.id === 'sort')?.label).toBe(
+        'Sorted by Size, descending',
+      );
+    });
+
+    it('offers Back, Forward, Up and Go to Location, then Local Computer, checked by default, and Remote Computer in Go', () => {
+      expect(go()?.items?.map((item) => item.id)).toEqual([
+        'go.back',
+        'go.forward',
+        'go.up',
+        'go.location',
+        'places.addBookmark',
+        'places.removeBookmark',
+        'go.local',
+        'go.remote',
+      ]);
+      expect(go()?.items?.slice(-2)).toEqual([
+        { id: 'go.local', label: 'Local Computer', checked: true, separatorBefore: true },
         { id: 'go.remote', label: 'Remote Computer…', checked: false },
       ]);
     });
@@ -100,7 +130,7 @@ describe('ChromeFeature', () => {
 
       it('checks Remote Computer, and names the server in the status bar', () => {
         expect(workbench.backend()).toBe('remote');
-        expect(go()?.items?.map((item) => item.checked)).toEqual([false, true]);
+        expect(go()?.items?.slice(-2).map((item) => item.checked)).toEqual([false, true]);
         expect(workbench.chromeFt.statusLeadingItems()[0]).toMatchObject({ label: 'ana@nas.local:4310', icon: 'cloud' });
       });
 
@@ -158,12 +188,27 @@ describe('ChromeFeature', () => {
       expect(workbench.chromeFt.settingsMenu()).toBeNull();
     });
 
-    it('opens beside the gear, from its bottom edge, and offers a disabled Todo', () => {
+    /** PRD 003, §6: what the app shows and remembers — commands of the table, checked as they stand. */
+    it('opens beside the gear, from its bottom edge, and offers what the app shows and remembers', () => {
       workbench.chromeFt.openMenu(anchor);
 
       expect(workbench.chromeFt.settingsMenu()).toEqual({ x: 48, y: 748 });
       expect(gear()).toMatchObject({ expanded: true, active: true });
-      expect(workbench.chromeFt.settingsMenuItems).toEqual([{ id: 'todo', label: 'Todo', disabled: true }]);
+      expect(workbench.chromeFt.settingsMenuItems()).toEqual([
+        { id: 'view.hidden', label: 'Show Hidden Files', keybinding: 'Ctrl+H', checked: false },
+        { id: 'settings.restoreSession', label: 'Restore Layout on Start', checked: true, separatorBefore: true },
+        { id: 'view.resetLayout', label: 'Reset Layout' },
+        { id: 'places.clearRecent', label: 'Clear Recent Folders', disabled: true, separatorBefore: true },
+      ]);
+    });
+
+    it('runs its entries: hidden files shown, and the layout not restored next time', () => {
+      workbench.chromeFt.runSettingsItem('view.hidden');
+      workbench.chromeFt.runSettingsItem('settings.restoreSession');
+
+      expect(workbench.showHidden()).toBe(true);
+      expect(workbench.settings.get('tr-file.restore-session.v1')).toBe(false);
+      expect(workbench.chromeFt.settingsMenuItems()[1]?.checked).toBe(false);
     });
 
     it('closes when the gear is pressed again, when dismissed, and after a choice', () => {
@@ -176,7 +221,7 @@ describe('ChromeFeature', () => {
       expect(workbench.chromeFt.settingsMenu()).toBeNull();
 
       workbench.chromeFt.openMenu(anchor);
-      workbench.chromeFt.runSettingsItem('todo');
+      workbench.chromeFt.runSettingsItem('places.clearRecent');
       expect(workbench.chromeFt.settingsMenu()).toBeNull();
     });
 

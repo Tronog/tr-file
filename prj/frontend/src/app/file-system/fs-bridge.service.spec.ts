@@ -411,6 +411,73 @@ describe('FsBridgeService', () => {
   });
 });
 
+/** PRD 003, §5 — the new commands, as the desktop transport sends them. */
+describe('FsBridgeService — what every file manager has', () => {
+  let fake: FakeBridge;
+  let fs: FileSystemService;
+
+  beforeEach(() => {
+    fake = new FakeBridge();
+    installBridge(fake);
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    fs = TestBed.inject(FileSystemService);
+  });
+
+  afterEach(() => installBridge(undefined));
+
+  it('renames, and makes folders and files, one command each', async () => {
+    fake.answer = { data: DETAILS };
+
+    await fs.editFt.rename('docs/a.txt', 'docs/b.txt');
+    await fs.editFt.createFolder('docs', 'New Folder');
+    await fs.editFt.createFile('', 'notes.txt');
+
+    expect(fake.sent).toEqual([
+      { command: 'rename', path: 'docs/a.txt', to: 'docs/b.txt' },
+      { command: 'mkdir', path: 'docs', name: 'New Folder' },
+      { command: 'create-file', path: '', name: 'notes.txt' },
+    ]);
+  });
+
+  it('searches and watches', async () => {
+    fake.answer = { data: { path: '', query: 'a', entries: [], truncated: false, scanned: 3 } };
+    await fs.readFt.search('', 'a', 50);
+    fake.answer = { data: { watchId: 'w1', changed: ['docs'] } };
+    await expect(fs.readFt.watch(null, ['', 'docs'])).resolves.toEqual({ watchId: 'w1', changed: ['docs'] });
+
+    expect(fake.sent).toEqual([
+      { command: 'search', path: '', query: 'a', limit: 50 },
+      { command: 'watch', watchId: null, paths: ['', 'docs'] },
+    ]);
+  });
+
+  it('opens with the system and reveals through the main process, which can say no', async () => {
+    expect(fs.systemFt.canReveal(false)).toBe(true);
+    expect(fs.systemFt.canReveal(true)).toBe(false);
+
+    fake.answer = { data: { opened: false } };
+    await expect(fs.systemFt.open('tools/setup.exe', 'setup.exe')).resolves.toBe(false);
+    fake.answer = { data: { revealed: true } };
+    await fs.systemFt.reveal('docs');
+
+    expect(fake.sent).toEqual([
+      { command: 'shell-open', path: 'tools/setup.exe' },
+      { command: 'shell-reveal', path: 'docs' },
+    ]);
+  });
+
+  it('deletes and restores as jobs', async () => {
+    fake.answer = { data: { id: 'j' } };
+    await fs.operationsFt.start({ kind: 'delete', paths: ['a.txt'] });
+    await fs.operationsFt.start({ kind: 'restore', ids: ['a.txt.1'] });
+
+    expect(fake.sent).toEqual([
+      { command: 'op-delete', paths: ['a.txt'] },
+      { command: 'op-restore', ids: ['a.txt.1'] },
+    ]);
+  });
+});
+
 describe('FileSystemService without a desktop bridge', () => {
   beforeEach(() => {
     installBridge(undefined);
@@ -448,5 +515,53 @@ describe('FileSystemService without a desktop bridge', () => {
     http.expectOne('/api/ops/info').flush({ data: { trash: 'server' } });
     await expect(info).resolves.toEqual({ trash: 'server' });
     http.verify();
+  });
+
+  /** PRD 003, §5, over HTTP: every write a POST the CSRF interceptor marks, search a GET. */
+  it('speaks the new /api/fs endpoints', async () => {
+    const fs = TestBed.inject(FileSystemService);
+    const http = TestBed.inject(HttpTestingController);
+    const details = { path: 'docs/b.txt' };
+
+    const renamed = fs.editFt.rename('docs/a.txt', 'docs/b.txt');
+    const rename = http.expectOne('/api/fs/rename');
+    expect(rename.request.method).toBe('POST');
+    expect(rename.request.body).toEqual({ path: 'docs/a.txt', to: 'docs/b.txt' });
+    rename.flush({ data: details });
+    await expect(renamed).resolves.toEqual(details);
+
+    const folder = fs.editFt.createFolder('docs', 'New Folder');
+    const mkdir = http.expectOne('/api/fs/mkdir');
+    expect(mkdir.request.body).toEqual({ path: 'docs', name: 'New Folder' });
+    mkdir.flush({ data: details }, { status: 201, statusText: 'Created' });
+    await folder;
+
+    const file = fs.editFt.createFile('', 'a b.txt');
+    http.expectOne('/api/fs/create').flush({ data: details }, { status: 201, statusText: 'Created' });
+    await file;
+
+    const found = fs.readFt.search('docs', 'a b', 20);
+    http.expectOne({ method: 'GET', url: '/api/fs/search?path=docs&query=a%20b&limit=20' }).flush({
+      data: { path: 'docs', query: 'a b', entries: [], truncated: false, scanned: 0 },
+    });
+    await found;
+
+    const watched = fs.readFt.watch('w1', ['docs']);
+    const watch = http.expectOne('/api/fs/watch');
+    expect(watch.request.body).toEqual({ watchId: 'w1', paths: ['docs'] });
+    watch.flush({ data: { watchId: 'w1', changed: [] } });
+    await watched;
+    http.verify();
+  });
+
+  it('opens a file in a new browser tab, served inline, and cannot reveal one', async () => {
+    const fs = TestBed.inject(FileSystemService);
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+
+    await expect(fs.systemFt.open('docs/a b.pdf', 'a b.pdf')).resolves.toBe(true);
+    expect(open).toHaveBeenCalledWith('/api/fs/download?path=docs/a%20b.pdf&inline=true', '_blank', 'noopener');
+    expect(fs.systemFt.canReveal(false)).toBe(false);
+    await expect(fs.systemFt.reveal('docs')).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    open.mockRestore();
   });
 });

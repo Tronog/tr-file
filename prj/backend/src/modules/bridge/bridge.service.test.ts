@@ -254,6 +254,19 @@ describe('a malformed request', () => {
       { command: 'upload-begin', path: '', overwrite: false },
       { command: 'upload-chunk', uploadId: 'x', content: 'not bytes' },
       { command: 'upload-commit' },
+      { command: 'rename', path: 'a' },
+      { command: 'rename', path: 'a', to: 1 },
+      { command: 'mkdir', path: '' },
+      { command: 'create-file', name: 'x' },
+      { command: 'search', path: '' },
+      { command: 'search', path: '', query: 'a', limit: -1 },
+      { command: 'search', path: '', query: 'a', limit: '5' },
+      { command: 'watch', watchId: 3, paths: [] },
+      { command: 'watch', watchId: null, paths: 'docs' },
+      { command: 'watch', watchId: null, paths: [1] },
+      { command: 'watch', watchId: null, paths: Array.from({ length: 257 }, () => '') },
+      { command: 'op-delete', paths: 'a' },
+      { command: 'op-restore', ids: [7] },
     ];
 
     for (const value of cases) {
@@ -284,12 +297,111 @@ describe('file operations (PRD 005, §1)', () => {
 
     assert.equal(job.state, 'done');
     assert.equal(await readFile(join(root, 'op copy.txt'), 'utf8'), 'op');
-    assert.deepEqual(dataOf(await bridge.dispatch({ command: 'op-info' })), { trash: 'server' });
+    assert.deepEqual(dataOf(await bridge.dispatch({ command: 'op-info' })), { trash: 'server', canRestore: true });
   });
 
   it('validates operation commands', async () => {
     assert.equal(errorOf(await bridge.dispatch({ command: 'op-trash', paths: 'op.txt' })).code, 'BAD_REQUEST');
     assert.equal(errorOf(await bridge.dispatch({ command: 'op-cancel' })).code, 'BAD_REQUEST');
     assert.equal(errorOf(await bridge.dispatch({ command: 'op-status', jobId: 'nope' })).status, 404);
+  });
+});
+
+async function settledJob(started: { id: string; state: string }): Promise<{ state: string; outcome: { source: string; target: string }[] }> {
+  let job = started as { id: string; state: string; outcome: { source: string; target: string }[] };
+  while (job.state === 'running') {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    job = dataOf(await bridge.dispatch({ command: 'op-status', jobId: started.id }));
+  }
+  return job;
+}
+
+describe('things every file manager has (PRD 003, §5)', () => {
+  it('makes a folder and a file, and renames, as /api/fs does', async () => {
+    const folder = dataOf<FileDetailsDto>(await bridge.dispatch({ command: 'mkdir', path: '', name: 'box' }));
+    assert.equal(folder.type, 'directory');
+
+    const file = dataOf<FileDetailsDto>(await bridge.dispatch({ command: 'create-file', path: 'box', name: 'n.txt' }));
+    assert.equal(file.path, 'box/n.txt');
+    assert.equal(file.size, 0);
+
+    const renamed = dataOf<FileDetailsDto>(await bridge.dispatch({ command: 'rename', path: 'box/n.txt', to: 'box/m.txt' }));
+    assert.equal(renamed.path, 'box/m.txt');
+
+    const taken = errorOf(await bridge.dispatch({ command: 'create-file', path: 'box', name: 'm.txt' }));
+    assert.equal(taken.code, 'CONFLICT');
+    assert.equal(taken.status, 409);
+    assert.equal(errorOf(await bridge.dispatch({ command: 'rename', path: 'box', to: 'box/in' })).status, 400);
+  });
+
+  it('searches, with or without a limit', async () => {
+    const found = dataOf<{ entries: { path: string }[]; truncated: boolean }>(
+      await bridge.dispatch({ command: 'search', path: '', query: 'm.TXT' }),
+    );
+    assert.deepEqual(found.entries.map((entry) => entry.path), ['box/m.txt']);
+
+    const limited = dataOf<{ entries: unknown[]; truncated: boolean }>(
+      await bridge.dispatch({ command: 'search', path: '', query: '*', limit: 1 }),
+    );
+    assert.equal(limited.entries.length, 1);
+    assert.equal(limited.truncated, true);
+    assert.equal(errorOf(await bridge.dispatch({ command: 'search', path: '', query: '' })).status, 400);
+  });
+
+  it('watches, starting a session from null and again from an unknown id', async () => {
+    const opened = dataOf<{ watchId: string; changed: string[] }>(
+      await bridge.dispatch({ command: 'watch', watchId: null, paths: ['box'] }),
+    );
+    assert.deepEqual(opened.changed, []);
+
+    const again = dataOf<{ watchId: string; changed: string[] }>(
+      await bridge.dispatch({ command: 'watch', watchId: 'unknown', paths: ['box'] }),
+    );
+    assert.notEqual(again.watchId, 'unknown');
+    assert.deepEqual(again.changed, ['box']);
+  });
+
+  it('deletes for good, and trashes then restores by the outcome’s id', async () => {
+    await writeFile(join(root, 'box', 'keep.txt'), 'k');
+    const trashed = await settledJob(dataOf(await bridge.dispatch({ command: 'op-trash', paths: ['box/keep.txt'] })));
+    const id = trashed.outcome[0]?.target as string;
+    assert.equal(typeof id, 'string');
+
+    const restored = await settledJob(dataOf(await bridge.dispatch({ command: 'op-restore', ids: [id] })));
+    assert.deepEqual(restored.outcome, [{ source: id, target: 'box/keep.txt' }]);
+    assert.equal(await readFile(join(root, 'box', 'keep.txt'), 'utf8'), 'k');
+
+    const deleted = await settledJob(dataOf(await bridge.dispatch({ command: 'op-delete', paths: ['box'] })));
+    assert.equal(deleted.state, 'done');
+    assert.equal((await readdir(root)).includes('box'), false);
+    assert.equal(errorOf(await bridge.dispatch({ command: 'op-restore', ids: ['nope'] })).status, 404);
+  });
+});
+
+describe('localPath', () => {
+  it('says where an entry is on this machine, for the desktop shell', async () => {
+    const located = dataOf<{ absolute: string; name: string; type: string; executable: boolean }>(
+      await bridge.localPath('README.md'),
+    );
+
+    assert.equal(located.absolute, join(root, 'README.md'));
+    assert.equal(located.name, 'README.md');
+    assert.equal(located.type, 'file');
+    assert.equal(located.executable, false);
+  });
+
+  it('refuses what is not there, or not in the root, as a command would', async () => {
+    assert.equal(errorOf(await bridge.localPath('nope')).status, 404);
+    assert.equal(errorOf(await bridge.localPath('../..')).status, 403);
+  });
+
+  it('asks for the same sign-in as every command', async () => {
+    const guarded = new App(
+      AppConfig.fromEnv({ FILES_ROOT: root, AUTH_USERNAME: 'ana', AUTH_PASSWORD: 'secret' }),
+      Logger.create('error'),
+      '0.0.0-test',
+    ).bridge;
+
+    assert.equal(errorOf(await guarded.localPath('README.md')).code, 'UNAUTHORIZED');
   });
 });

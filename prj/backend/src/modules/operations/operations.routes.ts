@@ -22,13 +22,22 @@ export class OperationsRoutes implements RouteModule {
   }
 
   private register(): void {
-    // GET /api/ops/info — what kind of trash this server keeps.
+    // GET /api/ops/info — what kind of trash this server keeps, and whether it can restore.
     this.router.get('/info', (_req, res) => {
       res.json({ data: this.operations.info });
     });
 
-    // POST /api/ops/copy | move | trash | empty-trash — start a job.
-    for (const kind of ['copy', 'move', 'trash', 'empty-trash'] as const satisfies readonly OperationKind[]) {
+    // POST /api/ops/copy | move | trash | empty-trash | delete | restore | compress | extract — start a job.
+    for (const kind of [
+      'copy',
+      'move',
+      'trash',
+      'empty-trash',
+      'delete',
+      'restore',
+      'compress',
+      'extract',
+    ] as const satisfies readonly OperationKind[]) {
       this.router.post(
         `/${kind}`,
         asyncHandler(async (req, res) => {

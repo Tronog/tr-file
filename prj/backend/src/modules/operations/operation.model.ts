@@ -1,9 +1,10 @@
 /**
  * File operations (PRD 005, §1): copy, move, move to trash, empty trash —
- * each a background job that reports how far it has got and can be stopped.
+ * each a background job that reports how far it has got and can be stopped —
+ * and, since PRD 003 §5, delete for good and restore from the trash.
  */
 
-export type OperationKind = 'copy' | 'move' | 'trash' | 'empty-trash';
+export type OperationKind = 'copy' | 'move' | 'trash' | 'empty-trash' | 'delete' | 'restore' | 'compress' | 'extract';
 
 export type OperationState = 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -35,7 +36,67 @@ export interface EmptyTrashOperationRequest {
   readonly kind: 'empty-trash';
 }
 
-export type OperationRequest = TransferOperationRequest | TrashOperationRequest | EmptyTrashOperationRequest;
+/** Removes entries for good — no trash. */
+export interface DeleteOperationRequest {
+  readonly kind: 'delete';
+  readonly paths: readonly string[];
+}
+
+/** Puts trashed entries back, by the ids a trash job's `outcome` gave them. */
+export interface RestoreOperationRequest {
+  readonly kind: 'restore';
+  readonly ids: readonly string[];
+}
+
+/**
+ * *Compress* (PRD 003, §6): a zip of `sources` as `destination/name`.
+ * `conflict` is what to do when that name is taken.
+ */
+export interface CompressOperationRequest {
+  readonly kind: 'compress';
+  readonly sources: readonly string[];
+  readonly destination: string;
+  readonly name: string;
+  readonly conflict: ConflictPolicy;
+}
+
+/**
+ * *Extract* (PRD 003, §6): a zip into `destination` — its one top entry
+ * straight in, or everything into a folder named after the archive.
+ * `conflict` is what to do when that top name is taken.
+ */
+export interface ExtractOperationRequest {
+  readonly kind: 'extract';
+  readonly path: string;
+  readonly destination: string;
+  readonly conflict: ConflictPolicy;
+}
+
+export type OperationRequest =
+  | CompressOperationRequest
+  | ExtractOperationRequest
+  | TransferOperationRequest
+  | TrashOperationRequest
+  | EmptyTrashOperationRequest
+  | DeleteOperationRequest
+  | RestoreOperationRequest;
+
+/**
+ * Where one entry of a job ended up — what Undo needs (PRD 003, §5):
+ *
+ * - copy: the source → the copy made of it;
+ * - move: the source → where it is now;
+ * - trash: the source → the id the trash can restore it by (only when it has one);
+ * - restore: that id → the path it is back at;
+ * - compress: the first source → the zip made;
+ * - extract: the archive → what it made at the destination's top.
+ *
+ * Top-level entries only, and only those actually done: a skipped one has none.
+ */
+export interface OperationOutcomeDto {
+  readonly source: string;
+  readonly target: string;
+}
 
 /**
  * A job as the API describes it. A client asks for it again to see progress —
@@ -62,6 +123,8 @@ export interface OperationJobDto {
   readonly error: { readonly code: string; readonly message: string } | null;
   /** Folders whose listing the job changed, root-relative: what a client should read again. */
   readonly affected: readonly string[];
+  /** Where each entry went, filled in as they are done; see `OperationOutcomeDto`. */
+  readonly outcome: readonly OperationOutcomeDto[];
 }
 
 /**
@@ -71,8 +134,25 @@ export interface OperationJobDto {
  */
 export interface TrashProvider {
   readonly kind: 'server' | 'system';
-  /** Moves one entry to the trash. `relative` is its root-relative path, for the record. */
-  trash(absolute: string, relative: string): Promise<void>;
+  /**
+   * Moves one entry to the trash. `relative` is its root-relative path, for
+   * the record. Resolves with the id `restore` knows it by — or `null` when
+   * this trash cannot put things back (a system trash: the user's own file
+   * manager does that).
+   */
+  trash(absolute: string, relative: string): Promise<string | null>;
+  /**
+   * Where the trashed entry `id` came from, root-relative, as it was
+   * recorded; `null` when there is no such entry. Paired with `restore`.
+   */
+  originOf?(id: string): Promise<string | null>;
+  /**
+   * Moves the trashed entry `id` to `absolute` and forgets its record.
+   * `OperationsService` decides `absolute` — the recorded place, or a free
+   * name beside it — and makes its folder; the trash only lets go of it.
+   * A trash that has this (and `originOf`) can restore.
+   */
+  restore?(id: string, absolute: string): Promise<void>;
   /**
    * Deletes everything in the trash, for good. Reports how far it has got
    * when it can count; a system trash emptied by the shell cannot.
@@ -84,7 +164,9 @@ export interface TrashProvider {
   readonly affected: readonly string[];
 }
 
-/** `GET /api/ops/info`: whose trash a trashed entry goes to. */
+/** `GET /api/ops/info`: whose trash a trashed entry goes to, and whether it can come back. */
 export interface OperationsInfoDto {
   readonly trash: TrashProvider['kind'];
+  /** `restore` works: the trash hands out ids (`outcome`) and puts entries back by them. */
+  readonly canRestore: boolean;
 }

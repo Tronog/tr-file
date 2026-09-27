@@ -2,7 +2,9 @@
   <ui-breadcrumbs
     [items]="browser().breadcrumbs"
     [label]="breadcrumbLabel()"
+    [location]="browser().location"
     (select)="breadcrumbSelect.emit($event)"
+    (submit)="pathSubmit.emit($event)"
   />
 }
 
@@ -22,7 +24,13 @@
     }
 
     @if (browser().searchPlaceholder; as placeholder) {
-      <ui-search-field [placeholder]="placeholder" label="Filter files" />
+      <ui-search-field
+        [placeholder]="placeholder"
+        label="Filter files"
+        [value]="browser().filterText ?? ''"
+        (valueChange)="filterChange.emit($event)"
+        (keydown)="onFilterKeydown($event)"
+      />
     }
   </ui-panel-toolbar>
 }
@@ -38,6 +46,7 @@
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
   (dragend)="onDragEnd()"
+  (contextmenu)="onContextMenu($event)"
 >
   @if (document(); as doc) {
     <!-- A file is open: the viewer owns its own scrolling, because its status
@@ -55,8 +64,10 @@
               [rows]="browser().rows"
               [draggable]="true"
               [dropTargetId]="dropTargetId()"
+              [sortable]="!!browser().sortable"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="rowActivate.emit($event)"
+              (sort)="sortChange.emit($event)"
               (command)="command.emit($event)"
             />
           }
@@ -68,9 +79,11 @@
               [rows]="browser().rows"
               [draggable]="true"
               [dropTargetId]="dropTargetId()"
+              [sortable]="!!browser().sortable"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="rowActivate.emit($event)"
               (toggle)="rowToggle.emit($event)"
+              (sort)="sortChange.emit($event)"
               (command)="command.emit($event)"
             />
           }
@@ -82,6 +95,7 @@
               (selectionChange)="selectionChange.emit($event)"
               (activate)="itemActivate.emit($event)"
               (command)="command.emit($event)"
+              (shown)="itemsShown.emit($event)"
             />
           }
         }

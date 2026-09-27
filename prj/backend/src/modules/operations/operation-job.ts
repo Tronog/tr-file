@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { OperationJobDto, OperationKind, OperationState } from './operation.model.js';
+import type { OperationJobDto, OperationKind, OperationOutcomeDto, OperationState } from './operation.model.js';
 
 /**
  * One running operation: its progress, updated as it goes, and the switch
@@ -12,6 +12,8 @@ export class OperationJob {
   readonly controller = new AbortController();
   readonly startedAt = new Date();
   readonly affected = new Set<string>();
+  /** Where each entry went, in the order they were done. */
+  readonly outcome: OperationOutcomeDto[] = [];
 
   state: OperationState = 'running';
   finishedAt: Date | null = null;
@@ -58,6 +60,7 @@ export class OperationJob {
       skipped: this.skipped,
       error: this.error,
       affected: [...this.affected],
+      outcome: [...this.outcome],
     };
   }
 }

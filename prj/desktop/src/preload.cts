@@ -17,7 +17,7 @@
 // what make the emitted `preload.cjs` loadable at all.
 import electron = require('electron');
 
-const { contextBridge, ipcRenderer } = electron;
+const { contextBridge, ipcRenderer, webUtils } = electron;
 
 /** Must match `FsBridgeChannel.CHANNEL` and the frontend's `BRIDGE_VERSION`. */
 const FS_CHANNEL = 'tr-file:fs';
@@ -32,6 +32,9 @@ const VERSION = 1;
 const SAVE_CHANNEL = 'tr-file:save';
 const SAVE_PROGRESS_EVENT = 'tr-file:save:progress';
 
+/** Must match `DragOutChannel`'s channel. */
+const DRAG_CHANNEL = 'tr-file:drag';
+
 contextBridge.exposeInMainWorld('trFileBridge', {
   version: FS_VERSION,
   invoke: (request: unknown): Promise<unknown> => ipcRenderer.invoke(FS_CHANNEL, request),
@@ -45,6 +48,42 @@ contextBridge.exposeInMainWorld('trFileBridge', {
     ipcRenderer.on(SAVE_PROGRESS_EVENT, handler);
     return () => void ipcRenderer.removeListener(SAVE_PROGRESS_EVENT, handler);
   },
+  /**
+   * Entries dragged out to another app (PRD 003, §6): the page names them by
+   * root-relative path at the start of its drag, and the main process starts
+   * the system's drag with their host paths.
+   */
+  startDrag: (paths: unknown): void => ipcRenderer.send(DRAG_CHANNEL, { paths }),
+  /**
+   * Where files dropped on the window are in the root, if they are
+   * (PRD 003, §6): their host paths are read here and go straight to the
+   * main process, which answers with root-relative paths or `null` — so the
+   * page learns what it could list anyway, and not one host path.
+   */
+  localPaths: (files: unknown): Promise<unknown> => {
+    const list = Array.isArray(files) ? files : [];
+    const absolute = list.map((file) => {
+      try {
+        return file instanceof File ? webUtils.getPathForFile(file) : '';
+      } catch {
+        return '';
+      }
+    });
+    return ipcRenderer.invoke(FS_CHANNEL, { command: 'local-paths', absolute });
+  },
+});
+
+/*
+ * What the page remembers between sessions (PRD 003, §6). The window's origin
+ * changes with every start, so `localStorage` forgets; the main process keeps
+ * a file instead — `all` once at start, `set` per change.
+ */
+const SETTINGS_CHANNEL = 'tr-file:settings';
+
+contextBridge.exposeInMainWorld('trFileSettings', {
+  version: VERSION,
+  all: (): Promise<unknown> => ipcRenderer.invoke(SETTINGS_CHANNEL, { command: 'all' }),
+  set: (key: unknown, value: unknown): Promise<unknown> => ipcRenderer.invoke(SETTINGS_CHANNEL, { command: 'set', key, value }),
 });
 
 /*

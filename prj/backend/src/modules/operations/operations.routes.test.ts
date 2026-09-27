@@ -51,7 +51,37 @@ after(async () => {
 
 describe('/api/ops', () => {
   it('says whose trash it keeps', async () => {
-    assert.deepEqual(await (await fetch(`${base}/ops/info`)).json(), { data: { trash: 'server' } });
+    assert.deepEqual(await (await fetch(`${base}/ops/info`)).json(), { data: { trash: 'server', canRestore: true } });
+  });
+
+  it('trashes and restores, by the id in the outcome (PRD 003, §5)', async () => {
+    await writeFile(join(root, 'target', 'undo.txt'), 'back');
+    const trashed = await settled(((await (await post('/trash', { paths: ['target/undo.txt'] })).json()) as { data: OperationJobDto }).data);
+    const id = trashed.outcome[0]?.target;
+    assert.equal(typeof id, 'string');
+
+    const response = await post('/restore', { ids: [id] });
+    assert.equal(response.status, 202);
+    const restored = await settled(((await response.json()) as { data: OperationJobDto }).data);
+
+    assert.equal(restored.state, 'done');
+    assert.deepEqual(restored.outcome, [{ source: id, target: 'target/undo.txt' }]);
+    assert.equal(await readFile(join(root, 'target', 'undo.txt'), 'utf8'), 'back');
+    assert.equal((await post('/restore', { ids: 'x' })).status, 400);
+    assert.equal((await post('/restore', { ids: ['unknown'] })).status, 404);
+  });
+
+  it('deletes for good with 202', async () => {
+    await writeFile(join(root, 'gone.txt'), 'bye');
+    const response = await post('/delete', { paths: ['gone.txt'] });
+    assert.equal(response.status, 202);
+
+    const job = await settled(((await response.json()) as { data: OperationJobDto }).data);
+
+    assert.equal(job.state, 'done');
+    assert.equal(job.kind, 'delete');
+    assert.equal((await readdir(root)).includes('gone.txt'), false);
+    assert.equal((await post('/delete', { paths: ['gone.txt'] })).status, 404);
   });
 
   it('starts a copy with 202 and reports it to the end', async () => {

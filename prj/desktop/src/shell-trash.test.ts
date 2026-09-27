@@ -24,10 +24,12 @@ describe('ShellTrash', () => {
     const seen: string[] = [];
     const trash = new ShellTrash(home, { trashItem: async (path) => void seen.push(path), platform: 'linux', home });
 
-    await trash.trash(join(home, 'a.txt'));
+    const id = await trash.trash(join(home, 'a.txt'));
 
     assert.deepEqual(seen, [join(home, 'a.txt')]);
     assert.equal(trash.kind, 'system');
+    assert.equal(id, null, 'the shell gives no id to restore by');
+    assert.equal('restore' in trash, false, 'the system file manager restores, not the app');
   });
 
   it('empties the freedesktop home trash, counting entries', async () => {

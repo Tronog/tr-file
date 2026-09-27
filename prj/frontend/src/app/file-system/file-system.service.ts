@@ -1,6 +1,8 @@
 import { Service, inject } from '@angular/core';
+import { FsEditFeature } from './features/fs-edit.feature';
 import { FsOperationsFeature } from './features/fs-operations.feature';
 import { FsReadFeature } from './features/fs-read.feature';
+import { FsSystemFeature } from './features/fs-system.feature';
 import { FsTransferFeature } from './features/fs-transfer.feature';
 import { FsBridgeService } from './fs-bridge.service';
 import { FsHttpService } from './fs-http.service';
@@ -32,7 +34,7 @@ export class FileSystemService {
 
   /* -- features ---------------------------------------------------------- */
 
-  /** Directory listings and entry details. */
+  /** Directory listings, entry details, search, and watching folders for changes. */
   readonly readFt = new FsReadFeature(this);
 
   /** Downloads and uploads, including per-upload progress. */
@@ -40,4 +42,10 @@ export class FileSystemService {
 
   /** Copy, move, trash and empty trash, as jobs on the backend (PRD 005, §1). */
   readonly operationsFt = new FsOperationsFeature(this);
+
+  /** Renaming, and new folders and files (PRD 003, §5). */
+  readonly editFt = new FsEditFeature(this);
+
+  /** Opening entries with the computer's own applications, and revealing them (PRD 003, §5). */
+  readonly systemFt = new FsSystemFeature(this);
 }

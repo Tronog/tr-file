@@ -1,6 +1,6 @@
-import { Component, computed, input, output, viewChildren, type ElementRef } from '@angular/core';
+import { Component, afterRenderEffect, computed, input, output, viewChildren, type ElementRef } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
-import type { UiTreeNode } from '../models';
+import type { UiContextMenuRequest, UiTreeNode } from '../models';
 
 /**
  * The directory tree.
@@ -45,6 +45,12 @@ export class UiTree {
    */
   readonly open = output<string>();
 
+  /**
+   * A row's context menu was asked for — a right-click, `Shift`+`F10` or the
+   * menu key (PRD 003, §5). The menu is the application's to draw.
+   */
+  readonly contextMenu = output<UiContextMenuRequest>();
+
   /** The single tab stop: the focused row, else the first one. */
   protected readonly tabStopId = computed(() => {
     const nodes = this.nodes();
@@ -53,10 +59,34 @@ export class UiTree {
 
   private readonly rowButtons = viewChildren<ElementRef<HTMLButtonElement>>('rowButton');
 
+  /** The selected row last scrolled to, so it is scrolled to once, not on every render. */
+  private scrolledTo: string | null = null;
+
+  constructor() {
+    // A newly selected row is brought into view — when the application reveals
+    // a folder deep in the tree, possibly once its ancestors' rows have loaded.
+    // `nearest`, so a row already in view never moves; focus is left alone.
+    afterRenderEffect(() => {
+      const nodes = this.nodes();
+      const index = nodes.findIndex((node) => node.selected);
+      const id = nodes[index]?.id ?? null;
+      if (id === this.scrolledTo) {
+        return;
+      }
+      this.scrolledTo = id;
+      this.rowButtons()[index]?.nativeElement.scrollIntoView?.({ block: 'nearest' });
+    });
+  }
+
   /** Keeps a twisty click from also activating the row it sits in. */
   protected onTwisty(event: Event, node: UiTreeNode): void {
     event.stopPropagation();
     this.toggle.emit(node.id);
+  }
+
+  protected onRowContextMenu(event: MouseEvent, node: UiTreeNode): void {
+    event.preventDefault();
+    this.contextMenu.emit({ target: node.id, x: event.clientX, y: event.clientY });
   }
 
   protected onKeyDown(event: KeyboardEvent): void {
@@ -67,6 +97,13 @@ export class UiTree {
     }
     const node = nodes[index];
     if (!node) {
+      return;
+    }
+
+    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      this.contextMenu.emit({ target: node.id, x: rect.left + 16, y: rect.bottom });
+      event.preventDefault();
       return;
     }
 

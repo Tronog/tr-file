@@ -55,7 +55,7 @@ export class DetailsFeature {
     // detection. Until it arrives the card shows the file-type icon.
     const imageSrc = this.parent.images.urlFor(details.path);
     return {
-      title: details.name || this.parent.mockWorkbench.workspaceName,
+      title: details.name || this.parent.workspaceName(),
       subtitle: `${files.typeLabel(details)} · ${size}`,
       icon: files.icon(details),
       tint: files.tint(details),
@@ -112,6 +112,16 @@ export class DetailsFeature {
       actions.push({ id: 'open', label: 'Open in this panel', icon: 'folder-open' });
       actions.push({ id: 'upload', label: 'Upload files here', icon: 'upload' });
     }
+    // PRD 003, §5: out of the app, and a new name — the root has neither.
+    if (details.path !== '') {
+      if (isFile(details)) {
+        actions.push({ id: 'open-external', label: this.parent.systemOpenFt.openLabel(), icon: 'external' });
+      }
+      if (this.parent.systemOpenFt.canReveal()) {
+        actions.push({ id: 'reveal', label: this.parent.systemOpenFt.revealLabel(), icon: 'folder' });
+      }
+      actions.push({ id: 'rename', label: 'Rename…', icon: 'pencil' });
+    }
     actions.push({ id: 'copy-path', label: 'Copy path', icon: 'copy' });
     actions.push({ id: 'refresh', label: 'Refresh details', icon: 'refresh' });
     return actions;
@@ -164,6 +174,15 @@ export class DetailsFeature {
         break;
       case 'upload':
         this.parent.requestUpload(this.parent.activeGroupId(), details.path);
+        break;
+      case 'open-external':
+        void this.parent.systemOpenFt.open(details.path);
+        break;
+      case 'reveal':
+        void this.parent.systemOpenFt.reveal(details.path);
+        break;
+      case 'rename':
+        void this.parent.fileEditFt.rename(details.path, this.parent.activeGroupId());
         break;
       case 'copy-path':
         void navigator.clipboard?.writeText(details.path);

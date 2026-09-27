@@ -11,6 +11,7 @@
     "./bridge": "./dist/modules/bridge/index.js",
     "./config": "./dist/config/index.js",
     "./core": "./dist/core/index.js",
+    "./files": "./dist/modules/files/index.js",
     "./operations": "./dist/modules/operations/index.js"
   },
   "engines": {

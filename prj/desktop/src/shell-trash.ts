@@ -23,7 +23,10 @@ export interface ShellTrashOptions {
  * the user throws away lands where their file manager's trash shows it, and
  * can be put back from there.
  *
- * Trashing is Electron's `shell.trashItem` on every platform. Emptying has no
+ * Trashing is Electron's `shell.trashItem` on every platform. It says nothing
+ * about where the entry went, so there is no id to restore it by: `trash`
+ * answers `null` and this provider has no `restore` (`canRestore` is false) —
+ * putting things back is the system file manager's job. Emptying has no
  * Electron call, so it is the platform's own way: on Linux the freedesktop.org
  * home trash is cleared entry by entry, which can be counted; on macOS Finder
  * empties it, and on Windows `Clear-RecycleBin` does — neither says how far
@@ -67,8 +70,9 @@ export class ShellTrash implements TrashProvider {
     return this.trashDir !== null && (absolute === this.trashDir || absolute.startsWith(this.trashDir + sep));
   }
 
-  trash(absolute: string): Promise<void> {
-    return this.options.trashItem(absolute);
+  async trash(absolute: string): Promise<null> {
+    await this.options.trashItem(absolute);
+    return null;
   }
 
   async empty(progress: (done: number, total: number | null) => void, signal: AbortSignal): Promise<void> {

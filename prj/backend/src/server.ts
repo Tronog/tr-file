@@ -10,7 +10,7 @@ export class Server {
   private shuttingDown = false;
 
   constructor(
-    app: App,
+    private readonly app: App,
     private readonly config: AppConfig,
     private readonly logger: Logger,
   ) {
@@ -45,6 +45,7 @@ export class Server {
       this.httpServer.close(() => resolve());
       this.httpServer.closeIdleConnections();
     });
+    this.app.close();
     this.logger.info('server stopped');
   }
 

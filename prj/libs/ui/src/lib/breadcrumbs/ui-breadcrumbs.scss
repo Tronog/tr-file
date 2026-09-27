@@ -12,6 +12,72 @@ nav {
   height: 22px;
   padding: 0 10px;
   overflow: hidden;
+
+  /* Its blank space edits the path (PRD 003, §5). */
+  &.is-editable {
+    cursor: text;
+  }
+}
+
+/* Pushed to the far end, and only drawn on hover or focus — the bar stays a path. */
+.edit {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vsc-fg-dim);
+  cursor: pointer;
+  opacity: 0;
+
+  nav:hover &,
+  &:focus-visible {
+    opacity: 1;
+  }
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+    color: var(--vsc-fg-bright);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  ui-icon {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+.location-bar {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+}
+
+.location {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--vsc-focus-border);
+  border-radius: var(--vsc-radius);
+  background: var(--vsc-input-bg);
+  color: var(--vsc-fg);
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+
+  &:focus {
+    outline: none;
+  }
 }
 
 .crumbs {

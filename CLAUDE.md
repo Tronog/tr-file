@@ -59,6 +59,12 @@ A new kind of content is a new tab kind, a library component, a feature class, a
 The explorer tree lists *folders only* (§9.1.1) — it is a map of the workspace, and files
 belong to the panels. Clicking a folder in the explorer shows it in the *active* panel; that
 link lives in `ExplorerNavigationFeature` so neither side has to know about the other.
+The other way round (§9.1.2), the tree follows what a panel *opens*, not what it selects: the tree
+keeps its own highlight (`ExplorerFeature.select` / `reveal`), separate from the workbench-wide
+`selectedEntryId` the details sidebar follows. `FileBrowserFeature.navigateTo` / `openFolder` —
+which opening a folder, Up, breadcrumbs, *Jump to Folder* and `Alt`+`←`/`→` all go through — call
+`reveal`, which opens the folders above and highlights the target; `UiTree` scrolls a newly
+selected row into view. Opening a file reveals the folder it is in.
 Inside a panel body the library components move focus (arrows, `Home`/`End`, page keys,
 type-to-find, selection following focus) and report the keys that mean something to the
 workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as a `UiPanelKey`;
@@ -66,7 +72,11 @@ workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as 
 `Ctrl`+`W` (close the focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab) are
 bound on the group's host instead, and emit the same outputs the tab bar's buttons do;
 `Ctrl`+`Enter` (open the focused entry in a new panel on the right) is `UiFileBrowser`'s,
-on its host; the desktop shell installs its own accelerator
+on its host; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring explorer → each
+panel in layout order → bottom panel (while open) → details, and round: `FocusCycleFeature`
+decides the ring, the `Workbench` component finds the `data-focus-region` that has focus and
+focuses into the next (a panel through `PanelFocusFeature`, a sidebar where focus last was in it).
+A browser keeps those chords for its own tabs, so they reach the page on the desktop only; the desktop shell installs its own accelerator
 table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
 since two panels are two places someone is working. Any key that changes the folder also
@@ -103,14 +113,15 @@ time, with "Do this for all remaining conflicts" for a batch.
 The Settings gear in the activity bar opens a menu (PRD 007, §1): the item is `hasMenu`, the
 bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`,
 `openMenu`, `closeSettingsMenu`) shows `UiContextMenu` fixed beside it, opening upward. Its
-items come from `MockDataWorkbenchService.settingsMenuItems` — for now one disabled `Todo`.
+items are commands of the table, laid out in `MockDataWorkbenchService.settingsMenuItems`:
+hidden files, restore the layout on start, reset it, clear recent folders (PRD 003, §6).
 
 The main menu (PRD 008, §1) is File, Edit, Selection, View and Go, from
 `MockDataWorkbenchService.menuItems`; `UiTitleBar` draws the menus, `ChromeFeature` holds
-which is open (`setMenuOpen`) and runs entries (`runMenuItem`). Only Go has entries so far:
-*Local Computer* — checked while `WorkbenchService.backend` is `local`, the default and, until
+which is open (`setMenuOpen`) and runs entries (`runMenuItem`, through `CommandsFeature`).
+Go ends with *Local Computer* — checked while `WorkbenchService.backend` is `local`, the default and, until
 PRD 006, the only one — and *Remote Computer…*, which opens the command palette at *Connect
-to Remote Server* (`CommandPaletteFeature.run`). The others hold a disabled `Todo`.
+to Remote Server* (`CommandPaletteFeature.run`).
 
 The command palette (PRD 009, §1) is `CommandPaletteFeature`: `Ctrl`+`Shift`+`P`, `F1`,
 `Ctrl`+`P` or the title bar's command centre open it in the library's `UiQuickInput`;
@@ -163,6 +174,54 @@ came from makes `name copy.ext`. `FileBrowserFeature.dropEntries` turns a drop i
 `OperationsFeature.transfer`, which starts nothing for a move to where the entries already are.
 Edit › Cut / Copy / Paste run the same.
 
+**What every file manager has (PRD 003, §5).** One command table,
+`CommandsFeature`, is what the main menu (laid out by id in
+`MockDataWorkbenchService.menuItems`), the right-click menus
+(`ContextMenuFeature`, per kind of target: entry, entries, blank space, tree
+folder, tab), the palette and the panel keys all run — each command is a label,
+a key to show, an `enabled` rule and a `run` over a `CommandTarget` (group,
+paths, folder). Rename (`F2`), New Folder (`Ctrl`+`Shift`+`N`) and New File are
+`FileEditFeature`: a modal prompt, one `/api/fs` request, then every path that
+knew the old name follows it (`relocatePath`). `UndoFeature` (`Ctrl`+`Z`) keeps
+the last 20 changes: rename back, trash what was created or copied, rename moved
+entries back from a job's `outcome`, restore trashed ones where the trash
+`canRestore`; a delete, or the system trash, says it cannot. `Shift`+`Delete`
+deletes for good, always after asking. Panels sort by clicking a column
+(`PanelGroupState.sort`, folders always first, `listing/listing-order.ts`) and
+filter with the toolbar box (`Ctrl`+`F`, cleared on leaving the folder); the path
+bar is an address bar (`Ctrl`+`L`, `goToLocation` — a file opens its folder,
+selected); the toolbar has Back and Forward. What the app cannot preview (PDF,
+Office, archives, too large) opens with `SystemOpenFeature` — the default app on
+the desktop (the main process asks before running a program), a new browser tab
+served `inline` otherwise; *Reveal* exists only on the desktop, for local files.
+The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
+under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
+polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what
+changed; folders leaving the screen are `expire`d in `FsDataFeature`, read again
+when next shown.
+
+**A whole computer's files (PRD 003, §6).** On the desktop the root is `/` — on Windows every
+drive, `FilePathResolver.drives()`, paths like `C:/Users` — and a fresh window starts in the
+home folder `/api/fs/places` names. `PlacesFeature` fills the explorer's Places pane (root,
+home, user folders, drives, mounts — a server names its root only, so in a browser the pane
+starts closed and asks when opened), Bookmarks and Recent; the activity bar's Bookmarks opens
+that pane. Bookmarks, recent folders and the session (`SessionFeature`: groups, tabs, views,
+sorts, grid, sizes, panes, bottom panel, hidden files) are kept per backend in
+`SettingsService` (`prj/frontend/src/app/settings/`) — `localStorage` in a browser, a file
+the main process keeps on the desktop, whose page origin is new on every start — loaded by
+an app initializer so `WorkbenchService.layout` is the restored one before any feature
+reads it; the Settings menu switches restoring off and resets the layout. The root's name
+is `WorkbenchService.workspaceName()`. Where the desktop is on its own computer
+(`systemFt.sharesFiles`), `FileClipboardFeature` shares the system clipboard, a drag out of a
+panel is the system's (`UiFileBrowser.nativeDrag`), and files dropped from outside that the
+root holds are moved like entries (`FileBrowserFeature.dropFiles`); anything else dropped —
+folders too — is uploaded (`TransfersFeature.uploadDropped`, *Upload Folder…*). The icon
+view draws thumbnails `ThumbnailsFeature` makes of what it has on screen (`UiIconView.shown`).
+Zips: the `archive` backend module; a `.zip` opens as an `archive` tab
+(`ArchiveBrowserFeature`, read-only, `inner` is the folder inside it); *Compress…*,
+*Extract Here* / *To…* are `/api/ops` jobs Undo trashes; a folder or a selection downloads
+as one zip.
+
 Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-system` is the
 `/api/fs` client, and `FsDataFeature` is the path-keyed cache the tree, the panels and the details
 sidebar all read from. Fetches are only ever started by an action (expanding a node, opening a
@@ -198,9 +257,11 @@ a production server refuses to start without one. Every write needs the
 `X-TR-File-Request: 1` header (CSRF) — the frontend's `csrfInterceptor` adds it — and the
 frontend shows `auth/login` until `AuthService` says there is a session (PRD 003, §2).
 The file-system API lives at `/api/fs`
-(listing, details, download, upload) — see `prj/backend/README.md` for the
-endpoint reference, the error codes and the `FILES_ROOT` confinement rules. File operations are the `operations` module at `/api/ops`: background jobs, polled
-by id and cancellable; the server's trash is `.tr-file-trash` in the root, reserved by the
+(listing, details, download — `inline` for a browser tab —, upload, rename, mkdir, create,
+search, watch) — see `prj/backend/README.md` for the
+endpoint reference, the error codes and the `FILES_ROOT` confinement rules. File operations are the `operations` module at `/api/ops`: background jobs (copy, move,
+trash, empty-trash, delete, restore), polled by id and cancellable, each reporting an
+`outcome` Undo reads; the server's trash is `.tr-file-trash` in the root, reserved by the
 path resolver so no API reaches into it. The same
 API is reachable without HTTP through `App.bridge`, for the desktop shell. Its
 frontend client is `prj/frontend/src/app/file-system/`, where `FsHttpService` and
@@ -215,7 +276,9 @@ loads that. It serves **no `/api`** (PRD 003, §2) — the window's data goes ov
 bridge, and an HTTP API would only let other local programs in. `pnpm --filter
 @tr-file/desktop test` boots the real stack with no desktop session, because
 `DesktopConfig` and `DesktopStack` import no `electron`. Signing in is off on the desktop
-unless `TR_FILE_AUTH_USERNAME` (with a password) is set.
+unless `TR_FILE_AUTH_USERNAME` (with a password) is set. Its root is the whole file system
+unless `FILES_ROOT` pins it; places, the settings file, the system clipboard and drags out
+are the main process's (PRD 003, §6, `prj/desktop/README.md`).
 
 In development the window can load `ng serve` instead of the bundle: `TR_FILE_DEV_SERVER`
 names it, `pnpm dev` at the root sets it, and the shell waits for that server and falls back
@@ -241,6 +304,13 @@ File operations (PRD 005 §1) run in the backend on whichever side the window is
 this computer `App` is given `ShellTrash`, so trash goes to the system trash
 (`shell.trashItem`), and on a remote server `RemoteBackend` maps the `op-*` commands onto
 its `/api/ops`.
+
+Opening with the system (PRD 003, §5): `BridgeSessions` answers `shell-open` and
+`shell-reveal` itself, through an injected `DesktopShell` (`desktop-shell.ts`) — Electron's
+`shell.openPath` / `showItemInFolder` in `main.ts`, stubs in tests. A local path comes from
+`bridge.localPath` (main process only, never a command); a remote file is copied to a temp
+folder first, and Reveal is refused for it. Anything that looks like a program is confirmed
+with a native dialog in the main process, so the renderer cannot skip it.
 
 Section 8.2 took the window's frame away: `UiTitleBar` is the title bar, with the drag
 region and the window buttons in it. `WindowControlsChannel` plus the preload give the

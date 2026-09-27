@@ -48,6 +48,29 @@ thead th {
   }
 }
 
+/* The header as a sort control: looks like the plain header it replaces. */
+.sort-button {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--vsc-fg-bright);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--vsc-focus-border);
+    outline-offset: -1px;
+  }
+}
+
 ui-icon.sort-icon {
   width: 12px;
   height: 12px;

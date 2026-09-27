@@ -83,6 +83,11 @@ export interface UiIconViewItem {
   readonly dropTarget?: boolean;
   /** On the clipboard to be moved: drawn faded. */
   readonly cut?: boolean;
+  /**
+   * A picture of the file, drawn in place of the icon (PRD 003, §6) — any
+   * URL an `<img>` takes; the application makes and frees it.
+   */
+  readonly thumbnail?: string;
 }
 
 /** One segment of the path bar above a panel body. */

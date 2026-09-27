@@ -6,4 +6,6 @@
 006 - remote server
 007 - settings
 008 - main menu
-00x - command panel
+009 - command panel
+010 - settings modal
+

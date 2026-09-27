@@ -43,9 +43,14 @@ const DEFAULT_ROW_HEIGHT = 22;
  * the cursor landed on.
  *
  * The keys that mean something to the *workbench* rather than to this table
- * — `Enter`, `Space`, `Backspace`, `F5` — leave as a `UiPanelKey` instead of
- * being acted on here; `PanelKeyboardFeature` in the app decides what each one
+ * — `Enter`, `Space`, `Backspace`, `F5`, `Delete` (`Shift`+`Delete` deletes
+ * for good) and `F2` (rename) — leave as a `UiPanelKey` instead of being
+ * acted on here; `PanelKeyboardFeature` in the app decides what each one
  * does.
+ *
+ * With `sortable` set the column headers are buttons that report `sort` with
+ * their column's key (PRD 003, §5); the order is the application's, and the
+ * header marked `sort` on its column says what it is.
  *
  * With `tree` set the same table is a tree grid (PRD 002, §4.1): the rows are
  * a pre-flattened tree — `depth`, `expandable`, `expanded` already describe
@@ -99,6 +104,12 @@ export class UiFileList {
   /** A tree row's twisty was clicked, or `→`/`←` opens or closes it. */
   readonly toggle = output<string>();
 
+  /** Column headers are buttons that ask for the listing to be sorted by them. */
+  readonly sortable = input(false);
+
+  /** A column header was clicked: sort by this column's key (or turn its order round). */
+  readonly sort = output<string>();
+
   /** The one row that is keyboard reachable (roving tabindex). */
   protected readonly focusId = computed(() => {
     const rows = this.rows();
@@ -106,7 +117,7 @@ export class UiFileList {
   });
 
   /** Keys documented on every row, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace Delete F5 PageUp PageDown Home End';
+  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete F2 F5 PageUp PageDown Home End';
 
   private readonly rowElements = viewChildren<ElementRef<HTMLTableRowElement>>('rowElement');
   private readonly body = viewChild<ElementRef<HTMLTableSectionElement>>('body');
@@ -288,7 +299,10 @@ export class UiFileList {
         this.command.emit({ command: 'refresh', entryId: row.id });
         break;
       case 'Delete':
-        this.command.emit({ command: 'delete', entryId: row.id });
+        this.command.emit({ command: event.shiftKey ? 'delete-permanently' : 'delete', entryId: row.id });
+        break;
+      case 'F2':
+        this.command.emit({ command: 'rename', entryId: row.id });
         break;
       default: {
         if (!isTypeaheadKey(event)) {

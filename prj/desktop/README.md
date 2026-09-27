@@ -32,7 +32,7 @@ Two ways to see the frontend, and the difference is worth knowing:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `FILES_ROOT` | the user's home directory | Absolute path all file access is confined to |
+| `FILES_ROOT` | `/` — the whole file system; on Windows every drive | Absolute path all file access is confined to. The window still *starts* in the home folder |
 | `TR_FILE_PORT` | `0` (OS picks) | Loopback port; pin it only to debug |
 | `TR_FILE_STATIC_ROOT` | the workspace `ng build` output | Where the Angular bundle is |
 | `TR_FILE_DEV` | `1` unless packaged | Debug logging |
@@ -154,6 +154,8 @@ bridge, over HTTP:
 | `auth-status`, `login`, `logout` | `/api/auth/*`; the session cookie is kept by the client |
 | `saveCopy` | `GET /api/fs/download`, streamed to the chosen file |
 | `op-*` (PRD 005, §1) | `/api/ops/*` — the file operations run on the server; the window polls them |
+| `rename`, `mkdir`, `create-file` (PRD 003, §5) | `POST /api/fs/rename`, `/mkdir`, `/create` |
+| `search`, `watch` | `GET /api/fs/search`, `POST /api/fs/watch` — the watch session lives on the server |
 
 Every write carries the CSRF header; the server's refusals come back with its
 own code and status, and an unreachable server as `NETWORK_ERROR`.
@@ -175,17 +177,94 @@ the trash:
 
 - **This computer** — `App` is built with `ShellTrash` (`src/shell-trash.ts`),
   so trashed entries land in the system trash the user's file manager shows and
-  can be restored from there. Trashing is Electron's `shell.trashItem`, handed
+  can be restored from there — from there only: `shell.trashItem` gives no id
+  to put an entry back by, so `op-info` says `canRestore: false` and the job's
+  `outcome` has no trash ids (PRD 003, §5). Trashing is Electron's `shell.trashItem`, handed
   in by `main.ts`, so the class itself imports no `electron` and is tested
   without a desktop session. Emptying has no Electron call: on Linux the
   freedesktop.org home trash is cleared entry by entry (with progress), on
   macOS Finder empties it, on Windows `Clear-RecycleBin` does.
 - **A remote server** — `RemoteBackend` maps the commands onto that server's
-  `/api/ops`; the work, and the server's own trash, are over there.
+  `/api/ops`; the work, and the server's own trash, are over there — which can
+  restore (`op-restore`), and delete for good (`op-delete`) works the same.
 
 Copies and moves run in the backend on this machine either way — Electron has
 no file-copy call of its own — so progress and cancelling behave the same
 locally and remotely.
+
+## Open with an app, Show in Folder (PRD 003, §5)
+
+Two commands only a desktop has, answered by `BridgeSessions` itself, as
+`connect` is: `shell-open` `{ path }` → `{ opened }` hands an entry to the
+operating system's default app (a folder opens in the file manager), and
+`shell-reveal` `{ path }` → `{ revealed: true }` selects it in the file manager.
+Both go through a `DesktopShell` — `shell.openPath`, `shell.showItemInFolder`
+and a native dialog, built in `main.ts` — so `BridgeSessions` still imports no
+`electron` and is tested with a stub (`src/desktop-shell.ts`).
+
+- **On this computer** the backend's `bridge.localPath` says where the entry
+  is: the same sign-in, resolver and root confinement as any command, and a
+  `404` for what is not there. It is a method, not a command — a host path is
+  never handed to the page. A failure to open is `OPEN_FAILED` with the
+  system's own reason.
+- **Programs are asked about first.** A file that would *run* — a Windows
+  program or script extension (`exe`, `bat`, `cmd`, `msi`, `ps1`, `vbs`, `js`,
+  `lnk`, `jar`, …) on any platform, and off Windows a file with an execute bit
+  or a launcher (`desktop`, `sh`, `run`, `AppImage`, `command`, `app`) — gets a
+  native dialog, *'name' is a program. Opening it will run it.*, with Run and
+  Cancel, Cancel the default. Anything but Run answers `{ opened: false }` and
+  opens nothing. The decision is made in the main process, so a compromised
+  page cannot skip it.
+- **On a remote server** a *file* is streamed (`saveCopy`) into a folder of
+  its own under `<tmp>/tr-file-open/<uuid>/` and that copy is opened; a program
+  is asked about before it is copied. A remote folder is refused
+  (`NOT_SUPPORTED`), as is Show in Folder — there is no folder here to show.
+  The temp folder is removed when the app quits (best effort).
+
+## A whole computer's files (PRD 003, §6)
+
+What a file manager on the desktop has that a server does not:
+
+- **The whole file system.** With no `FILES_ROOT` the root is `/` — other
+  drives, USB sticks, network mounts and everything above home are reachable.
+  On Windows `/` means *every drive*: the backend's `FilePathResolver.drives()`
+  makes the root the list of drives, and paths start with one (`C:/Users/me`).
+  A fresh window starts in the home folder, which the places say.
+- **Places** (`src/system-places.ts`): home and the user's folders from
+  `app.getPath`, then the drives and mounts — `/proc/self/mounts` on Linux
+  (under `/media`, `/run/media`, `/mnt`, and network file systems anywhere),
+  `/Volumes` on macOS (but the start-up disk), the drive letters on Windows.
+  Looked up on each request, so what was plugged in since is there. It is the
+  `PlacesProvider` `DesktopStack` hands `App`; the backend proves each inside
+  the root and answers root-relative paths.
+- **Settings that outlive a restart** (`src/settings-store.ts`,
+  `src/settings.channel.ts`): the window's origin is a new loopback port on
+  every start, so `localStorage` forgets. The main process keeps
+  `<userData>/settings.json` instead — layout, bookmarks, recent folders,
+  saved servers — read once, written through a temp file and a rename. The
+  preload's `trFileSettings` has `all()` and `set(key, value)`; keys are short
+  names, values plain JSON of at most 256 KiB, 64 keys at most.
+- **The system clipboard** (`src/system-clipboard.ts`, adapted to Electron's
+  clipboard in `src/electron-clipboard.ts`): `clipboard-read` answers the
+  files the system clipboard holds as root-relative paths — `{ paths, cut,
+  outside }`, `outside` counting what this window cannot reach — and
+  `clipboard-write` `{ paths, cut }` puts entries there for the system's file
+  manager. GNOME's `x-special/gnome-copied-files` and `text/uri-list` (with
+  KDE's cut marker) on Linux, Finder's `NSFilenamesPboardType` on macOS, the
+  first file of Explorer's `FileNameW` on Windows — where nothing can be
+  written that Explorer pastes as files, so the paths go as text. On a remote
+  server neither reaches anything.
+- **Dragging out** (`src/drag-out.channel.ts`): the page names the entries at
+  the start of its drag (`trFileBridge.startDrag`), and the main process starts
+  the system's drag with their host paths (`webContents.startDrag`) — this
+  computer's files only. **Dropping in**: `trFileBridge.localPaths(files)`
+  reads a dropped file's host path in the preload and asks the main process
+  (`local-paths`) where it is in the root; the page gets root-relative paths or
+  `null`, never a host path. Files the root holds are moved (copied with
+  `Ctrl`) like entries between panels; anything else is uploaded.
+- **Zips**: saving a folder or a selection goes through the same Save dialog
+  as a file (`save-zip` on the save channel, `saveZip` on the backend or the
+  remote server's `/api/archive/zip`); its size is counted as it is written.
 
 ## No window decorations (PRD 001, §8.2)
 
@@ -230,6 +309,11 @@ those three cases (browser, macOS, everywhere else) are decided.
 | `src/bridge-sessions.ts` | Each window's session, and which backend it talks to |
 | `src/remote-backend.ts` | A remote server's REST API, spoken as bridge commands |
 | `src/shell-trash.ts` | The system trash, for file operations on this computer |
+| `src/desktop-shell.ts` | Open with an app / Show in Folder: the shell's interface, and what counts as a program |
+| `src/system-places.ts` | Home, the user's folders, drives and mounts, for the Places pane |
+| `src/settings-store.ts`, `src/settings.channel.ts` | The page's settings, in a file in the user-data folder |
+| `src/system-clipboard.ts`, `src/electron-clipboard.ts` | Files on the system clipboard, both ways |
+| `src/drag-out.channel.ts` | Entries dragged out of a panel into other apps |
 | `src/window-controls.channel.ts` | The four verbs a page may use on its own window |
 | `src/app-menu.ts` | The accelerator table; deliberately without `Ctrl`+`W` |
 | `src/preload.cts` | The two small objects the renderer is given |
@@ -237,7 +321,7 @@ those three cases (browser, macOS, everywhere else) are decided.
 | `electron-builder.yml` | The distributables: one executable per platform |
 | `build/` | Icons the packager reads; not shipped inside the app |
 
-Only `main.ts`, `main-window.ts`, `fs-bridge.channel.ts` and the preload import
+Only `main.ts`, `main-window.ts`, the `*.channel.ts` files, `electron-clipboard.ts` and the preload import
 `electron`. Everything Electron knows
 reaches `DesktopConfig` as a plain `DesktopEnvironment`, which is what lets the
 whole stack be booted and tested by `pnpm test` with no desktop session at all —

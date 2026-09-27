@@ -2,11 +2,16 @@ import type { AuthStatus } from '../auth/auth.model';
 import type {
   FsDetails,
   FsDirectoryListing,
+  FsArchiveListing,
+  FsClipboardFiles,
   FsDownload,
   FsOperationJob,
+  FsPlaces,
   FsOperationRequest,
   FsOperationsInfo,
+  FsSearchResult,
   FsUpload,
+  FsWatchResult,
 } from './file-system.model';
 
 /**
@@ -60,8 +65,88 @@ export interface FsTransport {
    */
   save(path: string, name: string): FsDownload;
 
+  /**
+   * Saves entries — a folder, or a selection — as one zip, `name`
+   * (PRD 003, §6). Written as it is sent, so its size is not known ahead.
+   */
+  saveZip(paths: readonly string[], name: string): FsDownload;
+
   /** Uploads one file into `directoryPath`, reporting progress as it goes. */
   upload(directoryPath: string, file: File, options?: FsUploadOptions): FsUpload;
+
+  /* -- changing names, making entries (PRD 003, §5) ------------------------ */
+
+  /**
+   * Renames an entry — `to` is its whole new path, so an entry can also be
+   * put back into the folder it was moved from (Undo). Answers with what is
+   * now at `to`; `CONFLICT` when that name is taken.
+   */
+  rename(path: string, to: string): Promise<FsDetails>;
+
+  /** Makes an empty folder `name` in `parent`; `CONFLICT` when the name is taken. */
+  createFolder(parent: string, name: string): Promise<FsDetails>;
+
+  /** Makes an empty file `name` in `parent`; `CONFLICT` when the name is taken. */
+  createFile(parent: string, name: string): Promise<FsDetails>;
+
+  /** Entries under `path` whose names match `query` — a substring, or a glob with `*` / `?`. */
+  search(path: string, query: string, limit?: number): Promise<FsSearchResult>;
+
+  /**
+   * Which of `paths` changed since this watch last asked (auto-refresh). A
+   * `null` id starts a new watch; the answer carries the id to ask with next.
+   */
+  watch(watchId: string | null, paths: readonly string[]): Promise<FsWatchResult>;
+
+  /* -- places and archives (PRD 003, §6) ----------------------------------- */
+
+  /** Where to start, and what the Places pane lists; a server names only its root. */
+  places(): Promise<FsPlaces>;
+
+  /** One folder of a zip; `inner` `''` is its top. */
+  archiveList(path: string, inner: string): Promise<FsArchiveListing>;
+
+  /* -- the user's own computer (PRD 003, §5) -------------------------------- */
+
+  /**
+   * Whether this transport can hand a file to the apps of the computer the
+   * window runs on — the desktop can; a browser tab cannot show a folder in
+   * the system's file manager. Enables *Reveal*, never branches behaviour.
+   */
+  readonly systemShell: boolean;
+
+  /**
+   * Opens an entry outside the app: with its default application on the
+   * desktop (the main process asks before running a program), in a new tab of
+   * the browser otherwise. Resolves `false` when the user declined.
+   */
+  openExternally(path: string, name: string): Promise<boolean>;
+
+  /** Shows an entry in the system's file manager; refused where there is none (`NOT_SUPPORTED`). */
+  reveal(path: string): Promise<void>;
+
+  /**
+   * Whether this window shares files with the system — its clipboard, drags
+   * to and from other apps (PRD 003, §6). The desktop does; a browser tab
+   * cannot. Enables those paths, never branches behaviour.
+   */
+  readonly systemFiles: boolean;
+
+  /** Files on the system clipboard; none where there is no system to ask. */
+  readClipboard(): Promise<FsClipboardFiles>;
+
+  /** Puts entries on the system clipboard, for the system's file manager to paste. */
+  writeClipboard(paths: readonly string[], cut: boolean): Promise<void>;
+
+  /** Starts the system's drag of these entries, for other apps to take; `false` where there is none. */
+  startDrag(paths: readonly string[]): boolean;
+
+  /**
+   * Where files dropped on the window are in the root: a root-relative path
+   * each, or `null` for one it does not hold. All `null` where the window
+   * cannot know — a browser, or a remote server.
+   */
+  localPaths(files: readonly File[]): Promise<readonly (string | null)[]>;
 
   /** Whether the backend asks to sign in, and whether this session has (PRD 003, §2). */
   authStatus(): Promise<AuthStatus>;

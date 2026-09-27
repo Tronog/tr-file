@@ -2,6 +2,7 @@ import { computed, signal } from '@angular/core';
 import type {
   UiBreadcrumb,
   UiEntryDrop,
+  UiFilesDrop,
   UiFileBrowserModel,
   UiFileColumn,
   UiFileRow,
@@ -11,27 +12,36 @@ import type {
   UiSelectionChange,
 } from '@tr-file/ui';
 import type { FsEntry } from '../../file-system/file-system.model';
+import { FsError } from '../../file-system/fs-error';
+import { nameFilter, sortEntries } from '../listing/listing-order';
 import type { PanelContentFeature } from '../panel-content.model';
-import { PANEL_CONTENT, type PanelGroupState, type PanelTabState } from '../panel-group.model';
+import {
+  DEFAULT_SORT,
+  PANEL_CONTENT,
+  type PanelGroupState,
+  type PanelSort,
+  type PanelSortKey,
+  type PanelTabState,
+} from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
 import type { EditorGroupsFeature } from './editor-groups.feature';
 import type { FsListingState } from './fs-data.feature';
 import { isFolder } from '../../file-system/fs-entry-kind';
 
-/** Columns of the list view; the backend supplies every value. */
-const COLUMNS: readonly UiFileColumn[] = [
-  { key: 'name', label: 'Name', sort: 'asc' },
+/** Columns of the list view; the backend supplies every value, and each can sort it (PRD 003, §5). */
+const COLUMNS: readonly (UiFileColumn & { readonly key: PanelSortKey })[] = [
+  { key: 'name', label: 'Name' },
   { key: 'size', label: 'Size', width: '90px', align: 'end' },
   { key: 'type', label: 'Type', width: '110px' },
   { key: 'modified', label: 'Modified', width: '150px' },
 ];
 
-/** Toolbar of a folder tab: navigate, re-read, send files. */
-const FOLDER_TOOLBAR: readonly UiIconAction[] = [
-  { id: 'up', label: 'Up one level', icon: 'arrow-up' },
-  { id: 'refresh', label: 'Refresh listing', icon: 'refresh' },
-  { id: 'upload', label: 'Upload files', icon: 'upload' },
-];
+/** The columns, with the one the panel is sorted by marked — its header shows the arrow. */
+function columnsFor(sort: PanelSort): readonly UiFileColumn[] {
+  return COLUMNS.map((column) => (column.key === sort.key ? { ...column, sort: sort.direction } : column));
+}
+
+const SORT_KEYS: ReadonlySet<string> = new Set(COLUMNS.map((column) => column.key));
 
 /** Toolbar of a file tab: back to its folder, re-read, save it. */
 const FILE_TOOLBAR: readonly UiIconAction[] = [
@@ -45,6 +55,9 @@ const EMPTY_FOLDER = {
   title: 'This folder is empty',
   hint: 'Drop files here to upload them',
 } as const;
+
+/** What the filter box says while it is empty. */
+const FILTER_PLACEHOLDER = 'Filter (Ctrl+F)';
 
 /** The tree view of a panel that has opened nothing yet. */
 const NONE_OPEN: ReadonlySet<string> = new Set();
@@ -76,6 +89,15 @@ function parentOf(path: string): string {
 export class FileBrowserFeature implements PanelContentFeature {
   /** Folders open in each panel's tree view, keyed by group id. */
   private readonly expanded = signal<Readonly<Record<string, ReadonlySet<string>>>>({});
+
+  /**
+   * What each panel's filter box holds, keyed by group id (PRD 003, §5). A
+   * filter is about the folder it was typed in, so leaving the folder clears it.
+   */
+  private readonly filters = signal<Readonly<Record<string, string>>>({});
+
+  /** Requests for each panel's filter box and path bar to take the keyboard, by group id. */
+  private readonly focusRequests = signal<Readonly<Record<string, { readonly filter: number; readonly location: number }>>>({});
 
   constructor(private readonly parent: WorkbenchService) {}
 
@@ -129,6 +151,200 @@ export class FileBrowserFeature implements PanelContentFeature {
 
   setView(id: string, view: UiPanelView): void {
     this.groups.update(id, (group) => ({ ...group, view }));
+  }
+
+  /* -- order and filter (PRD 003, §5) --------------------------------------- */
+
+  /** How a panel orders its listing. */
+  sortOf(groupId: string): PanelSort {
+    return this.groups.stateOf(groupId)?.sort ?? DEFAULT_SORT;
+  }
+
+  /**
+   * A column header was clicked: sort by it, A to Z — or, when the panel is
+   * already sorted by it, the other way round.
+   */
+  toggleSort(groupId: string, key: string): void {
+    if (!SORT_KEYS.has(key)) {
+      return;
+    }
+    const current = this.sortOf(groupId);
+    const direction = current.key === key && current.direction === 'asc' ? 'desc' : 'asc';
+    this.setSort(groupId, { key: key as PanelSortKey, direction });
+  }
+
+  setSort(groupId: string, sort: PanelSort): void {
+    this.groups.update(groupId, (group) => ({ ...group, sort }));
+  }
+
+  /** What the panel's filter box holds; `''` when nothing is filtered out. */
+  filterOf(groupId: string): string {
+    return this.filters()[groupId] ?? '';
+  }
+
+  setFilter(groupId: string, text: string): void {
+    if (this.filterOf(groupId) === text) {
+      return;
+    }
+    this.filters.update((all) => ({ ...all, [groupId]: text }));
+  }
+
+  /**
+   * The entries of `path` as the panel shows them: filtered by its box, in its
+   * order, hidden ones left out unless the workbench shows them. Every view —
+   * list, grid, tree — and every command about "what is on screen" reads this.
+   */
+  visibleEntries(groupId: string, path: string): readonly FsEntry[] {
+    const matches = nameFilter(this.filterOf(groupId));
+    const entries = this.parent.fsDataFt.entries(path).filter((entry) => matches(entry.name));
+    return sortEntries(entries, this.sortOf(groupId), (entry) => this.parent.fileViewModel.typeLabel(entry));
+  }
+
+  /** The entries a panel is showing, in order — its folder's, and in the tree view those of open folders. */
+  entriesShown(groupId: string): readonly string[] {
+    const browser = this.browser(groupId);
+    if (browser === undefined) {
+      return [];
+    }
+    return browser.view === 'grid' ? browser.items.map((item) => item.id) : browser.rows.map((row) => row.id);
+  }
+
+  /**
+   * Every folder whose listing is on screen in some panel: each panel's own,
+   * and in the tree view the folders open under it — what auto-refresh
+   * watches (PRD 003, §5).
+   */
+  foldersShown(): readonly string[] {
+    const folders = new Set<string>();
+    for (const group of this.groups.states()) {
+      if (this.groups.activeTabOf(group)?.kind !== 'folder') {
+        continue;
+      }
+      folders.add(group.path);
+      if (group.view === 'tree') {
+        for (const path of this.openFoldersShown(group)) {
+          folders.add(path);
+        }
+      }
+    }
+    return [...folders];
+  }
+
+  /** Puts the keyboard in a panel's filter box — *Edit › Filter Folder*. */
+  focusFilter(groupId: string): void {
+    this.request(groupId, 'filter');
+  }
+
+  /** Turns a panel's path bar into a text field — *Go › Go to Location…*. */
+  editLocation(groupId: string): void {
+    this.request(groupId, 'location');
+  }
+
+  private request(groupId: string, what: 'filter' | 'location'): void {
+    this.groups.focus(groupId);
+    this.focusRequests.update((all) => {
+      const current = all[groupId] ?? { filter: 0, location: 0 };
+      return { ...all, [groupId]: { ...current, [what]: current[what] + 1 } };
+    });
+  }
+
+  /* -- selection (PRD 003, §5: the Selection menu) --------------------------- */
+
+  /** Selects everything the panel shows. */
+  selectAll(groupId: string): void {
+    const shown = this.entriesShown(groupId);
+    const group = this.groups.stateOf(groupId);
+    if (group === undefined || shown.length === 0) {
+      return;
+    }
+    const focused = group.focusedEntryId !== undefined && shown.includes(group.focusedEntryId) ? group.focusedEntryId : shown[0];
+    this.setSelection(groupId, { selected: shown, focused: focused ?? null });
+  }
+
+  selectNone(groupId: string): void {
+    this.groups.update(groupId, (group) => ({ ...group, selection: [] }));
+  }
+
+  /** Selects what was not selected, and leaves what was. */
+  invertSelection(groupId: string): void {
+    const group = this.groups.stateOf(groupId);
+    if (group === undefined) {
+      return;
+    }
+    const selected = new Set(group.selection);
+    const inverted = this.entriesShown(groupId).filter((path) => !selected.has(path));
+    this.groups.update(groupId, (state) => ({
+      ...state,
+      selection: inverted,
+      ...(inverted[0] === undefined ? {} : { focusedEntryId: inverted[0] }),
+    }));
+    if (inverted[0] !== undefined) {
+      this.parent.select(inverted[0]);
+    }
+  }
+
+  /**
+   * Opens an entry by its path — a context menu's, the explorer's — as a
+   * double click on it would: whether or not the panel is showing it.
+   */
+  openPath(groupId: string, path: string): void {
+    if (this.entryIn(groupId, path) !== undefined) {
+      this.openEntry(groupId, path);
+      return;
+    }
+    const entry = this.parent.fsDataFt.entryAt(path);
+    if (entry !== undefined && isFolder(entry)) {
+      this.openFolder(groupId, path, entry.name);
+      this.parent.panelFocusFt.focusBody(groupId);
+    } else if (entry !== undefined && this.parent.archiveBrowserFt.browses(path)) {
+      this.parent.archiveBrowserFt.open(groupId, path);
+    } else if (entry !== undefined && !this.parent.filePreviewFt.canPreview(path)) {
+      void this.parent.systemOpenFt.open(path);
+    } else if (entry !== undefined) {
+      this.parent.filePreviewFt.open(path);
+    }
+  }
+
+  /** Opens an entry by its path in a new panel beside `groupId`. */
+  openPathAside(groupId: string, path: string): void {
+    this.openEntryAside(groupId, path);
+  }
+
+  /**
+   * A path typed into a panel's path bar (PRD 003, §5), absolute within the
+   * workspace: a folder is shown in the panel, a file in the folder it is in —
+   * selected, so it is where the keyboard lands. What is not there is said so.
+   */
+  async goToLocation(groupId: string, text: string): Promise<void> {
+    const segments = text.trim().replace(/\\/g, '/').split('/').filter((segment) => segment !== '' && segment !== '.');
+    const shown = `/${segments.join('/')}`;
+    if (segments.includes('..')) {
+      await this.parent.modal.message({
+        severity: 'error',
+        message: `'${text.trim()}' is not a path this panel can go to.`,
+        detail: "Leave out '..': type the folder's own path from / up, e.g. /docs/prd.",
+      });
+      return;
+    }
+    const path = segments.join('/');
+    try {
+      const details = await this.parent.fileSystem.readFt.details(path);
+      if (isFolder(details)) {
+        this.openFolder(groupId, path, this.labelFor(path));
+      } else {
+        const folder = parentOf(path);
+        this.openFolder(groupId, folder, this.labelFor(folder));
+        this.selectEntry(groupId, path);
+      }
+      this.parent.panelFocusFt.focusBody(groupId);
+    } catch (error) {
+      const failure = FsError.from(error);
+      await this.parent.modal.message({
+        severity: 'error',
+        message: failure.code === 'NOT_FOUND' ? `There is no file or folder at '${shown}'.` : `Could not open '${shown}'.`,
+        detail: failure.code === 'NOT_FOUND' ? 'Check the path, and try again.' : failure.message,
+      });
+    }
   }
 
   /**
@@ -193,6 +409,16 @@ export class FileBrowserFeature implements PanelContentFeature {
     // A link to a folder is navigated into like one (PRD 003, §1).
     if (isFolder(entry)) {
       this.navigateTo(groupId, entry.path, entry.name);
+    } else if (this.parent.archiveBrowserFt.browses(entry.path)) {
+      // A zip is looked into, in a tab of its own (PRD 003, §6).
+      this.parent.archiveBrowserFt.open(groupId, entry.path);
+      return;
+    } else if (!this.parent.filePreviewFt.canPreview(entry.path)) {
+      // Nothing in the app can show it — a PDF, a document, an archive — so
+      // it goes to an application that can (PRD 003, §5); the listing stays.
+      this.groups.focus(groupId);
+      void this.parent.systemOpenFt.open(entry.path);
+      return;
     } else {
       this.groups.focus(groupId);
       this.parent.filePreviewFt.open(entry.path);
@@ -223,7 +449,7 @@ export class FileBrowserFeature implements PanelContentFeature {
    * request to work in it.
    */
   openEntryAside(groupId: string, entryId: string): void {
-    const entry = this.entryIn(groupId, entryId);
+    const entry = this.entryIn(groupId, entryId) ?? this.parent.fsDataFt.entryAt(entryId);
     if (!entry) {
       return;
     }
@@ -259,6 +485,21 @@ export class FileBrowserFeature implements PanelContentFeature {
     }
 
     switch (actionId) {
+      case 'back':
+        this.parent.panelHistoryFt.back(groupId);
+        break;
+      case 'forward':
+        this.parent.panelHistoryFt.forward(groupId);
+        break;
+      case 'new-file':
+        void this.parent.fileEditFt.createFile(group.path, groupId);
+        break;
+      case 'new-folder':
+        void this.parent.fileEditFt.createFolder(group.path, groupId);
+        break;
+      case 'open-external':
+        void this.parent.systemOpenFt.open(active.path);
+        break;
       case 'up': {
         // From a file, "up" shows the folder that contains it.
         const from = active.kind === 'file' ? active.path : group.path;
@@ -275,9 +516,9 @@ export class FileBrowserFeature implements PanelContentFeature {
         } else {
           // Everything on screen is re-read: in the tree, that includes the
           // folders open under this one.
-          this.parent.fsDataFt.reloadListing(group.path);
+          void this.parent.fsDataFt.reloadListing(group.path);
           for (const path of this.openFoldersShown(group)) {
-            this.parent.fsDataFt.reloadListing(path);
+            void this.parent.fsDataFt.reloadListing(path);
           }
         }
         break;
@@ -286,6 +527,9 @@ export class FileBrowserFeature implements PanelContentFeature {
         break;
       case 'download':
         this.parent.transfersFt.download(active.path, active.label);
+        break;
+      case 'upload-folder':
+        this.parent.requestUpload(groupId, undefined, true);
         break;
       default:
         break;
@@ -360,14 +604,20 @@ export class FileBrowserFeature implements PanelContentFeature {
     };
     const tabs = existing ? group.tabs : [...group.tabs, tab];
 
+    this.setFilter(groupId, '');
     this.groups.setTabs(groupId, tabs, tab.id);
     this.parent.panelHistoryFt.record(groupId, path);
+    this.parent.placesFt.recordRecent(path);
     this.parent.fsDataFt.ensureListing(path);
+    this.parent.explorerFt.reveal(path);
     this.groups.focus(groupId);
   }
 
   /** Points a group and its active tab at another folder. */
   navigateTo(groupId: string, path: string, label: string): void {
+    if (this.groups.stateOf(groupId)?.path !== path) {
+      this.setFilter(groupId, '');
+    }
     this.groups.update(groupId, (group) => {
       const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
       // Navigating turns the active tab into a folder tab, which is what
@@ -382,7 +632,11 @@ export class FileBrowserFeature implements PanelContentFeature {
     // Every folder a panel lands on goes on its trail; a move the trail itself
     // caused lands where the cursor already points, so it records nothing.
     this.parent.panelHistoryFt.record(groupId, path);
+    this.parent.placesFt.recordRecent(path);
     this.parent.fsDataFt.ensureListing(path);
+    // Opening a folder — or stepping back or forward to one — is what the
+    // sidebar follows; a selection in the panel is not (PRD 001, §9.1.2).
+    this.parent.explorerFt.reveal(path);
     this.groups.focus(groupId);
   }
 
@@ -408,6 +662,50 @@ export class FileBrowserFeature implements PanelContentFeature {
     }
     this.groups.focus(groupId);
     this.parent.transfersFt.uploadFiles(group.path, files);
+  }
+
+  /**
+   * Files from outside the page dropped on a panel (PRD 003, §6): onto a
+   * folder in it, or into the folder it lists.
+   *
+   * On the desktop, files that are already in this window's root — dragged
+   * from the system's file manager, or out of a panel as files and back —
+   * are *entries*, and a drop of them is a move (a copy with `Ctrl`), as a
+   * drop between panels is. Everything else is uploaded, folders and all.
+   */
+  async dropFiles(groupId: string, drop: UiFilesDrop): Promise<void> {
+    const group = this.groups.stateOf(groupId);
+    const destination = drop.target ?? group?.path;
+    if (group === undefined || destination === undefined || (drop.files.length === 0 && drop.entries.length === 0)) {
+      return;
+    }
+    this.groups.focus(groupId);
+    const system = this.parent.fileSystem.systemFt;
+    if (system.sharesFiles(this.parent.connection.connected()) && drop.files.length > 0) {
+      const paths = await system.localPaths(drop.files);
+      if (paths.every((path): path is string => path !== null)) {
+        void this.parent.operationsFt.transfer(drop.copy ? 'copy' : 'move', paths, destination);
+        return;
+      }
+    }
+    this.parent.transfersFt.uploadDropped(destination, drop.files, drop.entries);
+  }
+
+  /**
+   * Whether a drag out of a panel is the system's — files other apps take —
+   * rather than the page's own (PRD 003, §6): on the desktop, for its own
+   * computer's files.
+   */
+  readonly nativeDrag = computed(() => this.parent.fileSystem.systemFt.sharesFiles(this.parent.connection.connected()));
+
+  /** A drag of these entries began, to be handed to the system (`nativeDrag`). */
+  startNativeDrag(paths: readonly string[]): void {
+    this.parent.fileSystem.systemFt.startDrag(paths);
+  }
+
+  /** The icon view has these tiles on screen: their thumbnails are worth making now (PRD 003, §6). */
+  showItems(paths: readonly string[]): void {
+    this.parent.thumbnailsFt.request(paths);
   }
 
   /**
@@ -460,7 +758,7 @@ export class FileBrowserFeature implements PanelContentFeature {
   }
 
   private labelFor(path: string): string {
-    return path === '' ? this.parent.mockWorkbench.workspaceName : (path.split('/').at(-1) ?? path);
+    return path === '' ? this.parent.workspaceName() : (path.split('/').at(-1) ?? path);
   }
 
   /* -- view models -------------------------------------------------------- */
@@ -469,25 +767,55 @@ export class FileBrowserFeature implements PanelContentFeature {
     return tab.kind === 'file' ? this.fileViewModel(group, tab) : this.folderViewModel(group, active);
   }
 
+  /**
+   * A folder tab's toolbar: Back and Forward along the panel's trail — each
+   * disabled when there is nowhere to go — Up, Refresh, and what can be made
+   * or sent here (PRD 003, §5).
+   */
+  private folderToolbar(group: PanelGroupState): readonly UiIconAction[] {
+    const history = this.parent.panelHistoryFt;
+    return [
+      { id: 'back', label: 'Back (Alt+Left)', icon: 'arrow-left', ...(history.canGoBack(group.id) ? {} : { disabled: true }) },
+      {
+        id: 'forward',
+        label: 'Forward (Alt+Right)',
+        icon: 'arrow-right',
+        ...(history.canGoForward(group.id) ? {} : { disabled: true }),
+      },
+      { id: 'up', label: 'Up one level (Alt+Up)', icon: 'arrow-up', ...(group.path === '' ? { disabled: true } : {}) },
+      { id: 'refresh', label: 'Refresh listing (F5)', icon: 'refresh' },
+      { id: 'new-file', label: 'New file…', icon: 'file-plus' },
+      { id: 'new-folder', label: 'New folder… (Ctrl+Shift+N)', icon: 'folder-plus' },
+      { id: 'upload', label: 'Upload files', icon: 'upload' },
+    ];
+  }
+
   /** A folder tab: the listing, its toolbar and its states. */
   private folderViewModel(group: PanelGroupState, active: boolean): UiFileBrowserModel {
     const state = this.parent.fsDataFt.listingState(group.path);
-    const entries = this.parent.fsDataFt.entries(group.path);
+    const all = this.parent.fsDataFt.entries(group.path);
+    const entries = this.visibleEntries(group.id, group.path);
+    const filter = this.filterOf(group.id);
 
     return {
       breadcrumbs: this.breadcrumbs(group.path),
+      location: `/${group.path}`,
       view: group.view,
-      toolbarActions: FOLDER_TOOLBAR,
+      toolbarActions: this.folderToolbar(group),
       showViewSwitch: true,
-      columns: COLUMNS,
+      searchPlaceholder: FILTER_PLACEHOLDER,
+      filterText: filter,
+      sortable: true,
+      ...this.focusTokens(group.id),
+      columns: columnsFor(this.sortOf(group.id)),
       rows:
         group.view === 'tree'
           ? this.treeRows(group, group.path, 0, active)
           : entries.map((entry) => this.row(entry, group, active)),
       items: entries.map((entry) => this.item(entry, group, active)),
       // Kept through a reload, like the rows: the count changes when the answer does.
-      ...(state?.listing ? { summary: this.summary(entries.length), dropFolder: true } : {}),
-      ...this.placeholder(state, entries.length),
+      ...(state?.listing ? { summary: this.summary(entries.length, all.length, filter), dropFolder: true } : {}),
+      ...this.placeholder(state, entries.length, all.length, filter),
     };
   }
 
@@ -503,8 +831,10 @@ export class FileBrowserFeature implements PanelContentFeature {
 
     return {
       breadcrumbs: this.breadcrumbs(tab.path),
+      location: `/${tab.path}`,
+      ...this.focusTokens(group.id),
       view: group.view,
-      toolbarActions: FILE_TOOLBAR,
+      toolbarActions: this.fileToolbar(),
       columns: COLUMNS,
       rows: [],
       items: [],
@@ -520,9 +850,24 @@ export class FileBrowserFeature implements PanelContentFeature {
    * rather than `{ empty: undefined }` so the spread stays compatible with
    * `exactOptionalPropertyTypes`.
    */
+  private focusTokens(groupId: string): Pick<UiFileBrowserModel, 'filterFocus' | 'locationEdit'> {
+    const requests = this.focusRequests()[groupId];
+    return requests === undefined ? {} : { filterFocus: requests.filter, locationEdit: requests.location };
+  }
+
+  /** A file tab's toolbar: back to its folder, re-read, save, and open it outside the app. */
+  private fileToolbar(): readonly UiIconAction[] {
+    return [
+      ...FILE_TOOLBAR,
+      { id: 'open-external', label: this.parent.systemOpenFt.openLabel(), icon: 'external' },
+    ];
+  }
+
   private placeholder(
     state: FsListingState | undefined,
     count: number,
+    total: number,
+    filter: string,
   ): Pick<UiFileBrowserModel, 'empty'> | Record<string, never> {
     if (state?.status === 'error') {
       return {
@@ -533,20 +878,31 @@ export class FileBrowserFeature implements PanelContentFeature {
         },
       };
     }
+    if (state?.listing && count === 0 && total > 0 && filter.trim() !== '') {
+      return {
+        empty: {
+          icon: 'filter',
+          title: `No items match '${filter.trim()}'`,
+          hint: `Clear the filter to see all ${total} ${total === 1 ? 'item' : 'items'}.`,
+        },
+      };
+    }
     if (state?.listing && count === 0) {
       return { empty: EMPTY_FOLDER };
     }
     return {};
   }
 
-  private summary(count: number): string {
-    return `${count} ${count === 1 ? 'item' : 'items'}`;
+  /** `6 items` — or, while a filter hides some, `2 of 6 items`. */
+  private summary(count: number, total: number, filter: string): string {
+    const noun = total === 1 ? 'item' : 'items';
+    return filter.trim() === '' || count === total ? `${count} ${count === 1 ? 'item' : 'items'}` : `${count} of ${total} ${noun}`;
   }
 
   private breadcrumbs(path: string): readonly UiBreadcrumb[] {
     const root: UiBreadcrumb = {
       id: 'root',
-      label: this.parent.mockWorkbench.workspaceName,
+      label: this.parent.workspaceName(),
       icon: 'desktop',
     };
     const segments = path.split('/').filter(Boolean);
@@ -562,7 +918,14 @@ export class FileBrowserFeature implements PanelContentFeature {
    */
   private treeRows(group: PanelGroupState, path: string, depth: number, active: boolean): UiFileRow[] {
     const open = this.expandedIn(group.id);
-    return this.parent.fsDataFt.entries(path).flatMap((entry) => {
+    const filtering = this.filterOf(group.id).trim() !== '';
+    const matches = nameFilter(this.filterOf(group.id));
+    // Unfiltered here: an open folder whose own name does not match stays, for
+    // the matches inside it; `visibleEntries` still gives the panel's order.
+    const entries = sortEntries(this.parent.fsDataFt.entries(path), this.sortOf(group.id), (entry) =>
+      this.parent.fileViewModel.typeLabel(entry),
+    );
+    return entries.flatMap((entry) => {
       const expandable = isFolder(entry);
       const expanded = expandable && open.has(entry.path);
       // Busy only while there is nothing to list yet; a reload keeps the children up.
@@ -575,7 +938,11 @@ export class FileBrowserFeature implements PanelContentFeature {
         ...(expandable ? { expanded } : {}),
         ...(loading ? { busy: true } : {}),
       };
-      return expanded ? [row, ...this.treeRows(group, entry.path, depth + 1, active)] : [row];
+      const children = expanded ? this.treeRows(group, entry.path, depth + 1, active) : [];
+      if (filtering && !matches(entry.name) && children.length === 0) {
+        return [];
+      }
+      return [row, ...children];
     });
   }
 
@@ -610,11 +977,13 @@ export class FileBrowserFeature implements PanelContentFeature {
 
   private item(entry: FsEntry, group: PanelGroupState, active: boolean): UiIconViewItem {
     const files = this.parent.fileViewModel;
+    const thumbnail = this.parent.thumbnailsFt.urlFor(entry);
     return {
       id: entry.path,
       label: entry.name,
       icon: files.icon(entry),
       tint: files.tint(entry),
+      ...(thumbnail === undefined ? {} : { thumbnail }),
       ...(group.selection.includes(entry.path) ? { selected: true } : {}),
       ...(active && group.focusedEntryId === entry.path ? { focused: true } : {}),
       ...this.dragFlags(entry),

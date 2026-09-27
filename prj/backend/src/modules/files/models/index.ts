@@ -8,3 +8,7 @@ export type {
   FilePermissionsDto,
   PermissionTripletDto,
 } from './file-details.model.js';
+export { SearchResult } from './search-result.model.js';
+export type { SearchResultDto } from './search-result.model.js';
+export { NO_PLACES } from './place.model.js';
+export type { PlaceDto, PlaceKind, PlacesDto, PlacesProvider, SystemPlace } from './place.model.js';

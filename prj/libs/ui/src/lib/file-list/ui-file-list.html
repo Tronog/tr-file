@@ -16,9 +16,24 @@
           [style.width]="column.width"
           [attr.aria-sort]="ariaSort(column)"
         >
-          {{ column.label }}
-          @if (column.sort) {
-            <ui-icon class="sort-icon" [name]="sortIcon(column)" />
+          @if (sortable()) {
+            <!-- A button, so sorting is a keyboard stop too (PRD 003, §5). -->
+            <button
+              type="button"
+              class="sort-button"
+              [attr.title]="'Sort by ' + column.label"
+              (click)="sort.emit(column.key)"
+            >
+              {{ column.label }}
+              @if (column.sort) {
+                <ui-icon class="sort-icon" [name]="sortIcon(column)" />
+              }
+            </button>
+          } @else {
+            {{ column.label }}
+            @if (column.sort) {
+              <ui-icon class="sort-icon" [name]="sortIcon(column)" />
+            }
           }
         </th>
       }

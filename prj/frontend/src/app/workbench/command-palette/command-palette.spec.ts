@@ -244,12 +244,33 @@ describe('CommandPaletteFeature', () => {
   it('opens on Ctrl+Shift+P, F1 and Ctrl+P, listing every command', () => {
     expect(shortcut('P', { ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(true);
     expect(palette().isOpen()).toBe(true);
+    // Only what applies to the active panel — nothing is selected, so nothing to rename or trash.
     expect(palette().items().map((item) => item.label)).toEqual([
       'Go: Jump to Folder…',
-      'File: Copy To…',
-      'File: Move To…',
-      'File: Move to Trash',
+      'File: New File…',
+      'File: New Folder…',
+      'File: Upload Files…',
+      'File: Upload Folder…',
+      'File: Copy Path',
       'File: Empty Trash…',
+      'Edit: Filter Folder',
+      'Edit: Search Files…',
+      'Selection: Select All',
+      'Selection: Invert Selection',
+      'View: List',
+      'View: Icons',
+      'View: Tree',
+      'View: Sort by Name',
+      'View: Sort by Size',
+      'View: Sort by Type',
+      'View: Sort by Date Modified',
+      'View: Descending',
+      'View: Show Hidden Files',
+      'View: Refresh',
+      'View: Show Bookmarks',
+      'Preferences: Restore Layout on Start',
+      'View: Reset Layout',
+      'Go: Go to Location…',
       'Remote: Connect to Remote Server…',
     ]);
     expect(palette().activeId()).toBe('go.jumpToFolder');
@@ -326,6 +347,8 @@ describe('CommandPaletteFeature', () => {
       http.expectOne(detailsUrl('docs/prd')).flush(fsEnvelope(fsDetails('docs/prd', { type: 'directory' })));
       await accepted;
       http.expectOne(listUrl('docs/prd')).flush(fsEnvelope(fsListing('docs/prd', [])));
+      // The explorer opens the folders above it, to reveal where the panel went (PRD 001, §9.1.2).
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [])));
       await settled();
 
       expect(palette().isOpen()).toBe(false);

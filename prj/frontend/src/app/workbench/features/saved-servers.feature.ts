@@ -1,7 +1,8 @@
 import { computed, signal } from '@angular/core';
+import { SettingsService, type SettingsStore } from '../../settings/settings.service';
 import type { RemoteTarget } from '../command-palette/remote-target';
 
-/** Where the list lives in `localStorage`; the suffix is its format's version. */
+/** The settings key of the list; the suffix is its format's version. */
 export const SAVED_SERVERS_KEY = 'tr-file.remote-servers.v1';
 
 /**
@@ -25,19 +26,26 @@ export interface SavedServer {
  * The remote servers kept on this machine (PRD 009, §1): the list *Connect to
  * Remote Server* offers, with adding, editing and removing.
  *
- * Kept in `localStorage`, read once and written on every change. Storage that
- * is missing, full or refused — a private window, a policy — only means
- * nothing is remembered; the list still works for the session.
+ * Kept in the app's settings (`SettingsService`: `localStorage` in a browser,
+ * a file on the desktop, whose page origin changes with every start — PRD
+ * 003, §6), read once and written on every change. Storage that is missing,
+ * full or refused only means nothing is remembered; the list still works for
+ * the session.
  */
 export class SavedServersFeature {
-  private readonly list = signal<readonly SavedServer[]>(SavedServersFeature.load());
+  private readonly list: ReturnType<typeof signal<readonly SavedServer[]>>;
 
   /** Most recently used first, then most recently added. */
   readonly servers = computed(() =>
     [...this.list()].sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || b.addedAt - a.addedAt),
   );
 
-  constructor(private readonly now: () => number = () => Date.now()) {}
+  constructor(
+    private readonly now: () => number = () => Date.now(),
+    private readonly store: SettingsStore = new SettingsService(),
+  ) {
+    this.list = signal<readonly SavedServer[]>(SavedServersFeature.load(store));
+  }
 
   find(id: string): SavedServer | undefined {
     return this.list().find((server) => server.id === id);
@@ -95,11 +103,7 @@ export class SavedServersFeature {
 
   private save(list: readonly SavedServer[]): void {
     this.list.set(list);
-    try {
-      localStorage.setItem(SAVED_SERVERS_KEY, JSON.stringify(list));
-    } catch {
-      // Not remembered past this session; nothing else is lost.
-    }
+    this.store.set(SAVED_SERVERS_KEY, list);
   }
 
   private static same(server: SavedServer, target: RemoteTarget): boolean {
@@ -112,22 +116,9 @@ export class SavedServersFeature {
   }
 
   /** What storage holds, keeping only entries that are still well formed. */
-  private static load(): readonly SavedServer[] {
-    let raw: string | null;
-    try {
-      raw = localStorage.getItem(SAVED_SERVERS_KEY);
-    } catch {
-      return [];
-    }
-    if (raw === null) {
-      return [];
-    }
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter(SavedServersFeature.isServer) : [];
-    } catch {
-      return [];
-    }
+  private static load(store: SettingsStore): readonly SavedServer[] {
+    const parsed = store.get<unknown>(SAVED_SERVERS_KEY);
+    return Array.isArray(parsed) ? parsed.filter(SavedServersFeature.isServer) : [];
   }
 
   private static isServer(value: unknown): value is SavedServer {

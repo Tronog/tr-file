@@ -81,7 +81,9 @@ interface RemoteUpload {
  * - `read` asks for one chunk with an HTTP `Range`;
  * - an upload is one streamed multipart `POST`: `upload-begin` opens it,
  *   each `upload-chunk` feeds it, `upload-commit` ends it and reads the answer;
- * - `saveCopy` streams a download straight to the chosen file.
+ * - `saveCopy` streams a download straight to the chosen file;
+ * - everything else — rename, new folder and file, search, watch, and the
+ *   file operations — is one JSON request each.
  *
  * Every failure comes back flattened, with the remote server's own code and
  * status, or `NETWORK_ERROR` when the server could not be reached.
@@ -166,6 +168,35 @@ export class RemoteBackend {
         query: { path },
         ...(options.signal ? { signal: options.signal } : {}),
       });
+      return { data: await this.saveBody(response, destination, options) };
+    } catch (error) {
+      return { error: RemoteBackend.flatten(error, this.name) };
+    }
+  }
+
+  /**
+   * Streams a zip of remote entries to `destination` (PRD 003, §6): the
+   * server writes it as it goes, so nothing is known of its size ahead.
+   */
+  async saveZip(
+    paths: readonly string[],
+    destination: string,
+    options: FsSaveCopyOptions = {},
+  ): Promise<FsBridgeResponse<{ readonly bytes: number }>> {
+    try {
+      const response = await this.request('GET', '/archive/zip', {
+        query: { path: paths },
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+      return { data: await this.saveBody(response, destination, options) };
+    } catch (error) {
+      return { error: RemoteBackend.flatten(error, this.name) };
+    }
+  }
+
+  /** Writes a response body to `destination`, counting; a failed or aborted copy leaves nothing. */
+  private async saveBody(response: Response, destination: string, options: FsSaveCopyOptions): Promise<{ readonly bytes: number }> {
+    {
       const total = Number(response.headers.get('content-length') ?? 0);
       let loaded = 0;
       const report = options.onProgress;
@@ -189,9 +220,7 @@ export class RemoteBackend {
           ? new RemoteFailure({ code: 'ABORTED', message: 'The download was cancelled.', status: 0 })
           : error;
       }
-      return { data: { bytes: loaded } };
-    } catch (error) {
-      return { error: RemoteBackend.flatten(error, this.name) };
+      return { bytes: loaded };
     }
   }
 
@@ -247,7 +276,59 @@ export class RemoteBackend {
         return this.json('GET', `/ops/jobs/${encodeURIComponent(request.jobId)}`);
       case 'op-cancel':
         return this.json('POST', `/ops/jobs/${encodeURIComponent(request.jobId)}/cancel`, { body: {} });
+      case 'op-delete':
+        return this.json('POST', '/ops/delete', { body: { paths: request.paths }, accept: [202] });
+      case 'op-restore':
+        return this.json('POST', '/ops/restore', { body: { ids: request.ids }, accept: [202] });
+      // Things every file manager has (PRD 003, §5).
+      case 'rename':
+        return this.json('POST', '/fs/rename', { body: { path: request.path, to: request.to } });
+      case 'mkdir':
+      case 'create-file':
+        return this.json('POST', request.command === 'mkdir' ? '/fs/mkdir' : '/fs/create', {
+          body: { path: request.path, name: request.name },
+          accept: [201],
+        });
+      case 'search':
+        return this.json('GET', '/fs/search', {
+          query: {
+            path: request.path,
+            query: request.query,
+            ...(request.limit === undefined ? {} : { limit: String(request.limit) }),
+          },
+        });
+      case 'watch':
+        // The remote server keeps the session; its id travels back and forth unchanged.
+        return this.json('POST', '/fs/watch', { body: { watchId: request.watchId, paths: request.paths } });
+      case 'places':
+        return this.places();
+      // Archives (PRD 003, §6).
+      case 'archive-list':
+        return this.json('GET', '/archive/list', { query: { path: request.path, inner: request.inner } });
+      case 'op-compress':
+        return this.json('POST', '/ops/compress', {
+          body: { sources: request.sources, destination: request.destination, name: request.name, conflict: request.conflict },
+          accept: [202],
+        });
+      case 'op-extract':
+        return this.json('POST', '/ops/extract', {
+          body: { path: request.path, destination: request.destination, conflict: request.conflict },
+          accept: [202],
+        });
     }
+  }
+
+  /**
+   * The server's places (PRD 003, §6) — a server names only its root. One
+   * from before places existed answers `404`, and has that root all the same.
+   */
+  private async places(): Promise<unknown> {
+    const response = await this.request('GET', '/fs/places', { accept: [200, 404] });
+    if (response.status === 404) {
+      await response.body?.cancel();
+      return { home: '', places: [{ id: 'root', label: 'Files', kind: 'root', path: '' }] };
+    }
+    return ((await response.json()) as { data: unknown }).data;
   }
 
   /**
@@ -453,7 +534,7 @@ export class RemoteBackend {
     method: 'GET' | 'POST',
     path: string,
     options: {
-      query?: Record<string, string>;
+      query?: Record<string, string | readonly string[]>;
       body?: unknown;
       rawBody?: AsyncIterable<Uint8Array>;
       headers?: Record<string, string>;
@@ -463,7 +544,9 @@ export class RemoteBackend {
   ): Promise<Response> {
     const url = new URL(`${this.api}${path}`);
     for (const [key, value] of Object.entries(options.query ?? {})) {
-      url.searchParams.set(key, value);
+      for (const one of typeof value === 'string' ? [value] : value) {
+        url.searchParams.append(key, one);
+      }
     }
     const headers: Record<string, string> = { ...(options.headers ?? {}) };
     if (method !== 'GET') {

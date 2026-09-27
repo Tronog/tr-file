@@ -15,12 +15,17 @@ import type {
   FsDirectoryListing,
   FsDownload,
   FsDownloadResult,
+  FsArchiveListing,
+  FsClipboardFiles,
   FsEnvelope,
   FsOperationJob,
+  FsPlaces,
   FsOperationRequest,
   FsOperationsInfo,
+  FsSearchResult,
   FsUpload,
   FsUploadProgress,
+  FsWatchResult,
 } from './file-system.model';
 import type { AuthStatus } from '../auth/auth.model';
 import { FS_ABORTED, FsError } from './fs-error';
@@ -146,10 +151,51 @@ export class FsHttpService implements FsTransport {
     };
   }
 
+  /**
+   * A zip of the entries, written by the server as it is sent (PRD 003, §6).
+   * Each entry is looked up first, so one that is gone or out of reach fails
+   * here in the contract's words; the zip itself is then the browser's to
+   * save, like any download.
+   */
+  saveZip(paths: readonly string[], name: string): FsDownload {
+    const progress = signal<FsUploadProgress>(IDLE_PROGRESS);
+    let cancelled = false;
+    let fail: (error: FsError) => void = () => undefined;
+    const result = new Promise<FsDownloadResult>((resolve, reject) => {
+      fail = reject;
+      void Promise.all(paths.map((path) => this.details(path))).then(
+        () => {
+          if (cancelled) {
+            return;
+          }
+          let params = new HttpParams().set('name', name);
+          for (const path of paths) {
+            params = params.append('path', path);
+          }
+          this.handUrlToBrowser(`/api/archive/zip?${params.toString()}`, name);
+          resolve({ outcome: 'delegated' });
+        },
+        (error: unknown) => reject(FsError.from(error)),
+      );
+    });
+    return {
+      progress: progress.asReadonly(),
+      result,
+      cancel: () => {
+        cancelled = true;
+        fail(new FsError('The download was cancelled.', 0, FS_ABORTED));
+      },
+    };
+  }
+
   /** The backend answers with `Content-Disposition: attachment`, so this saves. */
   private handToBrowser(path: string, name: string): void {
+    this.handUrlToBrowser(this.downloadUrl(path), name);
+  }
+
+  private handUrlToBrowser(url: string, name: string): void {
     const anchor = document.createElement('a');
-    anchor.href = this.downloadUrl(path);
+    anchor.href = url;
     anchor.download = name;
     anchor.rel = 'noopener';
     document.body.append(anchor);
@@ -246,6 +292,92 @@ export class FsHttpService implements FsTransport {
 
   async logout(): Promise<AuthStatus> {
     return this.request<AuthStatus>(this.http.post<FsEnvelope<AuthStatus>>('/api/auth/logout', {}));
+  }
+
+  /* -- changing names, making entries (PRD 003, §5) ------------------------ */
+
+  async rename(path: string, to: string): Promise<FsDetails> {
+    return this.request(this.http.post<FsEnvelope<FsDetails>>(`${this.baseUrl}/rename`, { path, to }));
+  }
+
+  async createFolder(parent: string, name: string): Promise<FsDetails> {
+    return this.request(this.http.post<FsEnvelope<FsDetails>>(`${this.baseUrl}/mkdir`, { path: parent, name }));
+  }
+
+  async createFile(parent: string, name: string): Promise<FsDetails> {
+    return this.request(this.http.post<FsEnvelope<FsDetails>>(`${this.baseUrl}/create`, { path: parent, name }));
+  }
+
+  async search(path: string, query: string, limit?: number): Promise<FsSearchResult> {
+    let params = new HttpParams().set('path', path).set('query', query);
+    if (limit !== undefined) {
+      params = params.set('limit', String(limit));
+    }
+    return this.request(this.http.get<FsEnvelope<FsSearchResult>>(`${this.baseUrl}/search?${params.toString()}`));
+  }
+
+  async watch(watchId: string | null, paths: readonly string[]): Promise<FsWatchResult> {
+    return this.request(this.http.post<FsEnvelope<FsWatchResult>>(`${this.baseUrl}/watch`, { watchId, paths }));
+  }
+
+  /* -- places and archives (PRD 003, §6) ----------------------------------- */
+
+  /** A server from before places existed answers `404`; it has its root all the same. */
+  async places(): Promise<FsPlaces> {
+    try {
+      return (await firstValueFrom(this.http.get<FsEnvelope<FsPlaces>>(`${this.baseUrl}/places`))).data;
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 404) {
+        return { home: '', places: [{ id: 'root', label: 'Files', kind: 'root', path: '' }] };
+      }
+      throw FsError.from(error);
+    }
+  }
+
+  async archiveList(path: string, inner: string): Promise<FsArchiveListing> {
+    const params = new HttpParams().set('path', path).set('inner', inner);
+    return this.request(this.http.get<FsEnvelope<FsArchiveListing>>(`/api/archive/list?${params.toString()}`));
+  }
+
+  /* -- the user's own computer (PRD 003, §5) -------------------------------- */
+
+  /** A browser tab has no file manager to show a file in. */
+  readonly systemShell = false;
+
+  /** Nor a clipboard of files, nor a way to drag one out (PRD 003, §6). */
+  readonly systemFiles = false;
+
+  async readClipboard(): Promise<FsClipboardFiles> {
+    return { paths: [], cut: false, outside: 0 };
+  }
+
+  async writeClipboard(): Promise<void> {
+    // A page cannot put files on the system clipboard.
+  }
+
+  startDrag(): boolean {
+    return false;
+  }
+
+  /** A page never learns where a dropped file came from: every one is an upload. */
+  async localPaths(files: readonly File[]): Promise<readonly (string | null)[]> {
+    return files.map(() => null);
+  }
+
+  /**
+   * A new browser tab on the file itself, served `inline` — the browser shows
+   * what it can (a PDF, a picture, a video) and saves the rest. The server
+   * makes anything that could run script there inert, since it is served
+   * from the app's own origin.
+   */
+  async openExternally(path: string): Promise<boolean> {
+    const params = new HttpParams().set('path', path).set('inline', 'true');
+    globalThis.window?.open(`${this.baseUrl}/download?${params.toString()}`, '_blank', 'noopener');
+    return true;
+  }
+
+  async reveal(): Promise<void> {
+    throw new FsError('Showing a file in its folder works in the desktop app only.', 400, 'NOT_SUPPORTED');
   }
 
   /* -- file operations (PRD 005, §1) --------------------------------------- */

@@ -13,6 +13,10 @@
 @let layout = workbench.panelLayoutFt;
 @let resize = workbench.resizeFt;
 @let palette = workbench.commandPaletteFt;
+@let contextMenu = workbench.contextMenuFt;
+@let search = workbench.searchFt;
+@let places = workbench.placesFt;
+@let archive = workbench.archiveBrowserFt;
 
 <ui-workbench
   [leftWidth]="workbench.leftSidebarWidth()"
@@ -50,13 +54,96 @@
     (menuOpen)="chrome.openMenu($event)"
   />
 
-  <!-- left sidebar: the directory tree -->
-  <ui-sidebar uiSlot="left" title="Explorer" side="left" [actions]="chrome.sidebarMoreActions">
+  <!-- left sidebar: the directory tree, or the Search view (PRD 003, §5) -->
+  <ui-sidebar
+    uiSlot="left"
+    side="left"
+    data-focus-region="explorer"
+    [title]="chrome.sidebarView() === 'search' ? 'Search' : 'Explorer'"
+    [actions]="chrome.sidebarMoreActions"
+  >
+   @if (chrome.sidebarView() === 'search') {
+    <ui-pane
+      title="Files by name"
+      [expanded]="panes.isExpanded('search-results')"
+      [actions]="search.actions()"
+      [grow]="true"
+      (toggle)="panes.toggle('search-results')"
+      (actionSelect)="search.runAction($event)"
+    >
+      <div class="search-view">
+        <ui-search-field
+          class="search-box"
+          placeholder="Search by name, or *.md"
+          label="Search files and folders by name"
+          [value]="search.query()"
+          [focusToken]="search.focusToken()"
+          (valueChange)="search.setQuery($event)"
+          (keydown.enter)="search.searchNow()"
+        />
+        <p class="sidebar-note search-scope">{{ search.scopeLabel() }}</p>
+        @if (search.error(); as message) {
+          <p class="sidebar-note" role="alert">{{ message }}</p>
+        }
+        <p class="sidebar-note" role="status">{{ search.summary() }}</p>
+        @if (search.nodes().length > 0) {
+          <ui-tree
+            label="Search results"
+            [nodes]="search.nodes()"
+            (activate)="search.reveal($event)"
+            (open)="search.open($event)"
+          />
+        }
+      </div>
+    </ui-pane>
+   } @else {
+    <!-- Places, Bookmarks and Recent (PRD 003, §6): the root, home, the user's folders, drives. -->
     <ui-pane
       title="Places"
       [expanded]="panes.isExpanded('places')"
-      (toggle)="panes.toggle('places')"
-    />
+      (toggle)="panes.toggle('places'); places.load()"
+    >
+      <ui-tree
+        label="Places"
+        [nodes]="places.placeNodes()"
+        (activate)="places.open($event)"
+        (contextMenu)="places.openMenu($event)"
+      />
+    </ui-pane>
+
+    <ui-pane
+      title="Bookmarks"
+      [expanded]="panes.isExpanded('bookmarks')"
+      (toggle)="panes.toggle('bookmarks')"
+    >
+      @if (places.bookmarkNodes().length === 0) {
+        <p class="sidebar-note">Right-click a folder and choose Add to Bookmarks to pin it here.</p>
+      } @else {
+        <ui-tree
+          label="Bookmarks"
+          [nodes]="places.bookmarkNodes()"
+          (activate)="places.open($event)"
+          (contextMenu)="places.openMenu($event)"
+        />
+      }
+    </ui-pane>
+
+    <ui-pane
+      title="Recent"
+      [expanded]="panes.isExpanded('recent')"
+      (toggle)="panes.toggle('recent')"
+    >
+      @if (places.recentNodes().length === 0) {
+        <p class="sidebar-note">Folders you open are listed here.</p>
+      } @else {
+        <ui-tree
+          label="Recent folders"
+          [nodes]="places.recentNodes()"
+          (activate)="places.open($event)"
+          (contextMenu)="places.openMenu($event)"
+        />
+      }
+    </ui-pane>
 
     <ui-pane
       [title]="explorer.title"
@@ -77,12 +164,12 @@
           (toggle)="explorer.toggle($event)"
           (activate)="explorerNav.open($event)"
           (open)="preview.openFromExplorer($event)"
+          (contextMenu)="contextMenu.openInTree($event)"
         />
       }
     </ui-pane>
 
-    <ui-pane title="Outline" [expanded]="panes.isExpanded('outline')" (toggle)="panes.toggle('outline')" />
-    <ui-pane title="Timeline" [expanded]="panes.isExpanded('timeline')" (toggle)="panes.toggle('timeline')" />
+   }
   </ui-sidebar>
 
   <!-- centre: the split panel grid above the bottom panel -->
@@ -96,6 +183,7 @@
         <ng-template #leaf let-groupId>
           @if (groups.group(groupId); as group) {
             <ui-panel-group
+              [attr.data-focus-region]="'group:' + groupId"
               [group]="group"
               [active]="groups.isActive(groupId)"
               [acceptFiles]="groups.acceptsFiles(groupId)"
@@ -104,12 +192,13 @@
               (tabSelect)="groups.selectTab(groupId, $event)"
               (tabActivate)="panelFocus.focusBody(groupId)"
               (tabDoubleClick)="groups.runAction(groupId, 'maximize')"
+              (tabContextMenu)="contextMenu.openOnTab(groupId, $event)"
               (bodyPress)="panelFocus.focusBody(groupId)"
               (tabClose)="groups.closeTab(groupId, $event)"
               (tabMove)="groups.moveTab(groupId, $event)"
               (tabDrop)="groups.applyReorder($event)"
               (zoneDrop)="groups.applyZoneDrop($event)"
-              (fileDrop)="files.uploadInto(groupId, $event)"
+              (filesDrop)="files.dropFiles(groupId, $event)"
               (actionSelect)="groups.runAction(groupId, $event)"
             >
               <!-- What the active tab shows; one case per kind of panel content. -->
@@ -127,6 +216,27 @@
                       (itemActivate)="files.openEntry(groupId, $event)"
                       (command)="panelKeys.run(groupId, $event)"
                       (entryDrop)="files.dropEntries(groupId, $event)"
+                      (sortChange)="files.toggleSort(groupId, $event)"
+                      (filterChange)="files.setFilter(groupId, $event)"
+                      (pathSubmit)="files.goToLocation(groupId, $event)"
+                      (contextMenu)="contextMenu.openInPanel(groupId, $event)"
+                      [nativeDrag]="files.nativeDrag()"
+                      (nativeDragStart)="files.startNativeDrag($event)"
+                      (filesDrop)="files.dropFiles(groupId, $event)"
+                      (itemsShown)="files.showItems($event)"
+                    />
+                  }
+                }
+                <!-- Inside a zip (PRD 003, §6): read-only, one folder of it at a time. -->
+                @case ('archive') {
+                  @if (archive.browser(groupId); as browser) {
+                    <ui-file-browser
+                      [browser]="browser"
+                      (toolbarAction)="archive.runToolbarAction(groupId, $event)"
+                      (breadcrumbSelect)="archive.openBreadcrumb(groupId, $event)"
+                      (selectionChange)="archive.setSelection(groupId, $event)"
+                      (rowActivate)="archive.openEntry(groupId, $event)"
+                      (command)="archive.runKey(groupId, $event.command, $event.entryId)"
                     />
                   }
                 }
@@ -150,6 +260,7 @@
     }
 
     <ui-bottom-panel
+      data-focus-region="bottom"
       class="bottom-panel"
       label="Workbench panel"
       [style.height.px]="panel.collapsed() ? null : workbench.bottomPanelHeight()"
@@ -199,6 +310,7 @@
   <!-- right sidebar: details of the selected entry -->
   <ui-sidebar
     uiSlot="right"
+    data-focus-region="details"
     title="Details"
     side="right"
     [actions]="chrome.sidebarMoreActions"
@@ -264,6 +376,18 @@
   (change)="onFilesChosen($event)"
 />
 
+<!-- The folder picker of Upload Folder… (PRD 003, §6); never visible either. -->
+<input
+  #folderPicker
+  class="file-picker"
+  type="file"
+  webkitdirectory
+  multiple
+  tabindex="-1"
+  aria-hidden="true"
+  (change)="onFilesChosen($event)"
+/>
+
 <!-- The Settings gear's menu (PRD 007, §1): fixed, beside the gear, opening upward. -->
 @if (chrome.settingsMenu(); as menu) {
   <ui-context-menu
@@ -272,9 +396,22 @@
     [fixed]="true"
     [x]="menu.x"
     [y]="menu.y"
-    [items]="chrome.settingsMenuItems"
+    [items]="chrome.settingsMenuItems()"
     (select)="chrome.runSettingsItem($event)"
     (dismiss)="chrome.closeSettingsMenu()"
+  />
+}
+
+<!-- The right-click menus (PRD 003, §5): on an entry, blank space, a tree folder or a tab. -->
+@for (menu of contextMenu.menus(); track menu) {
+  <ui-context-menu
+    [label]="menu.label"
+    [fixed]="true"
+    [x]="menu.x"
+    [y]="menu.y"
+    [items]="menu.items"
+    (select)="contextMenu.run($event)"
+    (dismiss)="contextMenu.close()"
   />
 }
 

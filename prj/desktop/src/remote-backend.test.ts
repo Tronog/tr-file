@@ -236,7 +236,7 @@ describe('RemoteBackend commands', () => {
   });
 
   it('runs file operations on the server, polled by id (PRD 005, §1)', async () => {
-    assert.deepEqual(dataOf(await remote.dispatch({ command: 'op-info' })), { trash: 'server' });
+    assert.deepEqual(dataOf(await remote.dispatch({ command: 'op-info' })), { trash: 'server', canRestore: true });
     const started = dataOf<{ id: string; state: string }>(
       await remote.dispatch({ command: 'op-copy', sources: ['README.md'], destination: '', conflict: 'rename' }),
     );
@@ -259,5 +259,107 @@ describe('RemoteBackend commands', () => {
       'done',
     );
     assert.equal(errorOf(await remote.dispatch({ command: 'op-status', jobId: 'nope' })).status, 404);
+  });
+
+  it('renames, makes folders and files, over /api/fs (PRD 003, §5)', async () => {
+    const folder = dataOf<{ path: string; type: string }>(await remote.dispatch({ command: 'mkdir', path: '', name: 'made' }));
+    assert.deepEqual([folder.path, folder.type], ['made', 'directory']);
+
+    const file = dataOf<{ path: string }>(await remote.dispatch({ command: 'create-file', path: 'made', name: 'new.txt' }));
+    assert.equal(file.path, 'made/new.txt');
+    assert.equal(await readFile(join(root, 'made', 'new.txt'), 'utf8'), '');
+
+    const renamed = dataOf<{ path: string }>(await remote.dispatch({ command: 'rename', path: 'made/new.txt', to: 'made/old.txt' }));
+    assert.equal(renamed.path, 'made/old.txt');
+
+    const taken = errorOf(await remote.dispatch({ command: 'create-file', path: 'made', name: 'old.txt' }));
+    assert.deepEqual([taken.code, taken.status], ['CONFLICT', 409]);
+    assert.equal(errorOf(await remote.dispatch({ command: 'rename', path: 'made/old.txt' })).code, 'BAD_REQUEST');
+  });
+
+  it('searches, passing the limit through', async () => {
+    const found = dataOf<{ query: string; entries: { path: string }[]; truncated: boolean }>(
+      await remote.dispatch({ command: 'search', path: '', query: 'old*' }),
+    );
+    assert.equal(found.query, 'old*');
+    assert.deepEqual(found.entries.map((entry) => entry.path), ['made/old.txt']);
+
+    const limited = dataOf<{ entries: unknown[]; truncated: boolean }>(
+      await remote.dispatch({ command: 'search', path: '', query: '.', limit: 1 }),
+    );
+    assert.deepEqual([limited.entries.length, limited.truncated], [1, true]);
+    assert.equal(errorOf(await remote.dispatch({ command: 'search', path: '', query: ' ' })).status, 400);
+  });
+
+  it('watches on the server, keeping its session id', async () => {
+    const opened = dataOf<{ watchId: string; changed: string[] }>(
+      await remote.dispatch({ command: 'watch', watchId: null, paths: ['made'] }),
+    );
+    assert.deepEqual(opened.changed, []);
+
+    const again = dataOf<{ watchId: string; changed: string[] }>(
+      await remote.dispatch({ command: 'watch', watchId: opened.watchId, paths: ['made'] }),
+    );
+    assert.equal(again.watchId, opened.watchId);
+
+    const resync = dataOf<{ watchId: string; changed: string[] }>(
+      await remote.dispatch({ command: 'watch', watchId: 'from-before', paths: ['made'] }),
+    );
+    assert.deepEqual(resync.changed, ['made']);
+  });
+
+  it('trashes, restores and deletes on the server, with the outcome', async () => {
+    const settle = async (started: { id: string; state: string }) => {
+      let job = started as { id: string; state: string; outcome: { source: string; target: string }[] };
+      while (job.state === 'running') {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        job = dataOf(await remote.dispatch({ command: 'op-status', jobId: started.id }));
+      }
+      return job;
+    };
+
+    const trashed = await settle(dataOf(await remote.dispatch({ command: 'op-trash', paths: ['made/old.txt'] })));
+    const id = trashed.outcome[0]?.target as string;
+    const restored = await settle(dataOf(await remote.dispatch({ command: 'op-restore', ids: [id] })));
+    assert.deepEqual(restored.outcome, [{ source: id, target: 'made/old.txt' }]);
+
+    const deleted = await settle(dataOf(await remote.dispatch({ command: 'op-delete', paths: ['made'] })));
+    assert.equal(deleted.state, 'done');
+    assert.equal((await readdir(root)).includes('made'), false);
+    assert.equal(errorOf(await remote.dispatch({ command: 'op-restore', ids: ['nope'] })).status, 404);
+  });
+});
+
+describe('RemoteBackend places and archives (PRD 003, §6)', () => {
+  it('answers the server’s places: its root and nothing else', async () => {
+    const remote = await connected();
+    assert.deepEqual(dataOf(await remote.dispatch({ command: 'places' })), {
+      home: '',
+      places: [{ id: 'root', label: 'Files', kind: 'root', path: '' }],
+    });
+  });
+
+  it('compresses on the server, lists the zip, and saves a zip of it here', async () => {
+    const remote = await connected();
+    let job = dataOf<{ id: string; state: string }>(
+      await remote.dispatch({ command: 'op-compress', sources: ['README.md'], destination: '', name: 'readme.zip', conflict: 'fail' }),
+    );
+    while (job.state === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      job = dataOf(await remote.dispatch({ command: 'op-status', jobId: job.id }));
+    }
+    assert.equal(job.state, 'done');
+
+    const listing = dataOf<{ entries: { name: string }[] }>(await remote.dispatch({ command: 'archive-list', path: 'readme.zip', inner: '' }));
+    assert.deepEqual(listing.entries.map((entry) => entry.name), ['README.md']);
+
+    const local = await mkdtemp(join(tmpdir(), 'tr-file-remote-zip-'));
+    try {
+      const saved = await remote.saveZip(['README.md', 'empty.txt'], join(local, 'both.zip'));
+      assert.ok('data' in saved, JSON.stringify(saved));
+      assert.equal((await readFile(join(local, 'both.zip'))).subarray(0, 2).toString(), 'PK');
+    } finally {
+      await rm(local, { recursive: true, force: true });
+    }
   });
 });

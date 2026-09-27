@@ -1,25 +1,40 @@
 import { realpath } from 'node:fs/promises';
-import { isAbsolute, relative as relativePath, resolve, sep } from 'node:path';
+import { isAbsolute, relative as relativePath, resolve, sep, win32 } from 'node:path';
 
 import { HttpError } from '../../core/index.js';
 
 /** A request path that has been proven to live inside the configured root. */
 export class ResolvedPath {
   constructor(
-    /** Absolute path on the host file system. */
+    /**
+     * Absolute path on the host file system. `''` for the root of a
+     * `FilePathResolver.drives()` resolver, which is no folder at all but the
+     * list of drives — any file-system call on it fails with `ENOENT`.
+     */
     readonly absolute: string,
     /** Root-relative POSIX path; `''` denotes the root itself. */
     readonly relative: string,
   ) {}
 }
 
+/** `C:` — one path segment naming a Windows drive. */
+const DRIVE_SEGMENT = /^[A-Za-z]:$/;
+
 /**
  * Translates untrusted, client-supplied paths into absolute paths that are
  * guaranteed to stay within `root`. Every file-system access must go through
  * this resolver.
+ *
+ * The root is one folder — on a server, the files root; on the desktop, since
+ * PRD 003 §6, usually the whole file system: `/`. Windows has no one root, so
+ * there the desktop uses `FilePathResolver.drives()`, whose root is the list
+ * of drives: `C:/Users/me` is `C:\Users\me`, and `''` is nothing on disk.
  */
 export class FilePathResolver {
   private readonly root: string;
+
+  /** Every drive is a root of its own; `''` lists them (see `drives`). */
+  readonly allDrives: boolean;
 
   /**
    * @param reserved Names directly in the root that belong to the server,
@@ -29,12 +44,30 @@ export class FilePathResolver {
   constructor(
     root: string,
     private readonly reserved: readonly string[] = [],
+    allDrives = false,
   ) {
-    this.root = resolve(root);
+    this.allDrives = allDrives;
+    this.root = allDrives ? '' : resolve(root);
+  }
+
+  /**
+   * A resolver over every drive of a Windows machine (PRD 003, §6). Paths
+   * are Windows paths whatever the host, so it can be tested anywhere.
+   */
+  static drives(reserved: readonly string[] = []): FilePathResolver {
+    return new FilePathResolver('', reserved, true);
   }
 
   get rootPath(): string {
     return this.root;
+  }
+
+  /**
+   * Whether a root-relative path is a root nothing may rename, move or
+   * trash: the root itself, or — over every drive — a drive.
+   */
+  isRoot(relative: string): boolean {
+    return relative === '' || (this.allDrives && DRIVE_SEGMENT.test(relative));
   }
 
   /** Lexical resolution: rejects traversal out of the root. */
@@ -46,6 +79,9 @@ export class FilePathResolver {
 
     // A leading separator is interpreted relative to the root, never the host FS.
     const cleaned = raw.replace(/^[/\\]+/, '');
+    if (this.allDrives) {
+      return this.resolveOnDrive(cleaned);
+    }
     const absolute = resolve(this.root, cleaned);
     this.assertInsideRoot(absolute);
 
@@ -68,6 +104,9 @@ export class FilePathResolver {
    */
   async resolveReal(requested: string | undefined): Promise<ResolvedPath> {
     const candidate = this.resolve(requested);
+    if (candidate.absolute === '') {
+      return candidate; // The list of drives: nothing to follow.
+    }
     let real: string;
     try {
       real = await realpath(candidate.absolute);
@@ -77,9 +116,12 @@ export class FilePathResolver {
       }
       throw error;
     }
-    this.assertInsideRoot(real);
+    const relative = this.toRootRelative(real);
+    if (relative === null) {
+      throw HttpError.forbidden('Path escapes the configured files root');
+    }
     // A link elsewhere in the root must not be a way into a reserved folder either.
-    if (this.isReserved(FilePathResolver.toPosix(relativePath(this.root, real)))) {
+    if (this.isReserved(relative)) {
       throw HttpError.forbidden('That folder belongs to the server');
     }
     return candidate;
@@ -88,24 +130,68 @@ export class FilePathResolver {
   /**
    * Root-relative POSIX form of an absolute host path, or `null` when that
    * path lies outside the root. Used for reporting symlink targets without
-   * leaking host paths.
+   * leaking host paths, and for places the system names (PRD 003, §6).
    */
   toRootRelative(absolute: string): string | null {
+    if (this.allDrives) {
+      const match = /^([A-Za-z]):(?:[\\/](.*))?$/.exec(win32.resolve(absolute));
+      if (match === null) {
+        return null; // A UNC share, or not a Windows path at all.
+      }
+      const rest = FilePathResolver.toPosix((match[2] ?? '').replace(/[\\/]+$/, ''), '\\');
+      return rest === '' ? `${(match[1] as string).toUpperCase()}:` : `${(match[1] as string).toUpperCase()}:/${rest}`;
+    }
     const normalised = resolve(absolute);
-    if (normalised !== this.root && !normalised.startsWith(this.root + sep)) {
+    if (!FilePathResolver.within(this.root, normalised, sep)) {
       return null;
     }
     return FilePathResolver.toPosix(relativePath(this.root, normalised));
   }
 
+  /** `C:/Users/me` → `C:\Users\me`; the first segment must name a drive. */
+  private resolveOnDrive(cleaned: string): ResolvedPath {
+    if (cleaned === '') {
+      return new ResolvedPath('', '');
+    }
+    const [first, ...rest] = cleaned.split(/[/\\]+/);
+    if (first === undefined || !DRIVE_SEGMENT.test(first)) {
+      throw HttpError.notFound(`No such drive: ${first ?? cleaned}`);
+    }
+    // `D:` further in would be *drive-relative* — resolved against a working
+    // directory — and `name:stream` an NTFS stream; neither is a file name.
+    if (rest.some((segment) => segment.includes(':'))) {
+      throw HttpError.badRequest('Path must not contain ":" after the drive');
+    }
+    const drive = `${first.toUpperCase()}\\`;
+    const absolute = win32.resolve(drive, ...rest);
+    if (!FilePathResolver.within(drive.slice(0, -1), absolute, '\\') && absolute !== drive) {
+      throw HttpError.forbidden('Path escapes the configured files root');
+    }
+    const relative = this.toRootRelative(absolute) as string;
+    if (this.isReserved(relative)) {
+      throw HttpError.forbidden('That folder belongs to the server');
+    }
+    return new ResolvedPath(absolute, relative);
+  }
+
   private assertInsideRoot(absolute: string): void {
-    if (!isAbsolute(absolute) || (absolute !== this.root && !absolute.startsWith(this.root + sep))) {
+    if (!isAbsolute(absolute) || !FilePathResolver.within(this.root, absolute, sep)) {
       throw HttpError.forbidden('Path escapes the configured files root');
     }
   }
 
-  private static toPosix(value: string): string {
-    return value.split(sep).join('/');
+  /**
+   * Whether `absolute` is `root` or beneath it. A root that already ends in
+   * a separator — `/`, `C:\` — is not given a second one, or nothing would
+   * ever be inside the whole file system.
+   */
+  private static within(root: string, absolute: string, separator: string): boolean {
+    const prefix = root.endsWith(separator) ? root : root + separator;
+    return absolute === root || absolute.startsWith(prefix);
+  }
+
+  private static toPosix(value: string, separator: string = sep): string {
+    return value.split(separator).join('/');
   }
 
   static isErrnoException(error: unknown): error is NodeJS.ErrnoException {

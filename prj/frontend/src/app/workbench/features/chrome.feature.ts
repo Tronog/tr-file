@@ -23,8 +23,6 @@ export class ChromeFeature {
   readonly commandKeys: readonly string[];
   readonly titleBarActions: readonly UiIconAction[];
   readonly sidebarMoreActions: readonly UiIconAction[];
-  /** What the Settings menu offers (PRD 007, §1). */
-  readonly settingsMenuItems: readonly UiMenuItem[];
 
   constructor(private readonly parent: WorkbenchService) {
     const mock = parent.mockWorkbench;
@@ -32,49 +30,61 @@ export class ChromeFeature {
     this.commandKeys = mock.commandKeys;
     this.titleBarActions = mock.titleBarActions;
     this.sidebarMoreActions = mock.sidebarMoreActions;
-    this.settingsMenuItems = mock.settingsMenuItems;
   }
 
   /** The main menu that is open, if any (PRD 008, §1). */
   private readonly openMenuId = signal<string | null>(null);
 
+  /** Which view the left sidebar shows: the explorer, or the Search view (PRD 003, §5). */
+  private readonly sidebar = signal<'explorer' | 'search'>('explorer');
+
+  readonly sidebarView = this.sidebar.asReadonly();
+
+  showSidebar(view: 'explorer' | 'search'): void {
+    this.sidebar.set(view);
+  }
+
+  /** The activity bar's Bookmarks (PRD 003, §6): the explorer, with its Bookmarks pane open. */
+  showBookmarks(): void {
+    this.showSidebar('explorer');
+    this.parent.sidebarPanesFt.expand('bookmarks');
+    void this.parent.placesFt.load();
+  }
+
   /**
-   * The main menu, with the open one marked and Go's choice of computer
-   * following the connection: Local Computer is checked while the workbench
-   * talks to its own backend, Remote Computer once it talks to a remote one.
+   * What the Settings menu offers (PRD 007, §1; PRD 003, §6): commands of the
+   * table, laid out in `MockDataWorkbenchService.settingsMenuItems` — checked
+   * and enabled as they stand.
+   */
+  readonly settingsMenuItems = computed<readonly UiMenuItem[]>(() => {
+    const commands = this.parent.commandsFt;
+    return this.parent.mockWorkbench.settingsMenuItems.map((item) =>
+      commands.command(item.id) === undefined ? item : commands.menuItem(item.id, commands.activeTarget(), !!item.separatorBefore),
+    );
+  });
+
+  /**
+   * The main menu, with the open one marked. Each row is a command of the
+   * table (`CommandsFeature`), labelled, enabled and checked as it stands for
+   * the active panel — so File › Rename… greys out with nothing selected, and
+   * View shows the panel's own view and sort. Go's choice of computer follows
+   * the connection: Local Computer is checked while the workbench talks to its
+   * own backend, Remote Computer once it talks to a remote one.
    */
   readonly menuItems = computed<readonly UiMenuBarItem[]>(() => {
     const open = this.openMenuId();
     const backend = this.parent.backend();
-    const selected = this.parent.operationsFt.hasSelection();
+    const commands = this.parent.commandsFt;
+    const target = commands.activeTarget();
     return this.parent.mockWorkbench.menuItems.map((menu) => ({
       ...menu,
       open: menu.id === open,
-      ...(menu.id === 'file'
-        ? {
-            items: (menu.items ?? []).map((item) =>
-              item.id === 'file.emptyTrash' || selected ? item : { ...item, disabled: true },
-            ),
-          }
-        : {}),
-      ...(menu.id === 'edit'
-        ? {
-            items: (menu.items ?? []).map((item) =>
-              (item.id === 'edit.paste' ? this.parent.fileClipboardFt.canPaste() : selected)
-                ? item
-                : { ...item, disabled: true },
-            ),
-          }
-        : {}),
-      ...(menu.id === 'go'
-        ? {
-            items: (menu.items ?? []).map((item) =>
-              item.id === 'go.local' || item.id === 'go.remote'
-                ? { ...item, checked: item.id === (backend === 'local' ? 'go.local' : 'go.remote') }
-                : item,
-            ),
-          }
-        : {}),
+      items: (menu.items ?? []).map((item) => {
+        if (item.id === 'go.local' || item.id === 'go.remote') {
+          return { ...item, checked: item.id === (backend === 'local' ? 'go.local' : 'go.remote') };
+        }
+        return commands.command(item.id) === undefined ? item : commands.menuItem(item.id, target, !!item.separatorBefore);
+      }),
     }));
   });
 
@@ -103,28 +113,9 @@ export class ChromeFeature {
       case 'go.remote':
         this.parent.commandPaletteFt.run('remote.connect');
         break;
-      case 'edit.cut':
-        this.parent.fileClipboardFt.cut();
-        break;
-      case 'edit.copy':
-        this.parent.fileClipboardFt.copy();
-        break;
-      case 'edit.paste':
-        void this.parent.fileClipboardFt.paste();
-        break;
-      case 'file.copyTo':
-        void this.parent.operationsFt.copySelection();
-        break;
-      case 'file.moveTo':
-        void this.parent.operationsFt.moveSelection();
-        break;
-      case 'file.trash':
-        void this.parent.operationsFt.trashSelection();
-        break;
-      case 'file.emptyTrash':
-        void this.parent.operationsFt.emptyTrash();
-        break;
       default:
+        // Everything else is a command of the table, run on the active panel.
+        this.parent.commandsFt.run(selection.itemId);
         break;
     }
   }
@@ -171,22 +162,47 @@ export class ChromeFeature {
   }
 
   /** A Settings menu entry was chosen. None does anything yet; the menu just closes. */
-  runSettingsItem(_id: string): void {
+  runSettingsItem(id: string): void {
     this.closeSettingsMenu();
+    this.parent.commandsFt.run(id);
   }
 
-  /** A click in the activity bar. Only the account button acts yet (the rest is PRD 003, §3). */
+  /**
+   * A click in the activity bar: Explorer and Search switch the left sidebar
+   * (PRD 003, §5), Transfers opens its tab of the bottom panel, and the
+   * account button signs out. Bookmarks opens the explorer at its Bookmarks
+   * pane (PRD 003, §6).
+   */
   selectActivity(id: string): void {
-    if (id === 'account' && this.parent.auth.canSignOut()) {
-      void this.parent.auth.signOut();
+    switch (id) {
+      case 'explorer':
+        this.showSidebar('explorer');
+        break;
+      case 'search':
+        this.parent.searchFt.show();
+        break;
+      case 'transfers':
+        this.parent.bottomPanelFt.select('transfers');
+        break;
+      case 'bookmarks':
+        this.showBookmarks();
+        break;
+      case 'account':
+        if (this.parent.auth.canSignOut()) {
+          void this.parent.auth.signOut();
+        }
+        break;
+      default:
+        break;
     }
   }
 
   readonly activityItems = computed<readonly UiActivityItem[]>(() => {
     const transfers = this.parent.transfersFt.activeCount();
+    const view = this.sidebar();
     return [
-      { id: 'explorer', label: 'Explorer', icon: 'copy', active: true },
-      { id: 'search', label: 'Search', icon: 'search' },
+      { id: 'explorer', label: 'Explorer', icon: 'copy', ...(view === 'explorer' ? { active: true } : {}) },
+      { id: 'search', label: 'Search (Ctrl+Shift+F)', icon: 'search', ...(view === 'search' ? { active: true } : {}) },
       {
         id: 'transfers',
         label: 'Transfers',
@@ -212,7 +228,7 @@ export class ChromeFeature {
           }
         : {
             id: 'root',
-            label: this.parent.mockWorkbench.workspaceName,
+            label: this.parent.workspaceName(),
             icon: 'desktop',
             accent: true,
             title: 'Workspace served by the backend',
@@ -244,8 +260,15 @@ export class ChromeFeature {
       label: `Hidden files: ${this.parent.showHidden() ? 'shown' : 'hidden'}`,
       title: 'Toggle hidden files',
     },
-    { id: 'sort', label: 'Sorted by Name' },
+    { id: 'sort', label: this.sortSummary(), title: 'Turn the order round' },
   ]);
+
+  /** `Sorted by Size, descending` — the active panel's order (PRD 003, §5). */
+  private readonly sortSummary = computed(() => {
+    const sort = this.parent.fileBrowserFt.sortOf(this.parent.activeGroupId());
+    const column = { name: 'Name', size: 'Size', type: 'Type', modified: 'Date Modified' }[sort.key];
+    return `Sorted by ${column}${sort.direction === 'desc' ? ', descending' : ''}`;
+  });
 
   /** Status-bar items that do something when clicked. */
   runStatusAction(id: string): void {
@@ -258,6 +281,9 @@ export class ChromeFeature {
         break;
       case 'transfers':
         this.parent.bottomPanelFt.select('transfers');
+        break;
+      case 'sort':
+        this.parent.commandsFt.run('view.sortDescending');
         break;
       default:
         break;

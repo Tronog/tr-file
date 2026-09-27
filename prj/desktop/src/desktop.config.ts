@@ -5,14 +5,17 @@ import { isAbsolute, join, resolve } from 'node:path';
 export interface DesktopPaths {
   /** Directory the built Angular bundle lives in (`index.html` and friends). */
   readonly staticRoot: string;
-  /** Absolute path the file-system API is confined to. */
+  /**
+   * Absolute path the file-system API is confined to — `/` unless
+   * `FILES_ROOT` says otherwise, which on Windows means every drive.
+   */
   readonly filesRoot: string;
 }
 
 /** Everything `DesktopConfig.resolve` needs; all of it comes from `main.ts`. */
 export interface DesktopEnvironment {
   readonly env: NodeJS.ProcessEnv;
-  /** `app.getPath('home')` — the default the user browses when nothing says otherwise. */
+  /** `app.getPath('home')` — where the user starts, and the first of the places. */
   readonly homeDir: string;
   /** `app.getAppPath()`: the unpacked source root, or `app.asar` when packaged. */
   readonly appPath: string;
@@ -149,13 +152,17 @@ export class DesktopConfig {
   }
 
   /**
-   * The folder the user browses. `FILES_ROOT` wins so a shortcut or a script
-   * can pin the app to one tree; otherwise it is the home directory, which is
-   * the only default a file manager can pick without surprising anyone.
+   * The folder the user may browse. `FILES_ROOT` wins so a shortcut or a
+   * script can pin the app to one tree; otherwise it is the whole file system
+   * (PRD 003, §6) — other drives, USB sticks and network mounts are what a
+   * file manager is for, and the window still *starts* in the home folder,
+   * which the places say. `/` is passed on as it is, not resolved: on
+   * Windows that is how `AppConfig` knows to offer every drive rather than
+   * the one the process happens to run from.
    */
   private static findFilesRoot(environment: DesktopEnvironment): string {
     const configured = environment.env['FILES_ROOT']?.trim();
-    return resolve(configured && configured !== '' ? configured : environment.homeDir);
+    return configured && configured !== '' ? resolve(configured) : '/';
   }
 
   /**

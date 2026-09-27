@@ -6,6 +6,7 @@ import {
   inject,
   input,
   output,
+  signal,
   viewChildren,
 } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
@@ -35,6 +36,11 @@ export type UiMenuDismissReason = 'escape' | 'tab' | 'outside' | 'blur';
  * or its bottom-left with `origin: 'bottom-left'`, for a menu that opens
  * upward from a button at the bottom of the window. With `fixed` the point is
  * in viewport pixels; otherwise it is relative to the positioned ancestor.
+ *
+ * A `fixed` menu opening from its top-left corner stays on screen: one that
+ * would run past the right or bottom edge — a right-click near the corner of
+ * the window (PRD 003, §5) — is moved back just far enough, as a system menu
+ * is.
  */
 @Component({
   selector: 'ui-context-menu',
@@ -45,8 +51,8 @@ export type UiMenuDismissReason = 'escape' | 'tab' | 'outside' | 'blur';
     role: 'menu',
     '[attr.aria-label]': 'label()',
     '[style.position]': 'fixed() ? "fixed" : null',
-    '[style.left.px]': 'x()',
-    '[style.top.px]': 'y()',
+    '[style.left.px]': 'x() - shift().x',
+    '[style.top.px]': 'y() - shift().y',
     '[class.from-bottom]': 'origin() === "bottom-left"',
     '(keydown)': 'onKeydown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -91,8 +97,28 @@ export class UiContextMenu {
   /** Focus from before the menu opened, handed back when it closes by keyboard or choice. */
   private readonly previous: Element | null = document.activeElement;
 
+  /** How far the menu was moved back to stay inside the viewport. */
+  protected readonly shift = signal({ x: 0, y: 0 });
+
   constructor() {
-    afterNextRender(() => this.rows()[0]?.nativeElement.focus());
+    afterNextRender(() => {
+      this.keepOnScreen();
+      this.rows()[0]?.nativeElement.focus();
+    });
+  }
+
+  /** Moves a `fixed`, top-left menu that overflows the viewport back inside it, with a 4px margin. */
+  private keepOnScreen(): void {
+    if (!this.fixed() || this.origin() !== 'top-left') {
+      return;
+    }
+    const rect = this.host.getBoundingClientRect();
+    const margin = 4;
+    const x = Math.max(0, Math.min(rect.right + margin - window.innerWidth, rect.left - margin));
+    const y = Math.max(0, Math.min(rect.bottom + margin - window.innerHeight, rect.top - margin));
+    if (x > 0 || y > 0) {
+      this.shift.set({ x, y });
+    }
   }
 
   protected onSelect(item: UiMenuItem): void {
