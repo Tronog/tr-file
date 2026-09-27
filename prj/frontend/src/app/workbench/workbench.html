@@ -20,12 +20,16 @@
 @let git = workbench.gitFt;
 @let diff = workbench.gitDiffFt;
 
-@let swapped = workbench.preferencesFt.sidesSwapped();
+@let explorerSide = workbench.preferencesFt.explorerSide();
+@let detailsSide = workbench.preferencesFt.detailsSide();
 
-<!-- The `left` slot is the Explorer and the `right` one Details, wherever the
-     settings put them (PRD 010, §3): `mirrored` swaps the sides. -->
+<!-- The `left` slot is the Explorer and the `right` one Details, at whichever
+     edge the settings put each — both may be at the same one (PRD 010, §3). -->
 <ui-workbench
-  [mirrored]="swapped"
+  [leftAt]="explorerSide"
+  [rightAt]="detailsSide"
+  leftSashLabel="Resize Explorer"
+  rightSashLabel="Resize Details"
   [leftWidth]="workbench.leftSidebarWidth()"
   [rightWidth]="workbench.rightSidebarWidth()"
   [leftMin]="resize.leftBounds.min"
@@ -55,7 +59,7 @@
 
   <ui-activity-bar
     uiSlot="activity"
-    [side]="swapped ? 'right' : 'left'"
+    [side]="explorerSide"
     [items]="chrome.activityItems()"
     [bottomItems]="chrome.activityBottomItems()"
     (select)="chrome.selectActivity($event)"
@@ -65,7 +69,7 @@
   <!-- the Explorer sidebar: the directory tree, or the Search view (PRD 003, §5) -->
   <ui-sidebar
     uiSlot="left"
-    [side]="swapped ? 'right' : 'left'"
+    [side]="explorerSide"
     data-focus-region="explorer"
     [title]="chrome.sidebarView() === 'search' ? 'Search' : 'Explorer'"
     [actions]="chrome.sidebarMoreActions"
@@ -331,7 +335,7 @@
     uiSlot="right"
     data-focus-region="details"
     title="Details"
-    [side]="swapped ? 'left' : 'right'"
+    [side]="detailsSide"
     [actions]="chrome.sidebarMoreActions"
     [class.is-stale]="details.stale()"
     [attr.aria-busy]="details.stale() ? 'true' : null"

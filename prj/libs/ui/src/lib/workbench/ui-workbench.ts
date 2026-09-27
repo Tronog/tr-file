@@ -16,20 +16,21 @@ import type { UiSashResize } from '../models';
  * forwards every drag step as `leftResize` / `rightResize` and never changes a
  * width itself.
  *
- * `mirrored` swaps the sides (PRD 010, §3): the activity bar and the `left`
- * slot go to the right edge, the `right` slot to the left. The slots keep
- * their names — `left` is the sidebar beside the activity bar, wherever that
- * is — and so do the outputs: a drag that widens the `left` sidebar is still a
- * positive `leftResize`, whichever way the pointer went.
+ * Each sidebar may sit at either edge (PRD 010, §3): `leftAt` and `rightAt`
+ * say which, and both may be the same — then the two stand side by side, the
+ * `left` one outermost, beside the activity bar, which goes wherever the
+ * `left` slot goes. The slots keep their names — `left` is the sidebar that
+ * goes with the activity bar — and so do the outputs: a drag that widens the
+ * `left` sidebar is always the step `leftResize` reported with the sidebar at
+ * the left edge, and `rightResize` as with it at the right, whichever edge
+ * they are at now. Each sash sits in its sidebar, on the edge that faces the
+ * centre.
  */
 @Component({
   selector: 'ui-workbench',
   imports: [UiIconSprite, UiSash],
   templateUrl: './ui-workbench.html',
   styleUrl: './ui-workbench.scss',
-  host: {
-    '[class.is-mirrored]': 'mirrored()',
-  },
 })
 export class UiWorkbench {
   /** Width of the left sidebar in px. */
@@ -52,12 +53,24 @@ export class UiWorkbench {
 
   readonly rightMax = input<number>(520);
 
-  /** Whether the sides are swapped: the activity bar and the `left` slot on the right. */
-  readonly mirrored = input<boolean>(false);
+  /** The edge the `left` slot — and the activity bar with it — sits at. */
+  readonly leftAt = input<'left' | 'right'>('left');
 
-  /** What each sash is called, by the edge it is on. */
-  protected readonly leftSashLabel = computed(() => (this.mirrored() ? 'Resize right sidebar' : 'Resize left sidebar'));
-  protected readonly rightSashLabel = computed(() => (this.mirrored() ? 'Resize left sidebar' : 'Resize right sidebar'));
+  /** The edge the `right` slot sits at. */
+  readonly rightAt = input<'left' | 'right'>('right');
+
+  /** Accessible names for the sashes: what each resizes. */
+  readonly leftSashLabel = input<string>('Resize left sidebar');
+  readonly rightSashLabel = input<string>('Resize right sidebar');
+
+  /*
+   * Where each region goes along the row, as flex `order`: from the left
+   * edge in, the activity bar, the `left` slot, the `right` slot, then the
+   * centre (5) — and mirrored past it for whatever is at the right edge.
+   */
+  protected readonly activityOrder = computed(() => (this.leftAt() === 'left' ? 0 : 10));
+  protected readonly leftOrder = computed(() => (this.leftAt() === 'left' ? 1 : 9));
+  protected readonly rightOrder = computed(() => (this.rightAt() === 'left' ? 2 : 8));
 
   /** One step of a drag on the sash right of the left sidebar. */
   readonly leftResize = output<UiSashResize>();
@@ -66,11 +79,12 @@ export class UiWorkbench {
   readonly rightResize = output<UiSashResize>();
 
   /**
-   * A sash's step, as the output reports it: turned round when the sides are,
-   * since the sash is then on the other edge of its sidebar.
+   * A sash's step, as the output reports it: turned round when the sidebar is
+   * at the other edge from its slot's name, since its sash then is too.
    */
-  protected resized(side: 'left' | 'right', event: UiSashResize): void {
-    const step = this.mirrored() ? { ...event, delta: -event.delta } : event;
-    (side === 'left' ? this.leftResize : this.rightResize).emit(step);
+  protected resized(slot: 'left' | 'right', event: UiSashResize): void {
+    const moved = slot === 'left' ? this.leftAt() === 'right' : this.rightAt() === 'left';
+    const step = moved ? { ...event, delta: -event.delta } : event;
+    (slot === 'left' ? this.leftResize : this.rightResize).emit(step);
   }
 }

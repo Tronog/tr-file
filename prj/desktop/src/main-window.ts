@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import { BrowserWindow, shell } from 'electron';
 
+import { DARK_BACKGROUND } from './window-background.js';
 import { WINDOW_STATE_EVENT, WindowControlsChannel } from './window-controls.channel.js';
 
 /**
@@ -42,6 +43,8 @@ export class MainWindow {
     private readonly url: URL,
     /** Whether to open the dev tools; see `DesktopConfig.devTools`. */
     private readonly devTools: boolean,
+    /** What is painted before the first frame — the theme's background; see `windowBackground`. */
+    private readonly background: string = DARK_BACKGROUND,
   ) {}
 
   get isOpen(): boolean {
@@ -62,9 +65,9 @@ export class MainWindow {
       minHeight: 560,
       title: 'tr-file',
       ...MainWindow.frameOptions(),
-      // Painted before the first frame, so the workbench's dark chrome does
-      // not flash white while the bundle loads.
-      backgroundColor: '#1f1f1f',
+      // Painted before the first frame, so the workbench does not flash
+      // another colour while the bundle loads — its theme's (PRD 010, §4).
+      backgroundColor: this.background,
       show: false,
       autoHideMenuBar: true,
       webPreferences: {

@@ -50,11 +50,20 @@ Component SCSS reads design tokens as CSS custom properties (`var(--vsc-*)`,
 defined in `styles/_tokens.scss`) and may `@use 'mixins' as *;` for the shared
 structural helpers. No component hardcodes a colour.
 
+Two themes (PRD 010, §4): the tokens are VS Code's *Dark Modern* on `:root`, and
+*Light Modern* under `:root[data-theme='light']` — only colours change. Setting
+the attribute is the host's job; a component that needs a colour that differs
+between themes reads a token for it (there is one for alternate rows, key caps,
+the shade behind a widget that has taken the keyboard, and the scrollbars), and
+never a literal. The light palette's text colours clear WCAG AA on its
+surfaces; its severity colours and file-type accents are darkened from VS
+Code's to do so.
+
 ## What is in it
 
 | Area | Components |
 | --- | --- |
-| Shell | `UiWorkbench` (`mirrored` swaps the sidebars' sides — PRD 010, §3), `UiTitleBar`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
+| Shell | `UiWorkbench` (`leftAt` / `rightAt` put each sidebar at either edge, both at one if need be — PRD 010, §3), `UiTitleBar`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
 | Sidebars | `UiSidebar`, `UiPane`, `UiTree` |
 | Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |

@@ -5,45 +5,54 @@
 </div>
 
 <div class="body">
-  <div class="activity-slot" role="navigation" aria-label="Activity bar">
+  <div class="activity-slot" role="navigation" aria-label="Activity bar" [style.order]="activityOrder()">
     <ng-content select="[uiSlot=activity]" />
   </div>
 
-  <div class="sidebar sidebar-left" [class.is-hidden]="!leftVisible()" [style.width.px]="leftWidth()">
+  <div
+    class="sidebar"
+    [class.at-left]="leftAt() === 'left'"
+    [class.at-right]="leftAt() === 'right'"
+    [class.is-hidden]="!leftVisible()"
+    [style.width.px]="leftWidth()"
+    [style.order]="leftOrder()"
+  >
     <ng-content select="[uiSlot=left]" />
-  </div>
-
-  <div class="center" role="main">
-    <!-- Both sashes overlay the edges of the main region instead of sitting
-         between regions: they resize a boundary either way, and inside a
-         landmark they stay reachable to assistive tech. -->
+    <!-- Each sash sits on the edge of its sidebar that faces the centre, so
+         two sidebars on one side each keep theirs. -->
     <ui-sash
-      class="edge-sash edge-sash-left"
+      class="edge-sash"
       orientation="vertical"
       [label]="leftSashLabel()"
-      [class.is-hidden]="!leftVisible()"
       [value]="leftWidth()"
       [min]="leftMin()"
       [max]="leftMax()"
       (resize)="resized('left', $event)"
     />
+  </div>
 
+  <div class="center" role="main" [style.order]="5">
     <ng-content select="[uiSlot=center]" />
+  </div>
 
+  <div
+    class="sidebar"
+    [class.at-left]="rightAt() === 'left'"
+    [class.at-right]="rightAt() === 'right'"
+    [class.is-hidden]="!rightVisible()"
+    [style.width.px]="rightWidth()"
+    [style.order]="rightOrder()"
+  >
+    <ng-content select="[uiSlot=right]" />
     <ui-sash
-      class="edge-sash edge-sash-right"
+      class="edge-sash"
       orientation="vertical"
       [label]="rightSashLabel()"
-      [class.is-hidden]="!rightVisible()"
       [value]="rightWidth()"
       [min]="rightMin()"
       [max]="rightMax()"
       (resize)="resized('right', $event)"
     />
-  </div>
-
-  <div class="sidebar sidebar-right" [class.is-hidden]="!rightVisible()" [style.width.px]="rightWidth()">
-    <ng-content select="[uiSlot=right]" />
   </div>
 </div>
 

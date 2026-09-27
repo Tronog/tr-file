@@ -3,13 +3,35 @@
 <head>
   <meta charset="utf-8">
   <title>tr-file</title>
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <!-- The workbench's background from the very first paint: the full stylesheet
-       loads after the page, and a white frame before it is a flash. -->
-  <style>html, body { background: #1f1f1f; }</style>
+  <!-- The colour theme (PRD 010, §4) before the first paint: the stylesheet and
+       the app load after the page, and a dark frame in a light window is a
+       flash. The choice is the settings window's, kept in localStorage in a
+       browser; on the desktop it is in the main process's file, which only
+       the app reads, so there the first frame is dark. ThemeService takes
+       over from here. -->
+  <script>
+    (function () {
+      try {
+        var stored = JSON.parse(localStorage.getItem('tr-file.preferences.v1') || '{}') || {};
+        var choice = stored['workbench.colorTheme'];
+        var light = choice === 'light' || (choice === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
+        if (light) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (error) {
+        // Nothing stored, or no storage: the default, dark.
+      }
+    })();
+  </script>
+  <!-- The workbench's background from the very first paint, in either theme. -->
+  <style>
+    html, body { background: #1f1f1f; color-scheme: dark; }
+    html[data-theme='light'], html[data-theme='light'] body { background: #ffffff; color-scheme: light; }
+  </style>
 </head>
 <body>
   <app-root></app-root>

@@ -166,7 +166,7 @@ export class ChromeFeature {
     }
     // With the activity bar on the right (PRD 010, §3) the menu opens leftward, from the gear's left edge.
     this.settingsMenuAt.set(
-      this.parent.preferencesFt.sidesSwapped() ? { x: anchor.left, y: anchor.bottom, leftward: true } : { x: anchor.right, y: anchor.bottom },
+      this.parent.preferencesFt.explorerSide() === 'right' ? { x: anchor.left, y: anchor.bottom, leftward: true } : { x: anchor.right, y: anchor.bottom },
     );
   }
 

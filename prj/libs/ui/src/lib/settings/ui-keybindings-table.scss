@@ -56,7 +56,7 @@ td {
   cursor: default;
 
   &:nth-child(odd) {
-    background: rgb(255 255 255 / 2%);
+    background: var(--vsc-row-alt);
   }
 
   &:hover {
@@ -102,11 +102,11 @@ td {
   min-width: 14px;
   margin-right: 3px;
   padding: 1px 4px;
-  border: 1px solid rgb(51 51 51 / 60%);
-  border-bottom-color: rgb(68 68 68 / 60%);
+  border: 1px solid var(--vsc-kbd-border);
+  border-bottom-color: var(--vsc-kbd-border-bottom);
   border-radius: 3px;
-  background: rgb(128 128 128 / 17%);
-  box-shadow: inset 0 -1px 0 rgb(68 68 68 / 60%);
+  background: var(--vsc-kbd-bg);
+  box-shadow: inset 0 -1px 0 var(--vsc-kbd-border-bottom);
   color: var(--vsc-fg);
   font-family: var(--vsc-font);
   font-size: var(--vsc-font-size-xs);
@@ -156,7 +156,7 @@ td {
 .recorder-shade {
   position: fixed;
   z-index: 2;
-  background: rgb(0 0 0 / 25%);
+  background: var(--vsc-shade);
   inset: 0;
 }
 

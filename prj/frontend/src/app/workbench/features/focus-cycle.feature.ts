@@ -34,13 +34,18 @@ export class FocusCycleFeature {
 
   /** Every stop, in order. */
   readonly ring = computed<readonly FocusRegionId[]>(() => {
-    // Left to right as the window shows them: the sidebars trade ends when the sides are swapped (PRD 010, §3).
-    const [first, last]: readonly FocusRegionId[] = this.parent.preferencesFt.sidesSwapped() ? ['details', 'explorer'] : ['explorer', 'details'];
+    // Left to right as the window shows them, wherever the settings put the
+    // sidebars (PRD 010, §3): on one side together, the Explorer is outermost.
+    const preferences = this.parent.preferencesFt;
+    const explorer = preferences.explorerSide();
+    const details = preferences.detailsSide();
     return [
-      first as FocusRegionId,
+      ...(explorer === 'left' ? (['explorer'] as const) : []),
+      ...(details === 'left' ? (['details'] as const) : []),
       ...this.parent.panelLayoutFt.groupIds().map((id): FocusRegionId => `group:${id}`),
       ...(this.parent.bottomPanelFt.collapsed() ? [] : (['bottom'] as const)),
-      last as FocusRegionId,
+      ...(details === 'right' ? (['details'] as const) : []),
+      ...(explorer === 'right' ? (['explorer'] as const) : []),
     ];
   });
 

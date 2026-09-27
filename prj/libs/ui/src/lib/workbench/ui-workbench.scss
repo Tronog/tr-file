@@ -43,14 +43,6 @@
   background: var(--vsc-sidebar-bg);
 }
 
-.sidebar-left {
-  border-right: 1px solid var(--vsc-border);
-}
-
-.sidebar-right {
-  border-left: 1px solid var(--vsc-border);
-}
-
 .center {
   position: relative;
   display: flex;
@@ -61,8 +53,22 @@
   background: var(--vsc-editor-bg);
 }
 
-/* The two region sashes overlay the edges of the centre, the way VS Code's do,
-   so no layout column is spent on them. */
+/* A sidebar at the left edge faces the centre with its right side, and one at
+   the right edge with its left side: that is where its border and its sash go
+   (PRD 010, §3). The sash overlays the border, the way VS Code's do, so no
+   layout column is spent on it. */
+.sidebar {
+  position: relative;
+}
+
+.sidebar.at-left {
+  border-right: 1px solid var(--vsc-border);
+}
+
+.sidebar.at-right {
+  border-left: 1px solid var(--vsc-border);
+}
+
 .edge-sash {
   position: absolute;
   z-index: 2;
@@ -70,40 +76,12 @@
   bottom: 0;
 }
 
-.edge-sash-left {
-  left: calc(var(--vsc-sash-size) / -2);
-}
-
-.edge-sash-right {
+.at-left > .edge-sash {
   right: calc(var(--vsc-sash-size) / -2);
 }
 
-/* Mirrored (PRD 010, §3): the row runs the other way, and each sidebar's
-   border and sash move to the edge that now faces the centre. */
-:host(.is-mirrored) {
-  .body {
-    flex-direction: row-reverse;
-  }
-
-  .sidebar-left {
-    border-right: 0;
-    border-left: 1px solid var(--vsc-border);
-  }
-
-  .sidebar-right {
-    border-left: 0;
-    border-right: 1px solid var(--vsc-border);
-  }
-
-  .edge-sash-left {
-    right: calc(var(--vsc-sash-size) / -2);
-    left: auto;
-  }
-
-  .edge-sash-right {
-    right: auto;
-    left: calc(var(--vsc-sash-size) / -2);
-  }
+.at-right > .edge-sash {
+  left: calc(var(--vsc-sash-size) / -2);
 }
 
 /* Slots are always projected; a hidden region only loses its box. */

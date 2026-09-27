@@ -1,4 +1,5 @@
-import { computed, signal } from '@angular/core';
+import { computed, inject, signal } from '@angular/core';
+import { ThemeService, type ColorTheme } from '../../settings/theme.service';
 import type { WorkbenchService } from '../workbench.service';
 
 /** Where the preferences of their own are kept (PRD 010, §1) — for every backend alike. */
@@ -31,6 +32,13 @@ export interface PreferenceOption {
   readonly value: string;
   readonly label: string;
 }
+
+/** The colour themes (PRD 010, §4). */
+const THEMES: readonly PreferenceOption[] = [
+  { value: 'dark', label: 'Dark Modern' },
+  { value: 'light', label: 'Light Modern' },
+  { value: 'system', label: 'Follow the System' },
+];
 
 /** Where a sidebar goes (PRD 010, §3). */
 const SIDES: readonly PreferenceOption[] = [
@@ -103,12 +111,21 @@ export const PREFERENCES: readonly Preference[] = [
     kind: { type: 'boolean', default: true },
   },
   {
+    id: 'workbench.colorTheme',
+    section: 'appearance',
+    group: 'Workbench',
+    category: 'Workbench',
+    title: 'Color Theme',
+    description: 'The colours of the whole window: dark or light, after VS Code — or whichever the system prefers.',
+    kind: { type: 'choice', default: 'dark', options: THEMES },
+  },
+  {
     id: 'workbench.explorerLocation',
     section: 'appearance',
     group: 'Workbench',
     category: 'Explorer',
     title: 'Location',
-    description: 'Which side of the window the Explorer is on, with the activity bar beside it. Details takes the other side.',
+    description: 'Which side of the window the Explorer is on, with the activity bar beside it.',
     kind: { type: 'choice', default: 'left', options: SIDES },
   },
   {
@@ -117,7 +134,7 @@ export const PREFERENCES: readonly Preference[] = [
     group: 'Workbench',
     category: 'Details',
     title: 'Location',
-    description: 'Which side of the window the Details sidebar is on. The Explorer takes the other side.',
+    description: 'Which side of the window the Details sidebar is on. On the same side as the Explorer, it stands beside it, nearer the panels.',
     kind: { type: 'choice', default: 'right', options: SIDES },
   },
   {
@@ -134,6 +151,9 @@ export const PREFERENCES: readonly Preference[] = [
 export class PreferencesFeature {
   /** The preferences of their own that differ from their default. */
   private readonly stored = signal<Readonly<Record<string, boolean | string>>>({});
+
+  /** Applies the colour theme; it keeps the choice it read at start in step with this one. */
+  private readonly theme = inject(ThemeService);
 
   /** Mirrors `SessionFeature.restoresSessions`, which is read from storage and so cannot be watched. */
   private readonly restoreLayout = signal(true);
@@ -178,14 +198,8 @@ export class PreferencesFeature {
     }
   }
 
-  /**
-   * A choice's value now. The two sidebars' locations are one choice seen
-   * from either side (PRD 010, §3): Details is wherever the Explorer is not.
-   */
+  /** A choice's value now; `''` for anything that is not a choice. */
   choice(id: string): string {
-    if (id === 'workbench.detailsLocation') {
-      return this.choice('workbench.explorerLocation') === 'left' ? 'right' : 'left';
-    }
     const preference = PreferencesFeature.find(id);
     if (preference?.kind.type !== 'choice') {
       return '';
@@ -194,8 +208,12 @@ export class PreferencesFeature {
     return typeof stored === 'string' ? stored : preference.kind.default;
   }
 
-  /** Whether the Explorer is on the right, and Details on the left (PRD 010, §3). */
-  readonly sidesSwapped = computed(() => this.choice('workbench.explorerLocation') === 'right');
+  /**
+   * The edge each sidebar is at (PRD 010, §3) — each on its own: both may be
+   * on the same side.
+   */
+  readonly explorerSide = computed(() => (this.choice('workbench.explorerLocation') === 'right' ? 'right' : 'left'));
+  readonly detailsSide = computed(() => (this.choice('workbench.detailsLocation') === 'left' ? 'left' : 'right'));
 
   /** Whether a setting is set to something other than its default. */
   isModified(id: string): boolean {
@@ -206,17 +224,16 @@ export class PreferencesFeature {
     return kind?.type === 'boolean' && this.value(id) !== kind.default;
   }
 
-  /** Makes a choice; moving one sidebar moves the other to the side it left. */
+  /** Makes a choice, if `value` is one of its options. */
   choose(id: string, value: string): void {
-    if (id === 'workbench.detailsLocation') {
-      this.choose('workbench.explorerLocation', value === 'left' ? 'right' : 'left');
-      return;
-    }
     const kind = PreferencesFeature.find(id)?.kind;
     if (kind?.type !== 'choice' || !kind.options.some((option) => option.value === value)) {
       return;
     }
     this.keep(id, value, kind.default);
+    if (id === 'workbench.colorTheme') {
+      this.theme.choice.set(value as ColorTheme);
+    }
   }
 
   set(id: string, value: boolean): void {

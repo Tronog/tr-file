@@ -173,11 +173,19 @@ files and restoring the layout are read and written where they already live (the
 `SessionFeature`); auto refresh, the function-key bar and thumbnails are kept under
 `tr-file.preferences.v1`, only while they differ from their default; *Reset Layout* and *Clear
 Recent Folders* are actions that run their commands. *Explorer: Location* and *Details: Location*
-(PRD 010, §3) are one choice seen from either side — moving one moves the other opposite, as VS
-Code's primary and secondary side bars do: `PreferencesFeature.sidesSwapped` sets `UiWorkbench`'s
-`mirrored` (the activity bar and the Explorer on the right, Details on the left; the slots keep their
-names, `left` being the Explorer), the activity bar's and sidebars' `side`, the `Ctrl`+`Tab` ring's
-order and which way the gear's menu opens.
+(PRD 010, §3) are two choices, left or right, and both may be the same side:
+`PreferencesFeature.explorerSide` / `detailsSide` set `UiWorkbench`'s `leftAt` / `rightAt` (the slots
+keep their names — `left` is the Explorer, and the activity bar goes wherever it goes; on one side
+together the two stand side by side, the Explorer outermost), the activity bar's and sidebars'
+`side`, the `Ctrl`+`Tab` ring's order (left to right as shown) and which way the gear's menu opens.
+Each sidebar's sash sits in it, on the edge facing the centre.
+*Workbench: Color Theme* (PRD 010, §4) is Dark Modern (the default), Light Modern or Follow the
+System: the library's tokens are dark on `:root` and light under `data-theme="light"`, which the
+root `ThemeService` (`prj/frontend/src/app/settings/`) sets — from the stored preference as the app
+starts (before the sign-in screen), on each change, and with the OS while following it. Two things
+paint before Angular does, and both read the same preference: an inline script in `index.html` (a
+browser's `localStorage`) and, on the desktop, the window's `backgroundColor`
+(`desktop/src/window-background.ts`, from the main process's settings file).
 
 **Every key is configurable (PRD 010, §2).** The library's components never test a key for a
 command themselves: they ask the library's root `UiKeymap` (`prj/libs/ui/src/lib/keyboard/keymap.ts`)

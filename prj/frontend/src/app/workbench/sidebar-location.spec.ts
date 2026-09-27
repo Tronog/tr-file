@@ -8,45 +8,94 @@ import { MemorySettingsStore, SettingsService } from '../settings/settings.servi
 import { PREFERENCES_KEY } from './features/preferences.feature';
 import { WorkbenchService } from './workbench.service';
 
-/** PRD 010, §3 — the Explorer and Details sidebars, on either side of the window. */
+/**
+ * PRD 010, §3 — the Explorer and Details sidebars, each at either side of the
+ * window, both at the same one if so chosen.
+ */
 
 @Component({
   imports: [UiWorkbench],
   template: `
-    <ui-workbench [mirrored]="mirrored()" (leftResize)="left.push($event)" (rightResize)="right.push($event)">
-      <div uiSlot="activity" class="activity">A</div>
-      <div uiSlot="left" class="explorer">E</div>
-      <div uiSlot="center" class="centre">C</div>
-      <div uiSlot="right" class="details">D</div>
+    <ui-workbench [leftAt]="leftAt()" [rightAt]="rightAt()" (leftResize)="left.push($event)" (rightResize)="right.push($event)">
+      <div uiSlot="activity">A</div>
+      <div uiSlot="left">E</div>
+      <div uiSlot="center">C</div>
+      <div uiSlot="right">D</div>
     </ui-workbench>
   `,
 })
 class ShellHost {
-  readonly mirrored = signal(false);
+  readonly leftAt = signal<'left' | 'right'>('left');
+  readonly rightAt = signal<'left' | 'right'>('right');
   readonly left: UiSashResize[] = [];
   readonly right: UiSashResize[] = [];
 }
 
 describe('Sidebar location (PRD 010, §3)', () => {
   describe('UiWorkbench', () => {
-    it('swaps the sides when mirrored, and turns the sashes round so a wider sidebar is still a wider sidebar', () => {
+    const setUp = () => {
       const fixture = TestBed.createComponent(ShellHost);
       fixture.detectChanges();
-      const shell = fixture.nativeElement.querySelector('ui-workbench') as HTMLElement;
-      const sashes = () => Array.from(shell.querySelectorAll('ui-sash')) as HTMLElement[];
-      expect(shell.classList.contains('is-mirrored')).toBe(false);
-      expect(sashes()[0]?.getAttribute('aria-label') ?? sashes()[0]?.querySelector('[aria-label]')?.getAttribute('aria-label')).toContain('left');
+      const body = fixture.nativeElement.querySelector('ui-workbench .body') as HTMLElement;
+      /** The regions left to right, by their flex order, as the letters their slots hold. */
+      const order = (): string =>
+        (Array.from(body.children) as HTMLElement[])
+          .sort((a, b) => Number(a.style.order || 0) - Number(b.style.order || 0))
+          .map((region) => (region.classList.contains('center') ? 'C' : (region.textContent?.trim().charAt(0) ?? '')))
+          .join('');
+      const sash = (slot: 'left' | 'right') =>
+        (fixture.debugElement.children[0]?.componentInstance as { resized(slot: 'left' | 'right', event: UiSashResize): void }).resized(slot, {
+          delta: 10,
+          phase: 'move',
+        });
+      return { fixture, body, order, sash };
+    };
 
-      fixture.componentInstance.mirrored.set(true);
+    it('lays out the activity bar and the Explorer at the left, Details at the right, to start with', () => {
+      const { order } = setUp();
+
+      expect(order()).toBe('AECD');
+    });
+
+    it('moves each sidebar on its own — both to one side, the left slot outermost beside the activity bar', () => {
+      const { fixture, order } = setUp();
+
+      fixture.componentInstance.rightAt.set('left');
       fixture.detectChanges();
-      expect(shell.classList.contains('is-mirrored')).toBe(true);
+      expect(order()).toBe('AEDC');
 
-      const workbench = fixture.debugElement.children[0]?.componentInstance as UiWorkbench;
-      (workbench as unknown as { resized(side: 'left' | 'right', event: UiSashResize): void }).resized('left', { delta: 10, phase: 'move' });
-      (workbench as unknown as { resized(side: 'left' | 'right', event: UiSashResize): void }).resized('right', { delta: -4, phase: 'move' });
+      fixture.componentInstance.leftAt.set('right');
+      fixture.componentInstance.rightAt.set('right');
+      fixture.detectChanges();
+      expect(order()).toBe('CDEA');
 
-      expect(fixture.componentInstance.left).toEqual([{ delta: -10, phase: 'move' }]);
-      expect(fixture.componentInstance.right).toEqual([{ delta: 4, phase: 'move' }]);
+      fixture.componentInstance.rightAt.set('left');
+      fixture.detectChanges();
+      expect(order()).toBe('DCEA');
+    });
+
+    it('puts each sash on the edge its sidebar faces the centre with', () => {
+      const { fixture, body } = setUp();
+      fixture.componentInstance.rightAt.set('left');
+      fixture.detectChanges();
+
+      const sidebars = Array.from(body.querySelectorAll(':scope > .sidebar')) as HTMLElement[];
+      expect(sidebars.every((sidebar) => sidebar.classList.contains('at-left') && sidebar.querySelector(':scope > ui-sash') !== null)).toBe(true);
+    });
+
+    it('reports a sash step as if the sidebar were at the edge its slot is named for', () => {
+      const { fixture, sash } = setUp();
+      sash('left');
+      sash('right');
+
+      fixture.componentInstance.leftAt.set('right');
+      fixture.componentInstance.rightAt.set('left');
+      fixture.detectChanges();
+      sash('left');
+      sash('right');
+
+      expect(fixture.componentInstance.left.map((step) => step.delta)).toEqual([10, -10]);
+      expect(fixture.componentInstance.right.map((step) => step.delta)).toEqual([10, -10]);
     });
   });
 
@@ -90,30 +139,31 @@ describe('Sidebar location (PRD 010, §3)', () => {
     const preferences = () => workbench.preferencesFt;
 
     it('puts the Explorer on the left and Details on the right to start with', () => {
-      expect(preferences().choice('workbench.explorerLocation')).toBe('left');
-      expect(preferences().choice('workbench.detailsLocation')).toBe('right');
-      expect(preferences().sidesSwapped()).toBe(false);
+      expect(preferences().explorerSide()).toBe('left');
+      expect(preferences().detailsSide()).toBe('right');
     });
 
-    it('moves the other sidebar when one moves, and remembers only a change', () => {
-      preferences().choose('workbench.explorerLocation', 'right');
-      expect(preferences().choice('workbench.detailsLocation')).toBe('left');
-      expect(preferences().sidesSwapped()).toBe(true);
-      expect(store.get(PREFERENCES_KEY)).toEqual({ 'workbench.explorerLocation': 'right' });
+    it('moves each on its own — both may be on one side — and remembers only a change', () => {
+      preferences().choose('workbench.detailsLocation', 'left');
+      expect(preferences().explorerSide()).toBe('left');
+      expect(preferences().detailsSide()).toBe('left');
+      expect(store.get(PREFERENCES_KEY)).toEqual({ 'workbench.detailsLocation': 'left' });
 
+      preferences().choose('workbench.explorerLocation', 'right');
       preferences().choose('workbench.detailsLocation', 'right');
-      expect(preferences().choice('workbench.explorerLocation')).toBe('left');
-      expect(store.get(PREFERENCES_KEY)).toBeUndefined();
+      expect(preferences().explorerSide()).toBe('right');
+      expect(preferences().detailsSide()).toBe('right');
+      expect(store.get(PREFERENCES_KEY)).toEqual({ 'workbench.explorerLocation': 'right' });
     });
 
     it('ignores a side that is not one, and resets to the default', () => {
       preferences().choose('workbench.explorerLocation', 'top');
-      expect(preferences().choice('workbench.explorerLocation')).toBe('left');
+      expect(preferences().explorerSide()).toBe('left');
 
       preferences().choose('workbench.detailsLocation', 'left');
       expect(preferences().isModified('workbench.detailsLocation')).toBe(true);
       preferences().reset('workbench.detailsLocation');
-      expect(preferences().sidesSwapped()).toBe(false);
+      expect(preferences().detailsSide()).toBe('right');
     });
 
     it('shows both as drop-downs on the Appearance page, and changes them from there', () => {
@@ -132,15 +182,20 @@ describe('Sidebar location (PRD 010, §3)', () => {
       });
 
       editor.changeSetting({ id: 'workbench.detailsLocation', value: 'left' });
-      expect(preferences().sidesSwapped()).toBe(true);
+      expect(preferences().detailsSide()).toBe('left');
+      expect(preferences().explorerSide()).toBe('left');
     });
 
     it('walks Ctrl+Tab left to right as the window shows it', () => {
       const group = `group:${workbench.activeGroupId()}`;
       expect(workbench.focusCycleFt.ring()).toEqual(['explorer', group, 'details']);
 
+      preferences().choose('workbench.detailsLocation', 'left');
+      expect(workbench.focusCycleFt.ring()).toEqual(['explorer', 'details', group]);
+
       preferences().choose('workbench.explorerLocation', 'right');
-      expect(workbench.focusCycleFt.ring()).toEqual(['details', group, 'explorer']);
+      preferences().choose('workbench.detailsLocation', 'right');
+      expect(workbench.focusCycleFt.ring()).toEqual([group, 'details', 'explorer']);
     });
 
     it('opens the gear menu leftward from the gear when the activity bar is on the right', () => {

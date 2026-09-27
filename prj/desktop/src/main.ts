@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { app, BrowserWindow, dialog, shell, type MessageBoxOptions } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, shell, type MessageBoxOptions } from 'electron';
 
 import { installAppMenu } from './app-menu.js';
 import { DesktopConfig } from './desktop.config.js';
@@ -15,6 +15,7 @@ import { MainWindow } from './main-window.js';
 import { SaveFileChannel } from './save-file.channel.js';
 import { SettingsChannel } from './settings.channel.js';
 import { SettingsStore } from './settings-store.js';
+import { windowBackground } from './window-background.js';
 import { SystemClipboard } from './system-clipboard.js';
 import { ShellTrash } from './shell-trash.js';
 import { SystemPlaces } from './system-places.js';
@@ -58,6 +59,8 @@ class DesktopApplication {
   private windowChannel: WindowControlsChannel | null = null;
   private saveChannel: SaveFileChannel | null = null;
   private settingsChannel: SettingsChannel | null = null;
+  /** The settings file, read once here too: the window's first colour comes from it (PRD 010, §4). */
+  private settingsStore: SettingsStore | null = null;
   private dragChannel: DragOutChannel | null = null;
   private sessions: BridgeSessions | null = null;
 
@@ -144,11 +147,8 @@ class DesktopApplication {
 
       // What the page remembers between sessions (PRD 003, §6): its origin is
       // new on every start, so a file in the user-data folder remembers instead.
-      this.settingsChannel = new SettingsChannel(
-        page.origin,
-        this.stack.log,
-        new SettingsStore(join(app.getPath('userData'), 'settings.json')),
-      );
+      this.settingsStore = new SettingsStore(join(app.getPath('userData'), 'settings.json'));
+      this.settingsChannel = new SettingsChannel(page.origin, this.stack.log, this.settingsStore);
       this.settingsChannel.register();
 
       // Entries dragged out of a panel into another app (PRD 003, §6).
@@ -172,7 +172,8 @@ class DesktopApplication {
       return;
     }
 
-    this.window = new MainWindow(this.pageUrl ?? this.stack.address, this.config.devTools);
+    const background = windowBackground(this.settingsStore?.all() ?? {}, !nativeTheme.shouldUseDarkColors);
+    this.window = new MainWindow(this.pageUrl ?? this.stack.address, this.config.devTools, background);
     await this.window.open();
   }
 

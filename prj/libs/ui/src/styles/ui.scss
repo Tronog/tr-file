@@ -41,7 +41,7 @@ button {
 /* VS Code style overlay scrollbars. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #4f4f4f transparent;
+  scrollbar-color: var(--vsc-scrollbar) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -54,12 +54,12 @@ button {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #4f4f4f;
+  background: var(--vsc-scrollbar);
   border: 2px solid transparent;
   background-clip: content-box;
 
   &:hover {
-    background: #6b6b6b;
+    background: var(--vsc-scrollbar-hover);
     background-clip: content-box;
   }
 }
