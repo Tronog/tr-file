@@ -78,6 +78,11 @@ export class SystemClipboard {
     }
   }
 
+  /** Puts plain text on the clipboard — *Copy Path*. */
+  async writeText(text: string): Promise<void> {
+    await this.clipboard.writeFormats({ [PLAIN_TEXT]: text });
+  }
+
   async writeFiles(files: readonly string[], cut: boolean): Promise<void> {
     if (files.length === 0) {
       return;

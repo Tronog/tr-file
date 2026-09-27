@@ -12,6 +12,7 @@ export type {
   FsCreateRequest,
   FsDetailsRequest,
   FsGitRequest,
+  FsHostPathsRequest,
   FsListRequest,
   FsLocalPath,
   FsOpDeleteRequest,

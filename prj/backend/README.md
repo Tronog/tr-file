@@ -89,6 +89,7 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `rename` | `path`, `to` | the entry at `to` — as `POST /api/fs/rename` |
 | `mkdir`, `create-file` | `path`, `name` | the new folder / empty file — as `POST /api/fs/mkdir` / `create` |
 | `search` | `path`, `query`, `limit?` | `GET /api/fs/search`'s answer |
+| `host-paths` | `paths` | `GET /api/fs/host-paths`'s answer |
 | `watch` | `watchId` (string or `null`), `paths` | `{ watchId, changed }` — as `POST /api/fs/watch` |
 | `op-info` | — | `GET /api/ops/info`: `{ trash: 'server' \| 'system', canRestore }` |
 | `op-copy`, `op-move` | `sources`, `destination`, `conflict` | the job, started — as `POST /api/ops/copy` / `move` |
@@ -150,6 +151,7 @@ path reaches the file system.
 | POST | `/api/fs/rename` | JSON `{ path, to }`; `to` is the full new path. `200`, the entry's details |
 | POST | `/api/fs/mkdir` | JSON `{ path, name }`: an empty folder in `path`. `201`, its details |
 | POST | `/api/fs/create` | JSON `{ path, name }`: an empty file in `path`. `201`, its details |
+| GET | `/api/fs/host-paths?path=a&path=b` | `{ paths }`: each entry's full path on the server's disk, in the host's own form — what *Copy Path* copies (PRD 004, §1.3.2). Worked out from the path, so an entry that is not there has one too; outside the root is `403` |
 | GET | `/api/fs/search?path=&query=&limit=` | `{ path, query, entries, truncated, scanned }`: entries named like `query` beneath `path` |
 | POST | `/api/fs/watch` | JSON `{ watchId, paths }` → `{ watchId, changed }`: which of those folders changed since the last call |
 

@@ -325,6 +325,10 @@ describe('BridgeSessions and the system clipboard (PRD 003, §6)', () => {
       this.files = [...files];
       this.cut = cut;
     }
+    text: string | null = null;
+    async writeText(text: string) {
+      this.text = text;
+    }
   }
   let clipboard: FakeClipboard;
   let withClipboard: BridgeSessions;
@@ -359,6 +363,25 @@ describe('BridgeSessions and the system clipboard (PRD 003, §6)', () => {
       ['here.txt', null],
     );
     assert.equal(errorOf(await withClipboard.dispatch(window(), { command: 'local-paths', absolute: 'x' })).status, 400);
+  });
+
+  it('copies paths as text — host paths here, the server’s own on a remote one', async () => {
+    const sender = window();
+    const copied = dataOf(await withClipboard.dispatch(sender, { command: 'clipboard-write-paths', paths: ['here.txt', 'gone.txt', ''] }));
+    // A path that is not there, or the root, is still copied, as the app names it.
+    const expected = [join(localRoot, 'here.txt'), join(localRoot, 'gone.txt'), localRoot].join('\n');
+    assert.deepEqual(copied, { text: expected });
+    assert.equal(clipboard.text, expected);
+    assert.equal(errorOf(await withClipboard.dispatch(sender, { command: 'clipboard-write-paths', paths: [] })).status, 400);
+
+    dataOf(await withClipboard.dispatch(sender, { command: 'connect', scheme: 'http', host: '127.0.0.1', port, user: 'ana', password: 'secret' }));
+    dataOf(await withClipboard.dispatch(sender, { command: 'clipboard-write-paths', paths: ['there.txt'] }));
+    // The full path on the server's own disk (PRD 004, §1.3.2).
+    assert.equal(clipboard.text, join(remoteRoot, 'there.txt'));
+  });
+
+  it('says so when there is no clipboard to copy to', async () => {
+    assert.equal(errorOf(await sessions.dispatch(window(), { command: 'clipboard-write-paths', paths: ['here.txt'] })).code, 'NOT_SUPPORTED');
   });
 
   it('hands out host paths for a drag from this computer only', async () => {

@@ -405,3 +405,18 @@ describe('localPath', () => {
     assert.equal(errorOf(await guarded.localPath('README.md')).code, 'UNAUTHORIZED');
   });
 });
+
+/** PRD 004, §1.3.2 — the same full paths over the bridge as over `/api/fs/host-paths`. */
+describe('FileSystemBridge host-paths', () => {
+  it('answers where entries are on disk, and refuses what is not a list of paths', async () => {
+    const answer = await bridge.dispatch({ command: 'host-paths', paths: ['docs/a.md', ''] });
+    assert.ok('data' in answer);
+    assert.deepEqual(answer.data, { paths: [join(root, 'docs', 'a.md'), root] });
+    const refused = await bridge.dispatch({ command: 'host-paths', paths: 'docs' });
+    assert.ok('error' in refused);
+    assert.equal(refused.error.status, 400);
+    const outside = await bridge.dispatch({ command: 'host-paths', paths: ['../etc'] });
+    assert.ok('error' in outside);
+    assert.equal(outside.error.status, 403);
+  });
+});

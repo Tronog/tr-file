@@ -185,7 +185,7 @@ export class DetailsFeature {
         void this.parent.fileEditFt.rename(details.path, this.parent.activeGroupId());
         break;
       case 'copy-path':
-        void navigator.clipboard?.writeText(details.path);
+        void this.parent.systemOpenFt.copyPaths([details.path]);
         break;
       case 'refresh':
         this.parent.fsDataFt.reloadDetails(details.path);

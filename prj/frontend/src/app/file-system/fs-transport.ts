@@ -140,6 +140,14 @@ export interface FsTransport {
   /** Puts entries on the system clipboard, for the system's file manager to paste. */
   writeClipboard(paths: readonly string[], cut: boolean): Promise<void>;
 
+  /**
+   * *Copy Path*: entries' paths as text on the clipboard, one per line, and
+   * answers with the text. The desktop copies each entry's real host path,
+   * from the main process; a browser copies the path the app shows (`/docs/a.md`).
+   * Rejects with `NOT_SUPPORTED` where nothing may be copied at all.
+   */
+  copyPaths(paths: readonly string[]): Promise<string>;
+
   /** Starts the system's drag of these entries, for other apps to take; `false` where there is none. */
   startDrag(paths: readonly string[]): boolean;
 

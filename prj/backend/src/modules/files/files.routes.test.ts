@@ -332,3 +332,18 @@ describe('POST /api/fs/watch', () => {
     assert.equal((await postJson('/watch', { paths: [] })).status, 200);
   });
 });
+
+/** PRD 004, §1.3.2 — *Copy Path* copies the full path, which only the server knows. */
+describe('GET /api/fs/host-paths', () => {
+  it('answers where entries are on the server, there or not', async () => {
+    const response = await fetch(`${base}/host-paths?path=${encodeURIComponent(UNICODE_NAME)}&path=docs/not-yet.md&path=`);
+    assert.equal(response.status, 200);
+    const { data } = (await response.json()) as { data: { paths: string[] } };
+    assert.deepEqual(data.paths, [join(root, UNICODE_NAME), join(root, 'docs', 'not-yet.md'), root]);
+  });
+
+  it('refuses a path outside the root, and a request naming none', async () => {
+    assert.equal((await fetch(`${base}/host-paths?path=../etc/passwd`)).status, 403);
+    assert.equal((await fetch(`${base}/host-paths`)).status, 400);
+  });
+});

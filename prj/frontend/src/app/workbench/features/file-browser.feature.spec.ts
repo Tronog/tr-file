@@ -15,6 +15,7 @@ import {
   settled,
 } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
+import { FOLDER_VIEWS_KEY, FOLDER_VIEWS_LIMIT, FolderViewsFeature } from './folder-views.feature';
 
 const ROOT_ENTRIES = [
   fsDirectory('docs'),
@@ -291,16 +292,119 @@ describe('FileBrowserFeature', () => {
     });
   });
 
-  describe('setView()', () => {
-    it('switches only the targeted group', async () => {
+  /** PRD 004, §1.3.1 — the view and the order are the folder's, kept in the client's storage. */
+  describe('views and orders per folder', () => {
+    const DOCS = [fsEntry('docs/b.md', { size: 10 }), fsEntry('docs/a.md', { size: 90 })];
+
+    /** Moves a group into a folder and answers its listing. */
+    const enter = async (groupId: string, path: string, entries = DOCS): Promise<void> => {
+      workbench.fileBrowserFt.navigateTo(groupId, path, path.split('/').at(-1) ?? path);
+      for (const request of http.match(listUrl(path))) {
+        request.flush(fsEnvelope(fsListing(path, entries)));
+      }
+      await settled();
+    };
+    const view = (groupId: string) => workbench.fileBrowserFt.browser(groupId)?.view;
+    const names = (groupId: string) => workbench.fileBrowserFt.browser(groupId)?.rows.map((row) => row.name);
+
+    it('switches every panel showing the folder, and no other', async () => {
       await start();
       workbench.editorGroupsFt.runAction('group-root', 'split-right');
       const second = workbench.panelLayoutFt.groupIds()[1] as string;
 
       workbench.fileBrowserFt.setView('group-root', 'grid');
+      expect(view('group-root')).toBe('grid');
+      expect(view(second)).toBe('grid');
 
-      expect(workbench.fileBrowserFt.browser('group-root')?.view).toBe('grid');
-      expect(workbench.fileBrowserFt.browser(second)?.view).toBe('list');
+      await enter(second, 'docs');
+      workbench.fileBrowserFt.setView(second, 'tree');
+      expect(view(second)).toBe('tree');
+      expect(view('group-root')).toBe('grid');
+    });
+
+    it('shows each folder the way it was left, and a new one as its panel last did', async () => {
+      await start();
+      workbench.fileBrowserFt.setView('group-root', 'grid');
+      workbench.fileBrowserFt.toggleSort('group-root', 'size');
+
+      // Nothing chosen for docs yet: it looks as the panel last did.
+      await enter('group-root', 'docs');
+      expect(view('group-root')).toBe('grid');
+      workbench.fileBrowserFt.setView('group-root', 'list');
+      workbench.fileBrowserFt.setSort('group-root', { key: 'name', direction: 'desc' });
+      expect(names('group-root')).toEqual(['b.md', 'a.md']);
+
+      workbench.fileBrowserFt.navigateTo('group-root', '', 'tr-file');
+      await settled();
+      expect(view('group-root')).toBe('grid');
+      expect(workbench.fileBrowserFt.sortOf('group-root')).toEqual({ key: 'size', direction: 'asc' });
+
+      workbench.fileBrowserFt.navigateTo('group-root', 'docs', 'docs');
+      await settled();
+      expect(view('group-root')).toBe('list');
+      expect(workbench.fileBrowserFt.sortOf('group-root')).toEqual({ key: 'name', direction: 'desc' });
+      expect(workbench.commandsFt.menuItem('view.list').checked).toBe(true);
+    });
+
+    it('keeps them in the client storage, per backend, and reads them on the next start', async () => {
+      await start();
+      await enter('group-root', 'docs');
+      workbench.fileBrowserFt.setView('group-root', 'tree');
+      workbench.fileBrowserFt.toggleSort('group-root', 'modified');
+
+      const kept = JSON.parse(localStorage.getItem(`${FOLDER_VIEWS_KEY}:local`) ?? '[]') as { path: string }[];
+      expect(kept).toEqual([expect.objectContaining({ path: 'docs', view: 'tree', sort: { key: 'modified', direction: 'asc' } })]);
+
+      const next = new FolderViewsFeature(workbench);
+      expect(next.viewOf('docs')).toBe('tree');
+      expect(next.sortOf('docs')).toEqual({ key: 'modified', direction: 'asc' });
+      expect(next.viewOf('')).toBeUndefined();
+    });
+
+    it('lets go of what storage holds that makes no sense, and of the oldest past the limit', () => {
+      localStorage.setItem(
+        `${FOLDER_VIEWS_KEY}:local`,
+        JSON.stringify([
+          { path: 'a', view: 'grid', at: 2 },
+          { path: 'b', view: 'sideways', at: 3 },
+          { path: 'c', sort: { key: 'colour', direction: 'asc' }, at: 4 },
+          { view: 'grid' },
+          'junk',
+          { path: 'd', sort: { key: 'size', direction: 'desc' }, at: 1 },
+        ]),
+      );
+      const views = new FolderViewsFeature(workbench);
+      expect(views.viewOf('a')).toBe('grid');
+      expect(views.viewOf('b')).toBeUndefined();
+      expect(views.sortOf('c')).toBeUndefined();
+      expect(views.sortOf('d')).toEqual({ key: 'size', direction: 'desc' });
+
+      for (let index = 0; index < FOLDER_VIEWS_LIMIT; index++) {
+        views.rememberView(`f${index}`, 'list');
+      }
+      expect(views.viewOf('a')).toBeUndefined();
+      expect(views.viewOf(`f${FOLDER_VIEWS_LIMIT - 1}`)).toBe('list');
+    });
+
+    it('follows a folder that is renamed, and what is in it', () => {
+      const views = workbench.folderViewsFt;
+      views.rememberView('docs', 'grid');
+      views.rememberView('docs/prd', 'tree');
+      views.relocate((path) => (path === 'docs' || path.startsWith('docs/') ? `notes${path.slice(4)}` : path));
+      expect(views.viewOf('notes')).toBe('grid');
+      expect(views.viewOf('notes/prd')).toBe('tree');
+      expect(views.viewOf('docs')).toBeUndefined();
+    });
+
+    it('remembers nothing for a file shown in a panel', async () => {
+      await start();
+      workbench.fileBrowserFt.openFile('group-root', 'README.md', 'README.md');
+      for (const request of http.match(() => true)) {
+        request.flush(new Blob(['# hi']));
+      }
+      await settled();
+      workbench.fileBrowserFt.setView('group-root', 'grid');
+      expect(workbench.folderViewsFt.viewOf('README.md')).toBeUndefined();
     });
   });
 

@@ -141,6 +141,16 @@ export class FilesRoutes implements RouteModule {
       }),
     );
 
+    // GET /api/fs/host-paths?path=a&path=b — where entries are on the server's disk (PRD 004, §1.3.2).
+    this.router.get('/host-paths', (req, res) => {
+      const value = req.query['path'];
+      const paths = typeof value === 'string' ? [value] : value;
+      if (!Array.isArray(paths) || !paths.every((path): path is string => typeof path === 'string')) {
+        throw HttpError.badRequest('Name at least one "path"');
+      }
+      res.json({ data: { paths: this.filesService.hostPaths(paths) } });
+    });
+
     // GET /api/fs/download?path=... — stream one file back as an attachment.
     this.router.get(
       '/download',

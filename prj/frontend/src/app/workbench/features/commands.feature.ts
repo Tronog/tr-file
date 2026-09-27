@@ -272,7 +272,7 @@ export class CommandsFeature {
         category: 'File',
         label: 'Copy Path',
         enabled: (t) => some(t) || t.folder !== null,
-        run: (t) => void globalThis.navigator?.clipboard?.writeText((some(t) ? t.paths : [t.folder as string]).map((path) => `/${path}`).join('\n')),
+        run: (t) => p.systemOpenFt.copyPaths(some(t) ? t.paths : [t.folder as string]),
       },
       { id: 'file.emptyTrash', category: 'File', label: 'Empty Trash…', run: () => p.operationsFt.emptyTrash() },
 
@@ -303,7 +303,7 @@ export class CommandsFeature {
           category: 'View',
           label,
           enabled: listing,
-          checked: (t) => group(t)?.view === view,
+          checked: (t) => group(t) !== undefined && p.fileBrowserFt.viewOf(t.groupId) === view,
           run: (t) => p.fileBrowserFt.setView(t.groupId, view),
         }),
       ),

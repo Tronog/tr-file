@@ -361,6 +361,46 @@ export class FsHttpService implements FsTransport {
     return false;
   }
 
+  /** Where entries are on the server's disk; as the app shows them, from a server that cannot say. */
+  private async hostPaths(paths: readonly string[]): Promise<readonly string[]> {
+    let params = new HttpParams();
+    for (const path of paths) {
+      params = params.append('path', path);
+    }
+    try {
+      return (await firstValueFrom(this.http.get<FsEnvelope<{ paths: string[] }>>(`${this.baseUrl}/host-paths?${params.toString()}`))).data.paths;
+    } catch (error) {
+      if (FsError.from(error).code === 'NOT_FOUND') {
+        return paths.map(shownPath);
+      }
+      throw FsError.from(error);
+    }
+  }
+
+  /**
+   * The full paths, on the server's own disk (PRD 004, §1.3.2) — asked of
+   * the server, since only it knows where its root is — and the Clipboard API, where the page may use it — a secure context: HTTPS,
+   * or `localhost`. Served over plain HTTP from another address it does not
+   * exist, and the old `execCommand('copy')` of a selected text field still
+   * works there, inside the click that asked for it.
+   */
+  async copyPaths(paths: readonly string[]): Promise<string> {
+    const text = (await this.hostPaths(paths)).join('\n');
+    const clipboard = globalThis.navigator?.clipboard;
+    if (clipboard !== undefined) {
+      try {
+        await clipboard.writeText(text);
+        return text;
+      } catch {
+        // Refused — no permission, or the page lost focus: try the old way.
+      }
+    }
+    if (copyBySelection(text)) {
+      return text;
+    }
+    throw new FsError('This browser did not let the page write to the clipboard.', 0, 'NOT_SUPPORTED');
+  }
+
   /** A page never learns where a dropped file came from: every one is an upload. */
   async localPaths(files: readonly File[]): Promise<readonly (string | null)[]> {
     return files.map(() => null);
@@ -484,6 +524,36 @@ export class FsHttpService implements FsTransport {
         parse: (raw: unknown) => (raw as FsEnvelope<T>).data,
       },
     );
+  }
+}
+
+/** A root-relative path as the app shows it: `/docs/a.md`; a drive, over every drive, as `C:/Users`. */
+function shownPath(path: string): string {
+  return /^[A-Za-z]:(\/|$)/.test(path) ? path : `/${path}`;
+}
+
+/** Copies `text` by selecting it in a hidden field — for pages the Clipboard API is not open to. */
+function copyBySelection(text: string): boolean {
+  const document = globalThis.document;
+  if (document === undefined) {
+    return false;
+  }
+  const field = document.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  field.style.position = 'fixed';
+  field.style.opacity = '0';
+  document.body.append(field);
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  field.focus();
+  field.select();
+  try {
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    field.remove();
+    focused?.focus();
   }
 }
 

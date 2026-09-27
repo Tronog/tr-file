@@ -54,6 +54,11 @@ export class FsSystemFeature {
     return this.parent.transport.writeClipboard(paths, cut);
   }
 
+  /** *Copy Path*; answers with the text put on the clipboard. */
+  copyPaths(paths: readonly string[]): Promise<string> {
+    return this.parent.transport.copyPaths(paths);
+  }
+
   startDrag(paths: readonly string[]): boolean {
     return this.parent.transport.startDrag(paths);
   }

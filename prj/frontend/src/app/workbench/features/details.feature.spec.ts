@@ -359,8 +359,12 @@ describe('DetailsFeature', () => {
       Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 
       workbench.detailsFt.runAction('copy-path');
+      await Promise.resolve();
+      // The full path, which only the server knows (PRD 004, §1.3.2).
+      http.expectOne((request) => request.url.startsWith('/api/fs/host-paths')).flush({ data: { paths: ['/srv/files/docs/prd/001.md'] } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(writeText).toHaveBeenCalledWith('docs/prd/001.md');
+      expect(writeText).toHaveBeenCalledWith('/srv/files/docs/prd/001.md');
     });
 
     it('ignores an unknown action', async () => {

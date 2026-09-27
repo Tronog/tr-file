@@ -201,13 +201,21 @@ the last 20 changes: rename back, trash what was created or copied, rename moved
 entries back from a job's `outcome`, restore trashed ones where the trash
 `canRestore`; a delete, or the system trash, says it cannot. `Shift`+`Delete`
 deletes for good, always after asking. Panels sort by clicking a column
-(`PanelGroupState.sort`, folders always first, `listing/listing-order.ts`) and
+(folders always first, `listing/listing-order.ts`) — the order and the view (list, grid,
+tree) are the *folder's* (PRD 004, §1.3.1): `FolderViewsFeature` keeps them per folder in
+`SettingsService`, every panel showing a folder shows it that way, and a folder nothing was
+chosen for keeps its panel's last (`PanelGroupState.view` / `sort`) — and
 filter with the toolbar box (`Ctrl`+`F`, cleared on leaving the folder); the path
 bar is an address bar (`Ctrl`+`L`, `goToLocation` — a file opens its folder,
 selected); the toolbar has Back and Forward. What the app cannot preview (PDF,
 Office, archives, too large) opens with `SystemOpenFeature` — the default app on
 the desktop (the main process asks before running a program), a new browser tab
-served `inline` otherwise; *Reveal* exists only on the desktop, for local files.
+served `inline` otherwise; *Reveal* exists only on the desktop, for local files. *Copy Path* copies
+the *full* path (PRD 004, §1.3.2) — `SystemOpenFeature.copyPaths` → `FsTransport.copyPaths`: on the
+desktop the main process writes the real host paths (`clipboard-write-paths` — the window's own
+clipboard permission is denied; a remote server is asked with `host-paths`), in a browser the page
+asks `/api/fs/host-paths` and writes with the Clipboard API, or `execCommand('copy')` where the page
+is not a secure context; a failure is said, never swallowed.
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what

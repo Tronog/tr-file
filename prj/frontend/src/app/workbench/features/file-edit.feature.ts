@@ -233,6 +233,7 @@ export class FileEditFeature {
       }
     }
     this.parent.fileClipboardFt.relocate(move);
+    this.parent.folderViewsFt.relocate(move);
     this.parent.explorerFt.relocate(move);
     const selected = this.parent.selectedEntryId();
     if (move(selected) !== selected) {

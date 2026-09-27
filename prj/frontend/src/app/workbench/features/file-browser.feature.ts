@@ -149,15 +149,30 @@ export class FileBrowserFeature implements PanelContentFeature {
 
   /* -- navigation -------------------------------------------------------- */
 
+  /**
+   * How a panel shows its folder: what was chosen for that folder
+   * (PRD 004, §1.3.1), else what the panel last showed.
+   */
+  viewOf(groupId: string): UiPanelView {
+    const group = this.groups.stateOf(groupId);
+    return group === undefined ? 'list' : this.viewFor(group);
+  }
+
+  /** Shows a panel's folder as `view` — and every panel showing that folder, from now on. */
   setView(id: string, view: UiPanelView): void {
     this.groups.update(id, (group) => ({ ...group, view }));
+    this.rememberFor(id, (path) => this.parent.folderViewsFt.rememberView(path, view));
   }
 
   /* -- order and filter (PRD 003, §5) --------------------------------------- */
 
-  /** How a panel orders its listing. */
+  /**
+   * How a panel orders its listing: the order chosen for its folder
+   * (PRD 004, §1.3.1), else the panel's last.
+   */
   sortOf(groupId: string): PanelSort {
-    return this.groups.stateOf(groupId)?.sort ?? DEFAULT_SORT;
+    const group = this.groups.stateOf(groupId);
+    return (group === undefined ? undefined : this.parent.folderViewsFt.sortOf(group.path)) ?? group?.sort ?? DEFAULT_SORT;
   }
 
   /**
@@ -175,6 +190,19 @@ export class FileBrowserFeature implements PanelContentFeature {
 
   setSort(groupId: string, sort: PanelSort): void {
     this.groups.update(groupId, (group) => ({ ...group, sort }));
+    this.rememberFor(groupId, (path) => this.parent.folderViewsFt.rememberSort(path, sort));
+  }
+
+  /** Remembers a choice for the folder a panel lists — not for a file it shows. */
+  private rememberFor(groupId: string, remember: (path: string) => void): void {
+    const group = this.groups.stateOf(groupId);
+    if (group !== undefined && this.groups.activeTabOf(group)?.kind === 'folder') {
+      remember(group.path);
+    }
+  }
+
+  private viewFor(group: PanelGroupState): UiPanelView {
+    return this.parent.folderViewsFt.viewOf(group.path) ?? group.view;
   }
 
   /** What the panel's filter box holds; `''` when nothing is filtered out. */
@@ -221,7 +249,7 @@ export class FileBrowserFeature implements PanelContentFeature {
         continue;
       }
       folders.add(group.path);
-      if (group.view === 'tree') {
+      if (this.viewFor(group) === 'tree') {
         for (const path of this.openFoldersShown(group)) {
           folders.add(path);
         }
@@ -735,7 +763,7 @@ export class FileBrowserFeature implements PanelContentFeature {
    * behind by navigating elsewhere stay remembered, but are not shown.
    */
   private isShownInTree(group: PanelGroupState, path: string): boolean {
-    if (group.view !== 'tree' || path === group.path) {
+    if (this.viewFor(group) !== 'tree' || path === group.path) {
       return false;
     }
     const under = group.path === '' ? path !== '' : path.startsWith(`${group.path}/`);
@@ -796,11 +824,12 @@ export class FileBrowserFeature implements PanelContentFeature {
     const all = this.parent.fsDataFt.entries(group.path);
     const entries = this.visibleEntries(group.id, group.path);
     const filter = this.filterOf(group.id);
+    const view = this.viewFor(group);
 
     return {
       breadcrumbs: this.breadcrumbs(group.path),
       location: `/${group.path}`,
-      view: group.view,
+      view,
       toolbarActions: this.folderToolbar(group),
       showViewSwitch: true,
       searchPlaceholder: FILTER_PLACEHOLDER,
@@ -809,7 +838,7 @@ export class FileBrowserFeature implements PanelContentFeature {
       ...this.focusTokens(group.id),
       columns: columnsFor(this.sortOf(group.id)),
       rows:
-        group.view === 'tree'
+        view === 'tree'
           ? this.treeRows(group, group.path, 0, active)
           : entries.map((entry) => this.row(entry, group, active)),
       items: entries.map((entry) => this.item(entry, group, active)),

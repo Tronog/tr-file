@@ -19,6 +19,8 @@ import type { ClipboardFiles } from './system-clipboard.js';
 export interface FileClipboard {
   readFiles(): Promise<ClipboardFiles>;
   writeFiles(files: readonly string[], cut: boolean): Promise<void>;
+  /** Plain text — *Copy Path*. */
+  writeText(text: string): Promise<void>;
 }
 
 /** What a window is known by: its id, and the event that ends it. */
@@ -142,6 +144,8 @@ export class BridgeSessions {
         return this.readClipboard(sender);
       case 'clipboard-write':
         return this.writeClipboard(sender, request as Record<string, unknown>);
+      case 'clipboard-write-paths':
+        return this.copyPaths(sender, request as Record<string, unknown>);
       case 'local-paths': {
         const absolute = (request as { absolute?: unknown }).absolute;
         if (!Array.isArray(absolute) || !absolute.every((path): path is string => typeof path === 'string') || absolute.length > 10_000) {
@@ -209,6 +213,52 @@ export class BridgeSessions {
     const files = await this.dragFiles(sender, paths);
     await this.clipboard.writeFiles(files, cut === true);
     return { data: { written: files.length > 0 } };
+  }
+
+  /**
+   * `clipboard-write-paths`: *Copy Path* — entries' paths as text on the
+   * system clipboard, from the main process, since the window may not write
+   * to it itself. On this computer each is its real host path (`C:\Users\me`
+   * on Windows, whatever root the window is pinned to); on a remote server,
+   * the path the server names it by. Answers with the text copied.
+   */
+  private async copyPaths(sender: WindowRef, request: Record<string, unknown>): Promise<FsBridgeResponse> {
+    const { paths } = request;
+    if (!Array.isArray(paths) || !paths.every((path): path is string => typeof path === 'string') || paths.length === 0 || paths.length > 10_000) {
+      return failure('BAD_REQUEST', 400, 'Bridge request field "paths" must be a non-empty array of strings');
+    }
+    if (this.clipboard === null) {
+      return failure('NOT_SUPPORTED', 400, 'There is no system clipboard to copy to.');
+    }
+    const remote = this.remoteFor(sender);
+    let lines: readonly string[];
+    if (remote === null) {
+      lines = await Promise.all(
+        paths.map(async (path) => {
+          const located = await this.bridge.localPath(path, this.for(sender));
+          // Not there any more: still named where it would be.
+          return 'data' in located ? located.data.absolute : this.hostPathOf(path, sender);
+        }),
+      );
+    } else {
+      // The server's own disk (PRD 004, §1.3.2): only it knows where its root is.
+      const answer = await remote.dispatch({ command: 'host-paths', paths });
+      lines = 'data' in answer ? (answer.data as { paths: readonly string[] }).paths : paths.map(BridgeSessions.shownPath);
+    }
+    const text = lines.join(this.platform === 'win32' ? '\r\n' : '\n');
+    await this.clipboard.writeText(text);
+    return { data: { text } };
+  }
+
+  /** Where an entry that is not there would be on this computer. */
+  private async hostPathOf(path: string, sender: WindowRef): Promise<string> {
+    const answer = await this.bridge.dispatch({ command: 'host-paths', paths: [path] }, this.for(sender));
+    return 'data' in answer ? ((answer.data as { paths: readonly string[] }).paths[0] ?? BridgeSessions.shownPath(path)) : BridgeSessions.shownPath(path);
+  }
+
+  /** A root-relative path as the app shows it: `/docs/a.md`, `C:/Users` over every drive. */
+  private static shownPath(path: string): string {
+    return /^[A-Za-z]:(\/|$)/.test(path) ? path : `/${path}`;
   }
 
   /** Whether `sender`'s window may use the file system right now, on whichever backend it is on. */

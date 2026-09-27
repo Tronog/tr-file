@@ -343,6 +343,8 @@ export class FileSystemBridge {
         });
       case 'git':
         return this.git.handle(request.git);
+      case 'host-paths':
+        return { paths: this.files.hostPaths(request.paths) };
     }
   }
 
@@ -670,6 +672,8 @@ export class FileSystemBridge {
           ...(limit === undefined ? {} : { limit }),
         };
       }
+      case 'host-paths':
+        return { command, paths: FileSystemBridge.readStrings(value, 'paths') };
       case 'git': {
         const action = (value as { action?: unknown }).action;
         if (!isGitAction(action)) {

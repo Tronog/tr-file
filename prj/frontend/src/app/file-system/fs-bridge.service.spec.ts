@@ -122,6 +122,13 @@ describe('FsBridgeService', () => {
     expect(fs.transport.kind).toBe('desktop');
   });
 
+  it('copies paths through the main process, which knows the host paths', async () => {
+    fake.answer = { data: { text: '/home/me/docs/a.md' } };
+
+    await expect(fs.systemFt.copyPaths(['docs/a.md'])).resolves.toBe('/home/me/docs/a.md');
+    expect(fake.sent).toEqual([{ command: 'clipboard-write-paths', paths: ['docs/a.md'] }]);
+  });
+
   it('lists a directory with one command and no request', async () => {
     fake.answer = { data: LISTING };
 

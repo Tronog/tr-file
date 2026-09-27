@@ -50,7 +50,8 @@ export type FsBridgeCommand =
   | 'archive-list'
   | 'op-compress'
   | 'op-extract'
-  | 'git';
+  | 'git'
+  | 'host-paths';
 
 /**
  * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
@@ -255,7 +256,14 @@ export interface FsGitRequest {
   readonly git: GitRequest;
 }
 
+/** Where entries are on the backend's disk (PRD 004, §1.3.2) — `GET /api/fs/host-paths`. */
+export interface FsHostPathsRequest {
+  readonly command: 'host-paths';
+  readonly paths: readonly string[];
+}
+
 export type FsBridgeRequest =
+  | FsHostPathsRequest
   | FsGitRequest
   | FsArchiveListRequest
   | FsOpCompressRequest
@@ -348,6 +356,7 @@ export interface FsBridgeResults {
   readonly 'op-extract': OperationJobDto;
   /** What the action answers: `GitInfoDto`, `GitStatusDto`, `GitLogDto`, … */
   readonly git: unknown;
+  readonly 'host-paths': { readonly paths: readonly string[] };
 }
 
 export interface FsBridgeSuccess<T> {

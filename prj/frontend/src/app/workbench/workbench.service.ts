@@ -43,6 +43,7 @@ import { SessionFeature, type SessionSnapshot } from './features/session.feature
 import { ArchiveBrowserFeature } from './features/archive-browser.feature';
 import { ThumbnailsFeature } from './features/thumbnails.feature';
 import { GitFeature } from './features/git.feature';
+import { FolderViewsFeature } from './features/folder-views.feature';
 import { GitDiffFeature } from './features/git-diff.feature';
 import type { MockWorkbenchLayout } from './mock-data/mock-data.model';
 
@@ -135,6 +136,9 @@ export class WorkbenchService {
 
   /** The cache every view reads from; constructed before its readers. */
   readonly fsDataFt = new FsDataFeature(this);
+
+  /** Each folder's view and order, kept in the client's storage (PRD 004, §1.3.1); read by the panels. */
+  readonly folderViewsFt = new FolderViewsFeature(this);
 
   /** Places, bookmarks and recent folders (PRD 003, §6); names the root for everything else. */
   readonly placesFt = new PlacesFeature(this);

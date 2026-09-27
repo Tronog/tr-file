@@ -319,7 +319,22 @@ export class RemoteBackend {
       // Git (PRD 011, §1) runs on the server, in its repositories.
       case 'git':
         return this.git(request.git);
+      case 'host-paths':
+        return this.hostPaths(request.paths);
     }
+  }
+
+  /**
+   * Where entries are on the server's disk (PRD 004, §1.3.2). A server from
+   * before it answers `404`, and its entries are named as the app shows them.
+   */
+  private async hostPaths(paths: readonly string[]): Promise<unknown> {
+    const response = await this.request('GET', '/fs/host-paths', { query: { path: paths }, accept: [200, 404] });
+    if (response.status === 404) {
+      await response.body?.cancel();
+      return { paths: paths.map((path) => (/^[A-Za-z]:(\/|$)/.test(path) ? path : `/${path}`)) };
+    }
+    return ((await response.json()) as { data: unknown }).data;
   }
 
   /**

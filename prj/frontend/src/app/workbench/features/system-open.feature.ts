@@ -44,6 +44,26 @@ export class SystemOpenFeature {
     }
   }
 
+  /**
+   * *Copy Path* (PRD 003, §5): the entries' paths, one per line, on the
+   * clipboard — real host paths on the desktop. A clipboard that refuses is
+   * said, never swallowed.
+   */
+  async copyPaths(paths: readonly string[]): Promise<void> {
+    if (paths.length === 0) {
+      return;
+    }
+    try {
+      await this.parent.fileSystem.systemFt.copyPaths(paths);
+    } catch (error) {
+      await this.parent.modal.message({
+        severity: 'error',
+        message: paths.length === 1 ? 'Could not copy the path.' : 'Could not copy the paths.',
+        detail: FsError.from(error).message,
+      });
+    }
+  }
+
   /** Opens `path` outside the app; a refusal is said, a declined program is not. */
   async open(path: string): Promise<void> {
     const name = path.slice(path.lastIndexOf('/') + 1) || this.parent.workspaceName();

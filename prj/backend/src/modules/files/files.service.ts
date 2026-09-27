@@ -40,6 +40,9 @@ export const SEARCH_LIMITS = {
   concurrency: 16,
 } as const;
 
+/** The most paths one `hostPaths` call answers for. */
+export const HOST_PATHS_MAX = 10_000;
+
 /** Top-level folders of `/` a search passes over: the kernel's, not anyone's files. */
 const PSEUDO_FILE_SYSTEMS: ReadonlySet<string> = new Set(['proc', 'sys', 'dev', 'run']);
 
@@ -443,6 +446,21 @@ export class FilesService {
       type: FileEntry.typeOf(stats),
       executable: stats.isFile() && (stats.mode & 0o111) !== 0,
     };
+  }
+
+  /**
+   * Where entries are on the server's disk (PRD 004, §1.3.2) — what *Copy
+   * Path* copies: the full host path of each, in the host's own form
+   * (`/srv/files/docs/a.md`, `C:\Users\me`). Worked out from the path alone, so
+   * an entry that is not there still has one; every path is proven inside
+   * the root first, as any request path is. The root of a server over every
+   * Windows drive is no folder, and answers `''`.
+   */
+  hostPaths(requestedPaths: readonly string[]): string[] {
+    if (requestedPaths.length === 0 || requestedPaths.length > HOST_PATHS_MAX) {
+      throw HttpError.badRequest(`Name between 1 and ${HOST_PATHS_MAX} paths`);
+    }
+    return requestedPaths.map((path) => this.resolver.resolve(path).absolute);
   }
 
   /**

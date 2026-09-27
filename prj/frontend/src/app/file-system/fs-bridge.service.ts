@@ -383,6 +383,11 @@ export class FsBridgeService implements FsTransport {
     await this.invoke({ command: 'clipboard-write', paths: [...paths], cut });
   }
 
+  /** The main process writes it: the page itself may not write to the system clipboard. */
+  async copyPaths(paths: readonly string[]): Promise<string> {
+    return (await this.invoke<{ text: string }>({ command: 'clipboard-write-paths', paths: [...paths] })).text;
+  }
+
   /** The main process starts it — for entries on this computer; it knows which window is where. */
   startDrag(paths: readonly string[]): boolean {
     const start = this.api?.startDrag;
