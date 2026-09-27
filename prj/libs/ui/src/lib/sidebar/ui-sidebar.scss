@@ -5,6 +5,9 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  // What does not fit — more pane headers than the window is tall — is cut
+  // off here, never drawn over the status bar below (PRD 001, Fix 2).
+  overflow: hidden;
   background: var(--vsc-sidebar-bg);
 }
 

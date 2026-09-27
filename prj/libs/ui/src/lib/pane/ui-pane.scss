@@ -1,18 +1,19 @@
 @use 'mixins' as *;
 
+// A pane in a sidebar too short for all of them (PRD 001, Fix 2) shrinks —
+// the others in proportion to what they hold, a `grow` pane first — but never
+// below its own header, and its body scrolls rather than spilling over the
+// pane below it, or out of the sidebar onto the status bar. VS Code's panes
+// do the same.
 :host {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: calc(var(--vsc-pane-header-height) + 1px);
+  overflow: hidden;
 }
 
 :host(.is-grow) {
   flex: 1;
-  min-height: 0;
-
-  .pane-body {
-    @include scrollable;
-  }
 }
 
 .pane-header {
@@ -86,6 +87,6 @@
 
 .pane-body {
   flex: 1;
-  min-height: 0;
   padding-bottom: 6px;
+  @include scrollable;
 }
