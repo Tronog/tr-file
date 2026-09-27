@@ -3,8 +3,8 @@
     [items]="browser().breadcrumbs"
     [label]="breadcrumbLabel()"
     [location]="browser().location"
-    (select)="breadcrumbSelect.emit($event)"
-    (submit)="pathSubmit.emit($event)"
+    (crumbSelect)="breadcrumbSelect.emit($event)"
+    (pathSubmit)="pathSubmit.emit($event)"
   />
 }
 

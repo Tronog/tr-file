@@ -31,10 +31,16 @@ export class UiBreadcrumbs {
   /** The path as it is typed, e.g. `/docs/prd`; `undefined` keeps the bar read-only. */
   readonly location = input<string | undefined>(undefined);
 
-  readonly select = output<string>();
+  /**
+   * A crumb was chosen. Not `select`: an output named after a DOM event also
+   * hears that event, and the path field's own `select` — fired whenever its
+   * text is selected, as editing the path does at once — bubbles to this
+   * host, where it would arrive as a crumb that is an `Event`.
+   */
+  readonly crumbSelect = output<string>();
 
-  /** A path typed into the bar and confirmed with `Enter`. */
-  readonly submit = output<string>();
+  /** A path typed into the bar and confirmed with `Enter` — not `submit`, for the same reason. */
+  readonly pathSubmit = output<string>();
 
   /** Whether the bar is a text field right now. */
   protected readonly editing = signal(false);
@@ -75,7 +81,7 @@ export class UiBreadcrumbs {
     if (event.key === 'Enter') {
       const value = (event.target as HTMLInputElement).value;
       this.stop();
-      this.submit.emit(value);
+      this.pathSubmit.emit(value);
     } else if (event.key === 'Escape') {
       this.stop();
     } else {

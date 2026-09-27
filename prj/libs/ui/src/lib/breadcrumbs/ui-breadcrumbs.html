@@ -17,7 +17,7 @@
     <ol class="crumbs">
       @for (item of items(); track item.id; let last = $last) {
         <li class="crumb-item">
-          <button type="button" class="crumb" (click)="select.emit(item.id)">
+          <button type="button" class="crumb" (click)="crumbSelect.emit(item.id)">
             @if (item.icon; as icon) {
               <ui-icon [name]="icon" />
             }

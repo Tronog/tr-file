@@ -194,6 +194,18 @@ describe('UiFileBrowser, what every file manager has', () => {
     expect(document.activeElement).toBe(row(1));
   });
 
+  it('takes text selected in the path field for no crumb — the DOM `select` event is not the output', () => {
+    const crumbs: unknown[] = [];
+    fixture.componentInstance.breadcrumbSelect.subscribe((id) => crumbs.push(id));
+    row(1).focus();
+    row(1).dispatchEvent(keydown('l', { ctrlKey: true }));
+    fixture.detectChanges();
+
+    // What the browser fires as the field's text is selected — which editing the path does at once.
+    $<HTMLInputElement>('input.location').dispatchEvent(new Event('select', { bubbles: true }));
+    expect(crumbs).toEqual([]);
+  });
+
   it('answers the model’s requests to focus the filter and edit the path', () => {
     fixture.componentRef.setInput('browser', { ...BROWSER, filterFocus: 1 });
     fixture.detectChanges();
@@ -225,7 +237,7 @@ describe('UiBreadcrumbs, as an address bar', () => {
 
   it('edits on a click on its blank space, not on a crumb, and Escape puts the crumbs back', () => {
     const selected: string[] = [];
-    fixture.componentInstance.select.subscribe((id) => selected.push(id));
+    fixture.componentInstance.crumbSelect.subscribe((id) => selected.push(id));
     fixture.componentRef.setInput('location', '/');
     fixture.detectChanges();
 
