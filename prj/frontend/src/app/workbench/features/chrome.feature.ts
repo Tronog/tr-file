@@ -127,7 +127,7 @@ export class ChromeFeature {
   }
 
   /** Where the Settings menu is open — its bottom-left corner — or `null` (PRD 007, §1). */
-  private readonly settingsMenuAt = signal<{ readonly x: number; readonly y: number } | null>(null);
+  private readonly settingsMenuAt = signal<{ readonly x: number; readonly y: number; readonly leftward?: boolean } | null>(null);
 
   readonly settingsMenu = this.settingsMenuAt.asReadonly();
 
@@ -160,7 +160,14 @@ export class ChromeFeature {
     if (anchor.id !== 'settings') {
       return;
     }
-    this.settingsMenuAt.set(this.settingsMenuAt() === null ? { x: anchor.right, y: anchor.bottom } : null);
+    if (this.settingsMenuAt() !== null) {
+      this.settingsMenuAt.set(null);
+      return;
+    }
+    // With the activity bar on the right (PRD 010, §3) the menu opens leftward, from the gear's left edge.
+    this.settingsMenuAt.set(
+      this.parent.preferencesFt.sidesSwapped() ? { x: anchor.left, y: anchor.bottom, leftward: true } : { x: anchor.right, y: anchor.bottom },
+    );
   }
 
   closeSettingsMenu(): void {

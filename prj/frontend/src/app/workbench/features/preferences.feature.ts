@@ -17,9 +17,26 @@ export interface Preference {
   readonly category: string;
   readonly title: string;
   readonly description: string;
-  /** A switch, with its default — or an action, with its button's label and the command it runs. */
-  readonly kind: { readonly type: 'boolean'; readonly default: boolean } | { readonly type: 'action'; readonly label: string; readonly command: string };
+  /**
+   * A switch, with its default; a choice among `options`, with its default;
+   * or an action, with its button's label and the command it runs.
+   */
+  readonly kind:
+    | { readonly type: 'boolean'; readonly default: boolean }
+    | { readonly type: 'choice'; readonly default: string; readonly options: readonly PreferenceOption[] }
+    | { readonly type: 'action'; readonly label: string; readonly command: string };
 }
+
+export interface PreferenceOption {
+  readonly value: string;
+  readonly label: string;
+}
+
+/** Where a sidebar goes (PRD 010, §3). */
+const SIDES: readonly PreferenceOption[] = [
+  { value: 'left', label: 'Left' },
+  { value: 'right', label: 'Right' },
+];
 
 /**
  * Every setting the settings window shows (PRD 010, §1), and their values.
@@ -86,6 +103,24 @@ export const PREFERENCES: readonly Preference[] = [
     kind: { type: 'boolean', default: true },
   },
   {
+    id: 'workbench.explorerLocation',
+    section: 'appearance',
+    group: 'Workbench',
+    category: 'Explorer',
+    title: 'Location',
+    description: 'Which side of the window the Explorer is on, with the activity bar beside it. Details takes the other side.',
+    kind: { type: 'choice', default: 'left', options: SIDES },
+  },
+  {
+    id: 'workbench.detailsLocation',
+    section: 'appearance',
+    group: 'Workbench',
+    category: 'Details',
+    title: 'Location',
+    description: 'Which side of the window the Details sidebar is on. The Explorer takes the other side.',
+    kind: { type: 'choice', default: 'right', options: SIDES },
+  },
+  {
     id: 'files.thumbnails',
     section: 'appearance',
     group: 'Files',
@@ -98,17 +133,21 @@ export const PREFERENCES: readonly Preference[] = [
 
 export class PreferencesFeature {
   /** The preferences of their own that differ from their default. */
-  private readonly stored = signal<Readonly<Record<string, boolean>>>({});
+  private readonly stored = signal<Readonly<Record<string, boolean | string>>>({});
 
   /** Mirrors `SessionFeature.restoresSessions`, which is read from storage and so cannot be watched. */
   private readonly restoreLayout = signal(true);
 
   constructor(private readonly parent: WorkbenchService) {
     const raw = parent.settings.get<unknown>(PREFERENCES_KEY);
-    const stored: Record<string, boolean> = {};
+    const stored: Record<string, boolean | string> = {};
     if (typeof raw === 'object' && raw !== null) {
       for (const [id, value] of Object.entries(raw)) {
-        if (typeof value === 'boolean' && PreferencesFeature.find(id)?.kind.type === 'boolean') {
+        const kind = PreferencesFeature.find(id)?.kind;
+        if (
+          (typeof value === 'boolean' && kind?.type === 'boolean') ||
+          (typeof value === 'string' && kind?.type === 'choice' && kind.options.some((option) => option.value === value))
+        ) {
           stored[id] = value;
         }
       }
@@ -133,15 +172,51 @@ export class PreferencesFeature {
         if (preference?.kind.type !== 'boolean') {
           return false;
         }
-        return this.stored()[id] ?? preference.kind.default;
+        const stored = this.stored()[id];
+        return typeof stored === 'boolean' ? stored : preference.kind.default;
       }
     }
   }
 
-  /** Whether a switch is set to something other than its default. */
-  isModified(id: string): boolean {
+  /**
+   * A choice's value now. The two sidebars' locations are one choice seen
+   * from either side (PRD 010, §3): Details is wherever the Explorer is not.
+   */
+  choice(id: string): string {
+    if (id === 'workbench.detailsLocation') {
+      return this.choice('workbench.explorerLocation') === 'left' ? 'right' : 'left';
+    }
     const preference = PreferencesFeature.find(id);
-    return preference?.kind.type === 'boolean' && this.value(id) !== preference.kind.default;
+    if (preference?.kind.type !== 'choice') {
+      return '';
+    }
+    const stored = this.stored()[id];
+    return typeof stored === 'string' ? stored : preference.kind.default;
+  }
+
+  /** Whether the Explorer is on the right, and Details on the left (PRD 010, §3). */
+  readonly sidesSwapped = computed(() => this.choice('workbench.explorerLocation') === 'right');
+
+  /** Whether a setting is set to something other than its default. */
+  isModified(id: string): boolean {
+    const kind = PreferencesFeature.find(id)?.kind;
+    if (kind?.type === 'choice') {
+      return this.choice(id) !== kind.default;
+    }
+    return kind?.type === 'boolean' && this.value(id) !== kind.default;
+  }
+
+  /** Makes a choice; moving one sidebar moves the other to the side it left. */
+  choose(id: string, value: string): void {
+    if (id === 'workbench.detailsLocation') {
+      this.choose('workbench.explorerLocation', value === 'left' ? 'right' : 'left');
+      return;
+    }
+    const kind = PreferencesFeature.find(id)?.kind;
+    if (kind?.type !== 'choice' || !kind.options.some((option) => option.value === value)) {
+      return;
+    }
+    this.keep(id, value, kind.default);
   }
 
   set(id: string, value: boolean): void {
@@ -158,21 +233,27 @@ export class PreferencesFeature {
         this.restoreLayout.set(value);
         return;
     }
-    const byDefault = preference.kind.default;
+    this.keep(id, value, preference.kind.default);
+    this.applied(id, value);
+  }
+
+  /** Stores a value — only while it differs from the default. */
+  private keep(id: string, value: boolean | string, byDefault: boolean | string): void {
     this.stored.update((stored) => {
       const { [id]: _previous, ...rest } = stored;
       return value === byDefault ? rest : { ...rest, [id]: value };
     });
     const stored = this.stored();
     this.parent.settings.set(PREFERENCES_KEY, Object.keys(stored).length === 0 ? null : stored);
-    this.applied(id, value);
   }
 
-  /** Puts a switch back to its default. */
+  /** Puts a setting back to its default. */
   reset(id: string): void {
-    const preference = PreferencesFeature.find(id);
-    if (preference?.kind.type === 'boolean') {
-      this.set(id, preference.kind.default);
+    const kind = PreferencesFeature.find(id)?.kind;
+    if (kind?.type === 'boolean') {
+      this.set(id, kind.default);
+    } else if (kind?.type === 'choice') {
+      this.choose(id, kind.default);
     }
   }
 

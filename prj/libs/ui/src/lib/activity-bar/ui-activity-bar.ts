@@ -6,8 +6,10 @@ import type { UiActivityItem, UiMenuAnchor } from '../models/chrome.model';
  * The 48px activity bar: primary view switchers at the top, secondary entries
  * (account, settings) pinned to the bottom by a flexible spacer.
  *
- * The active entry is marked with `aria-pressed` and gets VS Code's 2px left
- * indicator bar, drawn as a `::before` pseudo element.
+ * The active entry is marked with `aria-pressed` and gets VS Code's 2px
+ * indicator bar, drawn as a `::before` pseudo element on the edge away from
+ * the sidebar — the left one, or the right one when the bar is on the right
+ * (`side`, PRD 010, §3).
  */
 @Component({
   selector: 'ui-activity-bar',
@@ -18,6 +20,7 @@ import type { UiActivityItem, UiMenuAnchor } from '../models/chrome.model';
     role: 'toolbar',
     'aria-orientation': 'vertical',
     'aria-label': 'Activity bar',
+    '[class.side-right]': "side() === 'right'",
   },
 })
 export class UiActivityBar {
@@ -25,6 +28,9 @@ export class UiActivityBar {
 
   /** Entries pushed to the bottom of the bar. */
   readonly bottomItems = input<readonly UiActivityItem[]>([]);
+
+  /** The window edge the bar is on; its border and indicator face the other way. */
+  readonly side = input<'left' | 'right'>('left');
 
   readonly select = output<string>();
 

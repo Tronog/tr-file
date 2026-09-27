@@ -54,7 +54,7 @@ structural helpers. No component hardcodes a colour.
 
 | Area | Components |
 | --- | --- |
-| Shell | `UiWorkbench`, `UiTitleBar`, `UiActivityBar`, `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
+| Shell | `UiWorkbench` (`mirrored` swaps the sidebars' sides — PRD 010, §3), `UiTitleBar`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
 | Sidebars | `UiSidebar`, `UiPane`, `UiTree` |
 | Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |

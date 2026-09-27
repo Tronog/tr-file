@@ -20,12 +20,12 @@
     <ui-sash
       class="edge-sash edge-sash-left"
       orientation="vertical"
-      label="Resize left sidebar"
+      [label]="leftSashLabel()"
       [class.is-hidden]="!leftVisible()"
       [value]="leftWidth()"
       [min]="leftMin()"
       [max]="leftMax()"
-      (resize)="leftResize.emit($event)"
+      (resize)="resized('left', $event)"
     />
 
     <ng-content select="[uiSlot=center]" />
@@ -33,12 +33,12 @@
     <ui-sash
       class="edge-sash edge-sash-right"
       orientation="vertical"
-      label="Resize right sidebar"
+      [label]="rightSashLabel()"
       [class.is-hidden]="!rightVisible()"
       [value]="rightWidth()"
       [min]="rightMin()"
       [max]="rightMax()"
-      (resize)="rightResize.emit($event)"
+      (resize)="resized('right', $event)"
     />
   </div>
 

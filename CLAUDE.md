@@ -172,7 +172,12 @@ Shortcuts* pages and a search box. The settings are `PREFERENCES` in `Preference
 files and restoring the layout are read and written where they already live (the session,
 `SessionFeature`); auto refresh, the function-key bar and thumbnails are kept under
 `tr-file.preferences.v1`, only while they differ from their default; *Reset Layout* and *Clear
-Recent Folders* are actions that run their commands.
+Recent Folders* are actions that run their commands. *Explorer: Location* and *Details: Location*
+(PRD 010, §3) are one choice seen from either side — moving one moves the other opposite, as VS
+Code's primary and secondary side bars do: `PreferencesFeature.sidesSwapped` sets `UiWorkbench`'s
+`mirrored` (the activity bar and the Explorer on the right, Details on the left; the slots keep their
+names, `left` being the Explorer), the activity bar's and sidebars' `side`, the `Ctrl`+`Tab` ring's
+order and which way the gear's menu opens.
 
 **Every key is configurable (PRD 010, §2).** The library's components never test a key for a
 command themselves: they ask the library's root `UiKeymap` (`prj/libs/ui/src/lib/keyboard/keymap.ts`)

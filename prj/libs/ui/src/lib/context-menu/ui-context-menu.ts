@@ -34,7 +34,9 @@ export type UiMenuDismissReason = 'escape' | 'tab' | 'outside' | 'blur';
  *
  * `(x, y)` is where the menu's corner goes: its top-left corner by default,
  * or its bottom-left with `origin: 'bottom-left'`, for a menu that opens
- * upward from a button at the bottom of the window. With `fixed` the point is
+ * upward from a button at the bottom of the window — or its bottom-right with
+ * `'bottom-right'`, for one that opens upward and leftward, from a button at
+ * the right edge (the activity bar, when the sides are swapped — PRD 010, §3). With `fixed` the point is
  * in viewport pixels; otherwise it is relative to the positioned ancestor.
  *
  * A `fixed` menu opening from its top-left corner stays on screen: one that
@@ -53,7 +55,7 @@ export type UiMenuDismissReason = 'escape' | 'tab' | 'outside' | 'blur';
     '[style.position]': 'fixed() ? "fixed" : null',
     '[style.left.px]': 'x() - shift().x',
     '[style.top.px]': 'y() - shift().y',
-    '[class.from-bottom]': 'origin() === "bottom-left"',
+    '[class.from-bottom]': 'origin() !== "top-left"',
     '(keydown)': 'onKeydown($event)',
     '(document:click)': 'onDocumentClick($event)',
     '(window:blur)': 'dismiss.emit("blur")',
@@ -70,7 +72,7 @@ export class UiContextMenu {
   readonly y = input<number>(0);
 
   /** Which corner of the menu `(x, y)` places. */
-  readonly origin = input<'top-left' | 'bottom-left'>('top-left');
+  readonly origin = input<'top-left' | 'bottom-left' | 'bottom-right'>('top-left');
 
   /** Position against the viewport rather than the nearest positioned ancestor. */
   readonly fixed = input<boolean>(false);
@@ -109,10 +111,15 @@ export class UiContextMenu {
 
   /** Moves a `fixed`, top-left menu that overflows the viewport back inside it, with a 4px margin. */
   private keepOnScreen(): void {
+    const rect = this.host.getBoundingClientRect();
+    if (this.origin() === 'bottom-right') {
+      // Its right edge at `x`: moved back by its own width, once it has one.
+      this.shift.set({ x: rect.width, y: 0 });
+      return;
+    }
     if (!this.fixed() || this.origin() !== 'top-left') {
       return;
     }
-    const rect = this.host.getBoundingClientRect();
     const margin = 4;
     const x = Math.max(0, Math.min(rect.right + margin - window.innerWidth, rect.left - margin));
     const y = Math.max(0, Math.min(rect.bottom + margin - window.innerHeight, rect.top - margin));

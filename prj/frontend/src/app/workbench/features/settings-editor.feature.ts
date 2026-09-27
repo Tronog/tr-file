@@ -85,6 +85,8 @@ export class SettingsEditorFeature {
   changeSetting(change: UiSettingChange): void {
     if (typeof change.value === 'boolean') {
       this.parent.preferencesFt.set(change.id, change.value);
+    } else {
+      this.parent.preferencesFt.choose(change.id, change.value);
     }
   }
 
@@ -204,7 +206,12 @@ export class SettingsEditorFeature {
       category: preference.category,
       title: preference.title,
       description: preference.description,
-      control: kind.type === 'boolean' ? { kind: 'boolean', value: preferences.value(preference.id) } : { kind: 'action', label: kind.label },
+      control:
+        kind.type === 'boolean'
+          ? { kind: 'boolean', value: preferences.value(preference.id) }
+          : kind.type === 'choice'
+            ? { kind: 'select', value: preferences.choice(preference.id), options: kind.options }
+            : { kind: 'action', label: kind.label },
       ...(preferences.isModified(preference.id) ? { modified: true } : {}),
     };
   }

@@ -11,6 +11,16 @@
   border-right: 1px solid var(--vsc-border);
 }
 
+:host(.side-right) {
+  border-right: 0;
+  border-left: 1px solid var(--vsc-border);
+
+  .activity-btn.is-active::before {
+    right: 0;
+    left: auto;
+  }
+}
+
 .activity-btn {
   position: relative;
   display: flex;

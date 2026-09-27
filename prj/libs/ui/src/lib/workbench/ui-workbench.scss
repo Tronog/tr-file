@@ -78,6 +78,34 @@
   right: calc(var(--vsc-sash-size) / -2);
 }
 
+/* Mirrored (PRD 010, §3): the row runs the other way, and each sidebar's
+   border and sash move to the edge that now faces the centre. */
+:host(.is-mirrored) {
+  .body {
+    flex-direction: row-reverse;
+  }
+
+  .sidebar-left {
+    border-right: 0;
+    border-left: 1px solid var(--vsc-border);
+  }
+
+  .sidebar-right {
+    border-left: 0;
+    border-right: 1px solid var(--vsc-border);
+  }
+
+  .edge-sash-left {
+    right: calc(var(--vsc-sash-size) / -2);
+    left: auto;
+  }
+
+  .edge-sash-right {
+    right: auto;
+    left: calc(var(--vsc-sash-size) / -2);
+  }
+}
+
 /* Slots are always projected; a hidden region only loses its box. */
 .is-hidden {
   display: none;
