@@ -39,6 +39,18 @@ export { UiButton } from './lib/controls/ui-button';
 export { UiSegmented } from './lib/controls/ui-segmented';
 export type { UiSegmentedOption } from './lib/controls/ui-segmented';
 export { UiSearchField } from './lib/controls/ui-search-field';
+
+/* keyboard (PRD 010, §2) --------------------------------------------------- */
+export {
+  UiKeymap,
+  UI_DEFAULT_KEYBINDINGS,
+  chordOf,
+  chordParts,
+  displayChord,
+  displayKey,
+  isChord,
+} from './lib/keyboard/keymap';
+export type { UiKeybinding, UiKeyContext } from './lib/keyboard/keymap';
 export { UiSash } from './lib/sash/ui-sash';
 export { UiProgress } from './lib/progress/ui-progress';
 export { UiEmptyState } from './lib/empty-state/ui-empty-state';
@@ -58,6 +70,10 @@ export { UiPanelGroup, UI_LOADING_RAIL_DELAY_MS } from './lib/panel-group/ui-pan
 export { UiPanelBody } from './lib/panel-group/ui-panel-body';
 export { UiPanelToolbar } from './lib/panel-toolbar/ui-panel-toolbar';
 export { UiPanelGrid } from './lib/panel-grid/ui-panel-grid';
+
+/* settings (PRD 010) ------------------------------------------------------ */
+export { UiSettingsEditor } from './lib/settings/ui-settings-editor';
+export { UiKeybindingsTable } from './lib/settings/ui-keybindings-table';
 
 /* panel content ----------------------------------------------------------- */
 export { UiFileBrowser } from './lib/file-browser/ui-file-browser';

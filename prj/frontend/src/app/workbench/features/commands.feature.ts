@@ -25,8 +25,6 @@ export interface WorkbenchCommand {
   /** Before the label in the palette, as in VS Code: `File: Rename…`. */
   readonly category: string;
   readonly label: (target: CommandTarget) => string;
-  /** Shown beside it in menus and the palette; the binding itself lives with the key's owner. */
-  readonly keybinding?: string;
   /** Whether the palette lists it; context-only commands (tabs, *Open*) do not. */
   readonly palette: boolean;
   readonly enabled: (target: CommandTarget) => boolean;
@@ -78,6 +76,11 @@ export class CommandsFeature {
   /** Every command the palette lists, in table order. */
   paletteCommands(): readonly WorkbenchCommand[] {
     return [...this.table.values()].filter((command) => command.palette);
+  }
+
+  /** Every command of the table, the palette's and the context menus' alike. */
+  allCommands(): readonly WorkbenchCommand[] {
+    return [...this.table.values()];
   }
 
   command(id: string): WorkbenchCommand | undefined {
@@ -142,10 +145,12 @@ export class CommandsFeature {
       return { id, label: id, disabled: true };
     }
     const checked = command.checked?.(target);
+    // The key shown is the one in force (PRD 010, §2), whatever the user bound.
+    const keybinding = this.parent.keybindingsFt.label(id);
     return {
       id,
       label: command.label(target),
-      ...(command.keybinding ? { keybinding: command.keybinding } : {}),
+      ...(keybinding === undefined ? {} : { keybinding }),
       ...(command.enabled(target) ? {} : { disabled: true }),
       ...(checked === undefined ? {} : { checked }),
       ...(separatorBefore ? { separatorBefore: true } : {}),
@@ -189,16 +194,14 @@ export class CommandsFeature {
         id: 'file.newFolder',
         category: 'File',
         label: 'New Folder…',
-        keybinding: 'Ctrl+Shift+N',
         enabled: inFolder,
         run: (t) => p.fileEditFt.createFolder(t.folder as string, t.groupId),
       },
-      { id: 'file.open', category: 'File', label: 'Open', keybinding: 'Enter', palette: false, enabled: one, run: (t) => p.fileBrowserFt.openPath(t.groupId, t.paths[0] as string) },
+      { id: 'file.open', category: 'File', label: 'Open', palette: false, enabled: one, run: (t) => p.fileBrowserFt.openPath(t.groupId, t.paths[0] as string) },
       {
         id: 'file.openToSide',
         category: 'File',
         label: 'Open to the Side',
-        keybinding: 'Ctrl+Enter',
         palette: false,
         enabled: one,
         run: (t) => p.fileBrowserFt.openPathAside(t.groupId, t.paths[0] as string),
@@ -207,7 +210,6 @@ export class CommandsFeature {
         id: 'file.openExternal',
         category: 'File',
         label: () => p.systemOpenFt.openLabel(),
-        keybinding: 'F4',
         enabled: one,
         run: (t) => p.systemOpenFt.open(t.paths[0] as string),
       },
@@ -218,15 +220,14 @@ export class CommandsFeature {
         enabled: (t) => p.systemOpenFt.canReveal() && (one(t) || t.folder !== null),
         run: (t) => p.systemOpenFt.reveal(t.paths[0] ?? (t.folder as string)),
       },
-      { id: 'file.rename', category: 'File', label: 'Rename…', keybinding: 'F2', enabled: one, run: (t) => p.fileEditFt.rename(t.paths[0] as string, t.groupId) },
-      { id: 'file.copyTo', category: 'File', label: 'Copy To…', keybinding: 'F5', enabled: some, run: (t) => p.operationsFt.transferPaths('copy', t.paths, t.groupId) },
-      { id: 'file.moveTo', category: 'File', label: 'Move To…', keybinding: 'F6', enabled: some, run: (t) => p.operationsFt.transferPaths('move', t.paths, t.groupId) },
-      { id: 'file.trash', category: 'File', label: 'Move to Trash', keybinding: 'Delete', enabled: some, run: (t) => p.operationsFt.trash(t.paths) },
+      { id: 'file.rename', category: 'File', label: 'Rename…', enabled: one, run: (t) => p.fileEditFt.rename(t.paths[0] as string, t.groupId) },
+      { id: 'file.copyTo', category: 'File', label: 'Copy To…', enabled: some, run: (t) => p.operationsFt.transferPaths('copy', t.paths, t.groupId) },
+      { id: 'file.moveTo', category: 'File', label: 'Move To…', enabled: some, run: (t) => p.operationsFt.transferPaths('move', t.paths, t.groupId) },
+      { id: 'file.trash', category: 'File', label: 'Move to Trash', enabled: some, run: (t) => p.operationsFt.trash(t.paths) },
       {
         id: 'file.delete',
         category: 'File',
         label: 'Delete Permanently…',
-        keybinding: 'Shift+Delete',
         enabled: some,
         run: (t) => p.operationsFt.deletePermanently(t.paths),
       },
@@ -277,25 +278,24 @@ export class CommandsFeature {
       },
       { id: 'file.emptyTrash', category: 'File', label: 'Empty Trash…', run: () => p.operationsFt.emptyTrash() },
       // Midnight Commander's `F10` (PRD 004, §2): only a window of the desktop app can be quit.
-      { id: 'file.quit', category: 'File', label: 'Quit', keybinding: 'F10', enabled: () => p.desktopWindow.isAvailable, run: () => this.quit() },
+      { id: 'file.quit', category: 'File', label: 'Quit', enabled: () => p.desktopWindow.isAvailable, run: () => this.quit() },
 
       /* Edit */
-      { id: 'edit.undo', category: 'Edit', label: () => p.undoFt.label(), keybinding: 'Ctrl+Z', enabled: () => p.undoFt.canUndo(), run: () => p.undoFt.undo() },
-      { id: 'edit.cut', category: 'Edit', label: 'Cut', keybinding: 'Ctrl+X', enabled: some, run: (t) => p.fileClipboardFt.putPaths('cut', t.paths) },
-      { id: 'edit.copy', category: 'Edit', label: 'Copy', keybinding: 'Ctrl+C', enabled: some, run: (t) => p.fileClipboardFt.putPaths('copy', t.paths) },
+      { id: 'edit.undo', category: 'Edit', label: () => p.undoFt.label(), enabled: () => p.undoFt.canUndo(), run: () => p.undoFt.undo() },
+      { id: 'edit.cut', category: 'Edit', label: 'Cut', enabled: some, run: (t) => p.fileClipboardFt.putPaths('cut', t.paths) },
+      { id: 'edit.copy', category: 'Edit', label: 'Copy', enabled: some, run: (t) => p.fileClipboardFt.putPaths('copy', t.paths) },
       {
         id: 'edit.paste',
         category: 'Edit',
         label: 'Paste',
-        keybinding: 'Ctrl+V',
         enabled: (t) => p.fileClipboardFt.canPaste() && t.folder !== null,
         run: (t) => p.fileClipboardFt.pasteInto(t.folder as string),
       },
-      { id: 'edit.filter', category: 'Edit', label: 'Filter Folder', keybinding: 'Ctrl+F', enabled: listing, run: (t) => p.fileBrowserFt.focusFilter(t.groupId) },
-      { id: 'edit.search', category: 'Edit', label: 'Search Files…', keybinding: 'Ctrl+Shift+F', run: () => p.searchFt.show() },
+      { id: 'edit.filter', category: 'Edit', label: 'Filter Folder', enabled: listing, run: (t) => p.fileBrowserFt.focusFilter(t.groupId) },
+      { id: 'edit.search', category: 'Edit', label: 'Search Files…', run: () => p.searchFt.show() },
 
       /* Selection */
-      { id: 'selection.all', category: 'Selection', label: 'Select All', keybinding: 'Ctrl+A', enabled: listing, run: (t) => p.fileBrowserFt.selectAll(t.groupId) },
+      { id: 'selection.all', category: 'Selection', label: 'Select All', enabled: listing, run: (t) => p.fileBrowserFt.selectAll(t.groupId) },
       { id: 'selection.none', category: 'Selection', label: 'Select None', enabled: some, run: (t) => p.fileBrowserFt.selectNone(t.groupId) },
       { id: 'selection.invert', category: 'Selection', label: 'Invert Selection', enabled: listing, run: (t) => p.fileBrowserFt.invertSelection(t.groupId) },
       /* Midnight Commander's `+` and `-` (PRD 004, §2) */
@@ -303,7 +303,6 @@ export class CommandsFeature {
         id: 'selection.byPattern',
         category: 'Selection',
         label: 'Select by Pattern…',
-        keybinding: '+',
         enabled: listing,
         run: (t) => p.fileBrowserFt.selectByPattern(t.groupId, true),
       },
@@ -311,7 +310,6 @@ export class CommandsFeature {
         id: 'selection.unselectByPattern',
         category: 'Selection',
         label: 'Unselect by Pattern…',
-        keybinding: '-',
         enabled: listing,
         run: (t) => p.fileBrowserFt.selectByPattern(t.groupId, false),
       },
@@ -352,11 +350,10 @@ export class CommandsFeature {
         id: 'view.hidden',
         category: 'View',
         label: 'Show Hidden Files',
-        keybinding: 'Ctrl+H',
         checked: () => p.showHidden(),
         run: () => p.showHidden.update((shown) => !shown),
       },
-      { id: 'view.refresh', category: 'View', label: 'Refresh', keybinding: 'Ctrl+R', enabled: (t) => group(t) !== undefined, run: (t) => p.fileBrowserFt.runToolbarAction(t.groupId, 'refresh') },
+      { id: 'view.refresh', category: 'View', label: 'Refresh', enabled: (t) => group(t) !== undefined, run: (t) => p.fileBrowserFt.runToolbarAction(t.groupId, 'refresh') },
 
       /* Places (PRD 003, §6) */
       {
@@ -435,22 +432,31 @@ export class CommandsFeature {
         id: 'settings.restoreSession',
         category: 'Preferences',
         label: 'Restore Layout on Start',
-        checked: () => p.sessionFt.restoresSessions,
-        run: () => p.sessionFt.setRestoresSessions(!p.sessionFt.restoresSessions),
+        // Through the settings (PRD 010, §1), so the window shows the switch as it stands.
+        checked: () => p.preferencesFt.value('window.restoreLayout'),
+        run: () => p.preferencesFt.set('window.restoreLayout', !p.preferencesFt.value('window.restoreLayout')),
       },
       { id: 'view.resetLayout', category: 'View', label: 'Reset Layout', run: () => p.sessionFt.resetLayout() },
 
+      /* The settings window (PRD 010) */
+      { id: 'workbench.openSettings', category: 'Preferences', label: 'Open Settings', run: () => p.settingsEditorFt.open('general') },
+      {
+        id: 'workbench.openKeybindings',
+        category: 'Preferences',
+        label: 'Open Keyboard Shortcuts',
+        run: () => p.settingsEditorFt.open('keyboard-shortcuts'),
+      },
+
       /* The window, for the function keys (PRD 004, §2): `F1` and `F9` */
-      { id: 'view.commandPalette', category: 'View', label: 'Show All Commands', keybinding: 'F1', palette: false, run: () => p.commandPaletteFt.show() },
-      { id: 'view.mainMenu', category: 'View', label: 'Open the Main Menu', keybinding: 'F9', palette: false, run: () => p.chromeFt.openMainMenu() },
+      { id: 'view.commandPalette', category: 'View', label: 'Show All Commands', palette: false, run: () => p.commandPaletteFt.show() },
+      { id: 'view.mainMenu', category: 'View', label: 'Open the Main Menu', palette: false, run: () => p.chromeFt.openMainMenu() },
 
       /* Go */
-      { id: 'go.back', category: 'Go', label: 'Back', keybinding: 'Alt+Left', enabled: (t) => p.panelHistoryFt.canGoBack(t.groupId), run: (t) => this.walk(t.groupId, () => p.panelHistoryFt.back(t.groupId)) },
+      { id: 'go.back', category: 'Go', label: 'Back', enabled: (t) => p.panelHistoryFt.canGoBack(t.groupId), run: (t) => this.walk(t.groupId, () => p.panelHistoryFt.back(t.groupId)) },
       {
         id: 'go.forward',
         category: 'Go',
         label: 'Forward',
-        keybinding: 'Alt+Right',
         enabled: (t) => p.panelHistoryFt.canGoForward(t.groupId),
         run: (t) => this.walk(t.groupId, () => p.panelHistoryFt.forward(t.groupId)),
       },
@@ -458,11 +464,10 @@ export class CommandsFeature {
         id: 'go.up',
         category: 'Go',
         label: 'Up One Level',
-        keybinding: 'Alt+Up',
         enabled: (t) => (group(t)?.path ?? '') !== '',
         run: (t) => this.walk(t.groupId, () => p.fileBrowserFt.navigateUp(t.groupId)),
       },
-      { id: 'go.location', category: 'Go', label: 'Go to Location…', keybinding: 'Ctrl+L', enabled: (t) => group(t) !== undefined, run: (t) => p.fileBrowserFt.editLocation(t.groupId) },
+      { id: 'go.location', category: 'Go', label: 'Go to Location…', enabled: (t) => group(t) !== undefined, run: (t) => p.fileBrowserFt.editLocation(t.groupId) },
 
       /* Git (PRD 011, §1) */
       {
@@ -495,7 +500,7 @@ export class CommandsFeature {
       { id: 'git.refresh', category: 'Git', label: 'Refresh', enabled: () => git.available() && !git.busy(), run: () => void git.refresh() },
 
       /* Tabs — from a tab's context menu only */
-      { id: 'tab.close', category: 'Tab', label: 'Close', keybinding: 'Ctrl+W', palette: false, enabled: (t) => t.tabId !== undefined, run: (t) => p.editorGroupsFt.closeTab(t.groupId, t.tabId as string) },
+      { id: 'tab.close', category: 'Tab', label: 'Close', palette: false, enabled: (t) => t.tabId !== undefined, run: (t) => p.editorGroupsFt.closeTab(t.groupId, t.tabId as string) },
       {
         id: 'tab.closeOthers',
         category: 'Tab',

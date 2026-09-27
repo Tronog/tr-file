@@ -1,0 +1,99 @@
+@if (recording(); as rec) {
+  <div class="recorder-shade" aria-hidden="true"></div>
+  <div
+    #recorder
+    class="recorder"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Record a key"
+    tabindex="0"
+    (keydown)="onRecorderKeydown($event)"
+  >
+    <p class="recorder-prompt">Press desired key combination and then press Enter.</p>
+    <div class="recorder-key" aria-live="polite">
+      @if (rec.key; as key) {
+        @for (part of keysOf(key); track $index) {
+          <kbd class="key">{{ part }}</kbd>
+        }
+      } @else {
+        <span class="recorder-empty">Waiting for a key…</span>
+      }
+    </div>
+    @if (rec.conflicts.length > 0) {
+      <p class="recorder-conflict" role="status">
+        <ui-icon name="alert-triangle" />
+        {{ rec.conflicts.length === 1 ? '1 existing command has' : rec.conflicts.length + ' existing commands have' }}
+        this keybinding: {{ rec.conflicts.join(', ') }}
+      </p>
+    }
+  </div>
+}
+
+<table class="table" aria-label="Keyboard shortcuts">
+  <thead>
+    <tr>
+      <th class="col-actions"><span class="visually-hidden">Actions</span></th>
+      <th class="col-command">Command</th>
+      <th class="col-key">Keybinding</th>
+      <th class="col-when">When</th>
+      <th class="col-source">Source</th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (row of rows(); track row.id; let index = $index) {
+      <tr
+        #rowElement
+        class="row"
+        [attr.data-row-id]="row.id"
+        [attr.tabindex]="row.id === cursorId() ? 0 : -1"
+        [attr.aria-label]="row.category + ': ' + row.label + (row.key ? ', ' + row.key : ', no keybinding')"
+        [class.is-modified]="row.modified"
+        (focus)="onRowFocus(row.id)"
+        (keydown)="onRowKeydown($event, index)"
+        (dblclick)="ask(row.id, 'change')"
+      >
+        <td class="col-actions">
+          <button type="button" class="row-action" tabindex="-1" title="Change Keybinding (Enter)" aria-label="Change keybinding" (click)="ask(row.id, 'change')">
+            <ui-icon name="pencil" />
+          </button>
+        </td>
+        <td class="col-command">
+          <span class="command-label"><span class="category">{{ row.category }}: </span>{{ row.label }}</span>
+          <span class="command-id">{{ row.command }}</span>
+        </td>
+        <td class="col-key">
+          @if (row.key; as key) {
+            @for (part of keysOf(key); track $index) {
+              <kbd class="key">{{ part }}</kbd>
+            }
+          } @else {
+            <span class="none">—</span>
+          }
+        </td>
+        <td class="col-when">{{ row.when }}</td>
+        <td class="col-source">
+          <span>{{ row.source }}</span>
+          <span class="more-actions">
+            <button type="button" class="row-action" tabindex="-1" title="Add Keybinding" aria-label="Add keybinding" (click)="ask(row.id, 'add')">
+              <ui-icon name="plus" />
+            </button>
+            @if (row.key !== null) {
+              <button type="button" class="row-action" tabindex="-1" title="Remove Keybinding (Delete)" aria-label="Remove keybinding" (click)="ask(row.id, 'remove')">
+                <ui-icon name="x" />
+              </button>
+            }
+            @if (row.modified) {
+              <button type="button" class="row-action" tabindex="-1" title="Reset Keybinding" aria-label="Reset keybinding" (click)="ask(row.id, 'reset')">
+                <ui-icon name="arrow-back-up" />
+              </button>
+            }
+          </span>
+        </td>
+      </tr>
+    } @empty {
+      <tr class="empty">
+        <td colspan="5">No keybindings found.</td>
+      </tr>
+    }
+  </tbody>
+</table>

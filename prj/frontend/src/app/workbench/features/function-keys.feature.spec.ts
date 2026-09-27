@@ -40,7 +40,7 @@ describe('Function keys (PRD 004, §2)', () => {
   const selection = () => workbench.editorGroupsFt.stateOf(group)?.selection;
   const press = (key: string, init: KeyboardEventInit = {}): KeyboardEvent => {
     const event = new KeyboardEvent('keydown', { key, cancelable: true, ...init });
-    workbench.functionKeysFt.handleShortcut(event);
+    workbench.keybindingsFt.handleShortcut(event);
     return event;
   };
 
@@ -135,12 +135,15 @@ describe('Function keys (PRD 004, §2)', () => {
       expect(transfer).not.toHaveBeenCalled();
     });
 
-    it('leaves chords, F10 in a browser, and keys while a window is open alone', () => {
+    it('leaves chords and keys while a window is open alone; F10 quits nothing in a browser', () => {
       const rename = vi.spyOn(workbench.fileEditFt, 'rename').mockResolvedValue();
+      const close = vi.spyOn(workbench.desktopWindow, 'close');
       select(['a.txt']);
 
       expect(press('F10', { shiftKey: true }).defaultPrevented).toBe(false);
-      expect(press('F10').defaultPrevented).toBe(false);
+      // Bound, so claimed — but Quit has no window to close.
+      expect(press('F10').defaultPrevented).toBe(true);
+      expect(close).not.toHaveBeenCalled();
       expect(press('F2', { ctrlKey: true }).defaultPrevented).toBe(false);
 
       void workbench.modal.confirm({ message: 'Open?' });
@@ -199,6 +202,31 @@ describe('Function keys (PRD 004, §2)', () => {
       expect(prompt.mock.calls[0]?.[0].value).toBe('*');
       expect(prompt.mock.calls[1]?.[0].value).toBe('*.pdf');
       expect(selection()).toEqual(['c.pdf']);
+    });
+  });
+
+  /** PRD 004, §1.3.2: `Ctrl`+`Shift`+`C` in a panel runs *Copy Path*. */
+  describe('Ctrl+Shift+C', () => {
+    it('copies the selection when the entry is part of it, else the entry', () => {
+      const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+      select(['a.txt', 'b.txt']);
+
+      workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
+      workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'c.pdf' });
+
+      expect(copy.mock.calls).toEqual([[['a.txt', 'b.txt']], [['c.pdf']]]);
+    });
+
+    it('copies the folder the panel lists when no entry has focus', () => {
+      const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+
+      workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: null });
+
+      expect(copy).toHaveBeenCalledWith(['']);
+    });
+
+    it('shows the key beside Copy Path', () => {
+      expect(workbench.commandsFt.menuItem('file.copyPath').keybinding).toBe('Ctrl+Shift+C');
     });
   });
 });

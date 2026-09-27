@@ -1,5 +1,6 @@
 import type { UiPanelKey } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
+import type { CommandTarget } from './commands.feature';
 
 /**
  * What a panel's keyboard does (PRD 001, Section 6.2).
@@ -96,6 +97,11 @@ export class PanelKeyboardFeature {
         void this.parent.fileClipboardFt.paste(groupId);
         break;
 
+      // PRD 004, §1.3.2: `Ctrl`+`Shift`+`C`, the command *Copy Path* runs.
+      case 'copy-path':
+        this.parent.commandsFt.run('file.copyPath', this.copyPathTarget(groupId, key.entryId));
+        break;
+
       case 'delete':
         // Asks first, always (PRD 005, §1); the rows it takes away are re-read when it ends.
         void this.parent.operationsFt.trashSelection(groupId, key.entryId);
@@ -124,6 +130,22 @@ export class PanelKeyboardFeature {
         void files.selectByPattern(groupId, key.command === 'select-pattern');
         break;
     }
+  }
+
+  /**
+   * What `Ctrl`+`Shift`+`C` copies the path of: the selection, when the entry
+   * the key was pressed on is part of it, else that entry; with no entry, a
+   * file tab's file, or the folder the panel lists.
+   */
+  private copyPathTarget(groupId: string, entryId: string | null): CommandTarget {
+    const commands = this.parent.commandsFt;
+    if (entryId !== null) {
+      return commands.entryTarget(groupId, entryId);
+    }
+    const groups = this.parent.editorGroupsFt;
+    const group = groups.stateOf(groupId);
+    const tab = group === undefined ? undefined : groups.activeTabOf(group);
+    return tab !== undefined && tab.kind !== 'folder' ? commands.tabTarget(groupId, tab.id) : commands.blankTarget(groupId);
   }
 
   /**

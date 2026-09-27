@@ -151,7 +151,9 @@ export class MockDataWorkbenchService {
    * (PRD 003, §6).
    */
   readonly settingsMenuItems: readonly UiMenuItem[] = [
-    { id: 'view.hidden', label: 'Show Hidden Files' },
+    { id: 'workbench.openSettings', label: 'Settings' },
+    { id: 'workbench.openKeybindings', label: 'Keyboard Shortcuts' },
+    { id: 'view.hidden', label: 'Show Hidden Files', separatorBefore: true },
     { id: 'settings.restoreSession', label: 'Restore Layout on Start', separatorBefore: true },
     { id: 'view.resetLayout', label: 'Reset Layout' },
     { id: 'places.clearRecent', label: 'Clear Recent Folders', separatorBefore: true },

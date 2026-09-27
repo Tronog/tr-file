@@ -1,4 +1,4 @@
-import { Component, afterRenderEffect, computed, input, output, signal, viewChild, type ElementRef } from '@angular/core';
+import { Component, afterRenderEffect, computed, inject, input, output, signal, viewChild, type ElementRef } from '@angular/core';
 import { UiBreadcrumbs } from '../breadcrumbs/ui-breadcrumbs';
 import { UiSearchField } from '../controls/ui-search-field';
 import { UiSegmented, type UiSegmentedOption } from '../controls/ui-segmented';
@@ -6,6 +6,7 @@ import { UiDocumentView } from '../document-view/ui-document-view';
 import { UiEmptyState } from '../empty-state/ui-empty-state';
 import { UiFileList } from '../file-list/ui-file-list';
 import { UiIconView } from '../icon-view/ui-icon-view';
+import { UiKeymap } from '../keyboard/keymap';
 import { UiPanelBody } from '../panel-group/ui-panel-body';
 import { UiPanelToolbar } from '../panel-toolbar/ui-panel-toolbar';
 import {
@@ -14,7 +15,6 @@ import {
   type UiEntryDrop,
   type UiFileBrowserModel,
   type UiFilesDrop,
-  type UiPanelCommand,
   type UiPanelKey,
   type UiPanelView,
   type UiSelectionChange,
@@ -29,7 +29,23 @@ interface DragEntry {
 }
 
 /** The clipboard chords, by key. */
-const CLIPBOARD_KEYS: Readonly<Record<string, UiPanelCommand>> = { c: 'copy', x: 'cut', v: 'paste' };
+/** The panel commands the browser answers from anywhere in it; see `onKeydown`. */
+const PANEL_COMMANDS = [
+  'file.openToSide',
+  'edit.copy',
+  'edit.cut',
+  'edit.paste',
+  'edit.filter',
+  'go.location',
+  'edit.undo',
+  'file.newFolder',
+  'view.refresh',
+  'file.copyPath',
+  'panel.contextMenu',
+] as const;
+
+/** The panel commands that walk from folder to folder; see `onBodyKeydown`. */
+const WALK_COMMANDS = ['go.back', 'go.forward', 'go.up'] as const;
 
 /**
  * File-management content for a panel: a path bar, a toolbar, and a body
@@ -148,6 +164,9 @@ export class UiFileBrowser {
   private dragging: ReadonlySet<string> | null = null;
 
   private readonly bodyElement = viewChild.required<ElementRef<HTMLElement>>('body');
+
+  /** The key bindings in force (PRD 010, §2). */
+  private readonly keymap = inject(UiKeymap);
   private readonly pathBar = viewChild(UiBreadcrumbs);
   private readonly filterField = viewChild(UiSearchField);
 
@@ -215,144 +234,129 @@ export class UiFileBrowser {
   }
 
   /**
-   * `Ctrl`+`Enter` opens what the cursor is on in a panel of its own
-   * (PRD 001, §6.2.5). Bound on the host, so it answers with focus anywhere in
-   * the browser — a row, a tile, the document, the path bar. The browser
-   * knows which entry has focus from its own model, so one handler covers the
-   * listing, the tree and the grid alike. Handled before the key reaches the group
-   * around it, which claims the other `Ctrl` chords.
+   * The keys that are about the browser as a whole, from anywhere in it
+   * (PRD 010, §2: each looked up in the keymap, `when: 'panel'`):
+   *
+   * - `Ctrl`+`Enter` opens what the cursor is on in a panel of its own
+   *   (PRD 001, §6.2.5) — from a row, a tile, the document, the path bar;
+   * - `Ctrl`+`C` / `X` / `V` copy, cut and paste entries (PRD 005, §2) — over
+   *   a listing only, never in a text field or the document viewer, where the
+   *   chords keep their usual meaning for text; copy and cut need an entry;
+   * - the chords of PRD 003, §5: `Ctrl`+`F` to the filter box, `Ctrl`+`L` to
+   *   the path bar, `Ctrl`+`Z` to undo, `Ctrl`+`Shift`+`N` for a new folder —
+   *   and `Ctrl`+`R` to read the folder again (PRD 004, §2) and
+   *   `Ctrl`+`Shift`+`C` to copy the full path of the entry focus is on, or of
+   *   what the panel shows (PRD 004, §1.3.2);
+   * - `Shift`+`F10` or the menu key: the context menu of the entry focus is
+   *   on, beside it.
+   *
+   * None is claimed inside a text field. Handled before the key reaches the
+   * group around it, which claims the tab chords. The browser knows which
+   * entry has focus from its own model, so one handler covers the listing,
+   * the tree and the grid alike.
    */
   protected onKeydown(event: KeyboardEvent): void {
-    if (this.onClipboardKey(event) || this.onChordKey(event) || this.onMenuKey(event)) {
+    if (UiFileBrowser.isTextField(event.target)) {
       return;
     }
-    if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.key !== 'Enter') {
+    const command = this.keymap.commandFor(event, 'panel', PANEL_COMMANDS);
+    if (command === null || !this.runPanelCommand(command)) {
       return;
     }
-
-    const entryId = this.focusedEntry();
-    if (entryId === null) {
-      return;
-    }
-
-    this.command.emit({ command: 'open-aside', entryId });
     event.preventDefault();
   }
 
+  /** Carries out a panel command; `false` when it does not apply here, so the key is left alone. */
+  private runPanelCommand(command: string): boolean {
+    const listing = !this.document();
+    const entryId = this.focusedEntry();
+    switch (command) {
+      case 'file.openToSide':
+        if (entryId === null) {
+          return false;
+        }
+        this.command.emit({ command: 'open-aside', entryId });
+        return true;
+      case 'edit.copy':
+      case 'edit.cut':
+        if (!listing || entryId === null) {
+          return false;
+        }
+        this.command.emit({ command: command === 'edit.copy' ? 'copy' : 'cut', entryId });
+        return true;
+      case 'edit.paste':
+        if (!listing) {
+          return false;
+        }
+        this.command.emit({ command: 'paste', entryId });
+        return true;
+      case 'edit.filter':
+        if (!listing || this.browser().searchPlaceholder === undefined) {
+          return false;
+        }
+        this.filterField()?.focus();
+        return true;
+      case 'go.location':
+        if (this.browser().location === undefined) {
+          return false;
+        }
+        this.pathBar()?.edit();
+        return true;
+      case 'edit.undo':
+        if (!listing) {
+          return false;
+        }
+        this.command.emit({ command: 'undo', entryId: null });
+        return true;
+      case 'file.newFolder':
+        if (!listing) {
+          return false;
+        }
+        this.command.emit({ command: 'new-folder', entryId: null });
+        return true;
+      case 'view.refresh':
+        this.command.emit({ command: 'refresh', entryId: null });
+        return true;
+      case 'file.copyPath':
+        this.command.emit({ command: 'copy-path', entryId: listing ? entryId : null });
+        return true;
+      case 'panel.contextMenu': {
+        if (!listing) {
+          return false;
+        }
+        const anchor = document.activeElement instanceof HTMLElement ? document.activeElement : this.bodyElement().nativeElement;
+        const rect = anchor.getBoundingClientRect();
+        this.contextMenu.emit({ target: entryId, x: rect.left + 16, y: rect.top + Math.min(rect.height, 22) });
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+
   /**
-   * The keys that are about the listing as a whole, wherever focus sits in
-   * the body.
+   * The keys that are about the *folder* rather than what is selected in it,
+   * wherever focus sits in the body: `Alt`+`←`/`→` walks the folders this
+   * panel has visited (PRD 001, §6.2.1) and `Alt`+`↑` leaves the current one
+   * for its parent (§6.2.3) — the *trail* and the *tree* are different
+   * journeys, which is why they are different chords. They must work just as
+   * well when the body is a document, or the empty-state placeholder, neither
+   * of which has a keyboard of its own.
    *
-   * `Alt`+`←`/`→` walks the folders this panel has visited (PRD 001, §6.2.1)
-   * and `Alt`+`↑` leaves the current one for its parent (§6.2.3) — the
-   * *trail* and the *tree* are different journeys, which is why they are
-   * different chords. They are handled here rather than in the list and the
-   * grid because they are about the *folder*, not about what is selected in
-   * it — and because they must work just as well when the body is a document,
-   * or the empty-state placeholder, neither of which has a keyboard of its
-   * own. Both views let an `Alt` chord bubble untouched so it arrives here
-   * exactly once.
-   *
-   * `Backspace` is handled here *only* when the body itself has focus, which
-   * is the empty-folder case: without it, a keyboard user who walked into an
-   * empty folder would have no way to walk back out of it. Whenever there is
-   * a row or a tile to stand on, the key belongs to the view that owns it. `Alt`+`↑` needs no such guard, since neither view
-   * claims an `Alt` chord.
+   * `Go Up`'s list key (`Backspace`) is answered here *only* when the body
+   * itself has focus, which is the empty-folder case: without it, a keyboard
+   * user who walked into an empty folder would have no way to walk back out
+   * of it. Whenever there is a row or a tile to stand on, the key belongs to
+   * the view that owns it.
    */
   protected onBodyKeydown(event: KeyboardEvent): void {
-    if (event.ctrlKey || event.metaKey || event.shiftKey) {
+    const walk = this.keymap.commandFor(event, 'panel', WALK_COMMANDS);
+    const up = event.target === this.bodyElement().nativeElement && this.keymap.commandFor(event, 'list', ['go.up']) !== null;
+    if (walk === null && !up) {
       return;
     }
-
-    if (event.altKey) {
-      if (event.key === 'ArrowLeft') {
-        this.command.emit({ command: 'back', entryId: null });
-      } else if (event.key === 'ArrowRight') {
-        this.command.emit({ command: 'forward', entryId: null });
-      } else if (event.key === 'ArrowUp') {
-        this.command.emit({ command: 'up', entryId: null });
-      } else {
-        return;
-      }
-      event.preventDefault();
-      return;
-    }
-
-    // Only when the body itself has focus, which happens when it has nothing
-    // to give focus to: an empty folder. The list and the grid own the key
-    // whenever there is a row or a tile to stand on, and handling it here as
-    // well would run it twice.
-    if (event.target !== this.bodyElement().nativeElement || event.key !== 'Backspace') {
-      return;
-    }
-
-    this.command.emit({ command: 'up', entryId: null });
+    this.command.emit({ command: walk === 'go.back' ? 'back' : walk === 'go.forward' ? 'forward' : 'up', entryId: null });
     event.preventDefault();
-  }
-
-  /**
-   * `Ctrl`+`C` / `X` / `V` (`Cmd` on macOS) — copy, cut and paste entries
-   * (PRD 005, §2). Only over a listing, and never in a text field or the
-   * document viewer, where the chords keep their usual meaning for text.
-   * Copy and cut need an entry to stand on; paste goes into the listed folder.
-   */
-  private onClipboardKey(event: KeyboardEvent): boolean {
-    const chord = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
-    const command = chord ? CLIPBOARD_KEYS[event.key.toLowerCase()] : undefined;
-    if (command === undefined || this.document() || UiFileBrowser.isTextField(event.target)) {
-      return false;
-    }
-    const entryId = this.focusedEntry();
-    if (command !== 'paste' && entryId === null) {
-      return false;
-    }
-    this.command.emit({ command, entryId });
-    event.preventDefault();
-    return true;
-  }
-
-  /**
-   * The chords of PRD 003, §5 that are about the listing as a whole, from
-   * anywhere in the browser: `Ctrl`+`F` to the filter box, `Ctrl`+`L` to the
-   * path bar, `Ctrl`+`Z` to undo, `Ctrl`+`Shift`+`N` for a new folder — and
-   * `Ctrl`+`R` to read the folder again, Midnight Commander's key for it
-   * (PRD 004, §2), now that `F5` copies. None is claimed inside a text field,
-   * where `Ctrl`+`Z` is the field's own.
-   */
-  private onChordKey(event: KeyboardEvent): boolean {
-    if (!(event.ctrlKey || event.metaKey) || event.altKey || UiFileBrowser.isTextField(event.target)) {
-      return false;
-    }
-    const key = event.key.toLowerCase();
-    const listing = !this.document();
-    if (!event.shiftKey && key === 'f' && listing && this.browser().searchPlaceholder !== undefined) {
-      this.filterField()?.focus();
-    } else if (!event.shiftKey && key === 'l' && this.browser().location !== undefined) {
-      this.pathBar()?.edit();
-    } else if (!event.shiftKey && key === 'z' && listing) {
-      this.command.emit({ command: 'undo', entryId: null });
-    } else if (event.shiftKey && key === 'n' && listing) {
-      this.command.emit({ command: 'new-folder', entryId: null });
-    } else if (!event.shiftKey && key === 'r') {
-      this.command.emit({ command: 'refresh', entryId: null });
-    } else {
-      return false;
-    }
-    event.preventDefault();
-    return true;
-  }
-
-  /** `Shift`+`F10` or the menu key: the context menu of the entry focus is on, beside it. */
-  private onMenuKey(event: KeyboardEvent): boolean {
-    const menuKey = event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
-    if (!menuKey || event.ctrlKey || event.altKey || event.metaKey || this.document() || UiFileBrowser.isTextField(event.target)) {
-      return false;
-    }
-    const anchor = document.activeElement instanceof HTMLElement ? document.activeElement : this.bodyElement().nativeElement;
-    const rect = anchor.getBoundingClientRect();
-    this.contextMenu.emit({ target: this.focusedEntry(), x: rect.left + 16, y: rect.top + Math.min(rect.height, 22) });
-    event.preventDefault();
-    return true;
   }
 
   /**

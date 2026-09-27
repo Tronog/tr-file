@@ -75,7 +75,7 @@ Missing: power-user features
 15. Only zip is supported as an archive. The archive module contains nothing but zip/. tar, tar.gz, 7z and rar can't be browsed or extracted.
 16. Remote access means tr-file servers only. Remote Computer connects to another tr-file server's API. There's no SFTP, SMB, WebDAV or S3.
 17. No tags, colour labels or per-folder view settings. Sort and view are stored per panel, not per folder.
-18. No settings screen or keybinding editor. The Settings menu has four items; PRD 010 (settings modal) is listed in docs/prd/__LIST__.md but not built.
+18. ~~No settings screen or keybinding editor.~~ Built (PRD 010): the settings window (General, Appearance, Keyboard Shortcuts) and a configurable key table behind every command key.
 
 Smaller gaps and leftovers
 

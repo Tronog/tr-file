@@ -128,6 +128,7 @@ export class ModalService {
           injector: Injector.create({ providers: [{ provide: MODAL_REF, useValue: ref }], parent: this.injector }),
           label: options.label,
           dismissible: options.dismissible ?? true,
+          size: options.size ?? 'default',
           resolve: close,
         },
       ]);

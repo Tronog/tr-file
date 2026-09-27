@@ -47,6 +47,10 @@ export class ThumbnailsFeature {
 
   /** The thumbnail of an entry, if there is one of this version of it. */
   urlFor(entry: FsEntry): string | undefined {
+    // Off in the settings (PRD 010, §1): the icon view draws file icons.
+    if (!this.parent.preferencesFt.value('files.thumbnails')) {
+      return undefined;
+    }
     const thumbnail = this.thumbnails().get(entry.path);
     return thumbnail !== undefined && thumbnail.version === ThumbnailsFeature.versionOf(entry) ? thumbnail.url : undefined;
   }
@@ -65,6 +69,9 @@ export class ThumbnailsFeature {
 
   /** The grid shows these entries now: make the thumbnails they lack. */
   request(paths: readonly string[]): void {
+    if (!this.parent.preferencesFt.value('files.thumbnails')) {
+      return;
+    }
     const wanted = paths
       .map((path) => this.parent.fsDataFt.entryAt(path))
       .filter((entry): entry is FsEntry => entry !== undefined && this.canMake(entry))

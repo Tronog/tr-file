@@ -35,6 +35,7 @@ import { ModalService } from './modal.service';
           [attr.inert]="top ? null : ''"
           [label]="entry.label"
           [dismissible]="entry.dismissible"
+          [size]="entry.size"
           (dismiss)="modal.dismiss(entry.id)"
         >
           <ng-container *ngComponentOutlet="entry.component; inputs: entry.inputs; injector: entry.injector" />

@@ -38,6 +38,8 @@ export interface ComponentModalOptions {
   /** The window's accessible name. */
   readonly label: string;
   readonly dismissible?: boolean;
+  /** `large` for a window to work in, like the settings (PRD 010). */
+  readonly size?: 'default' | 'large';
 }
 
 /** One open modal window, as `ModalHost` renders it. */
@@ -60,5 +62,6 @@ export interface ComponentEntry {
   readonly injector: Injector;
   readonly label: string;
   readonly dismissible: boolean;
+  readonly size: 'default' | 'large';
   readonly resolve: (result: unknown) => void;
 }

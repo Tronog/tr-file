@@ -70,10 +70,10 @@ type-to-find, selection following focus) and report the keys that mean something
 workbench — `Enter`, `Space`, `Backspace`, `Ctrl`+`R` (refresh), `+`/`-`, and `Alt`+`←`/`→` — as a
 `UiPanelKey`; `PanelKeyboardFeature` is the one place those bindings are decided.
 **Midnight Commander (PRD 004, §2).** The function keys are the *window's*, not a panel's:
-`FunctionKeysFeature` binds `F1`–`F10` document-wide (palette, rename, view, edit/open, copy and
+`F1`–`F10` are window bindings of `KeybindingsFeature` (palette, rename, view, edit/open, copy and
 move — to the other panel's folder —, mkdir, trash, main menu, and quit on the desktop), each a
-command of `CommandsFeature` run on the active panel, and feeds the strip in the middle of
-`UiStatusBar` (`functionKeys`). `F5` copies, so refreshing is `Ctrl`+`R` (the desktop's
+command of `CommandsFeature` run on the active panel; `FunctionKeysFeature` draws the strip in the
+middle of `UiStatusBar` (`functionKeys`) from whatever they are bound to. `F5` copies, so refreshing is `Ctrl`+`R` (the desktop's
 accelerator table leaves it unbound). In the list and grid `Insert` marks and moves on and `*`
 selects all or none (`UiListSelection`); `+`/`-` select or unselect by a pattern
 (`FileBrowserFeature.selectByPattern`, `listing/name-pattern.ts`). `Ctrl`+`T` (split),
@@ -165,6 +165,31 @@ transport does not change; `WorkbenchService.backend` follows the connection, th
 bar names the server, a remote that needs signing in shows the normal sign-in screen, and
 Go › Local Computer disconnects.
 
+**Settings (PRD 010).** The gear menu's *Settings* / *Keyboard Shortcuts* (and `Ctrl`+`,`) open
+the settings window: `SettingsEditorFeature` opens `SettingsModal` — the library's
+`UiSettingsEditor` in a `size: 'large'` modal — with *General*, *Appearance* and *Keyboard
+Shortcuts* pages and a search box. The settings are `PREFERENCES` in `PreferencesFeature`: hidden
+files and restoring the layout are read and written where they already live (the session,
+`SessionFeature`); auto refresh, the function-key bar and thumbnails are kept under
+`tr-file.preferences.v1`, only while they differ from their default; *Reset Layout* and *Clear
+Recent Folders* are actions that run their commands.
+
+**Every key is configurable (PRD 010, §2).** The library's components never test a key for a
+command themselves: they ask the library's root `UiKeymap` (`prj/libs/ui/src/lib/keyboard/keymap.ts`)
+which of their commands it is bound to, in their context — `list`, `panel` or `window` (VS Code's
+`when`). `KeybindingsFeature` owns the table: `UI_DEFAULT_KEYBINDINGS` plus
+`WORKBENCH_DEFAULT_KEYBINDINGS`, less what the user removed, plus what they added
+(`tr-file.keybindings.v1`), handed to `UiKeymap` on every change. It runs the `window` keys itself
+(`handleShortcut`, from the `Workbench` component: the palette, search, the function keys, `Ctrl`+`H`,
+`Ctrl`+`,` — each a command of `CommandsFeature` on the active panel; `F2`–`F4` act on the cursor's
+entry), and it is where menus, the palette and the function-key strip read the key they show
+(`label`, `keysFor`, `windowCommandOf`) — so the table has no key labels of its own. `Ctrl`+`Tab` and
+`Tab` between panels are keymap commands too (`workbench.focusNextPart`, `workbench.nextPanel`),
+answered by `FocusCycleFeature` because they move DOM focus. Navigation keys (arrows, `Home`/`End`,
+page keys, type-to-find, `Escape`, keys inside menus and dialogs) are not commands and stay fixed.
+A new key for the app: a binding in one of the default tables, and the component asks the keymap
+for its command id.
+
 **Git (PRD 011, §1)** is optional — the backend's `git` module (`/api/git`, the bridge's `git`
 command, `RemoteBackend` maps it) runs the system's `git`, and says so when there is none; a
 production server needs `GIT_ENABLED=true`, the desktop turns it on. A folder is in a repository
@@ -228,7 +253,7 @@ bar is an address bar (`Ctrl`+`L`, `goToLocation` — a file opens its folder,
 selected); the toolbar has Back and Forward. What the app cannot preview (PDF,
 Office, archives, too large) opens with `SystemOpenFeature` — the default app on
 the desktop (the main process asks before running a program), a new browser tab
-served `inline` otherwise; *Reveal* exists only on the desktop, for local files. *Copy Path* copies
+served `inline` otherwise; *Reveal* exists only on the desktop, for local files. *Copy Path* (`Ctrl`+`Shift`+`C` in a panel — the `copy-path` panel key) copies
 the *full* path (PRD 004, §1.3.2) — `SystemOpenFeature.copyPaths` → `FsTransport.copyPaths`: on the
 desktop the main process writes the real host paths (`clipboard-write-paths` — the window's own
 clipboard permission is denied; a remote server is asked with `host-paths`), in a browser the page

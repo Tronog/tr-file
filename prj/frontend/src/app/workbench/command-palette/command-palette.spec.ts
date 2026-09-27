@@ -231,7 +231,7 @@ describe('CommandPaletteFeature', () => {
   const palette = () => workbench.commandPaletteFt;
   const shortcut = (key: string, init: KeyboardEventInit = {}): KeyboardEvent => {
     const event = new KeyboardEvent('keydown', { key, cancelable: true, ...init });
-    palette().handleShortcut(event);
+    workbench.keybindingsFt.handleShortcut(event);
     return event;
   };
 
@@ -272,6 +272,8 @@ describe('CommandPaletteFeature', () => {
       'View: Show Bookmarks',
       'Preferences: Restore Layout on Start',
       'View: Reset Layout',
+      'Preferences: Open Settings',
+      'Preferences: Open Keyboard Shortcuts',
       'Go: Go to Location…',
       'Remote: Connect to Remote Server…',
     ]);

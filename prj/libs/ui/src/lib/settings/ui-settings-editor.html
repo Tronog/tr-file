@@ -1,0 +1,107 @@
+<header class="head">
+  <h2 class="title" id="ui-settings-title">Settings</h2>
+  <ui-search-field
+    class="search"
+    [placeholder]="searchPlaceholder()"
+    [label]="searchPlaceholder()"
+    [value]="model().query"
+    (valueChange)="queryChange.emit($event)"
+  />
+  <button type="button" class="close" title="Close (Escape)" aria-label="Close settings" (click)="close.emit()">
+    <ui-icon name="x" />
+  </button>
+</header>
+
+<div class="body">
+  <nav class="toc" aria-label="Settings sections">
+    @for (section of model().sections; track section.id) {
+      <button
+        type="button"
+        class="toc-item"
+        [class.is-active]="section.id === activeSection().id"
+        [attr.aria-current]="section.id === activeSection().id ? 'page' : null"
+        (click)="sectionSelect.emit(section.id)"
+      >
+        @if (section.icon) {
+          <ui-icon [name]="section.icon" />
+        }
+        <span>{{ section.label }}</span>
+      </button>
+    }
+  </nav>
+
+  <section class="page" [attr.aria-label]="activeSection().label">
+    @let page = model().page;
+    @if (page.kind === 'settings') {
+      @for (group of page.groups; track group.id) {
+        <div class="group" role="group" [attr.aria-labelledby]="'group-' + group.id">
+          <h3 class="group-title" [id]="'group-' + group.id">{{ group.title }}</h3>
+          @for (setting of group.settings; track setting.id) {
+            @let control = setting.control;
+            <div class="setting" [class.is-modified]="setting.modified">
+              <div class="setting-title" [id]="idOf(setting) + '-title'">
+                <span class="category">{{ setting.category }}: </span>
+                <span class="name">{{ setting.title }}</span>
+                @if (setting.modified) {
+                  <button type="button" class="reset" (click)="settingReset.emit(setting.id)">Reset to default</button>
+                }
+              </div>
+              @if (control.kind === 'boolean') {
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    [checked]="control.value"
+                    [attr.aria-labelledby]="idOf(setting) + '-title'"
+                    [attr.aria-describedby]="idOf(setting) + '-description'"
+                    (change)="onCheckbox(setting, $event)"
+                  />
+                  <span class="description" [id]="idOf(setting) + '-description'">{{ setting.description }}</span>
+                </label>
+              } @else if (control.kind === 'select') {
+                <p class="description" [id]="idOf(setting) + '-description'">{{ setting.description }}</p>
+                <select
+                  class="select"
+                  [attr.aria-labelledby]="idOf(setting) + '-title'"
+                  [attr.aria-describedby]="idOf(setting) + '-description'"
+                  (change)="onSelect(setting, $event)"
+                >
+                  @for (option of control.options; track option.value) {
+                    <option [value]="option.value" [selected]="option.value === control.value">{{ option.label }}</option>
+                  }
+                </select>
+              } @else {
+                <p class="description" [id]="idOf(setting) + '-description'">{{ setting.description }}</p>
+                <button
+                  uiButton
+                  variant="secondary"
+                  type="button"
+                  [attr.aria-describedby]="idOf(setting) + '-description'"
+                  (click)="settingAction.emit(setting.id)"
+                >
+                  {{ control.label }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      } @empty {
+        <p class="no-results">No settings found.</p>
+      }
+    } @else {
+      <div class="keybindings-head">
+        <p class="hint">Double-click a row, or press Enter on it, to change its key.</p>
+        <button uiButton variant="secondary" type="button" [disabled]="!page.modified" (click)="keybindingsReset.emit()">
+          Reset All Keybindings
+        </button>
+      </div>
+      <ui-keybindings-table
+        [rows]="page.rows"
+        [recording]="page.recording"
+        (request)="keybindingRequest.emit($event)"
+        (record)="keybindingRecord.emit($event)"
+        (accept)="keybindingAccept.emit()"
+        (cancel)="keybindingCancel.emit()"
+      />
+    }
+  </section>
+</div>

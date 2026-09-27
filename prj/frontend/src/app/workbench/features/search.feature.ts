@@ -111,16 +111,7 @@ export class SearchFeature {
     }));
   });
 
-  /** `Ctrl`+`Shift`+`F`, from anywhere in the workbench. */
-  handleShortcut(event: KeyboardEvent): void {
-    const command = event.ctrlKey || event.metaKey;
-    if (command && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f' && !this.parent.modal.isOpen()) {
-      event.preventDefault();
-      this.show();
-    }
-  }
-
-  /** Shows the Search view, with the keyboard in its box. */
+  /** Shows the Search view, with the keyboard in its box — *Search Files…*, `Ctrl`+`Shift`+`F`. */
   show(): void {
     this.parent.chromeFt.showSidebar('search');
     this.focus.update((token) => token + 1);

@@ -13,7 +13,9 @@ import {
 } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
-import { clickMode, markKey, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
+import { UiKeymap } from '../keyboard/keymap';
+import { LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
+import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
 import type { UiIconViewItem, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
 
@@ -102,7 +104,7 @@ interface MarqueeDrag {
         [attr.aria-selected]="item.selected ? 'true' : 'false'"
         [attr.aria-posinset]="virtual() ? index + 1 : null"
         [attr.aria-setsize]="virtual() ? items().length : null"
-        [attr.aria-keyshortcuts]="keyShortcuts"
+        [attr.aria-keyshortcuts]="keyShortcuts()"
         [attr.tabindex]="item.id === tabStopId() ? 0 : -1"
         [attr.title]="item.label"
         (click)="onClick($event, index)"
@@ -187,7 +189,10 @@ export class UiIconView {
   });
 
   /** Keys documented on every tile, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete Insert * + - PageUp PageDown Home End';
+  protected readonly keyShortcuts = computed(() => `${listKeyShortcuts(this.keymap)} PageUp PageDown Home End`);
+
+  /** The key bindings in force (PRD 010, §2). */
+  private readonly keymap = inject(UiKeymap);
 
   private readonly tiles = viewChildren<ElementRef<HTMLButtonElement>>('tile');
 
@@ -327,20 +332,22 @@ export class UiIconView {
       return;
     }
 
+    // A key bound to a list command (PRD 010, §2), as in the list view.
+    const bound = listCommandFor(this.keymap, event, this.typeahead.typing());
+    if (bound !== null) {
+      this.runBound(bound, index);
+      event.preventDefault();
+      return;
+    }
+
     // An `Alt` chord is the panel's, not a step between tiles: its history
-    // and `Up` (PRD 001, §6.2.1, §6.2.3). So are most `Ctrl` chords — switching
-    // tabs (§6.2.4), `Ctrl`+`Enter` — so they bubble to `UiPanelGroup`
-    // untouched; only the ones about the selection are claimed here.
+    // and `Up` (PRD 001, §6.2.1, §6.2.3). So are the other `Ctrl` chords —
+    // switching tabs (§6.2.4), `Ctrl`+`Enter` — so they bubble to
+    // `UiFileBrowser` and `UiPanelGroup` untouched.
     if (event.altKey) {
       return;
     }
     const command = event.ctrlKey || event.metaKey;
-
-    if (command && !event.shiftKey && (event.key === ' ' || event.key.toLowerCase() === 'a')) {
-      this.pick(item.id, event.key === ' ' ? 'toggle' : 'all');
-      event.preventDefault();
-      return;
-    }
 
     const target = this.movementTarget(event.key, index);
     if (target !== null) {
@@ -352,77 +359,60 @@ export class UiIconView {
       return;
     }
 
-    if (this.onMarkKey(event, index)) {
-      return;
-    }
-
-    if (command) {
-      return;
-    }
-
-    switch (event.key) {
-      case 'Enter':
-        this.command.emit({ command: 'open', entryId: item.id });
-        break;
-      case ' ':
-        this.command.emit({ command: 'select', entryId: item.id });
-        break;
-      case 'Backspace':
-        this.command.emit({ command: 'up', entryId: item.id });
-        break;
-      case 'Delete':
-        this.command.emit({ command: event.shiftKey ? 'delete-permanently' : 'delete', entryId: item.id });
-        break;
-      default: {
-        if (!isTypeaheadKey(event)) {
-          return;
-        }
-        const found = this.typeahead.match(
-          event.key,
-          items.map((candidate) => candidate.label),
-          index,
-        );
-        if (found === -1) {
-          break;
-        }
-        this.focusTile(found);
-        break;
+    if (command || !isTypeaheadKey(event)) {
+      // `Enter` and `Space` would otherwise also click the tile, and
+      // `Backspace` navigate the browser back — even with nothing bound to them.
+      if (!command && (event.key === 'Enter' || event.key === ' ' || event.key === 'Backspace')) {
+        event.preventDefault();
       }
+      return;
     }
 
-    // Claimed unconditionally: `Enter` and `Space` would otherwise also click
-    // the tile, and `Backspace` would navigate the browser back.
+    const found = this.typeahead.match(
+      event.key,
+      items.map((candidate) => candidate.label),
+      index,
+    );
+    if (found !== -1) {
+      this.focusTile(found);
+    }
     event.preventDefault();
   }
 
-  /**
-   * Midnight Commander's selection keys (PRD 004, §2); `true` when `event`
-   * was one. `Insert` moves on to the next tile in reading order.
-   */
-  private onMarkKey(event: KeyboardEvent, index: number): boolean {
-    const key = markKey(event, this.typeahead.typing());
+  /** A bound list command on tile `index`; see `UiFileList.runBound`. */
+  private runBound(command: UiListCommand, index: number): void {
     const items = this.items();
-    const item = items[index];
-    if (key === null || item === undefined) {
-      return false;
+    const item = items[index] as UiIconViewItem;
+    const panelKey = LIST_PANEL_KEYS[command];
+    if (panelKey !== undefined) {
+      this.command.emit({ command: panelKey, entryId: item.id });
+      return;
     }
-    event.preventDefault();
-    if (key === 'select-pattern' || key === 'unselect-pattern') {
-      this.command.emit({ command: key, entryId: item.id });
-    } else if (key === 'toggle-all') {
-      this.pick(item.id, 'toggle-all');
-    } else {
-      const next = Math.min(index + 1, items.length - 1);
-      const change = this.selection.mark({
-        ids: items.map((candidate) => candidate.id),
-        selected: this.selectedIds(),
-        target: item.id,
-        next: (items[next] as UiIconViewItem).id,
-      });
-      this.moveFocus(next);
-      this.report(change);
+    switch (command) {
+      case 'selection.all':
+        this.pick(item.id, 'all');
+        break;
+      case 'list.toggleSelection':
+        this.pick(item.id, 'toggle');
+        break;
+      case 'list.toggleAll':
+        this.pick(item.id, 'toggle-all');
+        break;
+      case 'list.mark': {
+        const next = Math.min(index + 1, items.length - 1);
+        const change = this.selection.mark({
+          ids: items.map((candidate) => candidate.id),
+          selected: this.selectedIds(),
+          target: item.id,
+          next: (items[next] as UiIconViewItem).id,
+        });
+        this.moveFocus(next);
+        this.report(change);
+        break;
+      }
+      default:
+        break;
     }
-    return true;
   }
 
   /** Where a movement key goes from `index`, or `null` for any other key. */

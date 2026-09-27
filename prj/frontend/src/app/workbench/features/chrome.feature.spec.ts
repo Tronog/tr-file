@@ -195,7 +195,9 @@ describe('ChromeFeature', () => {
       expect(workbench.chromeFt.settingsMenu()).toEqual({ x: 48, y: 748 });
       expect(gear()).toMatchObject({ expanded: true, active: true });
       expect(workbench.chromeFt.settingsMenuItems()).toEqual([
-        { id: 'view.hidden', label: 'Show Hidden Files', keybinding: 'Ctrl+H', checked: false },
+        { id: 'workbench.openSettings', label: 'Settings', keybinding: 'Ctrl+,' },
+        { id: 'workbench.openKeybindings', label: 'Keyboard Shortcuts' },
+        { id: 'view.hidden', label: 'Show Hidden Files', keybinding: 'Ctrl+H', checked: false, separatorBefore: true },
         { id: 'settings.restoreSession', label: 'Restore Layout on Start', checked: true, separatorBefore: true },
         { id: 'view.resetLayout', label: 'Reset Layout' },
         { id: 'places.clearRecent', label: 'Clear Recent Folders', disabled: true, separatorBefore: true },
@@ -208,7 +210,7 @@ describe('ChromeFeature', () => {
 
       expect(workbench.showHidden()).toBe(true);
       expect(workbench.settings.get('tr-file.restore-session.v1')).toBe(false);
-      expect(workbench.chromeFt.settingsMenuItems()[1]?.checked).toBe(false);
+      expect(workbench.chromeFt.settingsMenuItems().find((item) => item.id === 'settings.restoreSession')?.checked).toBe(false);
     });
 
     it('closes when the gear is pressed again, when dismissed, and after a choice', () => {

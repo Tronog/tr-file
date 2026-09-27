@@ -64,7 +64,7 @@
         [attr.aria-expanded]="tree() && row.expandable ? (row.expanded ?? false) : null"
         [attr.aria-busy]="tree() && row.busy ? 'true' : null"
         [attr.tabindex]="row.id === tabStopId() ? 0 : -1"
-        [attr.aria-keyshortcuts]="keyShortcuts"
+        [attr.aria-keyshortcuts]="keyShortcuts()"
         (click)="onClick($event, index)"
         (dblclick)="activate.emit(row.id)"
         (keydown)="onKeydown($event, index)"

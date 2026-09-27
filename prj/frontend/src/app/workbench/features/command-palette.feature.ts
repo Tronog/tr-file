@@ -1,5 +1,6 @@
 import { computed, signal } from '@angular/core';
 import type { UiQuickInputMessage, UiQuickPickButtonEvent, UiQuickPickItem } from '@tr-file/ui';
+import { chordParts, displayKey } from '@tr-file/ui';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import { FsError } from '../../file-system/fs-error';
 import { fuzzyMatch } from '../command-palette/fuzzy-match';
@@ -55,7 +56,8 @@ const ADD_SERVER = 'remote.add';
 
 /**
  * The command palette (PRD 009, §1), VS Code's: `Ctrl`+`Shift`+`P`, `F1` or
- * the command centre in the title bar opens it; typing filters the commands,
+ * the command centre in the title bar opens it — the keys are the window
+ * bindings of `view.commandPalette` (PRD 010, §2), run by `KeybindingsFeature`; typing filters the commands,
  * `Enter` runs one. A command that needs something typed — a path, a server —
  * turns the same box into an input box, and it closes once the answer has
  * been acted on.
@@ -95,7 +97,7 @@ export class CommandPaletteFeature {
           id: command.id,
           category: command.category,
           label: command.label(target),
-          ...(command.keybinding ? { keys: command.keybinding.split('+') } : {}),
+          ...this.keysOf(command.id),
           run: () => this.closeAnd(async () => table.run(command.id, target)),
         })),
       {
@@ -151,17 +153,10 @@ export class CommandPaletteFeature {
 
   constructor(private readonly parent: WorkbenchService) {}
 
-  /** The chords that open the palette, from anywhere in the workbench. */
-  handleShortcut(event: KeyboardEvent): void {
-    const command = event.ctrlKey || event.metaKey;
-    const opens =
-      event.key === 'F1' ||
-      (command && event.shiftKey && event.key.toLowerCase() === 'p') ||
-      (command && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p');
-    if (opens && !this.parent.modal.isOpen()) {
-      event.preventDefault();
-      this.show();
-    }
+  /** The keys a command is bound to now (PRD 010, §2), split for the palette's key caps. */
+  private keysOf(id: string): { readonly keys?: readonly string[] } {
+    const key = this.parent.keybindingsFt.keysFor(id)[0];
+    return key === undefined ? {} : { keys: chordParts(key).map(displayKey) };
   }
 
   /** Opens the palette on the command list, whatever it was doing. */

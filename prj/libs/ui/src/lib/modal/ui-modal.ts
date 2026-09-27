@@ -49,6 +49,7 @@ const FOCUSABLE =
       [attr.aria-describedby]="describedBy()"
       [attr.aria-label]="labelledBy() ? null : label()"
       [class.is-shaking]="shaking()"
+      [class.is-large]="size() === 'large'"
       (keydown)="onKeydown($event)"
       (animationend)="shaking.set(false)"
     >
@@ -67,6 +68,12 @@ export class UiModal {
 
   /** Id of the element that describes it — a dialog's detail. */
   readonly describedBy = input<string | null>(null);
+
+  /**
+   * `large` is a window to work in rather than to answer — the settings
+   * (PRD 010): wide and tall, its content scrolling inside it.
+   */
+  readonly size = input<'default' | 'large'>('default');
 
   /** Whether `Escape` may close it. A window that must be answered shakes instead. */
   readonly dismissible = input<boolean>(true);

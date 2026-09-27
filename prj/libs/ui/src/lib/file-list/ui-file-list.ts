@@ -14,7 +14,9 @@ import {
 } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
-import { clickMode, markKey, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
+import { UiKeymap } from '../keyboard/keymap';
+import { LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
+import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
 import type { UiFileColumn, UiFileRow, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
 
@@ -126,7 +128,10 @@ export class UiFileList {
   });
 
   /** Keys documented on every row, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete Insert * + - PageUp PageDown Home End';
+  protected readonly keyShortcuts = computed(() => `${listKeyShortcuts(this.keymap)} PageUp PageDown Home End`);
+
+  /** The key bindings in force (PRD 010, §2). */
+  private readonly keymap = inject(UiKeymap);
 
   private readonly rowElements = viewChildren<ElementRef<HTMLTableRowElement>>('rowElement');
   private readonly body = viewChild<ElementRef<HTMLTableSectionElement>>('body');
@@ -293,22 +298,23 @@ export class UiFileList {
       return;
     }
 
+    // A key bound to a list command (PRD 010, §2) — see `UI_DEFAULT_KEYBINDINGS`.
+    const bound = listCommandFor(this.keymap, event, this.typeahead.typing());
+    if (bound !== null) {
+      this.runBound(bound, index);
+      event.preventDefault();
+      return;
+    }
+
     // `Alt` belongs to the panel, not to the table: its history and its `Up`
-    // (PRD 001, §6.2.1, §6.2.3). So do most `Ctrl` chords — switching tabs
-    // with `Ctrl`+`PageUp`/`PageDown` (§6.2.4), `Ctrl`+`Enter`, `Ctrl`+`T` —
-    // and `UiFileBrowser` and `UiPanelGroup` listen for them, so they must not
-    // also move the cursor here on their way past. The `Ctrl` chords that are
-    // about the selection are the exception.
+    // (PRD 001, §6.2.1, §6.2.3). So do the other `Ctrl` chords — switching
+    // tabs with `Ctrl`+`PageUp`/`PageDown` (§6.2.4), `Ctrl`+`Enter`, `Ctrl`+`T`
+    // — and `UiFileBrowser` and `UiPanelGroup` listen for them, so they must
+    // not also move the cursor here on their way past.
     if (event.altKey) {
       return;
     }
     const command = event.ctrlKey || event.metaKey;
-
-    if (command && !event.shiftKey && (event.key === ' ' || event.key.toLowerCase() === 'a')) {
-      this.pick(row.id, event.key === ' ' ? 'toggle' : 'all');
-      event.preventDefault();
-      return;
-    }
 
     const target = this.movementTarget(event.key, index);
     if (target !== null) {
@@ -317,10 +323,6 @@ export class UiFileList {
       }
       this.focusRow(target, moveMode(event));
       event.preventDefault();
-      return;
-    }
-
-    if (this.onMarkKey(event, index)) {
       return;
     }
 
@@ -351,18 +353,6 @@ export class UiFileList {
           this.focusParent(index);
         }
         break;
-      case 'Enter':
-        this.command.emit({ command: 'open', entryId: row.id });
-        break;
-      case ' ':
-        this.command.emit({ command: 'select', entryId: row.id });
-        break;
-      case 'Backspace':
-        this.command.emit({ command: 'up', entryId: row.id });
-        break;
-      case 'Delete':
-        this.command.emit({ command: event.shiftKey ? 'delete-permanently' : 'delete', entryId: row.id });
-        break;
       default: {
         if (!isTypeaheadKey(event)) {
           return;
@@ -386,33 +376,44 @@ export class UiFileList {
   }
 
   /**
-   * Midnight Commander's selection keys (PRD 004, §2); `true` when `event`
-   * was one. `Insert` on the last row marks it and stays, as there.
+   * A bound list command on row `index`: one of the application's, reported
+   * as a `UiPanelKey`, or a selection gesture made here — `Ctrl`+`A`,
+   * `Ctrl`+`Space`, and Midnight Commander's `Insert` and `*` (PRD 004, §2).
+   * `Insert` on the last row marks it and stays, as there.
    */
-  private onMarkKey(event: KeyboardEvent, index: number): boolean {
-    const key = markKey(event, this.typeahead.typing());
+  private runBound(command: UiListCommand, index: number): void {
     const rows = this.rows();
-    const row = rows[index];
-    if (key === null || row === undefined) {
-      return false;
+    const row = rows[index] as UiFileRow;
+    const panelKey = LIST_PANEL_KEYS[command];
+    if (panelKey !== undefined) {
+      this.command.emit({ command: panelKey, entryId: row.id });
+      return;
     }
-    event.preventDefault();
-    if (key === 'select-pattern' || key === 'unselect-pattern') {
-      this.command.emit({ command: key, entryId: row.id });
-    } else if (key === 'toggle-all') {
-      this.pick(row.id, 'toggle-all');
-    } else {
-      const next = Math.min(index + 1, rows.length - 1);
-      const change = this.selection.mark({
-        ids: rows.map((candidate) => candidate.id),
-        selected: this.selectedIds(),
-        target: row.id,
-        next: (rows[next] as UiFileRow).id,
-      });
-      this.moveFocus(next);
-      this.report(change);
+    switch (command) {
+      case 'selection.all':
+        this.pick(row.id, 'all');
+        break;
+      case 'list.toggleSelection':
+        this.pick(row.id, 'toggle');
+        break;
+      case 'list.toggleAll':
+        this.pick(row.id, 'toggle-all');
+        break;
+      case 'list.mark': {
+        const next = Math.min(index + 1, rows.length - 1);
+        const change = this.selection.mark({
+          ids: rows.map((candidate) => candidate.id),
+          selected: this.selectedIds(),
+          target: row.id,
+          next: (rows[next] as UiFileRow).id,
+        });
+        this.moveFocus(next);
+        this.report(change);
+        break;
+      }
+      default:
+        break;
     }
-    return true;
   }
 
   /** Where a movement key goes from `index`, or `null` for any other key. */

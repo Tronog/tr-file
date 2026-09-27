@@ -33,6 +33,9 @@ import { RemoteConnectionService } from '../file-system/remote-connection.servic
 import { AutoRefreshFeature } from './features/auto-refresh.feature';
 import { CommandsFeature } from './features/commands.feature';
 import { FunctionKeysFeature } from './features/function-keys.feature';
+import { KeybindingsFeature } from './features/keybindings.feature';
+import { PreferencesFeature } from './features/preferences.feature';
+import { SettingsEditorFeature } from './features/settings-editor.feature';
 import { ContextMenuFeature } from './features/context-menu.feature';
 import { FileEditFeature } from './features/file-edit.feature';
 import { SearchFeature } from './features/search.feature';
@@ -206,6 +209,12 @@ export class WorkbenchService {
   readonly autoRefreshFt = new AutoRefreshFeature(this);
   /** The layout, remembered for the next session (PRD 003, §6); made last, since it reads them all. */
   readonly sessionFt = new SessionFeature(this);
+  /** The settings of the settings window (PRD 010, §1); after the session, whose switch it shows. */
+  readonly preferencesFt = new PreferencesFeature(this);
+  /** Every key, as the user may have changed it (PRD 010, §2). */
+  readonly keybindingsFt = new KeybindingsFeature(this);
+  /** The settings window itself (PRD 010). */
+  readonly settingsEditorFt = new SettingsEditorFeature(this);
 
   /** What the root is called: the backend's name for it (PRD 003, §6). */
   readonly workspaceName = computed(() => this.placesFt.rootLabel());
@@ -269,7 +278,9 @@ export class WorkbenchService {
     // `loading`: the request then waits for the first row rather than settling
     // on an empty body.
     this.panelFocusFt.focusBody(this.activeGroupId());
-    this.autoRefreshFt.start();
+    if (this.preferencesFt.autoRefresh()) {
+      this.autoRefreshFt.start();
+    }
     this.sessionFt.start();
   }
 

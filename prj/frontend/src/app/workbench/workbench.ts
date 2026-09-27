@@ -104,9 +104,8 @@ export class Workbench {
   }
 
   protected onDocumentKeydown(event: KeyboardEvent): void {
-    this.workbench.commandPaletteFt.handleShortcut(event);
-    this.workbench.searchFt.handleShortcut(event);
-    this.workbench.functionKeysFt.handleShortcut(event);
+    // The window's keys (PRD 010, §2): the palette, search, the function keys, …
+    this.workbench.keybindingsFt.handleShortcut(event);
     if (this.onPanelTab(event)) {
       return;
     }

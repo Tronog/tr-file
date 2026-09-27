@@ -542,6 +542,17 @@ describe('panel keys', () => {
     ]);
   });
 
+  /** PRD 004, §1.3.2: `Ctrl`+`Shift`+`C` copies the path of the entry focus is on. */
+  it('reports Ctrl+Shift+C as copy-path, with the focused entry', () => {
+    const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
+    const event = keydown('C', { ctrlKey: true, shiftKey: true });
+    row.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(commands).toEqual([{ command: 'copy-path', entryId: 'alpha.ts' }]);
+  });
+
   /** The function keys are the window's (PRD 004, §2): a panel reports none of them. */
   it('reports no function key', () => {
     const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;

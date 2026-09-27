@@ -1,5 +1,10 @@
-import { computed } from '@angular/core';
+import { computed, inject } from '@angular/core';
+import { UiKeymap } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
+import { FOCUS_COMMANDS } from './keybindings.feature';
+
+/** `Tab` / `Shift`+`Tab` between panels, as the keymap binds them (`when: 'panel'`). */
+const PANEL_COMMANDS = ['workbench.nextPanel', 'workbench.previousPanel'] as const;
 
 /** The regions `Ctrl`+`Tab` moves between; a panel group is `group:<id>`. */
 export type FocusRegionId = 'explorer' | 'bottom' | 'details' | `group:${string}`;
@@ -23,6 +28,8 @@ export type FocusRegionId = 'explorer' | 'bottom' | 'details' | `group:${string}
  * which works in a browser too; see `panelDirectionOf`.
  */
 export class FocusCycleFeature {
+  private readonly keymap = inject(UiKeymap);
+
   constructor(private readonly parent: WorkbenchService) {}
 
   /** Every stop, in order. */
@@ -33,16 +40,18 @@ export class FocusCycleFeature {
     'details',
   ]);
 
-  /** `Ctrl`+`Tab` or `Ctrl`+`Shift`+`Tab`: `1` forward, `-1` back, `0` for any other key. */
+  /**
+   * `Ctrl`+`Tab` or `Ctrl`+`Shift`+`Tab` — whatever the keymap binds to
+   * *Focus Next Part* / *Focus Previous Part* (PRD 010, §2): `1` forward,
+   * `-1` back, `0` for any other key.
+   */
   directionOf(event: KeyboardEvent): -1 | 0 | 1 {
-    if (event.key !== 'Tab' || !event.ctrlKey || event.altKey || event.metaKey) {
-      return 0;
-    }
+    const command = this.keymap.commandFor(event, 'window', FOCUS_COMMANDS);
     // Not while a window or the palette has the keyboard: they keep it.
-    if (this.parent.modal.isOpen() || this.parent.commandPaletteFt.isOpen()) {
+    if (command === null || this.parent.modal.isOpen() || this.parent.commandPaletteFt.isOpen()) {
       return 0;
     }
-    return event.shiftKey ? -1 : 1;
+    return command === 'workbench.focusPreviousPart' ? -1 : 1;
   }
 
   /**
@@ -76,13 +85,11 @@ export class FocusCycleFeature {
    * `Ctrl`+`Tab` is the way out of the panels.
    */
   panelDirectionOf(event: KeyboardEvent, inBody: boolean): -1 | 0 | 1 {
-    if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey || !inBody) {
+    const command = inBody ? this.keymap.commandFor(event, 'panel', PANEL_COMMANDS) : null;
+    if (command === null || this.parent.modal.isOpen() || this.parent.commandPaletteFt.isOpen() || this.panels().length < 2) {
       return 0;
     }
-    if (this.parent.modal.isOpen() || this.parent.commandPaletteFt.isOpen() || this.panels().length < 2) {
-      return 0;
-    }
-    return event.shiftKey ? -1 : 1;
+    return command === 'workbench.previousPanel' ? -1 : 1;
   }
 
   /**

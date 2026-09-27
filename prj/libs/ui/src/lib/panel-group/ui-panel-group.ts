@@ -12,6 +12,7 @@ import {
   ElementRef,
 } from '@angular/core';
 import { UiEmptyState } from '../empty-state/ui-empty-state';
+import { UiKeymap } from '../keyboard/keymap';
 import { UiIcon } from '../icon/ui-icon';
 import { UiProgress } from '../progress/ui-progress';
 import { UiTabBar } from '../tabs/ui-tab-bar';
@@ -61,6 +62,9 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
     return null;
   }
 }
+
+/** The chords of the group itself; see `onGroupKeydown`. */
+const GROUP_COMMANDS = ['view.splitRight', 'tab.close', 'tab.next', 'tab.previous'] as const;
 
 /**
  * One editor group: the shell around whatever its active tab shows.
@@ -179,6 +183,9 @@ export class UiPanelGroup {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
+  /** The key bindings in force (PRD 010, §2). */
+  private readonly keymap = inject(UiKeymap);
+
   /** The projected content's `uiPanelBody` element, while there is one. */
   private contentBody: HTMLElement | null = null;
 
@@ -282,7 +289,8 @@ export class UiPanelGroup {
   });
 
   /**
-   * The chords that belong to the panel as a whole (PRD 001, §6.2.2).
+   * The chords that belong to the panel as a whole (PRD 001, §6.2.2), as the
+   * keymap binds them (PRD 010, §2).
    *
    * Bound on the host rather than the body, so they work with focus anywhere
    * in the group — in its content, or on a tab in the bar. None is a new
@@ -297,15 +305,15 @@ export class UiPanelGroup {
    * `Ctrl`+`Enter` about the entry it is standing on (§6.2.5).
    */
   protected onGroupKeydown(event: KeyboardEvent): void {
-    if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+    // A key the content already took — a row's own binding — is not the group's too.
+    if (event.defaultPrevented) {
       return;
     }
-
-    switch (event.key.toLowerCase()) {
-      case 't':
+    switch (this.keymap.commandFor(event, 'panel', GROUP_COMMANDS)) {
+      case 'view.splitRight':
         this.actionSelect.emit('split-right');
         break;
-      case 'w': {
+      case 'tab.close': {
         // The focused tab is the active one; a group with none has nothing to
         // close, and must not silently close somebody else's tab.
         const group = this.group();
@@ -316,20 +324,18 @@ export class UiPanelGroup {
         this.tabClose.emit(active.id);
         break;
       }
-      default:
-        // `event.key`, not the letter cases above: the page keys have names.
-        if (event.key === 'PageDown') {
-          if (!this.switchTab(1)) {
-            return;
-          }
-        } else if (event.key === 'PageUp') {
-          if (!this.switchTab(-1)) {
-            return;
-          }
-        } else {
+      case 'tab.next':
+        if (!this.switchTab(1)) {
           return;
         }
         break;
+      case 'tab.previous':
+        if (!this.switchTab(-1)) {
+          return;
+        }
+        break;
+      default:
+        return;
     }
 
     event.preventDefault();

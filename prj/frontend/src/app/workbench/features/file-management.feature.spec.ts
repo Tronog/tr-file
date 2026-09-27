@@ -508,7 +508,7 @@ describe('File management (PRD 003, §5)', () => {
       expect(workbench.chromeFt.sidebarView()).toBe('search');
       const token = workbench.searchFt.focusToken();
       const event = new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, cancelable: true });
-      workbench.searchFt.handleShortcut(event);
+      workbench.keybindingsFt.handleShortcut(event);
       expect(event.defaultPrevented).toBe(true);
       expect(workbench.searchFt.focusToken()).toBe(token + 1);
 

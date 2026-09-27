@@ -33,6 +33,14 @@
   outline: none;
 }
 
+/* A window to work in: the settings (PRD 010). Its content scrolls itself. */
+.window.is-large {
+  width: min(980px, 100%);
+  max-width: none;
+  height: min(680px, 88vh);
+  overflow: hidden;
+}
+
 /* VS Code's answer to a click outside a dialog that is waiting for one. */
 .window.is-shaking {
   animation: ui-modal-shake 0.3s ease-in-out;

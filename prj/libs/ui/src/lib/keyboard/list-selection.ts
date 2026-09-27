@@ -20,45 +20,6 @@ import type { UiSelectionChange } from '../models';
  */
 export type UiSelectMode = 'replace' | 'toggle' | 'range' | 'range-add' | 'focus' | 'all' | 'toggle-all';
 
-/**
- * Midnight Commander's selection keys (PRD 004, §2), on a row or a tile:
- *
- * - `mark` — `Insert`: flip the entry in or out, and move on to the next.
- * - `toggle-all` — `*`: select everything, or nothing once everything is.
- * - `select-pattern` / `unselect-pattern` — `+` / `-`: add or take away
- *   the entries whose names match a pattern, which the application asks for.
- *
- * The first two are the list's own; the pattern keys leave as a `UiPanelKey`.
- */
-export type UiMarkKey = 'mark' | 'toggle-all' | 'select-pattern' | 'unselect-pattern';
-
-/**
- * The mark key `event` is, or `null`. `*`, `+` and `-` are read by the
- * character, so the numeric keypad's count too, and whatever `Shift` it took
- * to type them; `typing` says a name is being typed, which they are then part of.
- */
-export function markKey(event: KeyboardEvent, typing: boolean): UiMarkKey | null {
-  if (event.ctrlKey || event.metaKey || event.altKey) {
-    return null;
-  }
-  if (event.key === 'Insert') {
-    return event.shiftKey ? null : 'mark';
-  }
-  if (typing) {
-    return null;
-  }
-  switch (event.key) {
-    case '*':
-      return 'toggle-all';
-    case '+':
-      return 'select-pattern';
-    case '-':
-      return 'unselect-pattern';
-    default:
-      return null;
-  }
-}
-
 /** The mode a click means, from the keys held while it was made. */
 export function clickMode(event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): UiSelectMode {
   const toggle = event.ctrlKey || event.metaKey;

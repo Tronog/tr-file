@@ -78,7 +78,9 @@ export type UiIconName =
   | 'file-text'
   | 'history'
   | 'archive'
-  | 'network';
+  | 'network'
+  | 'keyboard'
+  | 'palette';
 
 /** Icon sizes used across the workbench (16px is VS Code's list/tab size). */
 export type UiIconSize = 'sm' | 'md' | 'lg' | 'xl';

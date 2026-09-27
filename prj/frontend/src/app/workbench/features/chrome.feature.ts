@@ -58,8 +58,9 @@ export class ChromeFeature {
    */
   readonly settingsMenuItems = computed<readonly UiMenuItem[]>(() => {
     const commands = this.parent.commandsFt;
+    // The menu's own words — *Settings*, not the palette's *Open Settings* — with the command's state.
     return this.parent.mockWorkbench.settingsMenuItems.map((item) =>
-      commands.command(item.id) === undefined ? item : commands.menuItem(item.id, commands.activeTarget(), !!item.separatorBefore),
+      commands.command(item.id) === undefined ? item : { ...commands.menuItem(item.id, commands.activeTarget(), !!item.separatorBefore), label: item.label },
     );
   });
 

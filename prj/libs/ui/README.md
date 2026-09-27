@@ -61,7 +61,9 @@ structural helpers. No component hardcodes a colour.
 | Panel content | `UiFileBrowser` (with `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
 | Bottom panel | `UiBottomPanel`, `UiTransferList` (Transfers and Progress; `cancellable` rows report `cancel`) |
 | Controls | `UiIconButton`, `UiButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
-| Modal windows | `UiModal`, `UiDialog`, `UiProgressDialog` |
+| Modal windows | `UiModal` (`size: 'large'` for a window to work in), `UiDialog`, `UiProgressDialog` |
+| Settings | `UiSettingsEditor` (the settings window: sections, settings, search — PRD 010), `UiKeybindingsTable` (Keyboard Shortcuts, with its key recorder) |
+| Keyboard | `UiKeymap` (the key bindings in force), `UI_DEFAULT_KEYBINDINGS`, `chordOf` — see *Key bindings* |
 | Quick input | `UiQuickInput` — the command palette's box |
 | Icons | `UiIcon`, `UiIconSprite` |
 
@@ -125,7 +127,8 @@ The library reports these; what they do is the application's.
 - **Keys.** `Shift`+`Delete` is the `delete-permanently` panel key, and `+` /
   `-` are `select-pattern` / `unselect-pattern` (PRD 004, §2), in the list and
   the grid. `UiFileBrowser` adds `Ctrl`+`Z` (`undo`), `Ctrl`+`Shift`+`N`
-  (`new-folder`) and `Ctrl`+`R` (`refresh`) — never inside a text field — and
+  (`new-folder`), `Ctrl`+`R` (`refresh`) and `Ctrl`+`Shift`+`C` (`copy-path`,
+  PRD 004, §1.3.2) — never inside a text field — and
   the mouse's back and forward buttons as `back` / `forward`. No function key
   is a panel key: `F1`–`F10` are the window's, and the app binds them.
 - **Filter box.** Given `searchPlaceholder`, the toolbar shows
@@ -480,6 +483,39 @@ use. Making the page behind the window `inert` is the host's job: the library
 does not own the page. In the app, `ModalService` (`confirm`, `prompt`,
 `message`, `show`, and `open` for a component of its own) keeps the stack and
 `ModalHost` draws it.
+
+## Key bindings (PRD 010, §2)
+
+No component tests a key itself for anything that is a *command*: it asks
+`UiKeymap` (a root service, the one piece of state the library keeps) which of
+*its* commands the key is bound to, in its context — `list` for a row or a
+tile, `panel` for a panel's content and the group around it, `window` for the
+application's own. A binding is `{ command, key, when }`, VS Code's shape; a
+key is a chord as `chordOf` writes it (`Ctrl+Shift+P`, `Alt+Left`, `F5`,
+`Plus`, `*`), with `Cmd` read as `Ctrl` and a symbol written without the
+`Shift` it took. The keymap starts with `UI_DEFAULT_KEYBINDINGS`, so the
+library works as it is; the application hands it the whole table with `set`.
+
+A key the library answers for a command of the application's table is bound
+to that command's id (`file.open`, `edit.copy`, `go.up`), so one binding
+governs both the key and what a menu shows beside the command. The library's
+own gestures have ids of their own: `list.select`, `list.toggleSelection`,
+`list.mark`, `list.toggleAll`, `panel.contextMenu`, `view.splitRight`,
+`tab.previous`, `tab.next`. Navigation is not bound — the arrows, `Home` /
+`End`, the page keys, type-to-find, `Escape`, and the keys inside menus,
+dialogs and the quick input are what those widgets *are*, not commands.
+
+A single-character chord bound in a list (`*`, `+`, `-`, a letter) is taken as
+part of a name while type-to-find is running.
+
+`UiSettingsEditor` and `UiKeybindingsTable` draw the settings window
+(PRD 010): a table of contents, a search box, pages of settings drawn the way
+VS Code draws them — `Category: Title`, the description, a checkbox,
+drop-down or button, a bar by a setting changed from its default — and the
+Keyboard Shortcuts table. Its recorder takes the keyboard while a key is
+recorded: each key is reported as a chord, `Enter` accepts (or is recorded
+itself, as the first key), `Escape` gives up, and neither reaches the modal
+around it.
 
 ## Long lists
 
