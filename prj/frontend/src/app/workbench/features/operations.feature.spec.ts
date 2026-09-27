@@ -35,7 +35,7 @@ describe('OperationsFeature', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     workbench = TestBed.inject(WorkbenchService);
     vi.spyOn(workbench.fileSystem.operationsFt, 'operationsInfo').mockResolvedValue({ trash: 'server' });
-    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockImplementation(() => undefined);
+    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockResolvedValue(undefined);
   });
 
   afterEach(() => {

@@ -13,6 +13,7 @@ import type {
   FsServerTime,
   FsOperationRequest,
   FsOperationsInfo,
+  FsTrashListing,
   FsSearchResult,
   FsUpload,
   FsWatchResult,
@@ -188,6 +189,9 @@ export interface FsTransport {
 
   /** Stops a job; answers with how it stands. */
   cancelOperation(id: string): Promise<FsOperationJob>;
+
+  /** What is in the trash (PRD 001, §14.1). */
+  trashListing(): Promise<FsTrashListing>;
 
   /** Answers a job that is `waiting` (PRD 001, Fix 3); rejects with `CONFLICT` when it is not. */
   resolveOperation(id: string, decision: FsOperationDecision): Promise<FsOperationJob>;

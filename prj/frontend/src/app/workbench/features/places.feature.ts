@@ -2,6 +2,7 @@ import { computed, signal } from '@angular/core';
 import type { UiContextMenuRequest, UiIconName, UiTreeNode } from '@tr-file/ui';
 import type { FsPlaceKind, FsPlaces } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
+import { TRASH_PLACE } from './trash.feature';
 
 /** Settings keys of the user's own places; the backend they belong to is appended. */
 export const BOOKMARKS_KEY = 'tr-file.bookmarks.v1';
@@ -88,9 +89,19 @@ export class PlacesFeature {
 
   /* -- the panes ------------------------------------------------------------ */
 
-  readonly placeNodes = computed<readonly UiTreeNode[]>(() =>
-    (this.answer()?.places ?? []).map((place) => this.node('place', place.path, place.label, ICONS[place.kind])),
-  );
+  /** The backend's places, and the trash last (PRD 001, §14.1) — lit while the active panel shows it. */
+  readonly placeNodes = computed<readonly UiTreeNode[]>(() => [
+    ...(this.answer()?.places ?? []).map((place) => this.node('place', place.path, place.label, ICONS[place.kind])),
+    {
+      id: TRASH_PLACE,
+      label: this.parent.trashFt.label(),
+      depth: 0,
+      icon: 'trash',
+      expandable: false,
+      guides: [],
+      ...(this.parent.trashFt.showing() ? { selected: true } : {}),
+    },
+  ]);
 
   readonly bookmarkNodes = computed<readonly UiTreeNode[]>(() =>
     this.bookmarkList().map((bookmark) => this.node('bookmark', bookmark.path, bookmark.label, 'star')),
@@ -100,8 +111,12 @@ export class PlacesFeature {
     this.recentList().map((path) => this.node('recent', path, this.labelFor(path), 'history', PlacesFeature.parentLabel(path))),
   );
 
-  /** A row was clicked: its folder, in the active panel. */
+  /** A row was clicked: its folder, in the active panel — or the trash, in a tab of its own. */
   open(nodeId: string): void {
+    if (nodeId === TRASH_PLACE) {
+      this.parent.trashFt.open(this.parent.activeGroupId());
+      return;
+    }
     const path = PlacesFeature.pathOf(nodeId);
     if (path === null) {
       return;
@@ -300,7 +315,10 @@ export class PlacesFeature {
    * folder it is in, to tell two of one name apart.
    */
   private node(section: PlaceSection, path: string, label: string, icon: UiIconName, meta?: string): UiTreeNode {
-    const groupPath = this.parent.editorGroupsFt.stateOf(this.parent.activeGroupId())?.path;
+    // Lit for the folder the active panel lists — not for the trash, whose tab has no folder (PRD 001, §14.1).
+    const groups = this.parent.editorGroupsFt;
+    const group = groups.stateOf(this.parent.activeGroupId());
+    const groupPath = group !== undefined && groups.activeTabOf(group)?.kind !== 'trash' ? group.path : undefined;
     return {
       id: `${section}:${path}`,
       label,

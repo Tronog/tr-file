@@ -16,6 +16,7 @@ import type {
   FsServerTime,
   FsOperationRequest,
   FsOperationsInfo,
+  FsTrashListing,
   FsSearchResult,
   FsUpload,
   FsUploadProgress,
@@ -482,6 +483,10 @@ export class FsBridgeService implements FsTransport {
 
   async cancelOperation(id: string): Promise<FsOperationJob> {
     return this.invoke<FsOperationJob>({ command: 'op-cancel', jobId: id });
+  }
+
+  async trashListing(): Promise<FsTrashListing> {
+    return this.invoke<FsTrashListing>({ command: 'op-trash-list' });
   }
 
   async resolveOperation(id: string, decision: FsOperationDecision): Promise<FsOperationJob> {

@@ -25,6 +25,7 @@ import type {
   OperationErrorPolicy,
   OperationJobDto,
   OperationsInfoDto,
+  TrashListingDto,
 } from '../operations/operation.model.js';
 
 /** Every operation the bridge offers. */
@@ -47,6 +48,7 @@ export type FsBridgeCommand =
   | 'op-status'
   | 'op-cancel'
   | 'op-resolve'
+  | 'op-trash-list'
   | 'rename'
   | 'mkdir'
   | 'create-file'
@@ -288,7 +290,13 @@ export interface FsTimeRequest {
   readonly command: 'time';
 }
 
+/** What is in the trash (PRD 001, §14.1) — `GET /api/ops/trash-items`. */
+export interface FsOpTrashListRequest {
+  readonly command: 'op-trash-list';
+}
+
 export type FsBridgeRequest =
+  | FsOpTrashListRequest
   | FsOpResolveRequest
   | FsTimeRequest
   | FsHostPathsRequest
@@ -372,6 +380,7 @@ export interface FsBridgeResults {
   readonly 'op-status': OperationJobDto;
   readonly 'op-cancel': OperationJobDto;
   readonly 'op-resolve': OperationJobDto;
+  readonly 'op-trash-list': TrashListingDto;
   readonly rename: FileDetailsDto;
   readonly mkdir: FileDetailsDto;
   readonly 'create-file': FileDetailsDto;

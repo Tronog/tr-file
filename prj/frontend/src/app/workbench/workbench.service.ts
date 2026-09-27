@@ -36,6 +36,7 @@ import { FunctionKeysFeature } from './features/function-keys.feature';
 import { KeybindingsFeature } from './features/keybindings.feature';
 import { PreferencesFeature } from './features/preferences.feature';
 import { SettingsEditorFeature } from './features/settings-editor.feature';
+import { TrashFeature } from './features/trash.feature';
 import { ServerClockFeature } from './features/server-clock.feature';
 import { ContextMenuFeature } from './features/context-menu.feature';
 import { FileEditFeature } from './features/file-edit.feature';
@@ -166,6 +167,8 @@ export class WorkbenchService {
   readonly fileBrowserFt = new FileBrowserFeature(this);
   /** Inside a zip, as a panel tab of its own (PRD 003, §6). */
   readonly archiveBrowserFt = new ArchiveBrowserFeature(this);
+  /** The trash, as a Places row and a panel tab of its own (PRD 001, §14.1). */
+  readonly trashFt = new TrashFeature(this);
   /** Frees cached file contents once nothing on screen shows them. */
   readonly previewRetentionFt = new PreviewRetentionFeature(this);
   readonly detailsFt = new DetailsFeature(this);

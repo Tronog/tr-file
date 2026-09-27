@@ -19,6 +19,7 @@
 @let archive = workbench.archiveBrowserFt;
 @let git = workbench.gitFt;
 @let diff = workbench.gitDiffFt;
+@let trash = workbench.trashFt;
 
 @let explorerSide = workbench.preferencesFt.explorerSide();
 @let detailsSide = workbench.preferencesFt.detailsSide();
@@ -250,6 +251,17 @@
                     />
                   }
                 }
+                <!-- The trash (PRD 001, §14.1): what was thrown away, read-only. -->
+                @case ('trash') {
+                  @if (trash.browser(groupId); as browser) {
+                    <ui-file-browser
+                      [browser]="browser"
+                      (toolbarAction)="trash.runToolbarAction(groupId, $event)"
+                      (selectionChange)="trash.setSelection(groupId, $event)"
+                      (command)="trash.runKey(groupId, $event.command)"
+                    />
+                  }
+                }
                 <!-- Inside a zip (PRD 003, §6): read-only, one folder of it at a time. -->
                 @case ('archive') {
                   @if (archive.browser(groupId); as browser) {
@@ -366,6 +378,25 @@
       </ui-pane>
     }
 
+    <!-- While a panel shows the trash, the sidebar describes it (PRD 001, §14.1). -->
+    @if (trash.showing()) {
+      <ui-preview-card [preview]="trash.preview()" />
+      <ui-pane
+        title="Properties"
+        [expanded]="panes.isExpanded('properties')"
+        (toggle)="panes.toggle('properties')"
+      >
+        <ui-property-list [properties]="trash.properties()" />
+      </ui-pane>
+      <ui-pane
+        title="Actions"
+        [expanded]="panes.isExpanded('open-with')"
+        [grow]="true"
+        (toggle)="panes.toggle('open-with')"
+      >
+        <ui-action-list [items]="trash.actions()" (select)="trash.runAction($event)" />
+      </ui-pane>
+    } @else {
     @if (details.error(); as message) {
       <p class="sidebar-note" role="alert">{{ message }}</p>
     } @else if (details.loading() && !details.hasDetails()) {
@@ -403,6 +434,7 @@
       >
         <ui-action-list [items]="details.actions()" (select)="details.runAction($event)" />
       </ui-pane>
+    }
     }
 
   </ui-sidebar>

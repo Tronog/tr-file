@@ -144,12 +144,11 @@ export class FsDataFeature {
 
   /**
    * Drops a directory from the cache and reloads it if anything is showing it.
-   * Called after an upload lands in that directory.
+   * Called after an upload lands in that directory. Resolves once it is read
+   * again — at once when nothing shows it.
    */
-  invalidateListing(path: string): void {
-    if (this.listings().has(path)) {
-      void this.reloadListing(path);
-    }
+  invalidateListing(path: string): Promise<void> {
+    return this.listings().has(path) ? this.reloadListing(path) : Promise.resolve();
   }
 
   /**

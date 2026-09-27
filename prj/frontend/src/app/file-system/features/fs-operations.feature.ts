@@ -1,5 +1,5 @@
 import type { FileSystemService } from '../file-system.service';
-import type { FsOperationDecision, FsOperationJob, FsOperationRequest, FsOperationsInfo } from '../file-system.model';
+import type { FsOperationDecision, FsOperationJob, FsOperationRequest, FsOperationsInfo, FsTrashListing } from '../file-system.model';
 
 /**
  * File operations on the backend (PRD 005, §1): copy, move, move to trash and
@@ -35,6 +35,11 @@ export class FsOperationsFeature {
 
   cancel(id: string): Promise<FsOperationJob> {
     return this.parent.transport.cancelOperation(id);
+  }
+
+  /** What is in the trash (PRD 001, §14.1). */
+  trashListing(): Promise<FsTrashListing> {
+    return this.parent.transport.trashListing();
   }
 
   /** What a waiting job should do about the entry it could not do (PRD 001, Fix 3). */

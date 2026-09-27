@@ -102,6 +102,7 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `op-restore` | `ids` | the job, started |
 | `op-empty-trash` | — | the job, started |
 | `op-status`, `op-cancel` | `jobId` | the job as it stands; `op-cancel` stops it first |
+| `op-trash-list` | — | `GET /api/ops/trash-items`'s answer (PRD 001, §14.1) |
 | `op-resolve` | `jobId`, `decision` | `POST /api/ops/jobs/:id/resolve`'s answer (PRD 001, Fix 3) |
 | `places` | — | `GET /api/fs/places`'s answer |
 | `time` | — | the machine's clock: `{ now, timeZone, utcOffsetMinutes }`, as `GET /api/health` reports it (PRD 001, §13.1) |
@@ -358,6 +359,7 @@ costs one small message a second however fast the job runs — and may cancel it
 | `POST` | `/api/ops/trash`, `/api/ops/delete` | `{ paths: string[], errors? }` | `202`, the job |
 | `POST` | `/api/ops/restore` | `{ ids: string[], errors? }` | `202`, the job |
 | `POST` | `/api/ops/empty-trash` | — | `202`, the job |
+| `GET` | `/api/ops/trash-items` | — | `{ trash, canRestore, canList, items: [{ id, name, location, deletedAt, type, size }] }` — what is in the trash, newest first (PRD 001, §14.1); `location` is root-relative for the server's trash, the host path for a system one; a trash that cannot be listed says `canList: false` |
 | `GET` | `/api/ops/jobs/:id` | — | the job |
 | `POST` | `/api/ops/jobs/:id/cancel` | — | the job; one that has ended stays as it ended |
 | `POST` | `/api/ops/jobs/:id/resolve` | `{ decision: 'skip' \| 'skip-all' \| 'retry' \| 'abort' }` | the job; `409` when it is not `waiting` |

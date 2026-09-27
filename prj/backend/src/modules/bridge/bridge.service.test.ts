@@ -406,6 +406,17 @@ describe('localPath', () => {
   });
 });
 
+/** PRD 001, §14.1 — the trash, listed over the bridge as over `/api/ops/trash-items`. */
+describe('FileSystemBridge op-trash-list', () => {
+  it('answers what the trash holds, and whether it could tell', async () => {
+    const answer = await bridge.dispatch({ command: 'op-trash-list' });
+    assert.ok('data' in answer, JSON.stringify(answer));
+    const listing = answer.data as { canList: boolean; items: unknown[] };
+    assert.equal(listing.canList, true);
+    assert.ok(Array.isArray(listing.items));
+  });
+});
+
 /** PRD 001, Fix 3 — answering a job that waits on an entry it could not do. */
 describe('FileSystemBridge op-resolve', () => {
   it('refuses an answer that is not one, and a job that is not there', async () => {

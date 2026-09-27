@@ -47,4 +47,35 @@ export class PanelFocusFeature {
     this.seq += 1;
     this.tokens.update((tokens) => ({ ...tokens, [groupId]: this.seq }));
   }
+
+  /**
+   * An action on files is over — its dialog answered or dismissed, its job
+   * ended and the folders it changed read again (PRD 001, Fix 5): the keyboard
+   * goes back into the content of the panel it was started from (or the
+   * active one, if that panel has gone), wherever the dialogs, the menu or
+   * the palette left it.
+   *
+   * Unless the user has gone somewhere of their own since: another window is
+   * open, a text field has the keyboard, or focus is in another part of the
+   * workbench — another panel, a sidebar, the bottom panel. Focus on the page
+   * itself, in the title bar, the activity bar or the status bar — or still in
+   * that panel — is taken back.
+   */
+  returnFocus(groupId: string): void {
+    const group = this.parent.editorGroupsFt.stateOf(groupId) === undefined ? this.parent.activeGroupId() : groupId;
+    if (this.parent.modal.isOpen()) {
+      return;
+    }
+    const focused = globalThis.document?.activeElement;
+    if (focused instanceof HTMLElement && focused !== document.body) {
+      if (focused.matches('input, textarea, select') || focused.isContentEditable) {
+        return;
+      }
+      const region = focused.closest('[data-focus-region]')?.getAttribute('data-focus-region') ?? null;
+      if (region !== null && region !== `group:${group}`) {
+        return;
+      }
+    }
+    this.focusBody(group);
+  }
 }

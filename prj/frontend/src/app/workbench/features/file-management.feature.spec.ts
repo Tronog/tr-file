@@ -355,7 +355,7 @@ describe('File management (PRD 003, §5)', () => {
       vi.spyOn(workbench.fileSystem.operationsFt, 'start').mockResolvedValue(
         job({ kind: 'trash', outcome: [{ source: 'a.txt', target: 'a.txt.k1' }] }),
       );
-      vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockImplementation(() => undefined);
+      vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockResolvedValue(undefined);
 
       await workbench.operationsFt.trash(['a.txt']);
       await settled();
@@ -368,7 +368,7 @@ describe('File management (PRD 003, §5)', () => {
     it('Shift+Delete asks, saying it cannot be undone, then deletes', async () => {
       const confirm = vi.spyOn(workbench.modal, 'confirm').mockResolvedValue(true);
       const start = vi.spyOn(workbench.fileSystem.operationsFt, 'start').mockResolvedValue(job({ kind: 'delete' }));
-      vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockImplementation(() => undefined);
+      vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockResolvedValue(undefined);
 
       workbench.panelKeyboardFt.run(group, { command: 'delete-permanently', entryId: 'a.txt' });
       await settled();

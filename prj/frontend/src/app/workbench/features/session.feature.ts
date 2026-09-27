@@ -15,7 +15,7 @@ export const RESTORE_SESSION_KEY = 'tr-file.restore-session.v1';
 const SAVE_DELAY_MS = 400;
 
 const VIEWS: ReadonlySet<string> = new Set<UiPanelView>(['list', 'grid', 'tree']);
-const TAB_KINDS: ReadonlySet<string> = new Set<PanelTabState['kind']>(['folder', 'file', 'archive', 'diff']);
+const TAB_KINDS: ReadonlySet<string> = new Set<PanelTabState['kind']>(['folder', 'file', 'archive', 'diff', 'trash']);
 const SORT_KEYS: ReadonlySet<string> = new Set<PanelSort['key']>(['name', 'size', 'type', 'modified']);
 
 /** Everything a session remembers (PRD 003, §6). */

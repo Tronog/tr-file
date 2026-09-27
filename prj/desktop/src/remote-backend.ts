@@ -277,6 +277,9 @@ export class RemoteBackend {
         return this.json('GET', `/ops/jobs/${encodeURIComponent(request.jobId)}`);
       case 'op-cancel':
         return this.json('POST', `/ops/jobs/${encodeURIComponent(request.jobId)}/cancel`, { body: {} });
+      // What is in the trash (PRD 001, §14.1); a server from before it cannot say.
+      case 'op-trash-list':
+        return this.trashList();
       // What to do about an entry a job could not do (PRD 001, Fix 3).
       case 'op-resolve':
         return this.json('POST', `/ops/jobs/${encodeURIComponent(request.jobId)}/resolve`, { body: { decision: request.decision } });
@@ -699,6 +702,20 @@ export class RemoteBackend {
       message: `Talking to ${name} failed: ${error instanceof Error ? error.message : String(error)}`,
       status: 0,
     };
+  }
+
+  /**
+   * The server's trash (PRD 001, §14.1). One from before it answers `404`:
+   * then it is its own trash as `op-info` describes it, with nothing listed.
+   */
+  private async trashList(): Promise<unknown> {
+    const response = await this.request('GET', '/ops/trash-items', { accept: [200, 404] });
+    if (response.status === 404) {
+      await response.body?.cancel();
+      const info = (await this.json('GET', '/ops/info')) as { trash: 'server' | 'system'; canRestore?: boolean };
+      return { trash: info.trash, canRestore: info.canRestore === true, canList: false, items: [] };
+    }
+    return ((await response.json()) as { data: unknown }).data;
   }
 
   /**

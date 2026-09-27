@@ -360,6 +360,18 @@ describe('RemoteBackend errors, asked about (PRD 001, Fix 3)', () => {
   });
 });
 
+describe('RemoteBackend trash (PRD 001, §14.1)', () => {
+  it('lists the server’s trash', async () => {
+    const remote = await connected();
+    const listing = dataOf<{ trash: string; canList: boolean; canRestore: boolean; items: unknown[] }>(await remote.dispatch({ command: 'op-trash-list' }));
+
+    assert.equal(listing.trash, 'server');
+    assert.equal(listing.canList, true);
+    assert.equal(listing.canRestore, true);
+    assert.ok(Array.isArray(listing.items));
+  });
+});
+
 describe('RemoteBackend time (PRD 001, §13.1)', () => {
   it('answers the server machine’s clock, from its health check', async () => {
     const remote = await connected();

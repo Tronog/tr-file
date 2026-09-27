@@ -40,6 +40,33 @@ type CommandSpec = Omit<WorkbenchCommand, 'label' | 'palette' | 'enabled'> & {
 };
 
 const always = (): boolean => true;
+
+/**
+ * The commands that act on files and then leave the keyboard where it was
+ * (PRD 001, Fix 5). Opening, revealing, filtering, searching are not among
+ * them: they send the keyboard somewhere of their own on purpose.
+ */
+const FILE_ACTIONS: ReadonlySet<string> = new Set([
+  'file.newFile',
+  'file.newFolder',
+  'file.rename',
+  'file.copyTo',
+  'file.moveTo',
+  'file.trash',
+  'file.delete',
+  'file.compress',
+  'file.extractHere',
+  'file.extractTo',
+  'file.copyPath',
+  'file.emptyTrash',
+  'file.download',
+  'edit.undo',
+  'edit.cut',
+  'edit.copy',
+  'edit.paste',
+  'selection.byPattern',
+  'selection.unselectByPattern',
+]);
 const nameOf = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
 
 /** The sort orders the View menu offers, by the column each is. */
@@ -130,11 +157,20 @@ export class CommandsFeature {
     return this.table.get(id)?.enabled(target) ?? false;
   }
 
-  /** Runs a command, if it applies to `target`; what it does is the owning feature's. */
+  /**
+   * Runs a command, if it applies to `target`; what it does is the owning
+   * feature's. A file action — asked for from a menu, the palette or a key —
+   * hands the keyboard back to the panel it acted on once its dialogs are
+   * done (PRD 001, Fix 5); a job it starts does the same again when it ends.
+   */
   run(id: string, target = this.activeTarget()): void {
     const command = this.table.get(id);
-    if (command !== undefined && command.enabled(target)) {
-      void command.run(target);
+    if (command === undefined || !command.enabled(target)) {
+      return;
+    }
+    const running = Promise.resolve(command.run(target));
+    if (FILE_ACTIONS.has(id)) {
+      void running.catch(() => undefined).then(() => this.parent.panelFocusFt.returnFocus(target.groupId));
     }
   }
 

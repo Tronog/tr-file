@@ -18,6 +18,7 @@ import type {
   OperationRequest,
   OperationsInfoDto,
   TransferOperationRequest,
+  TrashListingDto,
   TrashProvider,
 } from './operation.model.js';
 
@@ -105,6 +106,21 @@ export class OperationsService {
         return this.startCompress(request);
       case 'extract':
         return this.startExtract(request);
+    }
+  }
+
+  /** What is in the trash (PRD 001, §14.1), as far as this trash can tell. */
+  async trashListing(): Promise<TrashListingDto> {
+    const trash = this.trashProvider;
+    const base = { trash: trash.kind, canRestore: this.canRestore };
+    if (trash.list === undefined) {
+      return { ...base, canList: false, items: [] };
+    }
+    try {
+      return { ...base, canList: true, items: await trash.list() };
+    } catch (error) {
+      this.logger.warn('trash could not be listed', { error: error instanceof Error ? error.message : String(error) });
+      return { ...base, canList: false, items: [] };
     }
   }
 

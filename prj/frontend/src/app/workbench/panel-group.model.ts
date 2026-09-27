@@ -2,15 +2,16 @@ import type { UiPanelView } from '@tr-file/ui';
 
 /**
  * What a tab is showing: a directory listing, one file read-only, a folder
- * inside a zip (PRD 003, §6), or a file's git changes (PRD 011, §1).
+ * inside a zip (PRD 003, §6), a file's git changes (PRD 011, §1), or the
+ * trash (PRD 001, §14.1).
  */
-export type PanelTabKind = 'folder' | 'file' | 'archive' | 'diff';
+export type PanelTabKind = 'folder' | 'file' | 'archive' | 'diff' | 'trash';
 
 /**
  * Which kind of panel content renders a tab — one component and one feature
  * class per kind. File management is the only one so far.
  */
-export type PanelContentType = 'files' | 'archive' | 'diff';
+export type PanelContentType = 'files' | 'archive' | 'diff' | 'trash';
 
 /**
  * The content each tab kind is rendered by. A `Record`, so a new tab kind
@@ -21,6 +22,7 @@ export const PANEL_CONTENT: Readonly<Record<PanelTabKind, PanelContentType>> = {
   file: 'files',
   archive: 'archive',
   diff: 'diff',
+  trash: 'trash',
 };
 
 /** Which changes a diff tab shows: a file of a repository, staged or not (PRD 011, §1). */

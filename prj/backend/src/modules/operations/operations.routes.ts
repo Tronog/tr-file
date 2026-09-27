@@ -29,6 +29,14 @@ export class OperationsRoutes implements RouteModule {
       res.json({ data: this.operations.info });
     });
 
+    // GET /api/ops/trash-items — what is in the trash (PRD 001, §14.1).
+    this.router.get(
+      '/trash-items',
+      asyncHandler(async (_req, res) => {
+        res.json({ data: await this.operations.trashListing() });
+      }),
+    );
+
     // POST /api/ops/copy | move | trash | empty-trash | delete | restore | compress | extract — start a job.
     for (const kind of [
       'copy',

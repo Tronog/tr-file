@@ -339,6 +339,8 @@ export class EditorGroupsFeature {
         return this.parent.archiveBrowserFt;
       case 'diff':
         return this.parent.gitDiffFt;
+      case 'trash':
+        return this.parent.trashFt;
     }
   }
 
@@ -522,6 +524,10 @@ export class EditorGroupsFeature {
   private tabs(group: PanelGroupState): readonly UiTab[] {
     const files = this.parent.fileViewModel;
     return group.tabs.map((tab) => {
+      if (tab.kind === 'trash') {
+        // The trash is not a folder of the root (PRD 001, §14.1): its own icon, untinted.
+        return { id: tab.id, label: tab.label, icon: 'trash' as const, ...(tab.active ? { active: true } : {}) };
+      }
       const isFile = tab.kind === 'file' || tab.kind === 'diff';
       return {
         id: tab.id,

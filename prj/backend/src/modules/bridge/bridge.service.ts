@@ -312,6 +312,8 @@ export class FileSystemBridge {
         return this.operations.cancel(request.jobId);
       case 'op-resolve':
         return this.operations.resolve(request.jobId, request.decision);
+      case 'op-trash-list':
+        return this.operations.trashListing();
       case 'op-delete':
         return this.operations.start({ kind: 'delete', paths: request.paths, ...(request.errors === undefined ? {} : { errors: request.errors }) });
       case 'op-restore':
@@ -613,6 +615,7 @@ export class FileSystemBridge {
       case 'op-empty-trash':
       case 'places':
       case 'time':
+      case 'op-trash-list':
         return { command };
       case 'archive-list':
         return {

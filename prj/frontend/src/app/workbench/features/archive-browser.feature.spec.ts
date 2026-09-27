@@ -54,7 +54,7 @@ describe('ArchiveBrowserFeature', () => {
     for (const request of http.match(() => true)) {
       request.flush(fsEnvelope(fsListing('', [])));
     }
-    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockImplementation(() => undefined);
+    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockResolvedValue(undefined);
   });
 
   afterEach(() => {

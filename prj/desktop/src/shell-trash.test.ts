@@ -52,6 +52,42 @@ describe('ShellTrash', () => {
     assert.ok(!trash.contains(join(home, 'Documents')));
   });
 
+  it('lists the freedesktop home trash with where each entry was and when, newest first (PRD 001, §14.1)', async () => {
+    const own = await mkdtemp(join(tmpdir(), 'tr-file-shell-trash-list-'));
+    try {
+      const dir = join(own, '.local', 'share', 'Trash');
+      await mkdir(join(dir, 'files', 'Old Folder'), { recursive: true });
+      await mkdir(join(dir, 'info'), { recursive: true });
+      await writeFile(join(dir, 'files', 'notes.txt'), 'hello');
+      await writeFile(join(dir, 'info', 'notes.txt.trashinfo'), '[Trash Info]\nPath=/home/me/My%20Notes/notes.txt\nDeletionDate=2026-09-27T10:00:00\n');
+      await writeFile(join(dir, 'info', 'Old Folder.trashinfo'), '[Trash Info]\nPath=/home/me/Old%20Folder\nDeletionDate=2026-09-20T08:30:00\n');
+      await writeFile(join(dir, 'files', 'orphan.bin'), 'x');
+      const trash = new ShellTrash(own, { trashItem: async () => undefined, platform: 'linux', home: own });
+
+      const items = await trash.list?.();
+
+      assert.deepEqual(
+        items?.map(({ id, name, location, type, size }) => ({ id, name, location, type, size })),
+        [
+          { id: 'notes.txt', name: 'notes.txt', location: '/home/me/My Notes/notes.txt', type: 'file', size: 5 },
+          { id: 'Old Folder', name: 'Old Folder', location: '/home/me/Old Folder', type: 'directory', size: 0 },
+          { id: 'orphan.bin', name: 'orphan.bin', location: null, type: 'file', size: 1 },
+        ],
+      );
+      assert.equal(items?.[0]?.deletedAt, new Date('2026-09-27T10:00:00').toISOString());
+      assert.equal(items?.[2]?.deletedAt, null);
+    } finally {
+      await rm(own, { recursive: true, force: true });
+    }
+  });
+
+  it('cannot list the system trash on macOS or Windows', () => {
+    for (const platform of ['darwin', 'win32'] as const) {
+      const trash = new ShellTrash(home, { trashItem: async () => undefined, platform, home });
+      assert.equal(trash.list, undefined);
+    }
+  });
+
   it('asks Finder on macOS and the Recycle Bin on Windows, without a count', async () => {
     const calls: string[] = [];
     const exec = async (file: string) => void calls.push(file);

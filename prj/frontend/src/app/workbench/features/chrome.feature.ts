@@ -315,9 +315,14 @@ export class ChromeFeature {
    * folders opened in the tree view.
    */
   private readonly selectionSummary = computed(() => {
-    const group = this.parent.editorGroupsFt.stateOf(this.parent.activeGroupId());
+    const groups = this.parent.editorGroupsFt;
+    const group = groups.stateOf(this.parent.activeGroupId());
     if (group === undefined) {
       return 'No folder open';
+    }
+    // The trash counts what is in it (PRD 001, §14.1), not the root it shares a path with.
+    if (groups.activeTabOf(group)?.kind === 'trash') {
+      return this.parent.trashFt.summary();
     }
 
     const data = this.parent.fsDataFt;

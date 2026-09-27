@@ -54,6 +54,31 @@ describe('/api/ops', () => {
     assert.deepEqual(await (await fetch(`${base}/ops/info`)).json(), { data: { trash: 'server', canRestore: true } });
   });
 
+  it('lists what is in the trash, newest first, with where each came from (PRD 001, §14.1)', async () => {
+    await mkdir(join(root, 'target', 'listed'), { recursive: true });
+    await writeFile(join(root, 'target', 'listed', 'one.txt'), 'one');
+    await mkdir(join(root, 'target', 'listed', 'folder'));
+    await settled(((await (await post('/trash', { paths: ['target/listed/one.txt'] })).json()) as { data: OperationJobDto }).data);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await settled(((await (await post('/trash', { paths: ['target/listed/folder'] })).json()) as { data: OperationJobDto }).data);
+
+    const body = (await (await fetch(`${base}/ops/trash-items`)).json()) as {
+      data: { trash: string; canRestore: boolean; canList: boolean; items: { id: string; name: string; location: string; type: string; size: number; deletedAt: string }[] };
+    };
+    assert.equal(body.data.trash, 'server');
+    assert.equal(body.data.canList, true);
+    assert.equal(body.data.canRestore, true);
+    const listed = body.data.items.filter((item) => item.location?.startsWith('target/listed/'));
+    assert.deepEqual(
+      listed.map(({ name, location, type, size }) => ({ name, location, type, size })),
+      [
+        { name: 'folder', location: 'target/listed/folder', type: 'directory', size: 0 },
+        { name: 'one.txt', location: 'target/listed/one.txt', type: 'file', size: 3 },
+      ],
+    );
+    assert.ok(listed.every((item) => item.id !== '' && !Number.isNaN(Date.parse(item.deletedAt))));
+  });
+
   it('trashes and restores, by the id in the outcome (PRD 003, §5)', async () => {
     await writeFile(join(root, 'target', 'undo.txt'), 'back');
     const trashed = await settled(((await (await post('/trash', { paths: ['target/undo.txt'] })).json()) as { data: OperationJobDto }).data);

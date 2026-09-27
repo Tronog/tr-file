@@ -44,7 +44,7 @@ describe('Files shared with the system', () => {
       .flush(fsEnvelope(fsListing('', [fsDirectory('docs'), fsEntry('a.txt'), fsEntry('photo.png', { size: 5000 })])));
     await settled();
     group = workbench.activeGroupId();
-    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockImplementation(() => undefined);
+    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockResolvedValue(undefined);
   });
 
   afterEach(() => {

@@ -240,7 +240,12 @@ runs. When one ends, the folders it names in `affected` are re-read. An entry a 
 (PRD 001, Fix 3) does not end it: the frontend starts jobs with `errors: 'ask'`, the job waits
 (`state: 'waiting'`, with its `problem`), and `OperationsFeature` asks as Midnight Commander does —
 *Skip*, *Skip All*, *Retry*, *Abort* (`Escape`) — answering with `/api/ops/jobs/:id/resolve` (bridge
-`op-resolve`). Entry points: `Delete` in a
+`op-resolve`).
+After a file action the keyboard goes back into the content of the panel it acted on (PRD 001,
+Fix 5): `CommandsFeature.run` does it once a file action's dialogs are done (`FILE_ACTIONS` — not
+open, reveal, filter or search, which send focus elsewhere on purpose), and `OperationsFeature` again
+when a job ends, after the folders it changed are read again and its progress window has closed.
+`PanelFocusFeature.returnFocus` never takes it from another window, a text field or another region. Entry points: `Delete` in a
 panel (a `UiPanelKey`), the File menu and the palette's `File:` commands.
 
 Copy / cut / paste and drag & drop of entries (PRD 005 §2) sit on top of those jobs.
@@ -305,6 +310,12 @@ panel is the system's (`UiFileBrowser.nativeDrag`), and files dropped from outsi
 root holds are moved like entries (`FileBrowserFeature.dropFiles`); anything else dropped —
 folders too — is uploaded (`TransfersFeature.uploadDropped`, *Upload Folder…*). The icon
 view draws thumbnails `ThumbnailsFeature` makes of what it has on screen (`UiIconView.shown`).
+The trash (PRD 001, §14.1) is the last row of Places: `TrashFeature` opens it as a `trash` tab
+(read-only, like a zip) listing what `GET /api/ops/trash-items` (bridge `op-trash-list`) says is in
+it — where each entry was and when — with *Restore* where the trash can (the server's) and *Empty
+Trash*; while a panel shows it, the details sidebar describes it (or the entry picked) with *Empty
+Trash…* among its actions. The desktop's system trash lists on Linux (freedesktop `.trashinfo`);
+macOS and Windows say theirs is the file manager's (`canList: false`) and still empty from here.
 Zips: the `archive` backend module; a `.zip` opens as an `archive` tab
 (`ArchiveBrowserFeature`, read-only, `inner` is the folder inside it); *Compress…*,
 *Extract Here* / *To…* are `/api/ops` jobs Undo trashes; a folder or a selection downloads

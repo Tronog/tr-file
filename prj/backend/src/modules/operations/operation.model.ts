@@ -165,6 +165,35 @@ export interface OperationJobDto {
 }
 
 /**
+ * One entry in the trash (PRD 001, §14.1), as the Trash place lists it.
+ */
+export interface TrashItemDto {
+  /** What `restore` knows it by — the server trash's; unique in the listing either way. */
+  readonly id: string;
+  /** Its name as it was before it was thrown away. */
+  readonly name: string;
+  /**
+   * Where it was, to show: root-relative for the server's trash (`docs/a.txt`),
+   * the host's own path for the system's — `null` when the trash does not say.
+   */
+  readonly location: string | null;
+  /** When it was thrown away, ISO 8601; `null` when the trash does not say. */
+  readonly deletedAt: string | null;
+  readonly type: 'file' | 'directory' | 'symlink' | 'other';
+  /** Bytes, for a file; `0` for anything else. */
+  readonly size: number;
+}
+
+/** `GET /api/ops/trash-items`: what is in the trash, as far as this trash can tell. */
+export interface TrashListingDto {
+  readonly trash: 'server' | 'system';
+  readonly canRestore: boolean;
+  /** Whether it could list at all: a system trash on Windows cannot. `items` is then empty. */
+  readonly canList: boolean;
+  readonly items: readonly TrashItemDto[];
+}
+
+/**
  * Where trashed entries go. The server keeps its own, inside the files root
  * (`ServerTrash`); the desktop, on its own machine, uses the system's — the
  * one the user's file manager shows — through the shell (`prj/desktop`).
@@ -190,6 +219,11 @@ export interface TrashProvider {
    * A trash that has this (and `originOf`) can restore.
    */
   restore?(id: string, absolute: string): Promise<void>;
+  /**
+   * What is in the trash (PRD 001, §14.1), most recently thrown away first. A
+   * trash that cannot see into itself has none.
+   */
+  list?(): Promise<readonly TrashItemDto[]>;
   /**
    * Deletes everything in the trash, for good. Reports how far it has got
    * when it can count; a system trash emptied by the shell cannot.

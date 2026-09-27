@@ -39,7 +39,7 @@ describe('FileClipboardFeature and entry drops', () => {
       .flush(fsEnvelope(fsListing('', [fsDirectory('docs'), fsEntry('a.txt'), fsEntry('b.txt')])));
     await settled();
     group = workbench.activeGroupId();
-    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockImplementation(() => undefined);
+    vi.spyOn(workbench.fsDataFt, 'invalidateListing').mockResolvedValue(undefined);
   });
 
   afterEach(() => {

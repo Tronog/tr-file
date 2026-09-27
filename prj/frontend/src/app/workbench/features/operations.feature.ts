@@ -33,6 +33,8 @@ interface OperationRecord {
    * itself, which is not (PRD 003, §5).
    */
   readonly origin: 'user' | 'undo';
+  /** The panel it was started from, whose content gets the keyboard back when it ends (PRD 001, Fix 5). */
+  readonly groupId: string;
 }
 
 /**
@@ -378,7 +380,8 @@ export class OperationsFeature {
   }
 
   private track(job: FsOperationJob, removes: readonly string[], origin: OperationRecord['origin'] = 'user'): void {
-    this.records.update((records) => [{ job, removes, cancelling: false, windowed: false, origin }, ...records]);
+    const groupId = this.parent.activeGroupId();
+    this.records.update((records) => [{ job, removes, cancelling: false, windowed: false, origin, groupId }, ...records]);
     if (!OperationsFeature.isActive(job)) {
       this.finished(this.find(job.id) as OperationRecord);
       return;
@@ -487,9 +490,20 @@ export class OperationsFeature {
    * the Progress tab, so it is not missed.
    */
   private finished(record: OperationRecord): void {
-    for (const path of record.job.affected) {
-      this.parent.fsDataFt.invalidateListing(path);
+    const reread = Promise.all(record.job.affected.map((path) => this.parent.fsDataFt.invalidateListing(path)));
+    // What went into or out of the trash shows in its tab (PRD 001, §14.1).
+    if (['trash', 'empty-trash', 'restore'].includes(record.job.kind)) {
+      this.parent.trashFt.reload();
     }
+    this.reread.set(record.job.id, reread);
+    // The keyboard goes back to the panel once the folders are read again —
+    // the rows it stood on may be gone — and, while its progress window is
+    // still up, once that closes (PRD 001, Fix 5).
+    void reread.then(() => {
+      if (!this.openWindows.has(record.job.id)) {
+        this.parent.panelFocusFt.returnFocus(record.groupId);
+      }
+    });
     if (record.removes.length > 0 && record.job.state !== 'failed') {
       this.forgetRemoved(record.removes);
     }
@@ -530,16 +544,29 @@ export class OperationsFeature {
     }
   }
 
+  /** Jobs whose progress window is open; the keyboard waits for it to close (PRD 001, Fix 5). */
+  private readonly openWindows = new Set<string>();
+
+  /** Each ended job's re-reading of the folders it changed. */
+  private readonly reread = new Map<string, Promise<unknown>>();
+
   /** The progress window; closing it while the job runs sends it to the Progress tab. */
   private showWindow(id: string): void {
     this.patch(id, { windowed: true });
     const record = this.find(id) as OperationRecord;
+    this.openWindows.add(id);
     void this.parent.modal
       .open(OperationProgressModal, {
         label: record.job.title,
         inputs: { view: computed(() => this.dialogModel(id)), cancel: () => this.cancel(id) },
       })
-      .then(() => {
+      .then(async () => {
+        this.openWindows.delete(id);
+        const ended = this.find(id);
+        if (ended !== undefined && !OperationsFeature.isActive(ended.job)) {
+          await this.reread.get(id);
+          this.parent.panelFocusFt.returnFocus(ended.groupId);
+        }
         const now = this.find(id)?.job;
         if (now !== undefined && OperationsFeature.isActive(now)) {
           this.parent.bottomPanelFt.select('progress');

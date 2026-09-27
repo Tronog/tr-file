@@ -65,6 +65,7 @@ describe('PlacesFeature', () => {
       ['place:home/me', 'Home', 'home', undefined],
       ['place:home/me/Downloads', 'Downloads', 'download', undefined],
       ['place:media/me/USB', 'USB', 'usb', undefined],
+      ['trash:', 'Trash', 'trash', undefined],
     ]);
   });
 
@@ -74,7 +75,7 @@ describe('PlacesFeature', () => {
     http.expectOne('/api/fs/places').flush(null, { status: 404, statusText: 'Not Found' });
     await settled();
 
-    expect(places().placeNodes().map((node) => node.label)).toEqual(['Files']);
+    expect(places().placeNodes().map((node) => node.label)).toEqual(['Files', 'Trash']);
   });
 
   it('opens a place in the active panel', async () => {

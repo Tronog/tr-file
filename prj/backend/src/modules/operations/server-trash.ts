@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { cp, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, join, sep } from 'node:path';
 
-import type { TrashProvider } from './operation.model.js';
+import type { TrashItemDto, TrashProvider } from './operation.model.js';
 
 /** The trash, inside the files root; hidden, as a dot folder is. */
 export const SERVER_TRASH_DIR = '.tr-file-trash';
@@ -82,6 +82,46 @@ export class ServerTrash implements TrashProvider {
       await rm(source, { recursive: true, force: true });
     }
     await rm(join(this.info, `${id}.json`), { force: true });
+  }
+
+  /** Everything under `files/`, with where it came from and when, as its record says. */
+  async list(): Promise<readonly TrashItemDto[]> {
+    let names: string[];
+    try {
+      names = await readdir(this.files);
+    } catch {
+      return []; // Nothing was ever thrown away.
+    }
+    const items = await Promise.all(
+      names.map(async (id): Promise<TrashItemDto | null> => {
+        try {
+          const stats = await lstat(join(this.files, id));
+          const record = await readFile(join(this.info, `${id}.json`), 'utf8')
+            .then((text) => JSON.parse(text) as { path?: unknown; deletedAt?: unknown })
+            .catch(() => ({}) as { path?: unknown; deletedAt?: unknown });
+          const location = typeof record.path === 'string' && record.path !== '' ? record.path : null;
+          return {
+            id,
+            name: location === null ? ServerTrash.nameOf(id) : basename(location),
+            location,
+            deletedAt: typeof record.deletedAt === 'string' ? record.deletedAt : null,
+            type: stats.isDirectory() ? 'directory' : stats.isSymbolicLink() ? 'symlink' : stats.isFile() ? 'file' : 'other',
+            size: stats.isFile() ? stats.size : 0,
+          };
+        } catch {
+          return null; // Gone while it was being listed.
+        }
+      }),
+    );
+    return items
+      .filter((item): item is TrashItemDto => item !== null)
+      .sort((a, b) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? ''));
+  }
+
+  /** An id is `<name>.<stamp>`: the name, when no record says it. */
+  private static nameOf(id: string): string {
+    const dot = id.lastIndexOf('.');
+    return dot > 0 ? id.slice(0, dot) : id;
   }
 
   async empty(progress: (done: number, total: number | null) => void, signal: AbortSignal): Promise<void> {

@@ -238,6 +238,26 @@ export interface FsOperationJob {
   readonly outcome?: readonly FsOperationOutcome[];
 }
 
+/** One entry in the trash (PRD 001, §14.1); see the backend's `TrashItemDto`. */
+export interface FsTrashItem {
+  /** What a restore knows it by. */
+  readonly id: string;
+  readonly name: string;
+  /** Where it was — root-relative for the server's trash, the host's path for the system's; `null` when unknown. */
+  readonly location: string | null;
+  readonly deletedAt: string | null;
+  readonly type: 'file' | 'directory' | 'symlink' | 'other';
+  readonly size: number;
+}
+
+/** What is in the trash, as far as it can tell: a system trash on Windows or macOS cannot (`canList`). */
+export interface FsTrashListing {
+  readonly trash: 'server' | 'system';
+  readonly canRestore: boolean;
+  readonly canList: boolean;
+  readonly items: readonly FsTrashItem[];
+}
+
 /** Whose trash a trashed entry goes to: the server's own, or the desktop's system trash. */
 export interface FsOperationsInfo {
   readonly trash: 'server' | 'system';

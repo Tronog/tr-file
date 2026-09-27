@@ -26,6 +26,7 @@ import type {
   FsServerTime,
   FsOperationRequest,
   FsOperationsInfo,
+  FsTrashListing,
   FsSearchResult,
   FsUpload,
   FsUploadProgress,
@@ -453,6 +454,19 @@ export class FsHttpService implements FsTransport {
     return this.request(
       this.http.post<FsEnvelope<FsOperationJob>>(`/api/ops/jobs/${encodeURIComponent(id)}/cancel`, {}),
     );
+  }
+
+  /** A server from before the Trash place answers `404`: its trash, as `/api/ops/info` says, listing nothing. */
+  async trashListing(): Promise<FsTrashListing> {
+    try {
+      return (await firstValueFrom(this.http.get<FsEnvelope<FsTrashListing>>('/api/ops/trash-items'))).data;
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 404) {
+        const info = await this.operationsInfo();
+        return { trash: info.trash, canRestore: info.canRestore === true, canList: false, items: [] };
+      }
+      throw FsError.from(error);
+    }
   }
 
   async resolveOperation(id: string, decision: FsOperationDecision): Promise<FsOperationJob> {
