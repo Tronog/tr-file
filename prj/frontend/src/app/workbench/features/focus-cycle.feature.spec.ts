@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { WorkbenchService } from '../workbench.service';
 
-/** PRD 002, §2.6 — `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` between panels and panes. */
+/** PRD 002, §2.6 — `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` between panels and panes; `Tab` / `Shift`+`Tab` between panels only. */
 describe('FocusCycleFeature', () => {
   let workbench: WorkbenchService;
 
@@ -67,5 +67,43 @@ describe('FocusCycleFeature', () => {
     expect(cycle().enter(`group:${group()}`)).toBe(true);
     expect(workbench.panelFocusFt.token(group())).toBeGreaterThan(before);
     expect(cycle().enter('explorer')).toBe(false);
+  });
+
+  describe('Tab between panels', () => {
+    const splitThree = (): readonly string[] => {
+      const first = group();
+      workbench.editorGroupsFt.runAction(first, 'split-right');
+      workbench.editorGroupsFt.runAction(first, 'split-right');
+      return workbench.panelLayoutFt.groupIds();
+    };
+
+    it('answers Tab and Shift+Tab in a panel body, when there is another panel', () => {
+      expect(cycle().panelDirectionOf(key({}), true)).toBe(0);
+
+      splitThree();
+      expect(cycle().panelDirectionOf(key({}), true)).toBe(1);
+      expect(cycle().panelDirectionOf(key({ shiftKey: true }), true)).toBe(-1);
+      expect(cycle().panelDirectionOf(key({}), false)).toBe(0);
+      expect(cycle().panelDirectionOf(key({ ctrlKey: true }), true)).toBe(0);
+      expect(cycle().panelDirectionOf(new KeyboardEvent('keydown', { key: 'a' }), true)).toBe(0);
+    });
+
+    it('walks the panels in layout order, round at either end', () => {
+      const [a, b, c] = splitThree() as [string, string, string];
+
+      expect(cycle().nextPanel(a, 1)).toBe(b);
+      expect(cycle().nextPanel(c, 1)).toBe(a);
+      expect(cycle().nextPanel(a, -1)).toBe(c);
+    });
+
+    it('stays put while a panel is maximized, and while a window has the keyboard', () => {
+      const [a] = splitThree() as [string];
+      workbench.panelLayoutFt.toggleMaximize(a);
+      expect(cycle().panelDirectionOf(key({}), true)).toBe(0);
+      workbench.panelLayoutFt.toggleMaximize(a);
+
+      void workbench.modal.message({ message: 'hello' });
+      expect(cycle().panelDirectionOf(key({}), true)).toBe(0);
+    });
   });
 });

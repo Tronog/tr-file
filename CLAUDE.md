@@ -84,6 +84,10 @@ on its host; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring e
 panel in layout order → bottom panel (while open) → details, and round: `FocusCycleFeature`
 decides the ring, the `Workbench` component finds the `data-focus-region` that has focus and
 focuses into the next (a panel through `PanelFocusFeature`, a sidebar where focus last was in it).
+Plain `Tab` / `Shift`+`Tab` in a panel's *body* (`data-panel-body`, set by `UiPanelBody`; never
+in a text field or the chrome above it) walk the panels only, in layout order and round
+(`FocusCycleFeature.panelDirectionOf` / `nextPanel`) — Midnight Commander's `Tab`; with one
+panel (or one maximized) `Tab` keeps its usual meaning.
 A browser keeps those chords for its own tabs, so they reach the page on the desktop only; the desktop shell installs its own accelerator
 table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,

@@ -15,13 +15,17 @@ import { UiPanelGroup } from './ui-panel-group';
  *   focusable in it, is a press on the body's empty space (`bodyPress`). A
  *   press on the chrome above it is not.
  *
+ * It also names itself in the DOM (`data-panel-body`), so an application
+ * can tell a key pressed in a panel's body from one pressed in its chrome —
+ * `Tab` between panels (PRD 002, §2.6) is only the body's.
+ *
  * The group is found by injection, which reaches it because the content is
  * projected into it. Content rendered outside a group simply has no one to
  * tell, and the marker does nothing but make the element focusable.
  */
 @Directive({
   selector: '[uiPanelBody]',
-  host: { tabindex: '-1' },
+  host: { tabindex: '-1', 'data-panel-body': '' },
 })
 export class UiPanelBody {
   constructor() {

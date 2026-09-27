@@ -107,6 +107,9 @@ export class Workbench {
     this.workbench.commandPaletteFt.handleShortcut(event);
     this.workbench.searchFt.handleShortcut(event);
     this.workbench.functionKeysFt.handleShortcut(event);
+    if (this.onPanelTab(event)) {
+      return;
+    }
     const direction = this.workbench.focusCycleFt.directionOf(event);
     if (direction === 0 || event.defaultPrevented) {
       return;
@@ -118,6 +121,28 @@ export class Workbench {
         return;
       }
     }
+  }
+
+  /**
+   * `Tab` / `Shift`+`Tab` from a panel's body to the next or previous panel
+   * (PRD 002, §2.6), entered as choosing its tab enters it. `true` when it was that.
+   */
+  private onPanelTab(event: KeyboardEvent): boolean {
+    const focused = document.activeElement;
+    const region = this.regionOf(focused);
+    const inBody =
+      region?.startsWith('group:') === true &&
+      focused instanceof HTMLElement &&
+      focused.closest('[data-panel-body]') !== null &&
+      !focused.matches('input, textarea, select, [contenteditable="true"]');
+    const direction = event.defaultPrevented ? 0 : this.workbench.focusCycleFt.panelDirectionOf(event, inBody);
+    const next = direction === 0 ? null : this.workbench.focusCycleFt.nextPanel((region as string).slice('group:'.length), direction);
+    if (next === null) {
+      return false;
+    }
+    event.preventDefault();
+    this.workbench.focusCycleFt.enter(`group:${next}`);
+    return true;
   }
 
   protected onFocusIn(event: FocusEvent): void {

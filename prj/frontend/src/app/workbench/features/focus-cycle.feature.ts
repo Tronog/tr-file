@@ -18,6 +18,9 @@ export type FocusRegionId = 'explorer' | 'bottom' | 'details' | `group:${string}
  *
  * In a browser the chords belong to the browser — they switch tabs — and the
  * page never sees them; the desktop app gets them.
+ *
+ * Plain `Tab` / `Shift`+`Tab` in a panel's body walk the panels only (§2.6),
+ * which works in a browser too; see `panelDirectionOf`.
  */
 export class FocusCycleFeature {
   constructor(private readonly parent: WorkbenchService) {}
@@ -60,6 +63,47 @@ export class FocusCycleFeature {
       return ring[index] as FocusRegionId;
     });
   }
+
+  /**
+   * `Tab` or `Shift`+`Tab` in a panel's body (PRD 002, §2.6): `1` / `-1` to
+   * the next or previous panel, as Midnight Commander's `Tab` changes panel —
+   * `0` when the key is not that, or there is no other panel to go to, and
+   * `Tab` keeps its usual meaning.
+   *
+   * Only in the body — its rows, its tiles, the document — and never in a
+   * text field: the chrome above it (path bar, filter box, toolbar) is still
+   * walked with `Tab`, and the sidebars leave their `Tab` to the browser.
+   * `Ctrl`+`Tab` is the way out of the panels.
+   */
+  panelDirectionOf(event: KeyboardEvent, inBody: boolean): -1 | 0 | 1 {
+    if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey || !inBody) {
+      return 0;
+    }
+    if (this.parent.modal.isOpen() || this.parent.commandPaletteFt.isOpen() || this.panels().length < 2) {
+      return 0;
+    }
+    return event.shiftKey ? -1 : 1;
+  }
+
+  /**
+   * The panel `Tab` goes to from `groupId`: the next in layout order, or the
+   * previous one, round at either end.
+   */
+  nextPanel(groupId: string, direction: -1 | 1): string | null {
+    const panels = this.panels();
+    const at = panels.indexOf(groupId);
+    if (panels.length < 2) {
+      return null;
+    }
+    const from = at === -1 ? panels.indexOf(this.parent.activeGroupId()) : at;
+    return panels[(from + direction + panels.length) % panels.length] ?? null;
+  }
+
+  /** The panels `Tab` walks: all of them in layout order — only the one on screen while one is maximized. */
+  private readonly panels = computed<readonly string[]>(() => {
+    const maximized = this.parent.panelLayoutFt.maximizedGroupId();
+    return maximized === null ? this.parent.panelLayoutFt.groupIds() : [maximized];
+  });
 
   /** Enters a panel as choosing its tab does; `false` for a region the component must focus. */
   enter(region: FocusRegionId): boolean {
