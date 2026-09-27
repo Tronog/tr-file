@@ -32,6 +32,17 @@ export interface PanelDiffSpec {
   readonly staged: boolean;
 }
 
+/**
+ * What a tab had selected when another tab of its panel was chosen
+ * (PRD 001, Fix 4) — given back when it is chosen again.
+ */
+export interface PanelTabMemory {
+  /** The folder it was listing then: a tab that has since moved on starts afresh. */
+  readonly path: string;
+  readonly selection: readonly string[];
+  readonly focusedEntryId?: string;
+}
+
 /** One tab of a panel group. */
 export interface PanelTabState {
   readonly id: string;
@@ -45,6 +56,8 @@ export interface PanelTabState {
   readonly inner?: string;
   /** A diff tab's repository, file and side. */
   readonly diff?: PanelDiffSpec;
+  /** Its selection, kept while another tab of the panel is active; see `PanelTabMemory`. */
+  readonly remembered?: PanelTabMemory;
 }
 
 /** What a listing can be ordered by: its columns (PRD 003, §5). */

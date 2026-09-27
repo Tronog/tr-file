@@ -337,6 +337,9 @@ refuses early. Downloads are rows in the Transfers panel like uploads. Lists and
 Every view selects many (PRD 004, §1.2): `Ctrl`/`Shift` clicks and keys, and box selection in
 the icon view, all through `UiListSelection`; the views emit `selectionChange` and
 `FileBrowserFeature.setSelection` stores it in the group's `selection` / `focusedEntryId`.
+Choosing another tab of the panel does not lose it (PRD 001, Fix 4): the tab being left keeps it
+(`PanelTabState.remembered`), the tab chosen gets its own back — with the details sidebar on its
+cursor — and none of it is written to the session (`EditorGroupsFeature.withTabs`).
 
 # Backend
 Refer to `docs/ai/EXPRESS.md`. Every `/api` route but `/api/auth/*` and `/api/health`

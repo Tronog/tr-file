@@ -13,6 +13,7 @@ import {
   PANEL_CONTENT,
   type PanelContentType,
   type PanelGroupState,
+  type PanelTabMemory,
   type PanelTabState,
 } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
@@ -164,12 +165,18 @@ export class EditorGroupsFeature {
   /* -- tabs -------------------------------------------------------------- */
 
   selectTab(groupId: string, tabId: string): void {
+    const before = this.stateOf(groupId);
     this.groups.update((groups) =>
       groups.map((group) => (group.id === groupId ? this.withTabs(group, group.tabs, tabId) : group)),
     );
     const group = this.stateOf(groupId);
     if (group) {
       this.loadGroupContent(group);
+      // A tab given back its cursor (PRD 001, Fix 4): the details sidebar follows it, as it would a click.
+      const cursor = group.focusedEntryId;
+      if (cursor !== undefined && before !== undefined && this.activeTabOf(before)?.id !== tabId) {
+        this.parent.select(cursor);
+      }
     }
     this.focus(groupId);
   }
@@ -421,6 +428,11 @@ export class EditorGroupsFeature {
    * Rewrites a group's tab set: exactly one tab ends up active, and the group
    * follows it to its folder. A group that changed folder drops its selection,
    * because those paths belong to the previous listing.
+   *
+   * Choosing another tab is not leaving for good (PRD 001, Fix 4): the tab
+   * being left keeps what was selected in it and where the cursor was, and
+   * the tab being chosen gets back what it had — as long as it still shows
+   * the folder it had it in.
    */
   private withTabs(
     group: PanelGroupState,
@@ -428,16 +440,44 @@ export class EditorGroupsFeature {
     activeId?: string,
   ): PanelGroupState {
     const active = tabs.find((tab) => tab.id === activeId) ?? tabs.find((tab) => tab.active) ?? tabs[0];
-    const normalized = tabs.map((tab) => ({ ...tab, active: tab.id === active?.id }));
+    const previous = group.tabs.find((tab) => tab.active) ?? group.tabs[0];
+    const switching = previous !== undefined && active !== undefined && previous.id !== active.id;
+    const leaving: PanelTabMemory = {
+      path: group.path,
+      selection: group.selection,
+      ...(group.focusedEntryId === undefined ? {} : { focusedEntryId: group.focusedEntryId }),
+    };
+    const normalized = tabs.map((tab): PanelTabState => {
+      const { remembered, ...rest } = tab;
+      if (tab.id === active?.id) {
+        // In use again: what it remembered is the group's now.
+        return { ...rest, active: true };
+      }
+      if (switching && tab.id === previous.id) {
+        return { ...rest, active: false, remembered: leaving };
+      }
+      return { ...rest, active: false, ...(remembered === undefined ? {} : { remembered }) };
+    });
     const path = active?.path ?? group.path;
     const samePath = path === group.path;
+    const restored = switching && active.remembered?.path === path ? active.remembered : undefined;
 
+    const { focusedEntryId, ...rest } = group;
+    if (restored !== undefined) {
+      return {
+        ...rest,
+        tabs: normalized,
+        path,
+        selection: restored.selection,
+        ...(restored.focusedEntryId === undefined ? {} : { focusedEntryId: restored.focusedEntryId }),
+      };
+    }
     return {
-      ...group,
+      ...rest,
       tabs: normalized,
       path,
-      selection: samePath ? group.selection : [],
-      ...(samePath && group.focusedEntryId !== undefined ? { focusedEntryId: group.focusedEntryId } : {}),
+      selection: samePath && !switching ? group.selection : [],
+      ...(samePath && !switching && focusedEntryId !== undefined ? { focusedEntryId } : {}),
     };
   }
 

@@ -314,4 +314,87 @@ describe('EditorGroupsFeature', () => {
       });
     });
   });
+
+  /** PRD 001, Fix 4 — each tab of a panel keeps its own selection while another is chosen. */
+  describe('selection per tab', () => {
+    const group = 'group-root';
+    const state = () => workbench.editorGroupsFt.stateOf(group);
+    const select = (paths: string[], focused = paths[0]) =>
+      workbench.editorGroupsFt.update(group, (current) => ({ ...current, selection: paths, ...(focused === undefined ? {} : { focusedEntryId: focused }) }));
+
+    beforeEach(async () => {
+      await start();
+      vi.spyOn(workbench.detailsFt, 'load').mockImplementation(() => undefined);
+      workbench.editorGroupsFt.setTabs(
+        group,
+        [
+          { id: 'root', label: 'tr-file', path: '', kind: 'folder' },
+          { id: 'docs', label: 'docs', path: 'docs', kind: 'folder' },
+        ],
+        'root',
+      );
+    });
+
+    const toDocs = async () => {
+      workbench.editorGroupsFt.selectTab(group, 'docs');
+      for (const request of http.match(listUrl('docs'))) {
+        request.flush(fsEnvelope(fsListing('docs', [fsEntry('docs/NOTES.md'), fsEntry('docs/TODO.md')])));
+      }
+      await settled();
+    };
+
+    it('gives a tab back what was selected in it, and where the cursor was', async () => {
+      select(['README.md', 'main.ts'], 'main.ts');
+
+      await toDocs();
+      expect(state()?.selection).toEqual([]);
+      select(['docs/TODO.md']);
+
+      workbench.editorGroupsFt.selectTab(group, 'root');
+      expect(state()?.selection).toEqual(['README.md', 'main.ts']);
+      expect(state()?.focusedEntryId).toBe('main.ts');
+
+      await toDocs();
+      expect(state()?.selection).toEqual(['docs/TODO.md']);
+      expect(state()?.focusedEntryId).toBe('docs/TODO.md');
+    });
+
+    it('points the details sidebar at the cursor it gives back', async () => {
+      select(['main.ts']);
+      await toDocs();
+      const follow = vi.spyOn(workbench, 'select');
+
+      workbench.editorGroupsFt.selectTab(group, 'root');
+
+      expect(follow).toHaveBeenCalledWith('main.ts');
+    });
+
+    it('gives the tab that is left showing its selection when the active one closes', async () => {
+      select(['README.md']);
+      await toDocs();
+      select(['docs/NOTES.md']);
+
+      workbench.editorGroupsFt.closeTab(group, 'docs');
+
+      expect(state()?.path).toBe('');
+      expect(state()?.selection).toEqual(['README.md']);
+    });
+
+    it('does not keep what it remembers beyond the session', async () => {
+      select(['README.md']);
+      await toDocs();
+      expect(state()?.tabs.find((tab) => tab.id === 'root')?.remembered).toEqual({ path: '', selection: ['README.md'], focusedEntryId: 'README.md' });
+
+      const write = vi.spyOn(workbench.settings, 'set');
+      workbench.sessionFt.start();
+      workbench.editorGroupsFt.setTabs(group, state()?.tabs ?? [], 'docs');
+      TestBed.tick();
+      workbench.sessionFt.flush();
+
+      const saved = write.mock.calls.filter(([key]) => key.startsWith('tr-file.session.v1'));
+      expect(saved.length).toBeGreaterThan(0);
+      expect(JSON.stringify(saved)).not.toContain('remembered');
+    });
+  });
 });
+
