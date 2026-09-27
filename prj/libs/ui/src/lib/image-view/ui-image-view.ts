@@ -59,6 +59,9 @@ export class UiImageView {
   protected readonly dragging = signal<number | null>(null);
 
   private dragFrom = { x: 0, y: 0 };
+
+  /** `src` changed and the new picture has not loaded yet; see the constructor. */
+  private swapped = false;
   private panFrom = { x: 0, y: 0 };
 
   constructor() {
@@ -76,10 +79,13 @@ export class UiImageView {
       onCleanup(() => observer.disconnect());
     });
 
-    // A different file in the same viewer starts fresh.
+    // A different file in the same viewer starts fresh — once it has loaded.
+    // Resetting as soon as `src` changes would draw the *old* picture, which
+    // the browser keeps painting until the new one decodes, at natural size
+    // (the fit is unknown without a natural size): a zoomed-in flash.
     effect(() => {
       this.src();
-      this.view.reset();
+      this.swapped = true;
     });
   }
 
@@ -137,6 +143,10 @@ export class UiImageView {
 
   protected onLoad(): void {
     const image = this.imageRef().nativeElement;
+    if (this.swapped) {
+      this.swapped = false;
+      this.view.reset();
+    }
     this.view.loaded(image.naturalWidth, image.naturalHeight);
     this.measure(this.viewportRef().nativeElement);
   }

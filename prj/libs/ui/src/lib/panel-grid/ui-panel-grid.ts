@@ -26,6 +26,7 @@ const MIN_CELL_PX = 120;
   imports: [NgTemplateOutlet, UiSash],
   templateUrl: './ui-panel-grid.html',
   styleUrl: './ui-panel-grid.scss',
+  host: { '[class.has-maximized]': 'maximizedGroupId() !== null' },
 })
 export class UiPanelGrid {
   readonly node = input.required<UiGridNode>();
@@ -33,7 +34,11 @@ export class UiPanelGrid {
   /** Rendered for every leaf, with the group id as `$implicit`. */
   readonly leafTemplate = input<TemplateRef<{ $implicit: string }> | null>(null);
 
-  /** When set, only this group is rendered, filling the grid: no splits, no sashes. */
+  /**
+   * When set, only this group shows, filling the grid: no splits, no sashes.
+   * The others stay rendered but hidden (`inert`), so restoring them is
+   * instant and nothing they showed is lost.
+   */
   readonly maximizedGroupId = input<string | null>(null);
 
   /** New shares for the pair a dragged sash separates. */
@@ -69,6 +74,27 @@ export class UiPanelGrid {
   /** A child's share of its parent split: `size` grows, everything shrinks. */
   protected flexOf(node: UiGridNode): string {
     return `${node.size ?? 1} 1 0`;
+  }
+
+  /**
+   * A stable identity for a child of a split: its group, or a split's first
+   * group. Tracking by position would hand a closed group's cell — and its
+   * component, scroll and state — to whichever group moved into that slot.
+   */
+  protected keyOf(node: UiGridNode): string {
+    return node.kind === 'leaf' ? node.groupId : node.children[0] ? this.keyOf(node.children[0]) : '';
+  }
+
+  /** Whether a child is hidden because some other group is maximized. */
+  protected isHidden(node: UiGridNode): boolean {
+    const maximized = this.maximizedGroupId();
+    return maximized !== null && !UiPanelGrid.contains(node, maximized);
+  }
+
+  private static contains(node: UiGridNode, groupId: string): boolean {
+    return node.kind === 'leaf'
+      ? node.groupId === groupId
+      : node.children.some((child) => UiPanelGrid.contains(child, groupId));
   }
 
   /**

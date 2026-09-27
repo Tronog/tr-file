@@ -25,6 +25,7 @@
     draggable="false"
     [src]="src()"
     [style.transform]="view.transform()"
+    [class.is-pending]="!view.ready"
     (load)="onLoad()"
   />
 </div>

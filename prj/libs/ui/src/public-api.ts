@@ -53,7 +53,7 @@ export { UiDocumentView } from './lib/document-view/ui-document-view';
 export { UiImageView } from './lib/image-view/ui-image-view';
 export { UiImageViewService } from './lib/image-view/ui-image-view.service';
 export type { UiImagePoint, UiImageZoom } from './lib/image-view/ui-image-view.service';
-export { UiPanelGroup } from './lib/panel-group/ui-panel-group';
+export { UiPanelGroup, UI_LOADING_RAIL_DELAY_MS } from './lib/panel-group/ui-panel-group';
 export { UiPanelBody } from './lib/panel-group/ui-panel-body';
 export { UiPanelToolbar } from './lib/panel-toolbar/ui-panel-toolbar';
 export { UiPanelGrid } from './lib/panel-grid/ui-panel-grid';

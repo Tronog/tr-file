@@ -170,6 +170,18 @@ folder, selecting an entry) — never from a `computed`, which would write signa
 detection. What is left of `MockData*` is the shell the session starts with: menus, activity bar
 and the initial layout.
 
+**No blank frames.** A reload keeps what is on screen: `FsDataFeature`, `FilePreviewFeature` and
+`ImageSourceService` go to `status: 'loading'` *with* the previous listing / details / document /
+object URL, which is replaced (and, for a URL, revoked) only when the answer lands; a reload asked
+for while one is in flight reads once more afterwards. So "loading" means "nothing to show yet"
+only when there is no data — `ExplorerFeature.loading`, a tree row's `busy` and the panel's empty
+placeholders test for missing data, not for the status. The details sidebar keeps the previous
+entry up (`DetailsFeature.stale`, dimmed after 200 ms) while the next one loads, and acts only on
+the current one. The library does its part: the loading rail waits `UI_LOADING_RAIL_DELAY_MS`,
+a file tab still reading is `pending` (an empty body, not an empty table), `UiPanelGrid` tracks
+cells by group and maximizes by hiding the others, and `UiImageView` rescales on `load`, not on
+`src`. Keep new code to the same rule.
+
 A symlink is judged by what it leads to (`targetType`, `isFolder`/`isFile` in
 `file-system/fs-entry-kind.ts`): a link to a folder navigates, expands and sorts like one.
 Previews decide text by sniffing the bytes (`text-sniff.ts`), the extension list only

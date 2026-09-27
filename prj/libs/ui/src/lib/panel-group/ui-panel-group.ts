@@ -1,6 +1,9 @@
 import {
   Component,
+  DestroyRef,
   afterRenderEffect,
+  effect,
+  inject,
   computed,
   input,
   output,
@@ -13,6 +16,13 @@ import { UiIcon } from '../icon/ui-icon';
 import { UiProgress } from '../progress/ui-progress';
 import { UiTabBar } from '../tabs/ui-tab-bar';
 import { UI_TAB_MIME } from '../models';
+
+/**
+ * How long a load runs before the loading rail shows. Most answers — a
+ * refresh, a cached folder's revalidation — come back well inside it, and a
+ * bar that flashes for a frame says nothing but "something flickered".
+ */
+export const UI_LOADING_RAIL_DELAY_MS = 150;
 import type {
   UiDropZone,
   UiPanelGroupModel,
@@ -159,7 +169,24 @@ export class UiPanelGroup {
   /** A request that has not found anything to focus yet. */
   private focusWanted = false;
 
+  /** `group().loading`, once it has lasted `UI_LOADING_RAIL_DELAY_MS`; ends with it. */
+  protected readonly showLoading = signal(false);
+
   constructor() {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    effect(() => {
+      const loading = !!this.group().loading;
+      clearTimeout(timer);
+      if (!loading) {
+        this.showLoading.set(false);
+        return;
+      }
+      if (!this.showLoading()) {
+        timer = setTimeout(() => this.showLoading.set(true), UI_LOADING_RAIL_DELAY_MS);
+      }
+    });
+    inject(DestroyRef).onDestroy(() => clearTimeout(timer));
+
     // After render, not during it: the body has to exist before focus can go
     // into it, and on a tab switch the *new* tab's body is what must exist.
     // A request outlives an unsatisfied attempt while the listing is still

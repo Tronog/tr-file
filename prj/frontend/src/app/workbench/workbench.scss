@@ -86,3 +86,17 @@
   opacity: 0;
   pointer-events: none;
 }
+
+/* The previous entry's details, while the selected one's are on their way
+   (DetailsFeature.stale). The dimming waits a moment, so a quick answer never
+   shows it at all — only a slow one says the sidebar is catching up. */
+ui-sidebar ui-preview-card,
+ui-sidebar ui-pane {
+  transition: opacity 0.12s ease 0s;
+}
+
+ui-sidebar.is-stale ui-preview-card,
+ui-sidebar.is-stale ui-pane {
+  opacity: 0.55;
+  transition-delay: 0.2s;
+}

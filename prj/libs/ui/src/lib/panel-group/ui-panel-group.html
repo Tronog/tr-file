@@ -13,7 +13,7 @@
 />
 
 <div class="loading-rail">
-  @if (group().loading) {
+  @if (showLoading()) {
     <ui-progress [value]="null" [label]="loadingLabel()" />
   }
 </div>

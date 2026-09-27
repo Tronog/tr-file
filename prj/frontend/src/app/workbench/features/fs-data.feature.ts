@@ -20,8 +20,6 @@ export interface FsDetailsState {
   readonly error?: FsError;
 }
 
-const LOADING: FsListingState = { status: 'loading' };
-
 /**
  * The workbench's view of the backend file system.
  *
@@ -38,6 +36,13 @@ export class FsDataFeature {
   /** Paths with a request in flight; guards against duplicate fetches. */
   private readonly pendingListings = new Set<string>();
   private readonly pendingDetails = new Set<string>();
+
+  /**
+   * Paths asked to reload while a request for them was already in flight. That
+   * answer may predate the change being reported, so they are read once more
+   * when it lands — otherwise the last of several uploads could go unseen.
+   */
+  private readonly staleListings = new Set<string>();
 
   constructor(private readonly parent: WorkbenchService) {
     this.listings = signal<ReadonlyMap<string, FsListingState>>(new Map());
@@ -64,8 +69,9 @@ export class FsDataFeature {
 
   /**
    * The entries of a directory, hidden ones filtered out unless the workbench
-   * is showing them. Empty while loading or on error — callers render those
-   * states from `listingState`.
+   * is showing them. Empty until the first answer, or on error — callers
+   * render those states from `listingState`. While a reload is in flight these
+   * are still the previous entries, so nothing on screen blanks meanwhile.
    */
   entries(path: string): readonly FsEntry[] {
     const entries = this.listings().get(path)?.listing?.entries ?? [];
@@ -102,6 +108,7 @@ export class FsDataFeature {
   /** Re-fetches a directory even when it is cached (the Refresh action). */
   reloadListing(path: string): void {
     if (this.pendingListings.has(path)) {
+      this.staleListings.add(path);
       return;
     }
     void this.fetchListing(path);
@@ -117,9 +124,15 @@ export class FsDataFeature {
     }
   }
 
+  /**
+   * Reads a directory. A reload keeps the entries already cached — status
+   * `loading` with a `listing` — so every view goes from the old listing
+   * straight to the new one instead of through an empty frame.
+   */
   private async fetchListing(path: string): Promise<void> {
     this.pendingListings.add(path);
-    this.patchListing(path, LOADING);
+    const previous = this.listings().get(path)?.listing;
+    this.patchListing(path, { status: 'loading', ...(previous ? { listing: previous } : {}) });
     try {
       const listing = await this.parent.fileSystem.readFt.list(path);
       this.patchListing(path, { status: 'ready', listing });
@@ -127,6 +140,9 @@ export class FsDataFeature {
       this.patchListing(path, { status: 'error', error: FsError.from(error) });
     } finally {
       this.pendingListings.delete(path);
+      if (this.staleListings.delete(path)) {
+        void this.fetchListing(path);
+      }
     }
   }
 
@@ -156,7 +172,9 @@ export class FsDataFeature {
 
   private async fetchDetails(path: string): Promise<void> {
     this.pendingDetails.add(path);
-    this.patchDetails(path, { status: 'loading' });
+    // As with listings: a reload keeps what is shown until the answer replaces it.
+    const previous = this.details().get(path)?.details;
+    this.patchDetails(path, { status: 'loading', ...(previous ? { details: previous } : {}) });
     try {
       const details = await this.parent.fileSystem.readFt.details(path);
       this.patchDetails(path, { status: 'ready', details });

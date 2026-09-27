@@ -1,4 +1,4 @@
-import { computed } from '@angular/core';
+import { computed, linkedSignal } from '@angular/core';
 import type { UiActionListItem, UiPermissions, UiPreview, UiProperty } from '@tr-file/ui';
 import type { FsDetails } from '../../file-system/file-system.model';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
@@ -18,9 +18,25 @@ export class DetailsFeature {
 
   private readonly state = computed(() => this.parent.fsDataFt.detailsState(this.parent.selectedEntryId()));
 
-  private readonly details = computed<FsDetails | undefined>(() => this.state()?.details);
+  /**
+   * What the sidebar shows. While a newly selected entry's details are on
+   * their way, the previous entry's stay up — marked `stale` — so moving the
+   * selection down a list goes from one entry straight to the next instead of
+   * collapsing the whole sidebar to "Loading details…" at every step.
+   */
+  private readonly details = linkedSignal<ReturnType<typeof this.state>, FsDetails | undefined>({
+    source: () => this.state(),
+    computation: (state, previous) =>
+      state?.details ?? (state?.status === 'loading' ? previous?.value : undefined),
+  });
+
+  /** The selected entry's own details — never the stale ones — for acting on. */
+  private readonly current = computed<FsDetails | undefined>(() => this.state()?.details);
 
   readonly loading = computed(() => this.state()?.status === 'loading');
+
+  /** Showing the previous entry's details while the selected one's load. */
+  readonly stale = computed(() => this.current() === undefined && this.details() !== undefined);
 
   readonly error = computed(() => this.state()?.error?.message);
 
@@ -133,7 +149,8 @@ export class DetailsFeature {
   }
 
   runAction(actionId: string): void {
-    const details = this.details();
+    // Never the stale details: an action is about what is selected now.
+    const details = this.current();
     if (!details) {
       return;
     }

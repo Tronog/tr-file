@@ -186,7 +186,13 @@ export class ImageSourceService {
   }
 
   private async read(path: string): Promise<void> {
-    this.patch(path, { status: 'loading' });
+    // A reload keeps the picture on screen: the old URL stays valid until the
+    // new one replaces it, and `patch` revokes it then.
+    const previous = this.sources().get(path);
+    this.patch(path, {
+      status: 'loading',
+      ...(previous?.url !== undefined ? { url: previous.url, bytes: previous.bytes ?? 0 } : {}),
+    });
 
     try {
       // `maxBytes` travels with the request so a transport that can refuse an

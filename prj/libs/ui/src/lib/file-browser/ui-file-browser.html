@@ -47,7 +47,7 @@
     <div class="browser-scroll">
       @if (browser().empty; as empty) {
         <ui-empty-state [state]="empty" />
-      } @else {
+      } @else if (!browser().pending) {
         @switch (browser().view) {
           @case ('list') {
             <ui-file-list

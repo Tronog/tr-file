@@ -59,6 +59,12 @@
   /* Crisp at 100% and above, smooth when shrunk — the usual viewer bargain. */
   image-rendering: auto;
   user-select: none;
+
+  /* Nothing is drawn before the first picture's size is known: without it the
+     fit is unknown and the image would flash at 100% for a frame. */
+  &.is-pending {
+    visibility: hidden;
+  }
 }
 
 /* Floating over the image rather than stealing height from it, as every

@@ -36,7 +36,11 @@ export class ExplorerFeature {
   });
 
   /** True while the root listing has not arrived yet. */
-  readonly loading = computed(() => this.parent.fsDataFt.listingState(ROOT)?.status === 'loading');
+  /** Nothing to show yet: the root has never been read. A reload keeps the tree up. */
+  readonly loading = computed(() => {
+    const state = this.parent.fsDataFt.listingState(ROOT);
+    return state?.status === 'loading' && state.listing === undefined;
+  });
 
   /** The message to show instead of a tree when the root cannot be read. */
   readonly error = computed(() => this.parent.fsDataFt.listingState(ROOT)?.error?.message);
@@ -128,7 +132,7 @@ export class ExplorerFeature {
       tint: files.tint(entry),
       expandable,
       ...(expandable ? { expanded } : {}),
-      ...(expanded && state?.status === 'loading' ? { busy: true } : {}),
+      ...(expanded && state?.status === 'loading' && !state.listing ? { busy: true } : {}),
       selected,
       focused: selected,
       ...(entry.hidden ? { decoration: 'ignored' as const } : {}),

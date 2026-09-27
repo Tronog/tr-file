@@ -197,7 +197,14 @@
   </div>
 
   <!-- right sidebar: details of the selected entry -->
-  <ui-sidebar uiSlot="right" title="Details" side="right" [actions]="chrome.sidebarMoreActions">
+  <ui-sidebar
+    uiSlot="right"
+    title="Details"
+    side="right"
+    [actions]="chrome.sidebarMoreActions"
+    [class.is-stale]="details.stale()"
+    [attr.aria-busy]="details.stale() ? 'true' : null"
+  >
     @if (details.error(); as message) {
       <p class="sidebar-note" role="alert">{{ message }}</p>
     } @else if (details.loading() && !details.hasDetails()) {

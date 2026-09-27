@@ -160,7 +160,9 @@ export class FilePreviewFeature {
 
   private async fetch(path: string, force: boolean): Promise<void> {
     this.pending.add(path);
-    this.patch(path, { status: 'loading' });
+    // A reload keeps the document up until the new one replaces it.
+    const previous = this.previews().get(path)?.document;
+    this.patch(path, { status: 'loading', ...(previous ? { document: previous } : {}) });
 
     const refusal = this.refuse(path);
     if (refusal) {

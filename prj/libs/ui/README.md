@@ -72,7 +72,8 @@ component that renders it, the model carries the `Model` suffix
 ## Panel content
 
 `UiPanelGroup` is a frame, not a file manager. It renders the tab bar, the
-loading rail under it and the body — tab drop zones, OS file drops, the
+loading rail under it (shown only once a load has lasted
+`UI_LOADING_RAIL_DELAY_MS`, so a quick refresh never flashes it) and the body — tab drop zones, OS file drops, the
 focus request — and whatever the active tab *shows* is projected into that
 body by the application:
 
@@ -161,7 +162,7 @@ entry would maximize the window.
 | Gesture | Result |
 | --- | --- |
 | Click a tab | Activates it; the group re-points at that folder, takes focus, and focus moves into its body |
-| Double-click a tab | Emits `tabDoubleClick`; the app maximizes or restores that group |
+| Double-click a tab | Emits `tabDoubleClick`; the app maximizes or restores that group — `UiPanelGrid` hides the others (`inert`) rather than removing them, so nothing is rebuilt |
 | Middle-click / close button / `Delete` | Closes the tab; the group goes with its last tab |
 | Drag a tab inside its bar | Reorders it, with a 2px insertion bar showing the landing spot |
 | Drag a tab onto another bar or a group's centre | Moves it into that group |

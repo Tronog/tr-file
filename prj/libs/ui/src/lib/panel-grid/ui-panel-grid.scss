@@ -22,7 +22,21 @@
   min-height: 0;
 }
 
-/* A maximized group takes the whole grid; no split, no sash, nothing beside it. */
-.cell.is-maximized {
-  flex: 1;
+/* A maximized group takes the whole grid; no sash, nothing beside it. The
+   others keep their boxes at zero size — hidden and inert, but not destroyed,
+   so they come back exactly as they were. */
+:host(.has-maximized) {
+  .cell.holds-maximized {
+    flex: 1 1 0 !important;
+  }
+
+  .cell.is-hidden {
+    flex: 0 0 0 !important;
+    overflow: hidden;
+    visibility: hidden;
+  }
+
+  ui-sash {
+    display: none;
+  }
 }

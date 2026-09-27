@@ -97,6 +97,11 @@ export interface UiFileBrowserModel {
    * and its empty state (PRD 005, §2). Folders in it say so per row.
    */
   readonly dropFolder?: boolean;
+  /**
+   * The content is on its way — a file being read. The body stays empty
+   * rather than drawing an empty listing where the document will appear.
+   */
+  readonly pending?: boolean;
 }
 
 /** Placeholder shown where a panel has nothing to show. */

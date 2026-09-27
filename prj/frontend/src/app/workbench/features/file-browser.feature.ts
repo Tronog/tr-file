@@ -485,7 +485,8 @@ export class FileBrowserFeature implements PanelContentFeature {
           ? this.treeRows(group, group.path, 0, active)
           : entries.map((entry) => this.row(entry, group, active)),
       items: entries.map((entry) => this.item(entry, group, active)),
-      ...(state?.status === 'ready' ? { summary: this.summary(entries.length), dropFolder: true } : {}),
+      // Kept through a reload, like the rows: the count changes when the answer does.
+      ...(state?.listing ? { summary: this.summary(entries.length), dropFolder: true } : {}),
       ...this.placeholder(state, entries.length),
     };
   }
@@ -509,6 +510,8 @@ export class FileBrowserFeature implements PanelContentFeature {
       items: [],
       ...(document ? { document } : {}),
       ...(notice ? { empty: notice } : {}),
+      // On its way: an empty body, not an empty file table where the document will go.
+      ...(!document && !notice ? { pending: true } : {}),
     };
   }
 
@@ -530,7 +533,7 @@ export class FileBrowserFeature implements PanelContentFeature {
         },
       };
     }
-    if (state?.status === 'ready' && count === 0) {
+    if (state?.listing && count === 0) {
       return { empty: EMPTY_FOLDER };
     }
     return {};
@@ -562,7 +565,9 @@ export class FileBrowserFeature implements PanelContentFeature {
     return this.parent.fsDataFt.entries(path).flatMap((entry) => {
       const expandable = isFolder(entry);
       const expanded = expandable && open.has(entry.path);
-      const loading = expanded && this.parent.fsDataFt.listingState(entry.path)?.status === 'loading';
+      // Busy only while there is nothing to list yet; a reload keeps the children up.
+      const state = expanded ? this.parent.fsDataFt.listingState(entry.path) : undefined;
+      const loading = state?.status === 'loading' && !state.listing;
       const row: UiFileRow = {
         ...this.row(entry, group, active, expanded),
         depth,
