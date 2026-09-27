@@ -236,7 +236,11 @@ then polls each running job once a second — never faster, so neither the UI no
 is flooded. A job still running at its first poll opens a progress window
 (`OperationProgressModal` over the library's `UiProgressDialog`: *Run in Background* /
 *Cancel*); every job is a row in the bottom panel's Progress tab, with a stop button while it
-runs. When one ends, the folders it names in `affected` are re-read. Entry points: `Delete` in a
+runs. When one ends, the folders it names in `affected` are re-read. An entry a job cannot do
+(PRD 001, Fix 3) does not end it: the frontend starts jobs with `errors: 'ask'`, the job waits
+(`state: 'waiting'`, with its `problem`), and `OperationsFeature` asks as Midnight Commander does —
+*Skip*, *Skip All*, *Retry*, *Abort* (`Escape`) — answering with `/api/ops/jobs/:id/resolve` (bridge
+`op-resolve`). Entry points: `Delete` in a
 panel (a `UiPanelKey`), the File menu and the palette's `File:` commands.
 
 Copy / cut / paste and drag & drop of entries (PRD 005 §2) sit on top of those jobs.

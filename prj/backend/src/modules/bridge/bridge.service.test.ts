@@ -406,6 +406,27 @@ describe('localPath', () => {
   });
 });
 
+/** PRD 001, Fix 3 — answering a job that waits on an entry it could not do. */
+describe('FileSystemBridge op-resolve', () => {
+  it('refuses an answer that is not one, and a job that is not there', async () => {
+    const bad = await bridge.dispatch({ command: 'op-resolve', jobId: 'nope', decision: 'maybe' });
+    assert.ok('error' in bad);
+    assert.equal(bad.error.status, 400);
+
+    const missing = await bridge.dispatch({ command: 'op-resolve', jobId: 'nope', decision: 'skip' });
+    assert.ok('error' in missing);
+    assert.equal(missing.error.status, 404);
+  });
+
+  it('passes errors: ask through to the job it starts', async () => {
+    const started = await bridge.dispatch({ command: 'op-copy', sources: ['README.md'], destination: '', conflict: 'rename', errors: 'ask' });
+    assert.ok('data' in started, JSON.stringify(started));
+    const refusedPolicy = await bridge.dispatch({ command: 'op-trash', paths: ['README.md'], errors: 'sometimes' });
+    assert.ok('error' in refusedPolicy);
+    assert.equal(refusedPolicy.error.status, 400);
+  });
+});
+
 /** PRD 001, §13.1 — the backend machine's clock, for the status bar. */
 describe('FileSystemBridge time', () => {
   it("answers the machine's time, its time zone and its offset from UTC", async () => {

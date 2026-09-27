@@ -153,7 +153,24 @@ export interface FsDownload {
 
 export type FsOperationKind = 'copy' | 'move' | 'trash' | 'empty-trash' | 'delete' | 'restore' | 'compress' | 'extract';
 
-export type FsOperationState = 'running' | 'done' | 'failed' | 'cancelled';
+/** `waiting` — paused on an entry it could not do, for an `FsOperationDecision` (PRD 001, Fix 3). */
+export type FsOperationState = 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+
+/**
+ * What a job does about an entry it cannot do: end (`fail`), or wait to be
+ * told (`ask`) — see the backend's `OperationErrorPolicy`.
+ */
+export type FsOperationErrorPolicy = 'fail' | 'ask';
+
+/** The answer to a waiting job, Midnight Commander's four (PRD 001, Fix 3). */
+export type FsOperationDecision = 'skip' | 'skip-all' | 'retry' | 'abort';
+
+/** Why a job waits: the entry, root-relative, and what went wrong. */
+export interface FsOperationProblem {
+  readonly path: string;
+  readonly code: string;
+  readonly message: string;
+}
 
 /** What to do when a name is taken at the destination; see the backend's `ConflictPolicy`. */
 export type FsConflictPolicy = 'fail' | 'overwrite' | 'skip' | 'rename';
@@ -164,12 +181,13 @@ export type FsOperationRequest =
       readonly sources: readonly string[];
       readonly destination: string;
       readonly conflict: FsConflictPolicy;
+      readonly errors?: FsOperationErrorPolicy;
     }
-  | { readonly kind: 'trash'; readonly paths: readonly string[] }
+  | { readonly kind: 'trash'; readonly paths: readonly string[]; readonly errors?: FsOperationErrorPolicy }
   /** Deleted for good, not moved to the trash (PRD 003, §5). */
-  | { readonly kind: 'delete'; readonly paths: readonly string[] }
+  | { readonly kind: 'delete'; readonly paths: readonly string[]; readonly errors?: FsOperationErrorPolicy }
   /** Trashed entries put back where they came from, by the ids a trash job reported. */
-  | { readonly kind: 'restore'; readonly ids: readonly string[] }
+  | { readonly kind: 'restore'; readonly ids: readonly string[]; readonly errors?: FsOperationErrorPolicy }
   | { readonly kind: 'empty-trash' }
   /** A zip of `sources` as `destination/name` (PRD 003, §6). */
   | {
@@ -212,6 +230,8 @@ export interface FsOperationJob {
   readonly current: string | null;
   readonly skipped: number;
   readonly error: { readonly code: string; readonly message: string } | null;
+  /** While `waiting`: what it could not do, and why; absent from a server that predates it. */
+  readonly problem?: FsOperationProblem | null;
   /** Folders whose listing the job changed, root-relative. */
   readonly affected: readonly string[];
   /** What became of each entry, as far as the job got; absent from a server that predates it. */

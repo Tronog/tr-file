@@ -19,7 +19,13 @@ import type { DirectoryListingDto, FileDetailsDto, FileEntryType, PlacesDto, Sea
 import type { WatchResultDto } from '../files/watch.service.js';
 import type { GitRequest } from '../git/git-request.js';
 import type { ServerTimeDto } from '../health/server-time.js';
-import type { ConflictPolicy, OperationJobDto, OperationsInfoDto } from '../operations/operation.model.js';
+import type {
+  ConflictPolicy,
+  OperationDecision,
+  OperationErrorPolicy,
+  OperationJobDto,
+  OperationsInfoDto,
+} from '../operations/operation.model.js';
 
 /** Every operation the bridge offers. */
 export type FsBridgeCommand =
@@ -40,6 +46,7 @@ export type FsBridgeCommand =
   | 'op-empty-trash'
   | 'op-status'
   | 'op-cancel'
+  | 'op-resolve'
   | 'rename'
   | 'mkdir'
   | 'create-file'
@@ -160,11 +167,14 @@ export interface FsOpTransferRequest {
   readonly sources: readonly string[];
   readonly destination: string;
   readonly conflict: ConflictPolicy;
+  /** What an entry that fails does (PRD 001, Fix 3); `fail` when left out. */
+  readonly errors?: OperationErrorPolicy;
 }
 
 export interface FsOpTrashRequest {
   readonly command: 'op-trash';
   readonly paths: readonly string[];
+  readonly errors?: OperationErrorPolicy;
 }
 
 export interface FsOpEmptyTrashRequest {
@@ -174,6 +184,13 @@ export interface FsOpEmptyTrashRequest {
 export interface FsOpJobRequest {
   readonly command: 'op-status' | 'op-cancel';
   readonly jobId: string;
+}
+
+/** The answer to a job that is waiting (PRD 001, Fix 3) — `POST /api/ops/jobs/:id/resolve`. */
+export interface FsOpResolveRequest {
+  readonly command: 'op-resolve';
+  readonly jobId: string;
+  readonly decision: OperationDecision;
 }
 
 /**
@@ -213,11 +230,13 @@ export interface FsWatchRequest {
 export interface FsOpDeleteRequest {
   readonly command: 'op-delete';
   readonly paths: readonly string[];
+  readonly errors?: OperationErrorPolicy;
 }
 
 export interface FsOpRestoreRequest {
   readonly command: 'op-restore';
   readonly ids: readonly string[];
+  readonly errors?: OperationErrorPolicy;
 }
 
 /** Where to start, and the Places pane (PRD 003, §6) — `GET /api/fs/places`. */
@@ -270,6 +289,7 @@ export interface FsTimeRequest {
 }
 
 export type FsBridgeRequest =
+  | FsOpResolveRequest
   | FsTimeRequest
   | FsHostPathsRequest
   | FsGitRequest
@@ -351,6 +371,7 @@ export interface FsBridgeResults {
   readonly 'op-empty-trash': OperationJobDto;
   readonly 'op-status': OperationJobDto;
   readonly 'op-cancel': OperationJobDto;
+  readonly 'op-resolve': OperationJobDto;
   readonly rename: FileDetailsDto;
   readonly mkdir: FileDetailsDto;
   readonly 'create-file': FileDetailsDto;

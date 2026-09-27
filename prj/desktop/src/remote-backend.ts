@@ -266,21 +266,24 @@ export class RemoteBackend {
       case 'op-copy':
       case 'op-move':
         return this.json('POST', request.command === 'op-copy' ? '/ops/copy' : '/ops/move', {
-          body: { sources: request.sources, destination: request.destination, conflict: request.conflict },
+          body: { sources: request.sources, destination: request.destination, conflict: request.conflict, ...RemoteBackend.errorsOf(request) },
           accept: [202],
         });
       case 'op-trash':
-        return this.json('POST', '/ops/trash', { body: { paths: request.paths }, accept: [202] });
+        return this.json('POST', '/ops/trash', { body: { paths: request.paths, ...RemoteBackend.errorsOf(request) }, accept: [202] });
       case 'op-empty-trash':
         return this.json('POST', '/ops/empty-trash', { body: {}, accept: [202] });
       case 'op-status':
         return this.json('GET', `/ops/jobs/${encodeURIComponent(request.jobId)}`);
       case 'op-cancel':
         return this.json('POST', `/ops/jobs/${encodeURIComponent(request.jobId)}/cancel`, { body: {} });
+      // What to do about an entry a job could not do (PRD 001, Fix 3).
+      case 'op-resolve':
+        return this.json('POST', `/ops/jobs/${encodeURIComponent(request.jobId)}/resolve`, { body: { decision: request.decision } });
       case 'op-delete':
-        return this.json('POST', '/ops/delete', { body: { paths: request.paths }, accept: [202] });
+        return this.json('POST', '/ops/delete', { body: { paths: request.paths, ...RemoteBackend.errorsOf(request) }, accept: [202] });
       case 'op-restore':
-        return this.json('POST', '/ops/restore', { body: { ids: request.ids }, accept: [202] });
+        return this.json('POST', '/ops/restore', { body: { ids: request.ids, ...RemoteBackend.errorsOf(request) }, accept: [202] });
       // Things every file manager has (PRD 003, §5).
       case 'rename':
         return this.json('POST', '/fs/rename', { body: { path: request.path, to: request.to } });
@@ -696,5 +699,14 @@ export class RemoteBackend {
       message: `Talking to ${name} failed: ${error instanceof Error ? error.message : String(error)}`,
       status: 0,
     };
+  }
+
+  /**
+   * `errors: 'ask'` when the window asked for it (PRD 001, Fix 3). A server
+   * from before it ignores the field, and its jobs fail on an entry as they
+   * always did — which the window reads as it always has.
+   */
+  private static errorsOf(request: { readonly errors?: 'fail' | 'ask' }): { errors?: 'fail' | 'ask' } {
+    return request.errors === undefined ? {} : { errors: request.errors };
   }
 }

@@ -1,7 +1,7 @@
 import { Router, type Request } from 'express';
 
 import { asyncHandler, type RouteModule } from '../../core/index.js';
-import { parseOperationRequest } from './operation-request.js';
+import { parseDecision, parseOperationRequest } from './operation-request.js';
 import type { OperationKind } from './operation.model.js';
 import type { OperationsService } from './operations.service.js';
 
@@ -10,7 +10,9 @@ import type { OperationsService } from './operations.service.js';
  *
  * Starting an operation answers `202` with the job at once; the client then
  * asks `GET /jobs/:id` for its progress — once a second is what the frontend
- * does — and may `POST /jobs/:id/cancel`.
+ * does — and may `POST /jobs/:id/cancel`. A job started with `errors: 'ask'`
+ * that is `waiting` on an entry it could not do is answered with
+ * `POST /jobs/:id/resolve` (PRD 001, Fix 3).
  */
 export class OperationsRoutes implements RouteModule {
   readonly basePath = '/ops';
@@ -50,6 +52,11 @@ export class OperationsRoutes implements RouteModule {
     // GET /api/ops/jobs/:id — how far a job has got.
     this.router.get('/jobs/:id', (req, res) => {
       res.json({ data: this.operations.status(OperationsRoutes.id(req)) });
+    });
+
+    // POST /api/ops/jobs/:id/resolve { decision: skip | skip-all | retry | abort } — answer a waiting job.
+    this.router.post('/jobs/:id/resolve', (req, res) => {
+      res.json({ data: this.operations.resolve(OperationsRoutes.id(req), parseDecision(req.body)) });
     });
 
     // POST /api/ops/jobs/:id/cancel — stop a job.

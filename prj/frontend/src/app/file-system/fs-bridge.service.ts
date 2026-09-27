@@ -10,6 +10,7 @@ import type {
   FsDownloadResult,
   FsArchiveListing,
   FsClipboardFiles,
+  FsOperationDecision,
   FsOperationJob,
   FsPlaces,
   FsServerTime,
@@ -481,6 +482,10 @@ export class FsBridgeService implements FsTransport {
 
   async cancelOperation(id: string): Promise<FsOperationJob> {
     return this.invoke<FsOperationJob>({ command: 'op-cancel', jobId: id });
+  }
+
+  async resolveOperation(id: string, decision: FsOperationDecision): Promise<FsOperationJob> {
+    return this.invoke<FsOperationJob>({ command: 'op-resolve', jobId: id, decision });
   }
 
   /* -- git (PRD 011, §1) ---------------------------------------------------- */

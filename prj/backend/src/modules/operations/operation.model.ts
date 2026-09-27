@@ -6,7 +6,37 @@
 
 export type OperationKind = 'copy' | 'move' | 'trash' | 'empty-trash' | 'delete' | 'restore' | 'compress' | 'extract';
 
-export type OperationState = 'running' | 'done' | 'failed' | 'cancelled';
+/**
+ * `waiting` — paused on an entry it could not do, until the client says what
+ * to do about it (PRD 001, Fix 3); see `OperationDecision`.
+ */
+export type OperationState = 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+
+/**
+ * What a job does when an entry fails — it cannot be read, written, removed:
+ *
+ * - `fail` — the job ends there, `failed`, as it always has;
+ * - `ask` — the job waits (`waiting`, with the `problem`), and the client
+ *   answers with an `OperationDecision`, as Midnight Commander asks.
+ *
+ * Only a client that will answer asks for `ask`; one that never heard of it
+ * gets `fail`, and so never a job that waits for nobody.
+ */
+export type OperationErrorPolicy = 'fail' | 'ask';
+
+/**
+ * The answer to a job that is `waiting` (PRD 001, Fix 3), Midnight
+ * Commander's four: pass over this entry (`skip`), and every later one that
+ * fails too (`skip-all`); try it again (`retry`); or stop the job (`abort`).
+ */
+export type OperationDecision = 'skip' | 'skip-all' | 'retry' | 'abort';
+
+/** Why a job is `waiting`: the entry, root-relative, and what went wrong with it. */
+export interface OperationProblemDto {
+  readonly path: string;
+  readonly code: string;
+  readonly message: string;
+}
 
 /**
  * What to do when an entry of that name is already at the destination.
@@ -25,11 +55,14 @@ export interface TransferOperationRequest {
   /** The folder the sources go into. */
   readonly destination: string;
   readonly conflict: ConflictPolicy;
+  /** What an entry that fails does; `fail` when left out. */
+  readonly errors?: OperationErrorPolicy;
 }
 
 export interface TrashOperationRequest {
   readonly kind: 'trash';
   readonly paths: readonly string[];
+  readonly errors?: OperationErrorPolicy;
 }
 
 export interface EmptyTrashOperationRequest {
@@ -40,12 +73,14 @@ export interface EmptyTrashOperationRequest {
 export interface DeleteOperationRequest {
   readonly kind: 'delete';
   readonly paths: readonly string[];
+  readonly errors?: OperationErrorPolicy;
 }
 
 /** Puts trashed entries back, by the ids a trash job's `outcome` gave them. */
 export interface RestoreOperationRequest {
   readonly kind: 'restore';
   readonly ids: readonly string[];
+  readonly errors?: OperationErrorPolicy;
 }
 
 /**
@@ -121,6 +156,8 @@ export interface OperationJobDto {
   /** Entries passed over by `skip`. */
   readonly skipped: number;
   readonly error: { readonly code: string; readonly message: string } | null;
+  /** While `waiting`: the entry it could not do, and why (PRD 001, Fix 3). */
+  readonly problem: OperationProblemDto | null;
   /** Folders whose listing the job changed, root-relative: what a client should read again. */
   readonly affected: readonly string[];
   /** Where each entry went, filled in as they are done; see `OperationOutcomeDto`. */

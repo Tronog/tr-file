@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { lstat, mkdir, mkdtemp, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, beforeEach, describe, it } from 'node:test';
@@ -396,5 +396,119 @@ describe('restore (PRD 003, §5)', () => {
     assert.equal((await refused(service.start({ kind: 'restore', ids: ['..'] }))).status, 404);
     assert.equal((await refused(service.start({ kind: 'restore', ids: [] }))).status, 400);
     await assert.rejects(readFile(join(root, 'a.txt')), 'nothing was restored');
+  });
+});
+
+/**
+ * PRD 001, Fix 3 — an entry that fails, as Midnight Commander handles it: the
+ * job waits, and is told to skip it, skip every failure from now on, try it
+ * again, or stop. On a real disk: a file nobody may read is a real `EACCES`.
+ */
+describe('errors, asked about', () => {
+  const unreadable = async (...names: string[]): Promise<void> => {
+    for (const name of names) {
+      await writeFile(join(root, 'docs', name), name);
+      await chmod(join(root, 'docs', name), 0o000);
+    }
+  };
+  const copyDocs = () =>
+    service.start({ kind: 'copy', sources: ['docs'], destination: 'target', conflict: 'fail', errors: 'ask' });
+
+  it('waits on the entry it cannot copy, naming it and why, and skips it when told', async () => {
+    await unreadable('secret.txt');
+    const waiting = await settled(await copyDocs());
+
+    assert.equal(waiting.state, 'waiting');
+    assert.equal(waiting.problem?.path, 'docs/secret.txt');
+    assert.equal(waiting.problem?.code, 'FORBIDDEN');
+
+    service.resolve(waiting.id, 'skip');
+    const done = await settled(waiting);
+    assert.equal(done.state, 'done');
+    assert.equal(done.skipped, 1);
+    assert.equal(done.problem, null);
+    assert.equal(await readFile(join(root, 'target', 'docs', 'b.md'), 'utf8'), 'bravo');
+    assert.ok(!(await readdir(join(root, 'target', 'docs'))).includes('secret.txt'));
+  });
+
+  it('tries again when told to, and goes on once it works', async () => {
+    await unreadable('secret.txt');
+    const waiting = await settled(await copyDocs());
+
+    await chmod(join(root, 'docs', 'secret.txt'), 0o644);
+    service.resolve(waiting.id, 'retry');
+    const done = await settled(waiting);
+
+    assert.equal(done.state, 'done');
+    assert.equal(done.skipped, 0);
+    assert.equal(await readFile(join(root, 'target', 'docs', 'secret.txt'), 'utf8'), 'secret.txt');
+  });
+
+  it('asks once for Skip All, and passes over every later failure', async () => {
+    await unreadable('one.txt', 'two.txt', 'three.txt');
+    const waiting = await settled(await copyDocs());
+
+    service.resolve(waiting.id, 'skip-all');
+    const done = await settled(waiting);
+
+    assert.equal(done.state, 'done');
+    assert.equal(done.skipped, 3);
+  });
+
+  it('stops on Abort, keeping the reason, and leaves what was done', async () => {
+    await unreadable('secret.txt');
+    const waiting = await settled(await copyDocs());
+
+    service.resolve(waiting.id, 'abort');
+    const stopped = await settled(waiting);
+
+    assert.equal(stopped.state, 'cancelled');
+    assert.equal(stopped.error?.code, 'FORBIDDEN');
+  });
+
+  it('is cancelled like any job while it waits', async () => {
+    await unreadable('secret.txt');
+    const waiting = await settled(await copyDocs());
+
+    service.cancel(waiting.id);
+
+    assert.equal((await settled(waiting)).state, 'cancelled');
+  });
+
+  it('fails as it always did when the client did not ask to be asked', async () => {
+    await unreadable('secret.txt');
+    const failed = await settled(
+      await service.start({ kind: 'copy', sources: ['docs'], destination: 'target', conflict: 'fail' }),
+    );
+
+    assert.equal(failed.state, 'failed');
+    assert.equal(failed.error?.code, 'FORBIDDEN');
+  });
+
+  it('refuses an answer when nothing is waiting for one', async () => {
+    const done = await settled(await service.start({ kind: 'copy', sources: ['a.txt'], destination: 'target', conflict: 'fail', errors: 'ask' }));
+
+    assert.equal(done.state, 'done');
+    assert.throws(() => service.resolve(done.id, 'skip'), (error: unknown) => error instanceof HttpError && error.status === 409);
+  });
+
+  it('asks about an entry it cannot delete, and skips it', async () => {
+    await mkdir(join(root, 'locked'));
+    await writeFile(join(root, 'locked', 'kept.txt'), 'kept');
+    await chmod(join(root, 'locked'), 0o555);
+    try {
+      const waiting = await settled(await service.start({ kind: 'delete', paths: ['locked/kept.txt', 'a.txt'], errors: 'ask' }));
+      assert.equal(waiting.state, 'waiting');
+      assert.equal(waiting.problem?.path, 'locked/kept.txt');
+
+      service.resolve(waiting.id, 'skip');
+      const done = await settled(waiting);
+      assert.equal(done.state, 'done');
+      assert.equal(done.skipped, 1);
+      assert.equal(await readFile(join(root, 'locked', 'kept.txt'), 'utf8'), 'kept');
+      await assert.rejects(lstat(join(root, 'a.txt')));
+    } finally {
+      await chmod(join(root, 'locked'), 0o755);
+    }
   });
 });

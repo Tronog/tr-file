@@ -91,7 +91,7 @@ describe('Files shared with the system', () => {
 
       await workbench.fileClipboardFt.pasteInto('docs');
 
-      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['home/me/x.txt', 'home/me/y.txt'], destination: 'docs', conflict: 'fail' });
+      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['home/me/x.txt', 'home/me/y.txt'], destination: 'docs', conflict: 'fail', errors: 'ask' });
       // This window's own clipboard is still there for later.
       expect(workbench.fileClipboardFt.clipboard()).toEqual({ mode: 'copy', paths: ['a.txt'] });
     });
@@ -104,7 +104,7 @@ describe('Files shared with the system', () => {
 
       await workbench.fileClipboardFt.pasteInto('docs');
 
-      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail' });
+      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail', errors: 'ask' });
       expect(workbench.fileClipboardFt.clipboard()).toBeNull();
     });
 
@@ -135,8 +135,8 @@ describe('Files shared with the system', () => {
       await settled();
 
       expect(start.mock.calls.map(([request]) => request)).toEqual([
-        { kind: 'move', sources: ['home/me/x.txt'], destination: 'docs', conflict: 'fail' },
-        { kind: 'copy', sources: ['home/me/x.txt'], destination: '', conflict: 'fail' },
+        { kind: 'move', sources: ['home/me/x.txt'], destination: 'docs', conflict: 'fail', errors: 'ask' },
+        { kind: 'copy', sources: ['home/me/x.txt'], destination: '', conflict: 'fail', errors: 'ask' },
       ]);
     });
 

@@ -2,6 +2,7 @@ import { computed, signal, type WritableSignal } from '@angular/core';
 import type { UiProgressDialogModel, UiTransfer } from '@tr-file/ui';
 import type {
   FsConflictPolicy,
+  FsOperationDecision,
   FsOperationJob,
   FsOperationRequest,
   FsOperationsInfo,
@@ -64,9 +65,9 @@ export class OperationsFeature {
   /** Rows for the Progress tab, newest first. */
   readonly rows = computed<readonly UiTransfer[]>(() => this.records().map((record) => this.toRow(record)));
 
-  readonly runningCount = computed(() => this.records().filter((record) => record.job.state === 'running').length);
+  readonly runningCount = computed(() => this.records().filter((record) => OperationsFeature.isActive(record.job)).length);
 
-  readonly hasFinished = computed(() => this.records().some((record) => record.job.state !== 'running'));
+  readonly hasFinished = computed(() => this.records().some((record) => !OperationsFeature.isActive(record.job)));
 
   /** Whether the active panel has anything to copy, move or trash — for the File menu. */
   readonly hasSelection = computed(() => this.selectionOf(this.parent.activeGroupId(), null).length > 0);
@@ -109,7 +110,7 @@ export class OperationsFeature {
     let conflict: FsConflictPolicy = 'fail';
     for (;;) {
       try {
-        const job = await this.parent.fileSystem.operationsFt.start({ kind, sources, destination, conflict });
+        const job = await this.parent.fileSystem.operationsFt.start({ kind, sources, destination, conflict, errors: 'ask' });
         this.track(job, kind === 'move' ? sources : []);
         return true;
       } catch (error) {
@@ -150,7 +151,7 @@ export class OperationsFeature {
       return;
     }
     try {
-      this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'trash', paths }), paths);
+      this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'trash', paths, errors: 'ask' }), paths);
     } catch (error) {
       await this.refused('move to the trash', FsError.from(error));
     }
@@ -184,7 +185,7 @@ export class OperationsFeature {
       return;
     }
     try {
-      this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'delete', paths }), paths);
+      this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'delete', paths, errors: 'ask' }), paths);
     } catch (error) {
       await this.refused('delete', FsError.from(error));
     }
@@ -195,12 +196,12 @@ export class OperationsFeature {
    * just made, which is theirs to take back. Resolves once the job has started.
    */
   async trashQuietly(paths: readonly string[]): Promise<void> {
-    this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'trash', paths }), paths, 'undo');
+    this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'trash', paths, errors: 'ask' }), paths, 'undo');
   }
 
   /** Puts trashed entries back where they came from — Undo of a move to the trash. */
   async restore(ids: readonly string[]): Promise<void> {
-    this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'restore', ids }), [], 'undo');
+    this.track(await this.parent.fileSystem.operationsFt.start({ kind: 'restore', ids, errors: 'ask' }), [], 'undo');
   }
 
   /**
@@ -342,7 +343,7 @@ export class OperationsFeature {
   /** Stops a running job. Its row says *cancelling* until the backend confirms. */
   cancel(id: string): void {
     const record = this.find(id);
-    if (record === undefined || record.job.state !== 'running' || record.cancelling) {
+    if (record === undefined || !OperationsFeature.isActive(record.job) || record.cancelling) {
       return;
     }
     this.patch(id, { cancelling: true });
@@ -354,7 +355,7 @@ export class OperationsFeature {
 
   /** Forgets every job that has ended (the panel's bin button). */
   clearFinished(): void {
-    this.records.update((records) => records.filter((record) => record.job.state === 'running'));
+    this.records.update((records) => records.filter((record) => OperationsFeature.isActive(record.job)));
   }
 
   /** The job as its progress window shows it; `null` once it is gone. */
@@ -369,7 +370,8 @@ export class OperationsFeature {
       current: job.current === null ? null : `/${job.current}`,
       progress: OperationsFeature.percentOf(job),
       status: job.state === 'done' ? this.summaryOf(job, 'Done') : this.summaryOf(job),
-      state: job.state,
+      // Waiting on an answer is still underway, as far as the progress window goes.
+      state: job.state === 'waiting' ? 'running' : job.state,
       ...(record.cancelling ? { cancelling: true } : {}),
       ...(job.error ? { error: job.error.message } : {}),
     };
@@ -377,7 +379,7 @@ export class OperationsFeature {
 
   private track(job: FsOperationJob, removes: readonly string[], origin: OperationRecord['origin'] = 'user'): void {
     this.records.update((records) => [{ job, removes, cancelling: false, windowed: false, origin }, ...records]);
-    if (job.state !== 'running') {
+    if (!OperationsFeature.isActive(job)) {
       this.finished(this.find(job.id) as OperationRecord);
       return;
     }
@@ -396,7 +398,7 @@ export class OperationsFeature {
 
   /** Asks the backend about every running job, once; then again in a second while any runs. */
   private async poll(): Promise<void> {
-    const running = this.records().filter((record) => record.job.state === 'running');
+    const running = this.records().filter((record) => OperationsFeature.isActive(record.job));
     await Promise.all(
       running.map(async (record) => {
         try {
@@ -417,7 +419,7 @@ export class OperationsFeature {
     );
     for (const record of running) {
       const now = this.find(record.job.id);
-      if (now !== undefined && now.job.state === 'running' && !now.windowed) {
+      if (now !== undefined && OperationsFeature.isActive(now.job) && !now.windowed) {
         this.showWindow(now.job.id);
       }
     }
@@ -430,10 +432,53 @@ export class OperationsFeature {
     if (before === undefined) {
       return;
     }
-    this.patch(job.id, { job, ...(job.state === 'running' ? {} : { cancelling: false }) });
-    if (before.job.state === 'running' && job.state !== 'running') {
+    this.patch(job.id, { job, ...(OperationsFeature.isActive(job) ? {} : { cancelling: false }) });
+    if (OperationsFeature.isActive(before.job) && !OperationsFeature.isActive(job)) {
       this.finished(this.find(job.id) as OperationRecord);
     }
+    if (job.state === 'waiting' && !this.find(job.id)?.cancelling) {
+      void this.askAbout(job);
+    }
+  }
+
+  /** Jobs asked about right now, so a job still waiting at the next poll is not asked twice. */
+  private readonly asking = new Set<string>();
+
+  /**
+   * A job waits on an entry it could not do (PRD 001, Fix 3): the user says
+   * what to do, as Midnight Commander asks — *Skip* it, *Skip All* that fail
+   * from now on, *Retry* it, or *Abort* the job. `Escape` is *Abort*, as it is
+   * there. An answer that comes too late — the job was cancelled, or answered
+   * elsewhere — is dropped: the next poll says how it stands.
+   */
+  private async askAbout(job: FsOperationJob): Promise<void> {
+    const problem = job.problem;
+    if (problem == null || this.asking.has(job.id)) {
+      return;
+    }
+    this.asking.add(job.id);
+    try {
+      const result = await this.parent.modal.show({
+        severity: 'error',
+        message: `Cannot ${OperationsFeature.verbOf(job)} '${OperationsFeature.nameOf(problem.path)}'`,
+        detail: `${problem.message}\n/${problem.path}`,
+        buttons: [
+          { id: 'skip', label: 'Skip' },
+          { id: 'skip-all', label: 'Skip All' },
+          { id: 'retry', label: 'Retry' },
+          { id: 'abort', label: 'Abort' },
+        ],
+      });
+      const decision = (result?.buttonId ?? 'abort') as FsOperationDecision;
+      try {
+        this.apply(await this.parent.fileSystem.operationsFt.resolve(job.id, decision));
+      } catch {
+        // Not waiting any more: cancelled meanwhile, or gone. The next poll tells.
+      }
+    } finally {
+      this.asking.delete(job.id);
+    }
+    this.schedule();
   }
 
   /**
@@ -495,7 +540,8 @@ export class OperationsFeature {
         inputs: { view: computed(() => this.dialogModel(id)), cancel: () => this.cancel(id) },
       })
       .then(() => {
-        if (this.find(id)?.job.state === 'running') {
+        const now = this.find(id)?.job;
+        if (now !== undefined && OperationsFeature.isActive(now)) {
           this.parent.bottomPanelFt.select('progress');
         }
       });
@@ -627,6 +673,19 @@ export class OperationsFeature {
           iconColor: 'var(--vsc-fg-dim)',
           progress: 100,
           statusLabel: 'cancelled',
+          // Stopped on an entry it could not do (PRD 001, Fix 3): say which, and why.
+          ...(job.error ? { detail: job.error.message } : {}),
+        };
+      case 'waiting':
+        return {
+          id: job.id,
+          name: job.title,
+          icon: 'alert-triangle',
+          iconColor: 'var(--vsc-severity-warning)',
+          progress: OperationsFeature.percentOf(job),
+          statusLabel: record.cancelling ? 'cancelling…' : 'waiting',
+          ...(job.problem ? { detail: `${job.problem.message} — /${job.problem.path}` } : {}),
+          ...(record.cancelling ? {} : { cancellable: true }),
         };
       default: {
         const percent = OperationsFeature.percentOf(job);
@@ -668,6 +727,27 @@ export class OperationsFeature {
     this.records.update((records) =>
       records.map((record) => (record.job.id === id ? { ...record, ...change } : record)),
     );
+  }
+
+  /** Still underway: running, or waiting on an answer about an entry (PRD 001, Fix 3). */
+  private static isActive(job: FsOperationJob): boolean {
+    return job.state === 'running' || job.state === 'waiting';
+  }
+
+  /** What the job was doing to an entry, as the question about it says: `Cannot copy 'a.txt'`. */
+  private static verbOf(job: FsOperationJob): string {
+    switch (job.kind) {
+      case 'move':
+        return 'move';
+      case 'trash':
+        return 'move to the trash';
+      case 'delete':
+        return 'delete';
+      case 'restore':
+        return 'restore';
+      default:
+        return 'copy';
+    }
   }
 
   /** Bytes when there are any to count, else entries; `null` while there is nothing to go by. */

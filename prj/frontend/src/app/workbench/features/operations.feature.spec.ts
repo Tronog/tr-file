@@ -85,7 +85,7 @@ describe('OperationsFeature', () => {
 
       await ops().trashSelection(select('docs/a.txt', 'docs/b.txt'), 'docs/c.txt');
 
-      expect(start).toHaveBeenCalledWith({ kind: 'trash', paths: ['docs/c.txt'] });
+      expect(start).toHaveBeenCalledWith({ kind: 'trash', paths: ['docs/c.txt'], errors: 'ask' });
     });
 
     it('re-reads what changed and drops the trashed entries from the selection', async () => {
@@ -143,7 +143,7 @@ describe('OperationsFeature', () => {
       await ops().copySelection(group);
 
       expect(prompt).toHaveBeenCalledWith(expect.objectContaining({ message: "Copy 'a.txt' to:", confirmLabel: 'Copy' }));
-      expect(start).toHaveBeenCalledWith({ kind: 'copy', sources: ['docs/a.txt'], destination: 'target', conflict: 'fail' });
+      expect(start).toHaveBeenCalledWith({ kind: 'copy', sources: ['docs/a.txt'], destination: 'target', conflict: 'fail', errors: 'ask' });
     });
 
     it('asks about taken names once, and starts again with the answer', async () => {
@@ -161,6 +161,7 @@ describe('OperationsFeature', () => {
         sources: ['docs/a.txt', 'docs/b.txt'],
         destination: 'target',
         conflict: 'rename',
+        errors: 'ask',
       });
     });
 
@@ -307,6 +308,92 @@ describe('OperationsFeature', () => {
       expect(workbench.commandPaletteFt.commands.map((command) => command.id)).toEqual(
         expect.arrayContaining(['file.copyTo', 'file.moveTo', 'file.trash', 'file.delete', 'file.emptyTrash']),
       );
+    });
+  });
+
+  /**
+   * PRD 001, Fix 3 — an entry a job could not do, as Midnight Commander asks
+   * about it: Skip, Skip All, Retry or Abort; `Escape` is Abort.
+   */
+  describe('an entry it could not do', () => {
+    const waiting = job({
+      state: 'waiting',
+      problem: { path: 'docs/secret.txt', code: 'FORBIDDEN', message: 'Permission denied: secret.txt' },
+    });
+
+    const startWaiting = async () => {
+      vi.spyOn(workbench.modal, 'confirm').mockResolvedValue(true);
+      vi.spyOn(workbench.modal, 'open').mockReturnValue(new Promise(() => undefined));
+      vi.spyOn(fs(), 'start').mockResolvedValue(job());
+      vi.spyOn(fs(), 'status').mockResolvedValue(waiting);
+      await ops().trash(['docs/a.txt']);
+    };
+
+    it('asks the job to wait, and asks the user what to do — once, however long it waits', async () => {
+      await startWaiting();
+      const show = vi.spyOn(workbench.modal, 'show').mockReturnValue(new Promise(() => undefined));
+
+      await vi.advanceTimersByTimeAsync(OPERATION_POLL_MS * 3);
+
+      expect(show).toHaveBeenCalledTimes(1);
+      expect(show.mock.calls[0]?.[0]).toMatchObject({
+        severity: 'error',
+        message: "Cannot move to the trash 'secret.txt'",
+        detail: 'Permission denied: secret.txt\n/docs/secret.txt',
+        buttons: [
+          { id: 'skip', label: 'Skip' },
+          { id: 'skip-all', label: 'Skip All' },
+          { id: 'retry', label: 'Retry' },
+          { id: 'abort', label: 'Abort' },
+        ],
+      });
+      expect(ops().runningCount()).toBe(1);
+      expect(ops().rows()[0]).toMatchObject({ statusLabel: 'waiting', detail: 'Permission denied: secret.txt — /docs/secret.txt', cancellable: true });
+    });
+
+    it('sends the answer, and follows the job on from there', async () => {
+      await startWaiting();
+      vi.spyOn(workbench.modal, 'show').mockResolvedValue({ buttonId: 'skip-all', checked: false, value: '' });
+      const resolve = vi.spyOn(fs(), 'resolve').mockResolvedValue(job({ state: 'running' }));
+
+      await vi.advanceTimersByTimeAsync(OPERATION_POLL_MS);
+
+      expect(resolve).toHaveBeenCalledWith('job-1', 'skip-all');
+    });
+
+    it('takes Escape as Abort, as Midnight Commander does', async () => {
+      await startWaiting();
+      vi.spyOn(workbench.modal, 'show').mockResolvedValue(null);
+      const resolve = vi.spyOn(fs(), 'resolve').mockResolvedValue(
+        job({ state: 'cancelled', error: { code: 'FORBIDDEN', message: 'Permission denied: secret.txt' } }),
+      );
+
+      await vi.advanceTimersByTimeAsync(OPERATION_POLL_MS);
+
+      expect(resolve).toHaveBeenCalledWith('job-1', 'abort');
+      expect(ops().rows()[0]).toMatchObject({ statusLabel: 'cancelled', detail: 'Permission denied: secret.txt' });
+      expect(ops().runningCount()).toBe(0);
+    });
+
+    it('drops an answer that comes too late', async () => {
+      await startWaiting();
+      vi.spyOn(workbench.modal, 'show').mockResolvedValue({ buttonId: 'retry', checked: false, value: '' });
+      vi.spyOn(fs(), 'resolve').mockRejectedValue(new FsError('not waiting', 409, 'CONFLICT'));
+
+      await expect(vi.advanceTimersByTimeAsync(OPERATION_POLL_MS)).resolves.not.toThrow();
+      expect(ops().runningCount()).toBe(1);
+    });
+
+    it('asks every job to wait rather than fail — copy, move, trash, delete, restore', async () => {
+      const start = vi.spyOn(fs(), 'start').mockResolvedValue(job({ state: 'done' }));
+      vi.spyOn(workbench.modal, 'confirm').mockResolvedValue(true);
+
+      await ops().transfer('copy', ['docs/a.txt'], 'target');
+      await ops().trash(['docs/a.txt']);
+      await ops().deletePermanently(['docs/a.txt']);
+      await ops().restore(['a.txt.1']);
+
+      expect(start.mock.calls.map(([request]) => (request as { errors?: string }).errors)).toEqual(['ask', 'ask', 'ask', 'ask']);
     });
   });
 });

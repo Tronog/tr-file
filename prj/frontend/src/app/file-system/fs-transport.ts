@@ -7,6 +7,7 @@ import type {
   FsDownload,
   FsGitAction,
   FsGitFields,
+  FsOperationDecision,
   FsOperationJob,
   FsPlaces,
   FsServerTime,
@@ -187,6 +188,9 @@ export interface FsTransport {
 
   /** Stops a job; answers with how it stands. */
   cancelOperation(id: string): Promise<FsOperationJob>;
+
+  /** Answers a job that is `waiting` (PRD 001, Fix 3); rejects with `CONFLICT` when it is not. */
+  resolveOperation(id: string, decision: FsOperationDecision): Promise<FsOperationJob>;
 
   /* -- git (PRD 011, §1) ---------------------------------------------------- */
 

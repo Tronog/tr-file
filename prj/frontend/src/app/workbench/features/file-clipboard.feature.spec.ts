@@ -63,7 +63,7 @@ describe('FileClipboardFeature and entry drops', () => {
       await clipboard().paste(group);
 
       expect(start).toHaveBeenCalledTimes(2);
-      expect(start).toHaveBeenCalledWith({ kind: 'copy', sources: ['a.txt', 'b.txt'], destination: '', conflict: 'fail' });
+      expect(start).toHaveBeenCalledWith({ kind: 'copy', sources: ['a.txt', 'b.txt'], destination: '', conflict: 'fail', errors: 'ask' });
       expect(clipboard().canPaste()).toBe(true);
     });
 
@@ -79,7 +79,7 @@ describe('FileClipboardFeature and entry drops', () => {
       workbench.panelKeyboardFt.run(group, { command: 'paste', entryId: null });
       await settled();
 
-      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail' });
+      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail', errors: 'ask' });
       expect(clipboard().clipboard()).toBeNull();
     });
 
@@ -153,8 +153,8 @@ describe('FileClipboardFeature and entry drops', () => {
       await settled();
 
       expect(start.mock.calls.map(([request]) => request)).toEqual([
-        { kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail' },
-        { kind: 'copy', sources: ['b.txt'], destination: 'docs', conflict: 'fail' },
+        { kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail', errors: 'ask' },
+        { kind: 'copy', sources: ['b.txt'], destination: 'docs', conflict: 'fail', errors: 'ask' },
       ]);
     });
 
@@ -165,7 +165,7 @@ describe('FileClipboardFeature and entry drops', () => {
       workbench.fileBrowserFt.dropEntries(group, { sources: ['a.txt'], target: null, copy: false });
       await settled();
 
-      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail' });
+      expect(start).toHaveBeenCalledWith({ kind: 'move', sources: ['a.txt'], destination: 'docs', conflict: 'fail', errors: 'ask' });
     });
 
     it('starts nothing for a move to where the entries already are', async () => {

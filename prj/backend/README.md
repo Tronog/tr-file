@@ -102,6 +102,7 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `op-restore` | `ids` | the job, started |
 | `op-empty-trash` | — | the job, started |
 | `op-status`, `op-cancel` | `jobId` | the job as it stands; `op-cancel` stops it first |
+| `op-resolve` | `jobId`, `decision` | `POST /api/ops/jobs/:id/resolve`'s answer (PRD 001, Fix 3) |
 | `places` | — | `GET /api/fs/places`'s answer |
 | `time` | — | the machine's clock: `{ now, timeZone, utcOffsetMinutes }`, as `GET /api/health` reports it (PRD 001, §13.1) |
 | `archive-list` | `path`, `inner` | `GET /api/archive/list`'s answer |
@@ -353,18 +354,20 @@ costs one small message a second however fast the job runs — and may cancel it
 | Method | Path | Body | Answers with |
 | --- | --- | --- | --- |
 | `GET` | `/api/ops/info` | — | `{ trash: 'server' \| 'system', canRestore }` |
-| `POST` | `/api/ops/copy`, `/api/ops/move` | `{ sources: string[], destination, conflict? }` | `202`, the job |
-| `POST` | `/api/ops/trash`, `/api/ops/delete` | `{ paths: string[] }` | `202`, the job |
-| `POST` | `/api/ops/restore` | `{ ids: string[] }` | `202`, the job |
+| `POST` | `/api/ops/copy`, `/api/ops/move` | `{ sources: string[], destination, conflict?, errors? }` | `202`, the job |
+| `POST` | `/api/ops/trash`, `/api/ops/delete` | `{ paths: string[], errors? }` | `202`, the job |
+| `POST` | `/api/ops/restore` | `{ ids: string[], errors? }` | `202`, the job |
 | `POST` | `/api/ops/empty-trash` | — | `202`, the job |
 | `GET` | `/api/ops/jobs/:id` | — | the job |
 | `POST` | `/api/ops/jobs/:id/cancel` | — | the job; one that has ended stays as it ended |
+| `POST` | `/api/ops/jobs/:id/resolve` | `{ decision: 'skip' \| 'skip-all' \| 'retry' \| 'abort' }` | the job; `409` when it is not `waiting` |
 
 A job is `{ id, kind, state, title, startedAt, finishedAt, totalBytes, doneBytes,
-totalItems, doneItems, current, skipped, error, affected, outcome }`: `kind` is
+totalItems, doneItems, current, skipped, error, problem, affected, outcome }`: `kind` is
 `copy`, `move`, `trash`, `empty-trash`, `delete`, `restore`, `compress` or `extract`; `state` is
-`running`, `done`, `failed` or `cancelled`; the totals are `null` while unknown;
-`error` is `{ code, message }` when it failed; `affected` names the folders
+`running`, `waiting`, `done`, `failed` or `cancelled`; the totals are `null` while unknown;
+`error` is `{ code, message }` when it failed — or was aborted on an entry it could not do;
+`problem` is `{ path, code, message }` while it is `waiting`; `affected` names the folders
 whose listings it changed, for a client to read again. Finished jobs are kept
 for ten minutes.
 
@@ -374,6 +377,18 @@ move's source and where it is now, a trashed entry and the id the trash can
 restore it by (only when the trash hands one out), a restored id and the path
 it is back at. Skipped entries have none; delete and empty trash have none.
 
+- **`errors`** says what an entry that fails does — one that cannot be read,
+  written, moved or removed (PRD 001, Fix 3). `fail` (the default) ends the job
+  there, `failed`, as before. `ask` makes it wait instead: `state: 'waiting'`
+  with the `problem`, until `POST /jobs/:id/resolve` answers as Midnight
+  Commander's dialog does — `skip` passes over it (counted in `skipped`),
+  `skip-all` passes over it and every later failure without asking, `retry`
+  tries it again, `abort` stops the job (`cancelled`, the failure kept in
+  `error`). Cancelling a waiting job aborts it; an unanswered one aborts after
+  30 minutes. Copy and move ask entry by entry, a folder's contents included
+  (a folder moved across disks keeps its original while anything in it was
+  skipped); trash, delete and restore ask per path. Compress, extract and
+  empty trash are one thing each and still fail whole.
 - **`conflict`** says what to do with a name that is taken at the destination:
   `fail` (the default) refuses before anything is done with `409` and
   `details.conflicts`, naming every clash; `overwrite`, `skip`, or `rename` —

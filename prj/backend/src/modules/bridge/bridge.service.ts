@@ -11,7 +11,7 @@ import type { AuthService } from '../auth/index.js';
 import { WATCH_MAX_PATHS, type FileDetails, type FilesService, type PlacesService, type WatchService } from '../files/index.js';
 import { isGitAction, parseGitRequest, type GitService } from '../git/index.js';
 import { serverTime } from '../health/server-time.js';
-import { parseOperationRequest, type OperationsService } from '../operations/index.js';
+import { parseDecision, parseOperationRequest, type OperationsService } from '../operations/index.js';
 import {
   FS_BRIDGE_CHUNK_BYTES,
   type FsBridgeFailure,
@@ -300,19 +300,22 @@ export class FileSystemBridge {
           sources: request.sources,
           destination: request.destination,
           conflict: request.conflict,
+          ...(request.errors === undefined ? {} : { errors: request.errors }),
         });
       case 'op-trash':
-        return this.operations.start({ kind: 'trash', paths: request.paths });
+        return this.operations.start({ kind: 'trash', paths: request.paths, ...(request.errors === undefined ? {} : { errors: request.errors }) });
       case 'op-empty-trash':
         return this.operations.start({ kind: 'empty-trash' });
       case 'op-status':
         return this.operations.status(request.jobId);
       case 'op-cancel':
         return this.operations.cancel(request.jobId);
+      case 'op-resolve':
+        return this.operations.resolve(request.jobId, request.decision);
       case 'op-delete':
-        return this.operations.start({ kind: 'delete', paths: request.paths });
+        return this.operations.start({ kind: 'delete', paths: request.paths, ...(request.errors === undefined ? {} : { errors: request.errors }) });
       case 'op-restore':
-        return this.operations.start({ kind: 'restore', ids: request.ids });
+        return this.operations.start({ kind: 'restore', ids: request.ids, ...(request.errors === undefined ? {} : { errors: request.errors }) });
       case 'rename':
         return (await this.files.rename(request.path, request.to)).toJSON();
       case 'mkdir':
@@ -637,22 +640,30 @@ export class FileSystemBridge {
         if (parsed.kind !== 'copy' && parsed.kind !== 'move') {
           throw HttpError.internal();
         }
-        return { command, sources: parsed.sources, destination: parsed.destination, conflict: parsed.conflict };
+        return {
+          command,
+          sources: parsed.sources,
+          destination: parsed.destination,
+          conflict: parsed.conflict,
+          ...(parsed.errors === undefined ? {} : { errors: parsed.errors }),
+        };
       }
       case 'op-trash': {
         const parsed = parseOperationRequest('trash', value);
-        return { command, paths: parsed.kind === 'trash' ? parsed.paths : [] };
+        return parsed.kind === 'trash' ? { command, paths: parsed.paths, ...(parsed.errors === undefined ? {} : { errors: parsed.errors }) } : { command, paths: [] };
       }
       case 'op-status':
       case 'op-cancel':
         return { command, jobId: FileSystemBridge.readString(value, 'jobId') };
+      case 'op-resolve':
+        return { command, jobId: FileSystemBridge.readString(value, 'jobId'), decision: parseDecision(value) };
       case 'op-delete': {
         const parsed = parseOperationRequest('delete', value);
-        return { command, paths: parsed.kind === 'delete' ? parsed.paths : [] };
+        return parsed.kind === 'delete' ? { command, paths: parsed.paths, ...(parsed.errors === undefined ? {} : { errors: parsed.errors }) } : { command, paths: [] };
       }
       case 'op-restore': {
         const parsed = parseOperationRequest('restore', value);
-        return { command, ids: parsed.kind === 'restore' ? parsed.ids : [] };
+        return parsed.kind === 'restore' ? { command, ids: parsed.ids, ...(parsed.errors === undefined ? {} : { errors: parsed.errors }) } : { command, ids: [] };
       }
       case 'rename':
         return {

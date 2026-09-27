@@ -325,7 +325,7 @@ describe('File management (PRD 003, §5)', () => {
 
       await workbench.undoFt.undo();
 
-      expect(start).toHaveBeenCalledWith({ kind: 'trash', paths: ['docs/a.txt'] });
+      expect(start).toHaveBeenCalledWith({ kind: 'trash', paths: ['docs/a.txt'], errors: 'ask' });
       // Undoing is not itself undoable.
       await settled();
       expect(workbench.undoFt.canUndo()).toBe(false);
@@ -337,7 +337,7 @@ describe('File management (PRD 003, §5)', () => {
 
       workbench.undoFt.recordJob(job({ kind: 'trash', outcome: [{ source: 'a.txt', target: 'a.txt.k1' }] }), true);
       await workbench.undoFt.undo();
-      expect(start).toHaveBeenCalledWith({ kind: 'restore', ids: ['a.txt.k1'] });
+      expect(start).toHaveBeenCalledWith({ kind: 'restore', ids: ['a.txt.k1'], errors: 'ask' });
 
       workbench.undoFt.recordJob(job({ kind: 'trash', outcome: [] }), false);
       workbench.undoFt.recordJob(job({ kind: 'delete' }), false);
@@ -377,7 +377,7 @@ describe('File management (PRD 003, §5)', () => {
         message: "Are you sure you want to permanently delete 'a.txt'?",
         detail: 'This action is irreversible!',
       });
-      expect(start).toHaveBeenCalledWith({ kind: 'delete', paths: ['a.txt'] });
+      expect(start).toHaveBeenCalledWith({ kind: 'delete', paths: ['a.txt'], errors: 'ask' });
     });
   });
 

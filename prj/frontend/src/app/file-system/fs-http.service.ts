@@ -20,6 +20,7 @@ import type {
   FsEnvelope,
   FsGitAction,
   FsGitFields,
+  FsOperationDecision,
   FsOperationJob,
   FsPlaces,
   FsServerTime,
@@ -451,6 +452,12 @@ export class FsHttpService implements FsTransport {
   async cancelOperation(id: string): Promise<FsOperationJob> {
     return this.request(
       this.http.post<FsEnvelope<FsOperationJob>>(`/api/ops/jobs/${encodeURIComponent(id)}/cancel`, {}),
+    );
+  }
+
+  async resolveOperation(id: string, decision: FsOperationDecision): Promise<FsOperationJob> {
+    return this.request(
+      this.http.post<FsEnvelope<FsOperationJob>>(`/api/ops/jobs/${encodeURIComponent(id)}/resolve`, { decision }),
     );
   }
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -327,6 +327,36 @@ describe('RemoteBackend commands', () => {
     assert.equal(deleted.state, 'done');
     assert.equal((await readdir(root)).includes('made'), false);
     assert.equal(errorOf(await remote.dispatch({ command: 'op-restore', ids: ['nope'] })).status, 404);
+  });
+});
+
+describe('RemoteBackend errors, asked about (PRD 001, Fix 3)', () => {
+  it('starts a job that asks, sees it wait on the entry it cannot read, and tells it to skip', async () => {
+    await mkdir(join(root, 'locked-in'), { recursive: true });
+    await writeFile(join(root, 'locked-in', 'secret.txt'), 'secret');
+    await chmod(join(root, 'locked-in', 'secret.txt'), 0o000);
+    try {
+      const remote = await connected();
+      let job = dataOf<{ id: string; state: string; problem: { path: string } | null; skipped: number }>(
+        await remote.dispatch({ command: 'op-copy', sources: ['locked-in'], destination: '', conflict: 'rename', errors: 'ask' }),
+      );
+      while (job.state === 'running') {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        job = dataOf(await remote.dispatch({ command: 'op-status', jobId: job.id }));
+      }
+      assert.equal(job.state, 'waiting');
+      assert.equal(job.problem?.path, 'locked-in/secret.txt');
+
+      dataOf(await remote.dispatch({ command: 'op-resolve', jobId: job.id, decision: 'skip' }));
+      do {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        job = dataOf(await remote.dispatch({ command: 'op-status', jobId: job.id }));
+      } while (job.state === 'running');
+      assert.equal(job.state, 'done');
+      assert.equal(job.skipped, 1);
+    } finally {
+      await chmod(join(root, 'locked-in', 'secret.txt'), 0o644);
+    }
   });
 });
 

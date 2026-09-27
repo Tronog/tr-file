@@ -12,12 +12,21 @@ import type {
   CompressOperationRequest,
   ConflictPolicy,
   ExtractOperationRequest,
+  OperationDecision,
+  OperationErrorPolicy,
   OperationJobDto,
   OperationRequest,
   OperationsInfoDto,
   TransferOperationRequest,
   TrashProvider,
 } from './operation.model.js';
+
+/** A job stopped by its client's *Abort*, on the entry that failed (PRD 001, Fix 3). */
+class AbortedOnProblem extends Error {
+  constructor(readonly failure: { code: string; message: string }) {
+    super(failure.message);
+  }
+}
 
 /** Finished jobs are kept this long, so a client that polls late still learns how it ended. */
 const KEEP_FINISHED_MS = 10 * 60 * 1000;
@@ -49,6 +58,13 @@ interface PlannedEntry {
  * symlinks are copied as links, never followed. A move is a `rename` when it
  * can be and a copy-then-delete across file systems. Trash goes wherever the
  * `TrashProvider` puts it.
+ *
+ * An entry that fails — unreadable, not writable, not removable — ends the
+ * job, unless it was started with `errors: 'ask'` (PRD 001, Fix 3): then the
+ * job waits, `waiting` with the `problem`, for `resolve` — *Skip*, *Skip All*,
+ * *Retry* or *Abort*, as Midnight Commander asks. Copy, move, trash, delete
+ * and restore ask entry by entry, folders' contents included; compressing,
+ * extracting and emptying the trash are one thing each, and still fail whole.
  */
 export class OperationsService {
   private readonly jobs = new Map<string, OperationJob>();
@@ -78,13 +94,13 @@ export class OperationsService {
       case 'move':
         return this.startTransfer(request);
       case 'trash':
-        return this.startTrash(request.paths);
+        return this.startTrash(request.paths, request.errors);
       case 'empty-trash':
         return this.launch(new OperationJob('empty-trash', 'Emptying the trash'), (job) => this.emptyTrash(job));
       case 'delete':
-        return this.startDelete(request.paths);
+        return this.startDelete(request.paths, request.errors);
       case 'restore':
-        return this.startRestore(request.ids);
+        return this.startRestore(request.ids, request.errors);
       case 'compress':
         return this.startCompress(request);
       case 'extract':
@@ -94,6 +110,18 @@ export class OperationsService {
 
   status(id: string): OperationJobDto {
     return this.job(id).toJSON();
+  }
+
+  /**
+   * Answers a job that is `waiting` (PRD 001, Fix 3). `409` when it is not —
+   * it was answered already, or went on, or ended.
+   */
+  resolve(id: string, decision: OperationDecision): OperationJobDto {
+    const job = this.job(id);
+    if (!job.decide(decision)) {
+      throw HttpError.conflict('That operation is not waiting for an answer');
+    }
+    return job.toJSON();
   }
 
   /** Stops a job; a job that has already finished is left as it ended. */
@@ -181,6 +209,7 @@ export class OperationsService {
     const job = new OperationJob(
       request.kind,
       `${request.kind === 'copy' ? 'Copying' : 'Moving'} ${what} to /${destination.relative}`,
+      request.errors,
     );
     job.affected.add(destination.relative);
     if (request.kind === 'move') {
@@ -193,7 +222,7 @@ export class OperationsService {
     );
   }
 
-  private async startTrash(paths: readonly string[]): Promise<OperationJobDto> {
+  private async startTrash(paths: readonly string[], errors?: OperationErrorPolicy): Promise<OperationJobDto> {
     OperationsService.checkSources(paths);
     const targets: ResolvedPath[] = [];
     for (const path of paths) {
@@ -208,7 +237,7 @@ export class OperationsService {
       targets.push(target);
     }
     const what = paths.length === 1 ? `'${posix.basename(paths[0] as string)}'` : `${paths.length} items`;
-    const job = new OperationJob('trash', `Moving ${what} to the trash`);
+    const job = new OperationJob('trash', `Moving ${what} to the trash`, errors);
     for (const target of targets) {
       job.affected.add(OperationsService.parentOf(target.relative));
     }
@@ -217,8 +246,11 @@ export class OperationsService {
       for (const target of targets) {
         running.signal.throwIfAborted();
         running.current = target.relative;
-        const id = await this.trashProvider.trash(target.absolute, target.relative);
-        if (id !== null) {
+        let id: string | null = null;
+        const trashed = await this.attempt(running, target.relative, async () => {
+          id = await this.trashProvider.trash(target.absolute, target.relative);
+        });
+        if (trashed && id !== null) {
           running.outcome.push({ source: target.relative, target: id });
         }
         running.doneItems += 1;
@@ -231,7 +263,7 @@ export class OperationsService {
    * not the root, nothing in the trash — emptying it is how that goes — and
    * nothing that is not there. A link is removed as itself, never followed.
    */
-  private async startDelete(paths: readonly string[]): Promise<OperationJobDto> {
+  private async startDelete(paths: readonly string[], errors?: OperationErrorPolicy): Promise<OperationJobDto> {
     OperationsService.checkSources(paths);
     const targets: ResolvedPath[] = [];
     for (const path of paths) {
@@ -246,7 +278,7 @@ export class OperationsService {
       targets.push(target);
     }
     const what = paths.length === 1 ? `'${posix.basename(paths[0] as string)}'` : `${paths.length} items`;
-    const job = new OperationJob('delete', `Deleting ${what} permanently`);
+    const job = new OperationJob('delete', `Deleting ${what} permanently`, errors);
     for (const target of targets) {
       job.affected.add(OperationsService.parentOf(target.relative));
     }
@@ -255,7 +287,7 @@ export class OperationsService {
       for (const target of targets) {
         running.signal.throwIfAborted();
         running.current = target.relative;
-        await rm(target.absolute, { recursive: true, force: false });
+        await this.attempt(running, target.relative, () => rm(target.absolute, { recursive: true, force: false }));
         running.doneItems += 1;
       }
     });
@@ -268,7 +300,7 @@ export class OperationsService {
    * trash that can (`info.canRestore`) — a system trash is the user's own
    * file manager's to restore from.
    */
-  private async startRestore(ids: readonly string[]): Promise<OperationJobDto> {
+  private async startRestore(ids: readonly string[], errors?: OperationErrorPolicy): Promise<OperationJobDto> {
     const trash = this.trashProvider;
     if (trash.originOf === undefined || trash.restore === undefined) {
       throw HttpError.badRequest('This trash cannot put things back; restore them from the system trash');
@@ -288,7 +320,7 @@ export class OperationsService {
     }
 
     const what = planned.length === 1 ? `'${posix.basename(planned[0]?.origin.relative ?? '')}'` : `${planned.length} items`;
-    const job = new OperationJob('restore', `Restoring ${what} from the trash`);
+    const job = new OperationJob('restore', `Restoring ${what} from the trash`, errors);
     for (const entry of planned) {
       job.affected.add(OperationsService.parentOf(entry.origin.relative));
     }
@@ -299,14 +331,20 @@ export class OperationsService {
       for (const { id, origin } of planned) {
         running.signal.throwIfAborted();
         running.current = origin.relative;
-        const folder = await this.ensureFolder(OperationsService.parentOf(origin.relative));
-        let target = this.child(folder, basename(origin.absolute));
-        if (taken.has(target.absolute) || (await OperationsService.exists(target.absolute))) {
-          target = this.child(folder, await this.freeName(folder, basename(origin.absolute), taken));
+        let target: ResolvedPath | null = null;
+        const restored = await this.attempt(running, origin.relative, async () => {
+          const folder = await this.ensureFolder(OperationsService.parentOf(origin.relative));
+          let place = this.child(folder, basename(origin.absolute));
+          if (taken.has(place.absolute) || (await OperationsService.exists(place.absolute))) {
+            place = this.child(folder, await this.freeName(folder, basename(origin.absolute), taken));
+          }
+          await restore(id, place.absolute);
+          taken.add(place.absolute);
+          target = place;
+        });
+        if (restored && target !== null) {
+          running.outcome.push({ source: id, target: (target as ResolvedPath).relative });
         }
-        taken.add(target.absolute);
-        await restore(id, target.absolute);
-        running.outcome.push({ source: id, target: target.relative });
         running.doneItems += 1;
       }
     });
@@ -478,6 +516,11 @@ export class OperationsService {
     void run(job).then(
       () => job.finish(job.signal.aborted ? 'cancelled' : 'done'),
       (error: unknown) => {
+        if (error instanceof AbortedOnProblem) {
+          // Stopped by its client, on the entry that failed: the reason stays with it.
+          job.finish('cancelled', error.failure);
+          return;
+        }
         if (job.signal.aborted) {
           job.finish('cancelled');
           return;
@@ -499,11 +542,12 @@ export class OperationsService {
         job.skipped += 1;
         continue;
       }
-      if (entry.clash === 'overwrite') {
-        await rm(entry.target.absolute, { recursive: true, force: true });
+      if (entry.clash === 'overwrite' && !(await this.attempt(job, entry.source.relative, () => rm(entry.target.absolute, { recursive: true, force: true })))) {
+        continue;
       }
-      await this.copyEntry(job, entry.source.absolute, entry.target.absolute, entry.source.relative);
-      job.outcome.push({ source: entry.source.relative, target: entry.target.relative });
+      if (await this.copyEntry(job, entry.source.absolute, entry.target.absolute, entry.source.relative)) {
+        job.outcome.push({ source: entry.source.relative, target: entry.target.relative });
+      }
     }
   }
 
@@ -517,21 +561,37 @@ export class OperationsService {
         job.doneItems += 1;
         continue;
       }
-      if (entry.clash === 'overwrite') {
-        await rm(entry.target.absolute, { recursive: true, force: true });
-      }
-      try {
-        await rename(entry.source.absolute, entry.target.absolute);
-        job.doneItems += 1;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'EXDEV') {
-          throw error;
+      let crossDevice = false;
+      const moved = await this.attempt(job, entry.source.relative, async () => {
+        if (entry.clash === 'overwrite') {
+          await rm(entry.target.absolute, { recursive: true, force: true });
         }
-        // Another file system: copy it, byte-counted, then take the original away.
+        try {
+          await rename(entry.source.absolute, entry.target.absolute);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EXDEV') {
+            throw error;
+          }
+          crossDevice = true;
+        }
+      });
+      if (!moved) {
+        continue;
+      }
+      if (!crossDevice) {
+        job.doneItems += 1;
+      } else {
+        // Another file system: copy it, byte-counted, then take the original
+        // away — unless something in it was skipped, which would be lost.
         job.totalItems = null;
         await this.measure(job, [entry]);
-        await this.copyEntry(job, entry.source.absolute, entry.target.absolute, entry.source.relative);
-        await rm(entry.source.absolute, { recursive: true, force: true });
+        const skippedBefore = job.skipped;
+        if (!(await this.copyEntry(job, entry.source.absolute, entry.target.absolute, entry.source.relative))) {
+          continue;
+        }
+        if (job.skipped === skippedBefore) {
+          await this.attempt(job, entry.source.relative, () => rm(entry.source.absolute, { recursive: true, force: true }));
+        }
       }
       job.outcome.push({ source: entry.source.relative, target: entry.target.relative });
     }
@@ -547,9 +607,14 @@ export class OperationsService {
       if (stats.isFile()) {
         bytes += stats.size;
       } else if (stats.isDirectory()) {
-        for (const name of await readdir(absolute)) {
+        // What cannot be read is not counted: the copy asks about it when it gets there (PRD 001, Fix 3).
+        const names = await readdir(absolute).catch((): string[] => []);
+        for (const name of names) {
           const child = join(absolute, name);
-          await walk(child, await lstat(child));
+          const childStats = await lstat(child).catch(() => null);
+          if (childStats !== null) {
+            await walk(child, childStats);
+          }
         }
       }
     };
@@ -562,30 +627,77 @@ export class OperationsService {
     job.totalItems = items;
   }
 
-  /** Copies one entry — a file, a folder and everything in it, or a link as a link. */
-  private async copyEntry(job: OperationJob, source: string, target: string, relative: string): Promise<void> {
+  /**
+   * Copies one entry — a file, a folder and everything in it, or a link as a
+   * link. `false` when the entry itself was skipped (PRD 001, Fix 3); a folder
+   * some of whose contents were skipped is still made, and still `true`.
+   */
+  private async copyEntry(job: OperationJob, source: string, target: string, relative: string): Promise<boolean> {
     job.signal.throwIfAborted();
     job.current = relative;
-    const stats = await lstat(source);
+    let stats: Stats | null = null;
+    const made = await this.attempt(job, relative, async () => {
+      stats = await lstat(source);
+      if (stats.isDirectory()) {
+        await mkdir(target);
+      } else if (stats.isSymbolicLink()) {
+        await symlink(await readlink(source), target);
+      } else if (stats.isFile()) {
+        await this.copyFile(job, source, target);
+      }
+    });
+    if (!made || stats === null) {
+      return false;
+    }
+    const entry: Stats = stats;
 
-    if (stats.isDirectory()) {
-      await mkdir(target);
-      for (const name of await readdir(source)) {
+    if (entry.isDirectory()) {
+      let names: string[] = [];
+      // A folder that cannot be listed is made, and empty — unless told to stop.
+      await this.attempt(job, relative, async () => {
+        names = await readdir(source);
+      });
+      for (const name of names) {
         await this.copyEntry(job, join(source, name), join(target, name), `${relative}/${name}`);
       }
-    } else if (stats.isSymbolicLink()) {
-      await symlink(await readlink(source), target);
-    } else if (stats.isFile()) {
-      await this.copyFile(job, source, target);
-    } else {
+    } else if (!entry.isFile() && !entry.isSymbolicLink()) {
       job.skipped += 1; // A socket, a device: nothing a copy should reproduce.
     }
 
     job.doneItems += 1;
-    if (!stats.isSymbolicLink()) {
+    if (!entry.isSymbolicLink()) {
       // Best effort: the copy is what matters, its dates and mode are courtesy.
-      await chmod(target, stats.mode & 0o7777).catch(() => undefined);
-      await utimes(target, stats.atime, stats.mtime).catch(() => undefined);
+      await chmod(target, entry.mode & 0o7777).catch(() => undefined);
+      await utimes(target, entry.atime, entry.mtime).catch(() => undefined);
+    }
+    return true;
+  }
+
+  /**
+   * Does `action` for the entry `path`. When it fails and the job asks
+   * (`errors: 'ask'`, PRD 001, Fix 3), the job waits for what to do: try it
+   * again, pass over it — `false`, and counted as `skipped` — or stop. A job
+   * that does not ask fails, as it always has. Cancelling is never asked about.
+   */
+  private async attempt(job: OperationJob, path: string, action: () => Promise<unknown>): Promise<boolean> {
+    for (;;) {
+      try {
+        await action();
+        return true;
+      } catch (error) {
+        if (job.signal.aborted || job.errors !== 'ask') {
+          throw error;
+        }
+        const failure = OperationsService.describe(error);
+        const decision = await job.ask({ path, ...failure });
+        if (decision === 'skip') {
+          job.skipped += 1;
+          return false;
+        }
+        if (decision === 'abort') {
+          throw job.signal.aborted ? error : new AbortedOnProblem(failure);
+        }
+      }
     }
   }
 

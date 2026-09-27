@@ -136,6 +136,13 @@ describe('FsBridgeService', () => {
     expect(fake.sent).toEqual([{ command: 'list', path: 'docs' }]);
   });
 
+  it('answers a waiting job with one command (PRD 001, Fix 3)', async () => {
+    fake.answer = { data: { id: 'job-1', state: 'running' } };
+
+    await fs.operationsFt.resolve('job-1', 'retry');
+    expect(fake.sent).toEqual([{ command: 'op-resolve', jobId: 'job-1', decision: 'retry' }]);
+  });
+
   it('asks the machine’s clock with one command (PRD 001, §13.1)', async () => {
     const time = { now: '2026-09-27T10:05:30.000Z', timeZone: 'Europe/Zagreb', utcOffsetMinutes: 120 };
     fake.answer = { data: time };
@@ -521,6 +528,13 @@ describe('FileSystemService without a desktop bridge', () => {
     const status = fs.operationsFt.status('job 1');
     http.expectOne({ method: 'GET', url: '/api/ops/jobs/job%201' }).flush({ data: job });
     await status;
+
+    // PRD 001, Fix 3: the answer to a job that waits on an entry it could not do.
+    const resolved = fs.operationsFt.resolve('job 1', 'skip-all');
+    const answer = http.expectOne({ method: 'POST', url: '/api/ops/jobs/job%201/resolve' });
+    expect(answer.request.body).toEqual({ decision: 'skip-all' });
+    answer.flush({ data: job });
+    await resolved;
 
     const cancel = fs.operationsFt.cancel('job 1');
     http.expectOne({ method: 'POST', url: '/api/ops/jobs/job%201/cancel' }).flush({ data: job });
