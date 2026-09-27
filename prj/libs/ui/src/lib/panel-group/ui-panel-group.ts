@@ -9,7 +9,7 @@ import {
   output,
   signal,
   viewChild,
-  type ElementRef,
+  ElementRef,
 } from '@angular/core';
 import { UiEmptyState } from '../empty-state/ui-empty-state';
 import { UiIcon } from '../icon/ui-icon';
@@ -70,8 +70,9 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
  * management today (`UiFileBrowser`), other kinds later — each its own
  * component with its own toolbar and model. The group never looks inside that
  * content. It agrees with it on one thing only: the element marked
- * `uiPanelBody` (see `UiPanelBody`) is where focus goes and where a press
- * counts as a press on blank space. A group with no tabs has no content, and
+ * `uiPanelBody` (see `UiPanelBody`) is where focus goes; a press on blank
+ * space anywhere in the panel — body, tab bar or the content's chrome — asks
+ * for it (`bodyPress`). A group with no tabs has no content, and
  * renders its `empty` placeholder instead.
  *
  * The body is a drop target for tabs: the pointer's position inside it picks a
@@ -92,7 +93,7 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
   styleUrl: './ui-panel-group.scss',
   host: {
     '[class.is-active]': 'active()',
-    '(pointerdown)': 'focusRequest.emit()',
+    '(pointerdown)': 'onGroupPointerDown($event)',
     '(keydown)': 'onGroupKeydown($event)',
   },
 })
@@ -132,10 +133,13 @@ export class UiPanelGroup {
   readonly tabContextMenu = output<UiContextMenuRequest>();
 
   /**
-   * A press landed on the body's blank space — below the last row, beside the
-   * tiles, on the "no folder opened" placeholder (PRD 001, §6.3.1). Nothing
-   * there takes focus on its own, so the press would otherwise leave the panel
-   * active but empty-handed; the application answers by bumping `focusBody`.
+   * A press landed on the panel's blank space — below the last row, beside
+   * the tiles, on the "no folder opened" placeholder (PRD 001, §6.3.1), and
+   * anywhere else in the panel that nothing takes focus from: the tab bar
+   * beside the tabs, the loading rail, the gaps of the content's toolbar
+   * (PRD 002, §3.1). Nothing there takes focus on its own, so the press would
+   * otherwise leave the panel active but empty-handed — the browser drops
+   * focus to the page — and the application answers by bumping `focusBody`.
    */
   readonly bodyPress = output<void>();
 
@@ -172,6 +176,8 @@ export class UiPanelGroup {
   protected readonly fileDragging = signal(false);
 
   private readonly bodyElement = viewChild.required<ElementRef<HTMLElement>>('body');
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   /** The projected content's `uiPanelBody` element, while there is one. */
   private contentBody: HTMLElement | null = null;
@@ -359,33 +365,41 @@ export class UiPanelGroup {
   }
 
   /**
-   * Reports a press only when it landed on the body's blank space.
+   * Any press makes the group the active one; a press that lands on blank
+   * space is also reported as `bodyPress` (PRD 001, §6.3.1; PRD 002, §3.1).
    *
-   * Anything focusable under the pointer — a row, a tile, the document's
-   * scroll container, a button — is already about to take focus, and asking
-   * for the body's tab stop as well would drag focus off whatever was
-   * actually clicked. A press on the content's chrome, above its
-   * `uiPanelBody`, is not a press on the body at all.
+   * Blank is anything in the panel that nothing under the pointer takes focus
+   * from: the body below the last row or beside the tiles, an empty-state
+   * placeholder, the tab bar beside the tabs, the loading rail, the gaps of
+   * the content's toolbar. A row, a tile, the document's scroll container, a
+   * button is about to take focus itself, and asking for the body's tab stop
+   * as well would drag focus off whatever was actually clicked.
+   *
+   * An element that answers a press of its own without being focusable — the
+   * path bar, whose blank space turns it into a text field — says so with
+   * `data-own-press`, so the panel does not pull focus away from what it does.
    */
-  protected onBodyPointerDown(event: PointerEvent): void {
+  protected onGroupPointerDown(event: PointerEvent): void {
+    this.focusRequest.emit();
+
     const target = event.target;
     if (!(target instanceof Element)) {
-      return;
-    }
-
-    const body = this.bodyElement().nativeElement;
-    const scope = this.contentBody ?? body;
-    if (target !== body && !scope.contains(target)) {
       return;
     }
 
     // Both the group's body and the content's carry `tabindex="-1"` so they
     // can hold focus when there is nothing else, so a match on either is not
     // a match: pressing it *is* pressing the empty area.
+    const body = this.bodyElement().nativeElement;
     const focusable = target.closest(
-      'button, a, input, textarea, select, [tabindex], [contenteditable]',
+      'button, a, input, textarea, select, [tabindex], [contenteditable], [data-own-press]',
     );
-    if (focusable !== null && focusable !== scope && focusable !== body) {
+    if (
+      focusable !== null &&
+      focusable !== body &&
+      focusable !== this.contentBody &&
+      this.host.contains(focusable)
+    ) {
       return;
     }
 

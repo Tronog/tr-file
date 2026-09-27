@@ -72,7 +72,8 @@ interface MarqueeDrag {
  *
  * Selection is multiple (PRD 004, §1.2), exactly as in the list view — see
  * `UiListSelection`, Midnight Commander's `Insert`, `*`, `+` and `-` (§2)
- * included — and the grid adds a *box selection*: dragging across the
+ * included, and the first tile taking focus and the selection when focus is
+ * handed in with nothing selected (PRD 002, §3.1) — and the grid adds a *box selection*: dragging across the
  * blank space between and around the tiles selects every tile the box
  * touches, added to the selection when `Ctrl` or `Shift` is held; a plain
  * click on blank space clears it. The box is hit-tested against the grid's
@@ -107,6 +108,10 @@ interface MarqueeDrag {
         (click)="onClick($event, index)"
         (dblclick)="activate.emit(item.id)"
         (keydown)="onKeydown($event, index)"
+        (pointerdown)="pressing = true"
+        (pointerup)="pressing = false"
+        (pointercancel)="pressing = false"
+        (focus)="onFocusArrived()"
       >
         @if (item.thumbnail; as thumbnail) {
           <img class="item-thumbnail" alt="" draggable="false" decoding="async" [src]="thumbnail" />
@@ -282,6 +287,30 @@ export class UiIconView {
       this.focusPending();
     });
   }
+
+  /**
+   * Focus arrived on a tile from outside — the panel handing the keyboard
+   * to its content (a click on its blank space, a tab chosen, `Tab` from
+   * another panel, a folder entered), a sort — while nothing is selected
+   * (PRD 002, §3.1): the first tile takes the cursor and becomes the
+   * selection. A pointer press selects by its own rules, and a move of this
+   * component's own (`Ctrl`+arrow, `Insert`) has already said what it means.
+   */
+  protected onFocusArrived(): void {
+    if (this.movingFocus || this.pressing) {
+      this.pressing = false;
+      return;
+    }
+    if (this.selectedIds().size === 0) {
+      this.focusTile(0);
+    }
+  }
+
+  /** Set while this component moves focus itself; see `onFocusArrived`. */
+  private movingFocus = false;
+
+  /** Set from a pointer press on a tile until it is released; see `onFocusArrived`. */
+  protected pressing = false;
 
   /** A click selects by the keys held: alone, toggled, or as a range. */
   protected onClick(event: MouseEvent, index: number): void {
@@ -600,7 +629,12 @@ export class UiIconView {
     }
     const tile = this.tiles().find((candidate) => candidate.nativeElement.dataset['itemId'] === id);
     if (tile) {
-      tile.nativeElement.focus();
+      this.movingFocus = true;
+      try {
+        tile.nativeElement.focus();
+      } finally {
+        this.movingFocus = false;
+      }
       this.pendingFocusId = null;
     }
   }

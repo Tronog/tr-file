@@ -98,8 +98,14 @@ has nothing focusable in it, so the content's `uiPanelBody` carries `tabindex="-
 takes focus itself; otherwise a keyboard user could walk into one and not get out.
 Double-clicking a tab maximizes or restores its group (§6.1.1) — the bar reports the
 gesture, the app decides what it means. Choosing a tab (a click, not an arrow-key rove),
-or pressing the blank space of a panel body, hands focus to that panel's content once it
-has rendered; `PanelFocusFeature` owns
+or pressing blank space anywhere in a panel — its body, the tab bar beside the tabs, the
+loading rail, the gaps of the content's toolbar (PRD 002, §3.1; an element that answers a
+press itself, like the editable path bar, is marked `data-own-press`) — hands focus to that
+panel's content once it has rendered, and a click on a column header to sort gives focus back
+to the cursor's row in its new place — (`UiFileList`). Whenever focus is handed to a listing from
+outside — any of the above, `Tab` from another panel, a folder entered — while nothing is
+selected, the first row or tile takes the cursor and becomes the selection (PRD 002, §3.1); a
+click and the view's own key moves keep their own rules; `PanelFocusFeature` owns
 that request and `UiPanelGroup` answers it. The workbench asks for it once on start
 (§10.1), after the listing is in flight, so the keyboard is already in the folder content
 when the app opens rather than needing a click first. Row clicks only ever

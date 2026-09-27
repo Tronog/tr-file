@@ -95,8 +95,11 @@ of content follows the same shape:
 - **Body** — mark the element below its chrome with `uiPanelBody`. That is the
   only contract with the group: asked to focus its body, the group looks for the
   tab stop (`tabindex="0"`) inside that element and focuses the element itself
-  when there is none; a press on it — not on something focusable in it — is a
-  `bodyPress`, while a press on the chrome above it is not. `UiPanelBody` finds
+  when there is none. A press on blank space anywhere in the panel — the body,
+  the tab bar beside the tabs, the loading rail, the gaps of the content's
+  chrome — is a `bodyPress` (PRD 002, §3.1); a press on something focusable is
+  not, nor on an element marked `data-own-press`, which answers a press itself
+  (the editable path bar, a tab's box). `UiPanelBody` finds
   the group by injection, which works because the content is projected into it.
 - **Keys** — the content handles its own; it sits inside the group's host, so it
   sees a key before the group's panel chords do.
@@ -115,7 +118,9 @@ The library reports these; what they do is the application's.
 
 - **Sorting.** `UiFileList` with `sortable` draws its headers as buttons that
   report `sort` with the column's key; the column carrying `sort` shows the
-  order. `UiFileBrowserModel.sortable` turns it on for a browser, which
+  order. Once the re-sorted rows render, focus goes back to the cursor's
+  row, not the header — or, when nothing is selected, to the first row, which
+  becomes the selection (PRD 002, §3.1). `UiFileBrowserModel.sortable` turns it on for a browser, which
   re-emits `sortChange`.
 - **Keys.** `Shift`+`Delete` is the `delete-permanently` panel key, and `+` /
   `-` are `select-pattern` / `unselect-pattern` (PRD 004, §2), in the list and
@@ -214,7 +219,7 @@ entry would maximize the window.
 | `Ctrl`+`PageUp` / `Ctrl`+`PageDown` | Moves to the previous / next tab, wrapping at either end |
 | `Ctrl`+`Enter` | Emits `open-aside`; the app opens that entry in a new panel on the right |
 | Maximize, or double-click a tab | Renders one group alone; the button becomes Restore |
-| Press a group's empty body | Emits `bodyPress`; the app focuses the group and its content |
+| Press a group's blank space — body, tab bar, loading rail, toolbar gaps | Emits `bodyPress`; the app focuses the group and its content |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
 | Drag a sash / focus it and press arrows | Resizes the two regions it divides |
 | Drag the title bar's empty space | Moves a frameless desktop window; double-click maximizes |
@@ -247,7 +252,8 @@ somewhere to drop a tab.
 
 Choosing a tab means wanting to work in it, so once its content has rendered
 the body takes focus — no `Tab`, `Tab`, `Tab` down from the tab bar (PRD 001,
-§6.3). Pressing the body's blank space means the same thing (§6.3.1), and
+§6.3). Pressing blank space in the panel means the same thing (§6.3.1; PRD 002,
+§3.1 widened it from the body to the tab bar and the content's chrome), and
 `bodyPress` reports it — but only when the press landed on nothing focusable,
 since a row, a tile or the document's scroll container is already about to take
 focus and asking again would drag it off what was actually clicked. `UiTabBar` separates the two things a tab bar reports: a click
@@ -320,7 +326,11 @@ to the view that owns it.
 
 Two rules are worth stating outright. **Selection follows focus**: arrowing
 onto an entry selects it, so the details sidebar tracks the keyboard the same
-way it tracks the mouse.
+way it tracks the mouse. Focus handed to a list or grid from outside — the
+panel giving its content the keyboard, `Tab` from another panel, a sort — while
+nothing is selected moves to the first entry and selects it (PRD 002, §3.1); a
+pointer press and the view's own moves (`Ctrl`+arrow, `Insert`) keep their own
+rules.
 
 Selection is **multiple** in all three views (PRD 004, §1.2). `UiListSelection`
 (`lib/keyboard/list-selection.ts`) is the one place the rules live — replace,

@@ -56,6 +56,38 @@ describe('UiFileList, sortable', () => {
     expect(sorts).toEqual(['size']);
   });
 
+  /** PRD 002, §3.1: sorting is done from the header, the work goes on in the rows. */
+  it('gives focus back to the cursor row, in its new place, once the rows are re-sorted', () => {
+    document.body.appendChild(fixture.nativeElement);
+    fixture.componentRef.setInput('sortable', true);
+    fixture.detectChanges();
+    fixture.componentInstance.sort.subscribe(() => fixture.componentRef.setInput('rows', [...ROWS].reverse()));
+
+    const header = fixture.nativeElement.querySelector('th .sort-button') as HTMLButtonElement;
+    header.focus();
+    header.click();
+    fixture.detectChanges();
+
+    const rows = Array.from(fixture.nativeElement.querySelectorAll('tbody tr')) as HTMLElement[];
+    expect(rows.map((row) => row.dataset['rowId'])).toEqual(['b.txt', 'a.txt', 'docs']);
+    expect(document.activeElement).toBe(rows[1]);
+    fixture.nativeElement.remove();
+  });
+
+  it('focuses and selects the first row after a sort when nothing is selected', () => {
+    const changes: UiSelectionChange[] = [];
+    fixture.componentRef.setInput('rows', ROWS.map(({ selected: _selected, ...row }) => row));
+    fixture.componentRef.setInput('sortable', true);
+    fixture.detectChanges();
+    fixture.componentInstance.selectionChange.subscribe((change) => changes.push(change));
+
+    (fixture.nativeElement.querySelector('th .sort-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(changes).toEqual([{ selected: ['docs'], focused: 'docs' }]);
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('tbody tr'));
+  });
+
   it('keeps plain headers when it is not sortable', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.sort-button')).toBeNull();

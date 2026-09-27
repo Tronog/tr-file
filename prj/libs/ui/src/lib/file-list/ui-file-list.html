@@ -22,7 +22,7 @@
               type="button"
               class="sort-button"
               [attr.title]="'Sort by ' + column.label"
-              (click)="sort.emit(column.key)"
+              (click)="onSort(column.key)"
             >
               {{ column.label }}
               @if (column.sort) {
@@ -68,6 +68,10 @@
         (click)="onClick($event, index)"
         (dblclick)="activate.emit(row.id)"
         (keydown)="onKeydown($event, index)"
+        (pointerdown)="pressing = true"
+        (pointerup)="pressing = false"
+        (pointercancel)="pressing = false"
+        (focus)="onFocusArrived()"
       >
         @for (column of columns(); track column.key; let first = $first) {
           <td

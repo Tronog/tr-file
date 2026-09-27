@@ -259,6 +259,54 @@ describe('UiFileList keyboard', () => {
     press(4, 'PageUp');
     expect(document.activeElement).toBe(rows()[0]);
   });
+
+  /** PRD 002, §3.1: the keyboard never stands on a listing with nothing in hand. */
+  describe('focus handed in with nothing selected', () => {
+    let changes: UiSelectionChange[];
+
+    beforeEach(() => {
+      fixture.componentRef.setInput(
+        'rows',
+        ROWS.map(({ selected: _selected, focused: _focused, ...row }) => row),
+      );
+      fixture.detectChanges();
+      changes = [];
+      fixture.componentInstance.selectionChange.subscribe((change) => changes.push(change));
+    });
+
+    it('selects the first row, and focuses it, wherever focus landed', () => {
+      rows()[2]?.focus();
+
+      expect(changes).toEqual([{ selected: ['alpha.ts'], focused: 'alpha.ts' }]);
+      expect(document.activeElement).toBe(rows()[0]);
+    });
+
+    it('leaves a selection that exists alone', () => {
+      fixture.componentRef.setInput('rows', ROWS.map((row) => ({ ...row, selected: row.id === 'docs' })));
+      fixture.detectChanges();
+
+      rows()[0]?.focus();
+
+      expect(changes).toEqual([]);
+    });
+
+    it('leaves a pointer press to select by its own rules', () => {
+      rows()[1]?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      rows()[1]?.focus();
+
+      expect(changes).toEqual([]);
+    });
+
+    it('leaves its own moves alone: Ctrl+arrow still moves the cursor only', () => {
+      rows()[0]?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      rows()[0]?.focus();
+      rows()[0]?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      rows()[0]?.dispatchEvent(keydown('ArrowDown', { ctrlKey: true }));
+
+      expect(changes).toEqual([{ selected: [], focused: 'docs' }]);
+      expect(document.activeElement).toBe(rows()[1]);
+    });
+  });
 });
 
 describe('UiIconView keyboard', () => {
@@ -354,6 +402,19 @@ describe('UiIconView keyboard', () => {
     press(0, 'z');
 
     expect(document.activeElement).toBe(tiles()[4]);
+  });
+
+  /** PRD 002, §3.1, as in the list. */
+  it('selects the first tile when focus is handed in with nothing selected', () => {
+    const changes: UiSelectionChange[] = [];
+    fixture.componentRef.setInput('items', ITEMS.map(({ selected: _selected, focused: _focused, ...item }) => item));
+    fixture.detectChanges();
+    fixture.componentInstance.selectionChange.subscribe((change) => changes.push(change));
+
+    tiles()[3]?.focus();
+
+    expect(changes).toEqual([{ selected: ['alpha.ts'], focused: 'alpha.ts' }]);
+    expect(document.activeElement).toBe(tiles()[0]);
   });
 });
 

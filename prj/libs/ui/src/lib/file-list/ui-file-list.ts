@@ -35,6 +35,9 @@ const DEFAULT_ROW_HEIGHT = 22;
  * onto a row selects it, which is what makes the details sidebar track the
  * keyboard the same way it tracks the mouse.
  *
+ * Focus handed to the table from outside while nothing is selected lands on
+ * the first row and selects it (PRD 002, §3.1); see `onFocusArrived`.
+ *
  * Selection is multiple (PRD 004, §1.2; see `UiListSelection`): `Ctrl`/`⌘`
  * click toggles a row, `Shift` click selects the range from the anchor, and
  * with the keyboard `Shift` plus a movement key extends, `Ctrl` plus an arrow
@@ -53,7 +56,10 @@ const DEFAULT_ROW_HEIGHT = 22;
  *
  * With `sortable` set the column headers are buttons that report `sort` with
  * their column's key (PRD 003, §5); the order is the application's, and the
- * header marked `sort` on its column says what it is.
+ * header marked `sort` on its column says what it is. Once the rows are drawn
+ * in the new order the keyboard goes back to them rather than staying on the
+ * header (PRD 002, §3.1): to the cursor's row, wherever it moved to — or, with
+ * nothing selected, to the first row, which becomes the selection.
  *
  * With `tree` set the same table is a tree grid (PRD 002, §4.1): the rows are
  * a pre-flattened tree — `depth`, `expandable`, `expanded` already describe
@@ -133,6 +139,9 @@ export class UiFileList {
   /** Where the first row starts inside the scroll content — below the header. */
   private readonly leading = signal(0);
 
+  /** A header was pressed to sort: focus goes back to the cursor's row after the next render. */
+  private readonly refocusAfterSort = signal(false);
+
   /** A row a key moved to before it was rendered; focused once it is. */
   private pendingFocusId: string | null = null;
 
@@ -179,6 +188,25 @@ export class UiFileList {
     afterNextRender(() => this.viewport.attach(host));
     inject(DestroyRef).onDestroy(() => this.viewport.dispose());
 
+    // After a sort (PRD 002, §3.1): the rows are in their new order by now,
+    // since the application re-sorts as the header reports it.
+    afterRenderEffect(() => {
+      if (!this.refocusAfterSort()) {
+        return;
+      }
+      this.refocusAfterSort.set(false);
+      // With nothing selected there is no place to go back to: the first row
+      // takes the cursor, and becomes the selection.
+      if (this.selectedIds().size === 0) {
+        this.focusRow(0);
+        return;
+      }
+      const index = this.rows().findIndex((row) => row.id === this.focusId());
+      if (index !== -1) {
+        this.moveFocus(index);
+      }
+    });
+
     // After each render of a long list: measure what the window is computed
     // from, and hand focus to a row a key moved to while it was off-screen.
     afterRenderEffect(() => {
@@ -196,6 +224,12 @@ export class UiFileList {
       }
       this.focusPending();
     });
+  }
+
+  /** A header asks for the listing sorted by its column; see the class comment for where focus goes. */
+  protected onSort(key: string): void {
+    this.sort.emit(key);
+    this.refocusAfterSort.set(true);
   }
 
   protected ariaSort(column: UiFileColumn): string | null {
@@ -219,6 +253,30 @@ export class UiFileList {
       this.toggle.emit(row.id);
     }
   }
+
+  /**
+   * Focus arrived on a row from outside — the panel handing the keyboard
+   * to its content (a click on its blank space, a tab chosen, `Tab` from
+   * another panel, a folder entered), a sort — while nothing is selected
+   * (PRD 002, §3.1): the first row takes the cursor and becomes the
+   * selection. A pointer press selects by its own rules, and a move of this
+   * component's own (`Ctrl`+arrow, `Insert`) has already said what it means.
+   */
+  protected onFocusArrived(): void {
+    if (this.movingFocus || this.pressing) {
+      this.pressing = false;
+      return;
+    }
+    if (this.selectedIds().size === 0) {
+      this.focusRow(0);
+    }
+  }
+
+  /** Set while this component moves focus itself; see `onFocusArrived`. */
+  private movingFocus = false;
+
+  /** Set from a pointer press on a row until it is released; see `onFocusArrived`. */
+  protected pressing = false;
 
   /** A click selects by the keys held: alone, toggled, or as a range. */
   protected onClick(event: MouseEvent, index: number): void {
@@ -442,7 +500,12 @@ export class UiFileList {
     }
     const element = this.rowElements().find((candidate) => candidate.nativeElement.dataset['rowId'] === id);
     if (element) {
-      element.nativeElement.focus();
+      this.movingFocus = true;
+      try {
+        element.nativeElement.focus();
+      } finally {
+        this.movingFocus = false;
+      }
       this.pendingFocusId = null;
     }
   }

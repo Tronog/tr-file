@@ -13,7 +13,12 @@
     />
   </div>
 } @else {
-  <nav [attr.aria-label]="label()" [class.is-editable]="location() !== undefined" (click)="onBarClick($event)">
+  <nav
+    [attr.aria-label]="label()"
+    [class.is-editable]="location() !== undefined"
+    [attr.data-own-press]="location() !== undefined ? '' : null"
+    (click)="onBarClick($event)"
+  >
     <ol class="crumbs">
       @for (item of items(); track item.id; let last = $last) {
         <li class="crumb-item">

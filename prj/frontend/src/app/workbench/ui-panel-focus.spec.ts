@@ -177,14 +177,33 @@ describe('UiPanelGroup body focus', () => {
     });
 
     /**
-     * The path bar and the toolbar are the content's chrome, above its body:
-     * a press on their blank space is not a press on the panel's body.
+     * PRD 002, §3.1: an empty area of the panel is anywhere nothing takes
+     * focus from — the tab bar beside the tabs, the loading rail, the gaps of
+     * the content's toolbar, not only the body.
      */
-    it('is ignored when it lands on the chrome above the content body', () => {
+    it('is reported from the frame and the chrome above the content body', () => {
+      press(fixture.nativeElement.querySelector('ui-tab-bar .tabs') as Element);
+      press(fixture.nativeElement.querySelector('.loading-rail') as Element);
       press(fixture.nativeElement.querySelector('ui-panel-toolbar') as Element);
-      press(fixture.nativeElement.querySelector('ui-breadcrumbs') as Element);
+
+      expect(presses).toBe(3);
+    });
+
+    it('is ignored on a tab, a toolbar button and a path bar that edits on a press', () => {
+      press(fixture.nativeElement.querySelector('ui-tab-bar .tab') as Element);
+      press(fixture.nativeElement.querySelector('ui-panel-toolbar button') as Element);
+      show({ location: '/docs' });
+      press(fixture.nativeElement.querySelector('ui-breadcrumbs nav') as Element);
 
       expect(presses).toBe(0);
+    });
+
+    it('ends with focus on the body tab stop when it was on the tab bar', () => {
+      press(fixture.nativeElement.querySelector('ui-tab-bar .tabs') as Element);
+      ask(1);
+
+      expect(presses).toBe(1);
+      expect(document.activeElement).toBe(focusedRow());
     });
 
     it('is reported over an empty-state placeholder, which focuses nothing', () => {
