@@ -419,6 +419,12 @@ Opening with the system (PRD 003, §5): `BridgeSessions` answers `shell-open` an
 folder first, and Reveal is refused for it. Anything that looks like a program is confirmed
 with a native dialog in the main process, so the renderer cannot skip it.
 
+Section 8.5: `Ctrl`+`` ` `` shows and hides the desktop window system-wide — a global shortcut the
+main process registers (`desktop/src/window-visibility.ts`, `VisibilityShortcut`), which hides the
+window being looked at and brings back a hidden, minimised or background one; on Linux the
+`GlobalShortcutsPortal` feature lets a Wayland session grant it. A chord already taken is logged,
+not fatal.
+
 Section 8.2 took the window's frame away: `UiTitleBar` is the title bar, with the drag
 region and the window buttons in it. `WindowControlsChannel` plus the preload give the
 page four verbs over its own window, `DesktopWindowService` is the frontend seam, and

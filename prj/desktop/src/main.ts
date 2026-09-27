@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { app, BrowserWindow, dialog, nativeTheme, shell, type MessageBoxOptions } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, nativeTheme, shell, type MessageBoxOptions } from 'electron';
 
 import { installAppMenu } from './app-menu.js';
 import { DesktopConfig } from './desktop.config.js';
@@ -20,6 +20,7 @@ import { SystemClipboard } from './system-clipboard.js';
 import { ShellTrash } from './shell-trash.js';
 import { SystemPlaces } from './system-places.js';
 import { WindowControlsChannel } from './window-controls.channel.js';
+import { VisibilityShortcut } from './window-visibility.js';
 
 /**
  * The desktop entry point: the Electron half of PRD 001, Section 8.
@@ -59,6 +60,8 @@ class DesktopApplication {
   private windowChannel: WindowControlsChannel | null = null;
   private saveChannel: SaveFileChannel | null = null;
   private settingsChannel: SettingsChannel | null = null;
+  /** The global shortcut that shows and hides the window (PRD 001, §8.5). */
+  private visibilityShortcut: VisibilityShortcut | null = null;
   /** The settings file, read once here too: the window's first colour comes from it (PRD 010, §4). */
   private settingsStore: SettingsStore | null = null;
   private dragChannel: DragOutChannel | null = null;
@@ -97,6 +100,12 @@ class DesktopApplication {
     if (!app.requestSingleInstanceLock()) {
       app.quit();
       return;
+    }
+
+    // A Wayland session gives out global shortcuts only through its portal
+    // (PRD 001, §8.5); X11 and the other platforms need nothing.
+    if (process.platform === 'linux') {
+      app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal');
     }
 
     app.on('second-instance', () => this.window?.focus());
@@ -161,6 +170,14 @@ class DesktopApplication {
       this.windowChannel.register();
 
       await this.openWindow();
+
+      // `Ctrl`+`` ` `` shows and hides the window from anywhere (PRD 001, §8.5).
+      this.visibilityShortcut = new VisibilityShortcut(
+        globalShortcut,
+        () => this.window?.toggleVisibility(),
+        (message, fields) => this.stack.log.warn(message, fields),
+      );
+      this.visibilityShortcut.register();
     } catch (error: unknown) {
       this.fail(error);
     }
@@ -222,6 +239,7 @@ class DesktopApplication {
    */
   private shutDown(event: Electron.Event): void {
     event.preventDefault();
+    this.visibilityShortcut?.dispose();
     this.channel?.dispose();
     this.windowChannel?.dispose();
     this.saveChannel?.dispose();

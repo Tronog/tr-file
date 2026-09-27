@@ -1,8 +1,9 @@
 import { fileURLToPath } from 'node:url';
 
-import { BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 
 import { DARK_BACKGROUND } from './window-background.js';
+import { toggleVisibility } from './window-visibility.js';
 import { WINDOW_STATE_EVENT, WindowControlsChannel } from './window-controls.channel.js';
 
 /**
@@ -112,7 +113,26 @@ export class MainWindow {
     if (this.window.isMinimized()) {
       this.window.restore();
     }
+    // Hidden by the visibility shortcut (PRD 001, §8.5): launching the app again brings it back too.
+    if (!this.window.isVisible()) {
+      this.window.show();
+    }
     this.window.focus();
+  }
+
+  /**
+   * The global `Ctrl`+`` ` `` (PRD 001, §8.5): hides the window the user is
+   * looking at, brings back one that is hidden, minimised or behind another
+   * app's. On macOS an app that is not frontmost has to be made so, or the
+   * window would come back behind the one the user is in.
+   */
+  toggleVisibility(): void {
+    if (this.window === null || this.window.isDestroyed()) {
+      return;
+    }
+    if (toggleVisibility(this.window) === 'shown' && process.platform === 'darwin') {
+      app.focus({ steal: true });
+    }
   }
 
   /**

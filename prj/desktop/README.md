@@ -365,6 +365,23 @@ visible window at all, which went unnoticed only because opening the dev tools
 happened to show it. A window nobody can see is the worst failure this shell
 has, so it does not depend on an event that may not arrive.
 
+### Showing and hiding it from anywhere (PRD 001, §8.5)
+
+`Ctrl`+`` ` `` is a *global* shortcut — it works while another app has the
+keyboard — registered through Electron's `globalShortcut` once the window is
+up, and given back on quit (`window-visibility.ts`). One press behaves like a
+drop-down terminal: the window you are looking at hides; a hidden, minimised
+or background window comes to the front with the keyboard. It is `Control`
+on macOS too, because `Cmd`+`` ` `` is the system's own window-cycling key.
+Launching the app again also brings a hidden window back (the single-instance
+lock hands the launch to the running copy).
+
+When the chord cannot be had — another app owns it, or the session offers no
+global shortcuts — the app logs a warning and runs without it. On Linux the
+`GlobalShortcutsPortal` feature is switched on, so a Wayland session grants it
+through its desktop portal (which may ask the user once); an X11 session needs
+nothing.
+
 ## Running inside a container
 
 Chromium's `chrome-sandbox` helper must be root-owned and setuid, which it
