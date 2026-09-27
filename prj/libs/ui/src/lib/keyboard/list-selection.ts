@@ -11,13 +11,53 @@ import type { UiSelectionChange } from '../models';
  * - `range-add` — the same range, added to what is selected: `Ctrl`+`Shift`-click.
  * - `focus` — move the cursor, leave the selection: `Ctrl` with a movement key.
  * - `all` — every entry: `Ctrl`+`A`.
+ * - `toggle-all` — every entry, or none when every one already is: `*` (PRD 004, §2).
  *
  * The *anchor* is where a range starts: the last entry picked by a replace or
  * a toggle. It is transient gesture state, like a type-to-find prefix, so it
  * lives here rather than in the application's model; a list whose anchor is no
  * longer in it starts ranges from the cursor instead.
  */
-export type UiSelectMode = 'replace' | 'toggle' | 'range' | 'range-add' | 'focus' | 'all';
+export type UiSelectMode = 'replace' | 'toggle' | 'range' | 'range-add' | 'focus' | 'all' | 'toggle-all';
+
+/**
+ * Midnight Commander's selection keys (PRD 004, §2), on a row or a tile:
+ *
+ * - `mark` — `Insert`: flip the entry in or out, and move on to the next.
+ * - `toggle-all` — `*`: select everything, or nothing once everything is.
+ * - `select-pattern` / `unselect-pattern` — `+` / `-`: add or take away
+ *   the entries whose names match a pattern, which the application asks for.
+ *
+ * The first two are the list's own; the pattern keys leave as a `UiPanelKey`.
+ */
+export type UiMarkKey = 'mark' | 'toggle-all' | 'select-pattern' | 'unselect-pattern';
+
+/**
+ * The mark key `event` is, or `null`. `*`, `+` and `-` are read by the
+ * character, so the numeric keypad's count too, and whatever `Shift` it took
+ * to type them; `typing` says a name is being typed, which they are then part of.
+ */
+export function markKey(event: KeyboardEvent, typing: boolean): UiMarkKey | null {
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return null;
+  }
+  if (event.key === 'Insert') {
+    return event.shiftKey ? null : 'mark';
+  }
+  if (typing) {
+    return null;
+  }
+  switch (event.key) {
+    case '*':
+      return 'toggle-all';
+    case '+':
+      return 'select-pattern';
+    case '-':
+      return 'unselect-pattern';
+    default:
+      return null;
+  }
+}
 
 /** The mode a click means, from the keys held while it was made. */
 export function clickMode(event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): UiSelectMode {
@@ -88,7 +128,38 @@ export class UiListSelection {
 
       case 'all':
         return { selected: [...ids], focused: options.cursor ?? target };
+
+      case 'toggle-all':
+        return { selected: ids.every((id) => selected.has(id)) ? [] : [...ids], focused: options.cursor ?? target };
     }
+  }
+
+  /**
+   * `Insert` (PRD 004, §2): `target` — the entry the cursor is on — flips in
+   * or out of the selection, and the cursor moves on to `next` without
+   * touching the rest.
+   *
+   * Selection follows the cursor here, so an entry the cursor merely stands on
+   * is already selected. That lone entry is *kept*, not dropped: the first
+   * `Insert` on a fresh list marks the entry it is on, as it does in Midnight
+   * Commander. `Ctrl`+`Space` still takes it out.
+   */
+  mark(options: {
+    readonly ids: readonly string[];
+    readonly selected: ReadonlySet<string>;
+    readonly target: string;
+    readonly next: string;
+  }): UiSelectionChange {
+    const { ids, selected, target } = options;
+    const next = new Set(selected);
+    const lone = selected.size === 1 && selected.has(target);
+    if (selected.has(target) && !lone) {
+      next.delete(target);
+    } else {
+      next.add(target);
+    }
+    this.anchorId = target;
+    return { selected: ids.filter((id) => next.has(id)), focused: options.next };
   }
 
   /** Forgets the anchor — for a gesture, like a box selection, that sets its own. */

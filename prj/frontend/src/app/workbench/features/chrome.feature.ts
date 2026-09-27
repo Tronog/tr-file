@@ -88,6 +88,11 @@ export class ChromeFeature {
     }));
   });
 
+  /** `F9` (PRD 004, §2): the first menu opens, as Midnight Commander's pull-down does. */
+  openMainMenu(): void {
+    this.openMenuId.set(this.parent.mockWorkbench.menuItems[0]?.id ?? null);
+  }
+
   /** Opens the main menu `id`, or closes the open one with `null`. */
   setMenuOpen(id: string | null): void {
     this.openMenuId.set(id);

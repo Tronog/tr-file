@@ -207,6 +207,7 @@ export class CommandsFeature {
         id: 'file.openExternal',
         category: 'File',
         label: () => p.systemOpenFt.openLabel(),
+        keybinding: 'F4',
         enabled: one,
         run: (t) => p.systemOpenFt.open(t.paths[0] as string),
       },
@@ -218,8 +219,8 @@ export class CommandsFeature {
         run: (t) => p.systemOpenFt.reveal(t.paths[0] ?? (t.folder as string)),
       },
       { id: 'file.rename', category: 'File', label: 'Rename…', keybinding: 'F2', enabled: one, run: (t) => p.fileEditFt.rename(t.paths[0] as string, t.groupId) },
-      { id: 'file.copyTo', category: 'File', label: 'Copy To…', enabled: some, run: (t) => p.operationsFt.transferPaths('copy', t.paths, t.groupId) },
-      { id: 'file.moveTo', category: 'File', label: 'Move To…', enabled: some, run: (t) => p.operationsFt.transferPaths('move', t.paths, t.groupId) },
+      { id: 'file.copyTo', category: 'File', label: 'Copy To…', keybinding: 'F5', enabled: some, run: (t) => p.operationsFt.transferPaths('copy', t.paths, t.groupId) },
+      { id: 'file.moveTo', category: 'File', label: 'Move To…', keybinding: 'F6', enabled: some, run: (t) => p.operationsFt.transferPaths('move', t.paths, t.groupId) },
       { id: 'file.trash', category: 'File', label: 'Move to Trash', keybinding: 'Delete', enabled: some, run: (t) => p.operationsFt.trash(t.paths) },
       {
         id: 'file.delete',
@@ -275,6 +276,8 @@ export class CommandsFeature {
         run: (t) => p.systemOpenFt.copyPaths(some(t) ? t.paths : [t.folder as string]),
       },
       { id: 'file.emptyTrash', category: 'File', label: 'Empty Trash…', run: () => p.operationsFt.emptyTrash() },
+      // Midnight Commander's `F10` (PRD 004, §2): only a window of the desktop app can be quit.
+      { id: 'file.quit', category: 'File', label: 'Quit', keybinding: 'F10', enabled: () => p.desktopWindow.isAvailable, run: () => this.quit() },
 
       /* Edit */
       { id: 'edit.undo', category: 'Edit', label: () => p.undoFt.label(), keybinding: 'Ctrl+Z', enabled: () => p.undoFt.canUndo(), run: () => p.undoFt.undo() },
@@ -295,6 +298,23 @@ export class CommandsFeature {
       { id: 'selection.all', category: 'Selection', label: 'Select All', keybinding: 'Ctrl+A', enabled: listing, run: (t) => p.fileBrowserFt.selectAll(t.groupId) },
       { id: 'selection.none', category: 'Selection', label: 'Select None', enabled: some, run: (t) => p.fileBrowserFt.selectNone(t.groupId) },
       { id: 'selection.invert', category: 'Selection', label: 'Invert Selection', enabled: listing, run: (t) => p.fileBrowserFt.invertSelection(t.groupId) },
+      /* Midnight Commander's `+` and `-` (PRD 004, §2) */
+      {
+        id: 'selection.byPattern',
+        category: 'Selection',
+        label: 'Select by Pattern…',
+        keybinding: '+',
+        enabled: listing,
+        run: (t) => p.fileBrowserFt.selectByPattern(t.groupId, true),
+      },
+      {
+        id: 'selection.unselectByPattern',
+        category: 'Selection',
+        label: 'Unselect by Pattern…',
+        keybinding: '-',
+        enabled: listing,
+        run: (t) => p.fileBrowserFt.selectByPattern(t.groupId, false),
+      },
 
       /* View */
       ...VIEWS.map(
@@ -336,7 +356,7 @@ export class CommandsFeature {
         checked: () => p.showHidden(),
         run: () => p.showHidden.update((shown) => !shown),
       },
-      { id: 'view.refresh', category: 'View', label: 'Refresh', keybinding: 'F5', enabled: (t) => group(t) !== undefined, run: (t) => p.fileBrowserFt.runToolbarAction(t.groupId, 'refresh') },
+      { id: 'view.refresh', category: 'View', label: 'Refresh', keybinding: 'Ctrl+R', enabled: (t) => group(t) !== undefined, run: (t) => p.fileBrowserFt.runToolbarAction(t.groupId, 'refresh') },
 
       /* Places (PRD 003, §6) */
       {
@@ -419,6 +439,10 @@ export class CommandsFeature {
         run: () => p.sessionFt.setRestoresSessions(!p.sessionFt.restoresSessions),
       },
       { id: 'view.resetLayout', category: 'View', label: 'Reset Layout', run: () => p.sessionFt.resetLayout() },
+
+      /* The window, for the function keys (PRD 004, §2): `F1` and `F9` */
+      { id: 'view.commandPalette', category: 'View', label: 'Show All Commands', keybinding: 'F1', palette: false, run: () => p.commandPaletteFt.show() },
+      { id: 'view.mainMenu', category: 'View', label: 'Open the Main Menu', keybinding: 'F9', palette: false, run: () => p.chromeFt.openMainMenu() },
 
       /* Go */
       { id: 'go.back', category: 'Go', label: 'Back', keybinding: 'Alt+Left', enabled: (t) => p.panelHistoryFt.canGoBack(t.groupId), run: (t) => this.walk(t.groupId, () => p.panelHistoryFt.back(t.groupId)) },
@@ -506,6 +530,14 @@ export class CommandsFeature {
   private walk(groupId: string, move: () => void): void {
     move();
     this.parent.panelFocusFt.focusBody(groupId);
+  }
+
+  /** `F10`: the window closes, once the user has said so — as Midnight Commander asks before it quits. */
+  private async quit(): Promise<void> {
+    const sure = await this.parent.modal.confirm({ message: 'Quit tr-file?', confirmLabel: 'Quit' });
+    if (sure) {
+      this.parent.desktopWindow.close();
+    }
   }
 
   /** Closes the tabs of `target`'s group that `close` picks, by index against the target tab's. */

@@ -15,6 +15,11 @@ import { Menu, type MenuItemConstructorOptions } from 'electron';
  * is not a guarantee worth betting a window on, and the platforms differ. The
  * chord is simply not bound here.
  *
+ * `Ctrl`+`R` is the same story since PRD 004, §2: it reads a panel's folder
+ * again (Midnight Commander's key for it, now that `F5` copies), so the
+ * default **Reload** is left out — `Ctrl`+`Shift`+`R` (force reload) still
+ * reloads the window.
+ *
  * What is kept is what a desktop app is expected to answer: reload, the
  * inspector (the reason `TR_FILE_DEVTOOLS` is not the only way in), full
  * screen and quit.
@@ -23,7 +28,7 @@ export function installAppMenu(): void {
   const view: MenuItemConstructorOptions = {
     label: 'View',
     submenu: [
-      { role: 'reload' },
+      // No `reload` role: `Ctrl`+`R` belongs to the panel, which reads its folder again.
       { role: 'forceReload' },
       { role: 'toggleDevTools' },
       { type: 'separator' },

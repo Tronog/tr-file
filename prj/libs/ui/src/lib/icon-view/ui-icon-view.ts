@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
-import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
+import { clickMode, markKey, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
 import type { UiIconViewItem, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
 
@@ -71,7 +71,8 @@ interface MarqueeDrag {
  * once it exists.
  *
  * Selection is multiple (PRD 004, §1.2), exactly as in the list view — see
- * `UiListSelection` — and the grid adds a *box selection*: dragging across the
+ * `UiListSelection`, Midnight Commander's `Insert`, `*`, `+` and `-` (§2)
+ * included — and the grid adds a *box selection*: dragging across the
  * blank space between and around the tiles selects every tile the box
  * touches, added to the selection when `Ctrl` or `Shift` is held; a plain
  * click on blank space clears it. The box is hit-tested against the grid's
@@ -181,7 +182,7 @@ export class UiIconView {
   });
 
   /** Keys documented on every tile, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete F2 F5 PageUp PageDown Home End';
+  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete Insert * + - PageUp PageDown Home End';
 
   private readonly tiles = viewChildren<ElementRef<HTMLButtonElement>>('tile');
 
@@ -322,6 +323,10 @@ export class UiIconView {
       return;
     }
 
+    if (this.onMarkKey(event, index)) {
+      return;
+    }
+
     if (command) {
       return;
     }
@@ -336,14 +341,8 @@ export class UiIconView {
       case 'Backspace':
         this.command.emit({ command: 'up', entryId: item.id });
         break;
-      case 'F5':
-        this.command.emit({ command: 'refresh', entryId: item.id });
-        break;
       case 'Delete':
         this.command.emit({ command: event.shiftKey ? 'delete-permanently' : 'delete', entryId: item.id });
-        break;
-      case 'F2':
-        this.command.emit({ command: 'rename', entryId: item.id });
         break;
       default: {
         if (!isTypeaheadKey(event)) {
@@ -365,6 +364,36 @@ export class UiIconView {
     // Claimed unconditionally: `Enter` and `Space` would otherwise also click
     // the tile, and `Backspace` would navigate the browser back.
     event.preventDefault();
+  }
+
+  /**
+   * Midnight Commander's selection keys (PRD 004, §2); `true` when `event`
+   * was one. `Insert` moves on to the next tile in reading order.
+   */
+  private onMarkKey(event: KeyboardEvent, index: number): boolean {
+    const key = markKey(event, this.typeahead.typing());
+    const items = this.items();
+    const item = items[index];
+    if (key === null || item === undefined) {
+      return false;
+    }
+    event.preventDefault();
+    if (key === 'select-pattern' || key === 'unselect-pattern') {
+      this.command.emit({ command: key, entryId: item.id });
+    } else if (key === 'toggle-all') {
+      this.pick(item.id, 'toggle-all');
+    } else {
+      const next = Math.min(index + 1, items.length - 1);
+      const change = this.selection.mark({
+        ids: items.map((candidate) => candidate.id),
+        selected: this.selectedIds(),
+        target: item.id,
+        next: (items[next] as UiIconViewItem).id,
+      });
+      this.moveFocus(next);
+      this.report(change);
+    }
+    return true;
   }
 
   /** Where a movement key goes from `index`, or `null` for any other key. */
@@ -394,13 +423,18 @@ export class UiIconView {
 
   /** Applies a selection gesture to `id` and reports the result. */
   private pick(id: string, mode: UiSelectMode): void {
-    const change = this.selection.pick({
-      ids: this.items().map((item) => item.id),
-      selected: this.selectedIds(),
-      cursor: this.focusId(),
-      target: id,
-      mode,
-    });
+    this.report(
+      this.selection.pick({
+        ids: this.items().map((item) => item.id),
+        selected: this.selectedIds(),
+        cursor: this.focusId(),
+        target: id,
+        mode,
+      }),
+    );
+  }
+
+  private report(change: UiSelectionChange): void {
     this.selectionChange.emit(change);
     if (change.focused !== null) {
       this.select.emit(change.focused);
@@ -532,11 +566,19 @@ export class UiIconView {
 
   /** Moves focus to a tile and selects by `mode` — the tile alone unless told otherwise; indices are clamped. */
   private focusTile(index: number, mode: UiSelectMode = 'replace'): void {
+    const item = this.moveFocus(index);
+    if (item !== undefined) {
+      this.pick(item.id, mode);
+    }
+  }
+
+  /** Moves focus to a tile, selecting nothing; see `focusTile`. */
+  private moveFocus(index: number): UiIconViewItem | undefined {
     const items = this.items();
     const clamped = Math.min(Math.max(index, 0), items.length - 1);
     const item = items[clamped];
     if (!item) {
-      return;
+      return undefined;
     }
 
     if (this.virtual()) {
@@ -547,7 +589,7 @@ export class UiIconView {
     // are the old window's until the next render.
     this.pendingFocusId = item.id;
     this.focusPending();
-    this.pick(item.id, mode);
+    return item;
   }
 
   /** Focuses the tile a key moved to, if it is rendered yet. */

@@ -272,7 +272,8 @@ describe('File management (PRD 003, §5)', () => {
       const rename = vi.spyOn(workbench.fileEditFt, 'rename').mockResolvedValue();
 
       workbench.panelKeyboardFt.run(group, { command: 'new-folder', entryId: null });
-      workbench.panelKeyboardFt.run(group, { command: 'rename', entryId: 'a.txt' });
+      workbench.fileBrowserFt.selectEntry(group, 'a.txt');
+      workbench.functionKeysFt.run('F2');
 
       expect(folder).toHaveBeenCalledWith('', group);
       expect(rename).toHaveBeenCalledWith('a.txt', group);

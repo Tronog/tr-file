@@ -98,7 +98,7 @@ describe('PanelKeyboardFeature', () => {
     expect(crumbs()).toBe('tr-file');
   });
 
-  it('re-reads the listing on F5', async () => {
+  it('re-reads the listing on Ctrl+R', async () => {
     await start();
     await openDocs();
 

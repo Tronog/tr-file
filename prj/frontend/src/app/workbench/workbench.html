@@ -401,7 +401,9 @@
     uiSlot="status"
     [leadingItems]="chrome.statusLeadingItems()"
     [trailingItems]="chrome.statusTrailingItems()"
+    [functionKeys]="workbench.functionKeysFt.strip()"
     (select)="chrome.runStatusAction($event)"
+    (functionKeySelect)="workbench.functionKeysFt.run($event)"
   />
 </ui-workbench>
 

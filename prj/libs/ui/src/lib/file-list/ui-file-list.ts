@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
-import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
+import { clickMode, markKey, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
 import type { UiFileColumn, UiFileRow, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
 
@@ -39,14 +39,17 @@ const DEFAULT_ROW_HEIGHT = 22;
  * click toggles a row, `Shift` click selects the range from the anchor, and
  * with the keyboard `Shift` plus a movement key extends, `Ctrl` plus an arrow
  * moves the cursor alone, `Ctrl`+`Space` toggles and `Ctrl`+`A` selects all.
- * Every change leaves as one `selectionChange`; `select` still names the row
- * the cursor landed on.
+ * Midnight Commander's keys work too (PRD 004, §2): `Insert` marks the row and
+ * moves on, `*` selects everything or, once everything is, nothing. Every
+ * change leaves as one `selectionChange`; `select` still names the row the
+ * cursor landed on.
  *
  * The keys that mean something to the *workbench* rather than to this table
- * — `Enter`, `Space`, `Backspace`, `F5`, `Delete` (`Shift`+`Delete` deletes
- * for good) and `F2` (rename) — leave as a `UiPanelKey` instead of being
- * acted on here; `PanelKeyboardFeature` in the app decides what each one
- * does.
+ * — `Enter`, `Space`, `Backspace`, `Delete` (`Shift`+`Delete` deletes for
+ * good), and `+` / `-` (select or unselect by a pattern) — leave as a
+ * `UiPanelKey` instead of being acted on here; `PanelKeyboardFeature` in the
+ * app decides what each one does. The function keys are the window's, not
+ * the table's.
  *
  * With `sortable` set the column headers are buttons that report `sort` with
  * their column's key (PRD 003, §5); the order is the application's, and the
@@ -117,7 +120,7 @@ export class UiFileList {
   });
 
   /** Keys documented on every row, so the set is discoverable. */
-  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete F2 F5 PageUp PageDown Home End';
+  protected readonly keyShortcuts = 'Enter Space Backspace Delete Shift+Delete Insert * + - PageUp PageDown Home End';
 
   private readonly rowElements = viewChildren<ElementRef<HTMLTableRowElement>>('rowElement');
   private readonly body = viewChild<ElementRef<HTMLTableSectionElement>>('body');
@@ -259,6 +262,10 @@ export class UiFileList {
       return;
     }
 
+    if (this.onMarkKey(event, index)) {
+      return;
+    }
+
     if (command) {
       return;
     }
@@ -295,14 +302,8 @@ export class UiFileList {
       case 'Backspace':
         this.command.emit({ command: 'up', entryId: row.id });
         break;
-      case 'F5':
-        this.command.emit({ command: 'refresh', entryId: row.id });
-        break;
       case 'Delete':
         this.command.emit({ command: event.shiftKey ? 'delete-permanently' : 'delete', entryId: row.id });
-        break;
-      case 'F2':
-        this.command.emit({ command: 'rename', entryId: row.id });
         break;
       default: {
         if (!isTypeaheadKey(event)) {
@@ -324,6 +325,36 @@ export class UiFileList {
     }
 
     event.preventDefault();
+  }
+
+  /**
+   * Midnight Commander's selection keys (PRD 004, §2); `true` when `event`
+   * was one. `Insert` on the last row marks it and stays, as there.
+   */
+  private onMarkKey(event: KeyboardEvent, index: number): boolean {
+    const key = markKey(event, this.typeahead.typing());
+    const rows = this.rows();
+    const row = rows[index];
+    if (key === null || row === undefined) {
+      return false;
+    }
+    event.preventDefault();
+    if (key === 'select-pattern' || key === 'unselect-pattern') {
+      this.command.emit({ command: key, entryId: row.id });
+    } else if (key === 'toggle-all') {
+      this.pick(row.id, 'toggle-all');
+    } else {
+      const next = Math.min(index + 1, rows.length - 1);
+      const change = this.selection.mark({
+        ids: rows.map((candidate) => candidate.id),
+        selected: this.selectedIds(),
+        target: row.id,
+        next: (rows[next] as UiFileRow).id,
+      });
+      this.moveFocus(next);
+      this.report(change);
+    }
+    return true;
   }
 
   /** Where a movement key goes from `index`, or `null` for any other key. */
@@ -348,31 +379,49 @@ export class UiFileList {
 
   /** Applies a selection gesture to `id` and reports the result. */
   private pick(id: string, mode: UiSelectMode): void {
-    const rows = this.rows();
-    const change = this.selection.pick({
-      ids: rows.map((row) => row.id),
-      selected: new Set(rows.filter((row) => row.selected || row.inactiveSelected).map((row) => row.id)),
-      cursor: this.focusId(),
-      target: id,
-      mode,
-    });
+    this.report(
+      this.selection.pick({
+        ids: this.rows().map((row) => row.id),
+        selected: this.selectedIds(),
+        cursor: this.focusId(),
+        target: id,
+        mode,
+      }),
+    );
+  }
+
+  private report(change: UiSelectionChange): void {
     this.selectionChange.emit(change);
     if (change.focused !== null) {
       this.select.emit(change.focused);
     }
   }
 
+  private selectedIds(): ReadonlySet<string> {
+    return new Set(this.rows().filter((row) => row.selected || row.inactiveSelected).map((row) => row.id));
+  }
+
   /**
    * Moves focus to a row and selects by `mode` — the row alone unless told
-   * otherwise; indices are clamped. A row that is not rendered is scrolled in
-   * first and focused after the next render.
+   * otherwise; indices are clamped.
    */
   private focusRow(index: number, mode: UiSelectMode = 'replace'): void {
+    const row = this.moveFocus(index);
+    if (row !== undefined) {
+      this.pick(row.id, mode);
+    }
+  }
+
+  /**
+   * Moves focus to a row, selecting nothing; indices are clamped. A row that
+   * is not rendered is scrolled in first and focused after the next render.
+   */
+  private moveFocus(index: number): UiFileRow | undefined {
     const rows = this.rows();
     const clamped = Math.min(Math.max(index, 0), rows.length - 1);
     const row = rows[clamped];
     if (!row) {
-      return;
+      return undefined;
     }
 
     if (this.virtual()) {
@@ -382,7 +431,7 @@ export class UiFileList {
     // the old window's until the next render.
     this.pendingFocusId = row.id;
     this.focusPending();
-    this.pick(row.id, mode);
+    return row;
   }
 
   /** Focuses the row a key moved to, if it is rendered yet. */

@@ -72,6 +72,15 @@ export class UiTypeahead {
 
     return -1;
   }
+
+  /**
+   * Whether a name is being typed — a letter came in less than the timeout
+   * ago — so a key that is a command of its own on a list (`+`, `-`, `*`)
+   * is taken as part of the name instead.
+   */
+  typing(now: number = Date.now()): boolean {
+    return this.prefix !== '' && now - this.at <= TYPEAHEAD_TIMEOUT;
+  }
 }
 
 /**

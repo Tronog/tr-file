@@ -8,6 +8,7 @@ import type {
   UiIconViewItem,
   UiPanelGroupModel,
   UiPanelKey,
+  UiSelectionChange,
 } from '@tr-file/ui';
 import { PanelHost } from './testing/panel-host';
 
@@ -106,22 +107,86 @@ describe('UiFileList keyboard', () => {
    * These keys are reported, not acted on: what "open" means to the workbench
    * is `PanelKeyboardFeature`'s decision, not this table's.
    */
-  it('reports Enter, Space, Backspace, F5 and Delete as panel commands', () => {
+  it('reports Enter, Space, Backspace, Delete, + and - as panel commands', () => {
     press(2, 'Enter');
     press(2, ' ');
     press(2, 'Backspace');
-    press(2, 'F5');
     press(2, 'Delete');
+    press(2, '+');
+    press(2, '-');
 
     expect(commands).toEqual([
       { command: 'open', entryId: 'download.zip' },
       { command: 'select', entryId: 'download.zip' },
       { command: 'up', entryId: 'download.zip' },
-      { command: 'refresh', entryId: 'download.zip' },
       { command: 'delete', entryId: 'download.zip' },
+      { command: 'select-pattern', entryId: 'download.zip' },
+      { command: 'unselect-pattern', entryId: 'download.zip' },
     ]);
     // None of them moved the selection on their own.
     expect(selected).toEqual([]);
+  });
+
+  /** Midnight Commander's selection keys (PRD 004, §2). */
+  describe('Insert and *', () => {
+    let changes: UiSelectionChange[];
+
+    beforeEach(() => {
+      changes = [];
+      fixture.componentInstance.selectionChange.subscribe((change) => changes.push(change));
+    });
+
+    const withSelection = (ids: readonly string[], focused: string): void => {
+      fixture.componentRef.setInput(
+        'rows',
+        ROWS.map((row) => ({ ...row, selected: ids.includes(row.id), focused: row.id === focused })),
+      );
+      fixture.detectChanges();
+    };
+
+    it('Insert keeps the row the cursor alone selected, and moves on without selecting the next', () => {
+      press(0, 'Insert');
+
+      expect(changes).toEqual([{ selected: ['alpha.ts'], focused: 'docs' }]);
+      expect(document.activeElement).toBe(rows()[1]);
+    });
+
+    it('Insert adds a row to what is marked, or takes a marked one out', () => {
+      withSelection(['alpha.ts'], 'docs');
+      press(1, 'Insert');
+      withSelection(['alpha.ts', 'docs'], 'alpha.ts');
+      press(0, 'Insert');
+
+      expect(changes).toEqual([
+        { selected: ['alpha.ts', 'docs'], focused: 'download.zip' },
+        { selected: ['docs'], focused: 'docs' },
+      ]);
+    });
+
+    it('Insert on the last row marks it and stays', () => {
+      withSelection(['alpha.ts'], 'zeta.json');
+      press(4, 'Insert');
+
+      expect(changes).toEqual([{ selected: ['alpha.ts', 'zeta.json'], focused: 'zeta.json' }]);
+    });
+
+    it('* selects every row, and nothing once every row is', () => {
+      press(0, '*');
+      withSelection(NAMES, 'alpha.ts');
+      press(0, '*');
+
+      expect(changes).toEqual([
+        { selected: [...NAMES], focused: 'alpha.ts' },
+        { selected: [], focused: 'alpha.ts' },
+      ]);
+    });
+
+    it('takes *, + and - as part of a name being typed', () => {
+      press(0, 'a');
+      press(0, '-');
+
+      expect(commands).toEqual([]);
+    });
   });
 
   it('narrows on each letter as a prefix is typed', () => {
@@ -388,9 +453,9 @@ describe('panel keys', () => {
    * An empty folder gives focus to the body itself, and a keyboard user has to
    * be able to walk back out of it (PRD 001, §6.2.1 with §6.3.1).
    */
-  it('answers Backspace and F5 when the body itself has focus', () => {
+  it('answers Backspace and Ctrl+R when the body itself has focus', () => {
     contentBody().dispatchEvent(keydown('Backspace'));
-    contentBody().dispatchEvent(keydown('F5'));
+    contentBody().dispatchEvent(keydown('r', { ctrlKey: true }));
     fixture.detectChanges();
 
     expect(commands).toEqual([
@@ -404,16 +469,27 @@ describe('panel keys', () => {
    * therefore arrive exactly once — from the list, carrying its entry — and
    * not a second time from the browser.
    */
-  it('leaves Backspace and F5 to the row that has focus', () => {
+  it('leaves Backspace to the row that has focus, and answers Ctrl+R once', () => {
     const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
     row.dispatchEvent(keydown('Backspace'));
-    row.dispatchEvent(keydown('F5'));
+    row.dispatchEvent(keydown('r', { ctrlKey: true }));
     fixture.detectChanges();
 
     expect(commands).toEqual([
       { command: 'up', entryId: 'alpha.ts' },
-      { command: 'refresh', entryId: 'alpha.ts' },
+      { command: 'refresh', entryId: null },
     ]);
+  });
+
+  /** The function keys are the window's (PRD 004, §2): a panel reports none of them. */
+  it('reports no function key', () => {
+    const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
+    for (const key of ['F2', 'F5']) {
+      expect(row.dispatchEvent(keydown(key))).toBe(true);
+    }
+    fixture.detectChanges();
+
+    expect(commands).toEqual([]);
   });
 
   /**

@@ -1,4 +1,36 @@
-@for (item of leadingItems(); track item.id) {
+<div class="status-group is-leading">
+  @for (item of leadingItems(); track item.id) {
+    <ng-container *ngTemplateOutlet="statusItem; context: { $implicit: item }" />
+  }
+</div>
+
+@if (functionKeys().length > 0) {
+  <div class="function-keys" role="toolbar" aria-label="Function keys">
+    @for (fkey of functionKeys(); track fkey.id) {
+      <button
+        type="button"
+        class="function-key"
+        tabindex="-1"
+        [disabled]="fkey.disabled"
+        [attr.title]="fkey.title ?? fkey.label"
+        [attr.aria-label]="'F' + fkey.key + ' ' + (fkey.title ?? fkey.label)"
+        (mousedown)="$event.preventDefault()"
+        (click)="functionKeySelect.emit(fkey.id)"
+      >
+        <span class="function-key-number">{{ fkey.key }}</span>
+        <span class="function-key-label">{{ fkey.label }}</span>
+      </button>
+    }
+  </div>
+}
+
+<div class="status-group is-trailing">
+  @for (item of trailingItems(); track item.id) {
+    <ng-container *ngTemplateOutlet="statusItem; context: { $implicit: item }" />
+  }
+</div>
+
+<ng-template #statusItem let-item>
   <button
     type="button"
     class="status-item"
@@ -17,27 +49,4 @@
       <ui-icon [name]="item.trailingIcon" />
     }
   </button>
-}
-
-<span class="status-spacer"></span>
-
-@for (item of trailingItems(); track item.id) {
-  <button
-    type="button"
-    class="status-item"
-    [class.is-accent]="item.accent"
-    [attr.title]="item.title ?? item.label"
-    [attr.aria-label]="item.label"
-    (click)="select.emit(item.id)"
-  >
-    @if (item.icon) {
-      <ui-icon [name]="item.icon" />
-    }
-    @if (item.label) {
-      <span class="status-label">{{ item.label }}</span>
-    }
-    @if (item.trailingIcon) {
-      <ui-icon [name]="item.trailingIcon" />
-    }
-  </button>
-}
+</ng-template>

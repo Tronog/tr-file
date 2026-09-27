@@ -253,11 +253,10 @@ export class UiFileBrowser {
    * own. Both views let an `Alt` chord bubble untouched so it arrives here
    * exactly once.
    *
-   * `Backspace` and `F5` are handled here *only* when the body itself has
-   * focus, which is the empty-folder case: without it, a keyboard user who
-   * walked into an empty folder would have no way to walk back out of it.
-   * Whenever there is a row or a tile to stand on, those keys belong to the
-   * view that owns it. `Alt`+`↑` needs no such guard, since neither view
+   * `Backspace` is handled here *only* when the body itself has focus, which
+   * is the empty-folder case: without it, a keyboard user who walked into an
+   * empty folder would have no way to walk back out of it. Whenever there is
+   * a row or a tile to stand on, the key belongs to the view that owns it. `Alt`+`↑` needs no such guard, since neither view
    * claims an `Alt` chord.
    */
   protected onBodyKeydown(event: KeyboardEvent): void {
@@ -280,21 +279,14 @@ export class UiFileBrowser {
     }
 
     // Only when the body itself has focus, which happens when it has nothing
-    // to give focus to: an empty folder. The list and the grid own these keys
-    // whenever there is a row or a tile to stand on, and handling them here as
-    // well would run them twice.
-    if (event.target !== this.bodyElement().nativeElement) {
+    // to give focus to: an empty folder. The list and the grid own the key
+    // whenever there is a row or a tile to stand on, and handling it here as
+    // well would run it twice.
+    if (event.target !== this.bodyElement().nativeElement || event.key !== 'Backspace') {
       return;
     }
 
-    if (event.key === 'Backspace') {
-      this.command.emit({ command: 'up', entryId: null });
-    } else if (event.key === 'F5') {
-      this.command.emit({ command: 'refresh', entryId: null });
-    } else {
-      return;
-    }
-
+    this.command.emit({ command: 'up', entryId: null });
     event.preventDefault();
   }
 
@@ -322,8 +314,10 @@ export class UiFileBrowser {
   /**
    * The chords of PRD 003, §5 that are about the listing as a whole, from
    * anywhere in the browser: `Ctrl`+`F` to the filter box, `Ctrl`+`L` to the
-   * path bar, `Ctrl`+`Z` to undo, `Ctrl`+`Shift`+`N` for a new folder. None
-   * is claimed inside a text field, where `Ctrl`+`Z` is the field's own.
+   * path bar, `Ctrl`+`Z` to undo, `Ctrl`+`Shift`+`N` for a new folder — and
+   * `Ctrl`+`R` to read the folder again, Midnight Commander's key for it
+   * (PRD 004, §2), now that `F5` copies. None is claimed inside a text field,
+   * where `Ctrl`+`Z` is the field's own.
    */
   private onChordKey(event: KeyboardEvent): boolean {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || UiFileBrowser.isTextField(event.target)) {
@@ -339,6 +333,8 @@ export class UiFileBrowser {
       this.command.emit({ command: 'undo', entryId: null });
     } else if (event.shiftKey && key === 'n' && listing) {
       this.command.emit({ command: 'new-folder', entryId: null });
+    } else if (!event.shiftKey && key === 'r') {
+      this.command.emit({ command: 'refresh', entryId: null });
     } else {
       return false;
     }

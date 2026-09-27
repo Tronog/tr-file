@@ -72,6 +72,21 @@ export interface UiStatusItem {
   readonly title?: string;
 }
 
+/**
+ * One key of the status bar's function-key strip (PRD 004, §2), Midnight
+ * Commander's `1Help 2Menu 3View …`: `key` is what is printed before the
+ * label — `'5'` for `F5` — and a click reports `id`.
+ */
+export interface UiFunctionKey {
+  readonly id: string;
+  readonly key: string;
+  readonly label: string;
+  /** The tooltip: what the key does, in full. */
+  readonly title?: string;
+  /** Drawn dimmed and not clickable: there is nothing for it to act on. */
+  readonly disabled?: boolean;
+}
+
 /** A row of a context menu. */
 export interface UiMenuItem {
   readonly id: string;

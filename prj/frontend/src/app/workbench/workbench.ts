@@ -106,6 +106,7 @@ export class Workbench {
   protected onDocumentKeydown(event: KeyboardEvent): void {
     this.workbench.commandPaletteFt.handleShortcut(event);
     this.workbench.searchFt.handleShortcut(event);
+    this.workbench.functionKeysFt.handleShortcut(event);
     const direction = this.workbench.focusCycleFt.directionOf(event);
     if (direction === 0 || event.defaultPrevented) {
       return;

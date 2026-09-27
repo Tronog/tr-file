@@ -61,7 +61,7 @@ describe('UiFileList, sortable', () => {
     expect(fixture.nativeElement.querySelector('.sort-button')).toBeNull();
   });
 
-  it('reports F2 as rename and Shift+Delete as delete for good', () => {
+  it('reports Shift+Delete as delete for good, and leaves F2 to the window', () => {
     const commands: UiPanelKey[] = [];
     fixture.componentInstance.command.subscribe((key) => commands.push(key));
     fixture.detectChanges();
@@ -72,7 +72,6 @@ describe('UiFileList, sortable', () => {
     row.dispatchEvent(keydown('Delete'));
 
     expect(commands).toEqual([
-      { command: 'rename', entryId: 'a.txt' },
       { command: 'delete-permanently', entryId: 'a.txt' },
       { command: 'delete', entryId: 'a.txt' },
     ]);

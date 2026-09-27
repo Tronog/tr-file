@@ -96,12 +96,13 @@ export type UiPanelCommand =
   | 'forward'
   | 'delete'
   | 'delete-permanently'
-  | 'rename'
   | 'new-folder'
   | 'undo'
   | 'copy'
   | 'cut'
-  | 'paste';
+  | 'paste'
+  | 'select-pattern'
+  | 'unselect-pattern';
 
 /**
  * One `UiPanelCommand`, with the entry focus sat on when the key was hit.
@@ -109,6 +110,11 @@ export type UiPanelCommand =
  * `back` and `forward` carry an entry like the rest, but never use one: they
  * are about where the *panel* has been, not what is selected in it.
  * `open-aside` opens its entry in a panel that does not exist yet.
+ * `select-pattern` / `unselect-pattern` are `+` / `-` (PRD 004, §2): the
+ * application asks for the pattern.
+ *
+ * The function keys are not panel keys: `F1`–`F10` mean the same wherever
+ * focus is (PRD 004, §2), so the application binds them for the whole window.
  */
 export interface UiPanelKey {
   readonly command: UiPanelCommand;

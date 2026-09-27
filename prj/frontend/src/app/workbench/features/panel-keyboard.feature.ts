@@ -14,7 +14,7 @@ import type { WorkbenchService } from '../workbench.service';
  *
  * That also keeps the bindings honest about their reach: `open` and `select`
  * are the same operations a double click and a click perform, `up` is the
- * toolbar's Up button, and `F5` is its Refresh — a keyboard user gets at the
+ * toolbar's Up button, and `Ctrl`+`R` is its Refresh — a keyboard user gets at the
  * panel's existing verbs rather than a parallel set of their own. `back` and
  * `forward` are the exception, and the reason `PanelHistoryFeature` exists:
  * `Alt`+`←`/`→` is the only way to walk a panel's trail, since nothing in the
@@ -22,8 +22,10 @@ import type { WorkbenchService } from '../workbench.service';
  * that does not exist until the key is pressed (§6.2.5). `Delete` moves the
  * selection to the trash, after asking (PRD 005, §1), and `Ctrl`+`C` / `X` /
  * `V` are the clipboard (§2). PRD 003, §5 adds `Shift`+`Delete` (delete for
- * good, after asking), `F2` (rename), `Ctrl`+`Shift`+`N` (new folder) and
- * `Ctrl`+`Z` (undo) — each the same command its menu entry runs.
+ * good, after asking), `Ctrl`+`Shift`+`N` (new folder) and `Ctrl`+`Z` (undo)
+ * — each the same command its menu entry runs — and PRD 004, §2 `+` / `-`,
+ * select and unselect by a pattern. The function keys are not here: they
+ * mean the same wherever focus is, and `FunctionKeysFeature` binds them.
  */
 export class PanelKeyboardFeature {
   constructor(private readonly parent: WorkbenchService) {}
@@ -99,15 +101,9 @@ export class PanelKeyboardFeature {
         void this.parent.operationsFt.trashSelection(groupId, key.entryId);
         break;
 
-      // PRD 003, §5: `Shift`+`Delete`, `F2`, `Ctrl`+`Shift`+`N`, `Ctrl`+`Z`.
+      // PRD 003, §5: `Shift`+`Delete`, `Ctrl`+`Shift`+`N`, `Ctrl`+`Z`.
       case 'delete-permanently':
         void this.parent.operationsFt.deleteSelection(groupId, key.entryId);
-        break;
-
-      case 'rename':
-        if (key.entryId !== null) {
-          void this.parent.fileEditFt.rename(key.entryId, groupId);
-        }
         break;
 
       case 'new-folder': {
@@ -120,6 +116,12 @@ export class PanelKeyboardFeature {
 
       case 'undo':
         void this.parent.undoFt.undo();
+        break;
+
+      // PRD 004, §2: Midnight Commander's `+` and `-`.
+      case 'select-pattern':
+      case 'unselect-pattern':
+        void files.selectByPattern(groupId, key.command === 'select-pattern');
         break;
     }
   }

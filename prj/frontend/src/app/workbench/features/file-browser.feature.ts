@@ -14,6 +14,7 @@ import type {
 import type { FsEntry } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import { nameFilter, sortEntries } from '../listing/listing-order';
+import { namePattern, patternProblem } from '../listing/name-pattern';
 import type { PanelContentFeature } from '../panel-content.model';
 import {
   DEFAULT_SORT,
@@ -310,6 +311,53 @@ export class FileBrowserFeature implements PanelContentFeature {
       this.parent.select(inverted[0]);
     }
   }
+
+  /**
+   * `+` / `-` (PRD 004, §2): asks for a pattern — `*.txt`, see `namePattern`
+   * — and adds the entries the panel shows whose names match it to the
+   * selection, or takes them out of it. The cursor stays where it is.
+   *
+   * An entry selected only because the cursor stands on it was never picked,
+   * so selecting by a pattern starts without it, as `Insert` does.
+   */
+  async selectByPattern(groupId: string, select: boolean): Promise<void> {
+    if (this.groups.stateOf(groupId) === undefined || this.entriesShown(groupId).length === 0) {
+      return;
+    }
+    const value = this.lastPattern;
+    const answer = await this.parent.modal.prompt({
+      message: select ? 'Select the entries whose names match:' : 'Unselect the entries whose names match:',
+      detail: '* stands for any characters, ? for one; separate several patterns with ;',
+      label: 'Pattern',
+      value,
+      selection: [0, value.length],
+      confirmLabel: select ? 'Select' : 'Unselect',
+      validate: patternProblem,
+    });
+    const group = this.groups.stateOf(groupId);
+    if (answer === null || group === undefined) {
+      return;
+    }
+    this.lastPattern = answer.trim();
+
+    const matches = namePattern(answer);
+    const lone = group.selection.length === 1 && group.selection[0] === group.focusedEntryId;
+    const selected = new Set(select && lone ? [] : group.selection);
+    const shown = this.entriesShown(groupId);
+    for (const path of shown) {
+      if (matches(path.slice(path.lastIndexOf('/') + 1))) {
+        if (select) {
+          selected.add(path);
+        } else {
+          selected.delete(path);
+        }
+      }
+    }
+    this.groups.update(groupId, (state) => ({ ...state, selection: shown.filter((path) => selected.has(path)) }));
+  }
+
+  /** The pattern `+` / `-` last used, offered again. */
+  private lastPattern = '*';
 
   /**
    * Opens an entry by its path — a context menu's, the explorer's — as a
@@ -811,7 +859,7 @@ export class FileBrowserFeature implements PanelContentFeature {
         ...(history.canGoForward(group.id) ? {} : { disabled: true }),
       },
       { id: 'up', label: 'Up one level (Alt+Up)', icon: 'arrow-up', ...(group.path === '' ? { disabled: true } : {}) },
-      { id: 'refresh', label: 'Refresh listing (F5)', icon: 'refresh' },
+      { id: 'refresh', label: 'Refresh listing (Ctrl+R)', icon: 'refresh' },
       { id: 'new-file', label: 'New file…', icon: 'file-plus' },
       { id: 'new-folder', label: 'New folder… (Ctrl+Shift+N)', icon: 'folder-plus' },
       { id: 'upload', label: 'Upload files', icon: 'upload' },

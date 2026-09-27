@@ -67,8 +67,16 @@ which opening a folder, Up, breadcrumbs, *Jump to Folder* and `Alt`+`←`/`→` 
 selected row into view. Opening a file reveals the folder it is in.
 Inside a panel body the library components move focus (arrows, `Home`/`End`, page keys,
 type-to-find, selection following focus) and report the keys that mean something to the
-workbench — `Enter`, `Space`, `Backspace`, `F5`, and `Alt`+`←`/`→` — as a `UiPanelKey`;
-`PanelKeyboardFeature` is the one place those bindings are decided. `Ctrl`+`T` (split),
+workbench — `Enter`, `Space`, `Backspace`, `Ctrl`+`R` (refresh), `+`/`-`, and `Alt`+`←`/`→` — as a
+`UiPanelKey`; `PanelKeyboardFeature` is the one place those bindings are decided.
+**Midnight Commander (PRD 004, §2).** The function keys are the *window's*, not a panel's:
+`FunctionKeysFeature` binds `F1`–`F10` document-wide (palette, rename, view, edit/open, copy and
+move — to the other panel's folder —, mkdir, trash, main menu, and quit on the desktop), each a
+command of `CommandsFeature` run on the active panel, and feeds the strip in the middle of
+`UiStatusBar` (`functionKeys`). `F5` copies, so refreshing is `Ctrl`+`R` (the desktop's
+accelerator table leaves it unbound). In the list and grid `Insert` marks and moves on and `*`
+selects all or none (`UiListSelection`); `+`/`-` select or unselect by a pattern
+(`FileBrowserFeature.selectByPattern`, `listing/name-pattern.ts`). `Ctrl`+`T` (split),
 `Ctrl`+`W` (close the focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab) are
 bound on the group's host instead, and emit the same outputs the tab bar's buttons do;
 `Ctrl`+`Enter` (open the focused entry in a new panel on the right) is `UiFileBrowser`'s,

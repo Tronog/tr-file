@@ -175,7 +175,7 @@ export class GitDiffFeature implements PanelContentFeature {
     const state = this.stateOf(tab);
     const staged = tab.diff?.staged ?? false;
     const toolbar: readonly UiIconAction[] = [
-      { id: 'refresh', label: 'Read the changes again (F5)', icon: 'refresh' },
+      { id: 'refresh', label: 'Read the changes again', icon: 'refresh' },
       { id: 'open-file', label: 'Open File', icon: 'file-text' },
       staged ? { id: 'unstage', label: 'Unstage Changes', icon: 'minus' } : { id: 'stage', label: 'Stage Changes', icon: 'plus' },
     ];

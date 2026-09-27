@@ -32,6 +32,7 @@ import { SavedServersFeature } from './features/saved-servers.feature';
 import { RemoteConnectionService } from '../file-system/remote-connection.service';
 import { AutoRefreshFeature } from './features/auto-refresh.feature';
 import { CommandsFeature } from './features/commands.feature';
+import { FunctionKeysFeature } from './features/function-keys.feature';
 import { ContextMenuFeature } from './features/context-menu.feature';
 import { FileEditFeature } from './features/file-edit.feature';
 import { SearchFeature } from './features/search.feature';
@@ -195,6 +196,8 @@ export class WorkbenchService {
   readonly gitDiffFt = new GitDiffFeature(this);
   /** The one table of commands the menus, context menus, palette and keys share (PRD 003, §4–5). */
   readonly commandsFt = new CommandsFeature(this);
+  /** Midnight Commander's `F1`–`F10`, and the status bar's strip of them (PRD 004, §2). */
+  readonly functionKeysFt = new FunctionKeysFeature(this);
   /** Right-click menus on entries, blank space, the tree and tabs (PRD 003, §5). */
   readonly contextMenuFt = new ContextMenuFeature(this);
   /** The Search view: files and folders by name, anywhere under a folder (PRD 003, §5). */

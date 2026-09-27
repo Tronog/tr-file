@@ -54,7 +54,7 @@ structural helpers. No component hardcodes a colour.
 
 | Area | Components |
 | --- | --- |
-| Shell | `UiWorkbench`, `UiTitleBar`, `UiActivityBar`, `UiStatusBar` |
+| Shell | `UiWorkbench`, `UiTitleBar`, `UiActivityBar`, `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
 | Sidebars | `UiSidebar`, `UiPane`, `UiTree` |
 | Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
@@ -117,10 +117,12 @@ The library reports these; what they do is the application's.
   report `sort` with the column's key; the column carrying `sort` shows the
   order. `UiFileBrowserModel.sortable` turns it on for a browser, which
   re-emits `sortChange`.
-- **Keys.** `F2` is the `rename` panel key and `Shift`+`Delete`
-  `delete-permanently`, in the list and the grid. `UiFileBrowser` adds
-  `Ctrl`+`Z` (`undo`) and `Ctrl`+`Shift`+`N` (`new-folder`) — never inside a
-  text field — and the mouse's back and forward buttons as `back` / `forward`.
+- **Keys.** `Shift`+`Delete` is the `delete-permanently` panel key, and `+` /
+  `-` are `select-pattern` / `unselect-pattern` (PRD 004, §2), in the list and
+  the grid. `UiFileBrowser` adds `Ctrl`+`Z` (`undo`), `Ctrl`+`Shift`+`N`
+  (`new-folder`) and `Ctrl`+`R` (`refresh`) — never inside a text field — and
+  the mouse's back and forward buttons as `back` / `forward`. No function key
+  is a panel key: `F1`–`F10` are the window's, and the app binds them.
 - **Filter box.** Given `searchPlaceholder`, the toolbar shows
   `UiSearchField` holding `filterText`; typing is `filterChange`. `Ctrl`+`F`
   goes there, `Escape` empties it (and, empty, leaves it), `↓` / `Enter` go
@@ -226,8 +228,10 @@ entry would maximize the window.
 | `Shift`-click, `Shift` + a movement key | Selects the range from the anchor; `Ctrl`+`Shift`-click adds the range |
 | `Ctrl` + an arrow, `Home`, `End` | Moves the cursor without changing the selection |
 | `Ctrl`+`A` | Selects every entry |
+| `Insert` | Marks the entry (or unmarks it) and moves the cursor on, selecting nothing else (PRD 004, §2) |
+| `*` | Selects every entry — or none, once every one is |
 | Drag across blank space in the icon view | Box selection: every tile the box touches; added to the selection with `Ctrl`/`Shift`. A plain click on blank space clears it |
-| `Enter` / `Space` / `Backspace` / `F5` / `Delete` in a body | Emitted as a `UiPanelKey`; the app decides what each means |
+| `Enter` / `Space` / `Backspace` / `Delete` / `+` / `-` in a body, `Ctrl`+`R` anywhere in it | Emitted as a `UiPanelKey`; the app decides what each means |
 | `Ctrl`+`C` / `X` / `V` over a listing | `copy` / `cut` / `paste` panel keys (PRD 005, §2) |
 | Drag a row or tile | Onto a folder or another listing: `entryDrop`, a move — or a copy with `Ctrl` |
 | `Alt`+`←` / `Alt`+`→` in a body | Emitted as `back` / `forward`; the app walks that panel's own trail |
@@ -310,8 +314,8 @@ placeholder contains nothing focusable, so the `uiPanelBody` element carries
 group's own body does the same when it has no content at all); without that the
 keyboard would fall out of the panel and every one of its keys would reach
 nothing — a keyboard user could walk into an empty folder and not get out. For
-the same reason the browser answers `Backspace` and `F5` when its body *itself* has focus,
-and only then: whenever there is a row or a tile to stand on, those keys belong
+the same reason the browser answers `Backspace` when its body *itself* has focus,
+and only then: whenever there is a row or a tile to stand on, the key belongs
 to the view that owns it.
 
 Two rules are worth stating outright. **Selection follows focus**: arrowing
@@ -328,8 +332,8 @@ plus the entry the cursor is on; `select` still names that entry, and
 hit-tested against the grid's geometry, not the rendered tiles, so it reaches
 tiles the virtual window has not drawn, and scrolls the panel when dragged
 near its edge. And **the views move focus but decide nothing**:
-`Enter`, `Space`, `Backspace`, `F5` and `Delete` leave as a `UiPanelKey`
-(`open` / `select` / `up` / `refresh` / `delete`) for the application to interpret — in
+`Enter`, `Space`, `Backspace`, `Delete`, `+` and `-` leave as a `UiPanelKey`
+(`open` / `select` / `up` / `delete` / `select-pattern` / `unselect-pattern`) for the application to interpret — in
 the app that is `PanelKeyboardFeature`, which is the whole answer to "what does
 this key do in a panel". Focus movement stays in the component because a
 roving tabindex can only be rolled where the elements are.

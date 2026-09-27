@@ -257,6 +257,8 @@ describe('CommandPaletteFeature', () => {
       'Edit: Search Files…',
       'Selection: Select All',
       'Selection: Invert Selection',
+      'Selection: Select by Pattern…',
+      'Selection: Unselect by Pattern…',
       'View: List',
       'View: Icons',
       'View: Tree',
