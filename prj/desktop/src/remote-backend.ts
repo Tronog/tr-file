@@ -14,6 +14,7 @@ import {
   type FsSaveCopyOptions,
 } from '@tr-file/backend/bridge';
 import { HttpError, type Logger } from '@tr-file/backend/core';
+import { GIT_READ_ACTIONS, type GitRequest } from '@tr-file/backend/git';
 
 /** Where a remote server is, and — optionally — who to sign in as. */
 export interface RemoteEndpoint {
@@ -315,7 +316,30 @@ export class RemoteBackend {
           body: { path: request.path, destination: request.destination, conflict: request.conflict },
           accept: [202],
         });
+      // Git (PRD 011, §1) runs on the server, in its repositories.
+      case 'git':
+        return this.git(request.git);
     }
+  }
+
+  /**
+   * One git action on the server: a read as `GET /git/<action>` with its
+   * fields in the query, a change as a `POST` with them in the body. A
+   * server from before git answers `404` — and has no git, which `info`
+   * says rather than fail.
+   */
+  private async git(request: GitRequest): Promise<unknown> {
+    const { action, ...fields } = request;
+    if (!(GIT_READ_ACTIONS as readonly string[]).includes(action)) {
+      return this.json('POST', `/git/${action}`, { body: fields });
+    }
+    const query = Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, String(value)]));
+    const response = await this.request('GET', `/git/${action}`, { query, accept: action === 'info' ? [200, 404] : [200] });
+    if (response.status === 404) {
+      await response.body?.cancel();
+      return { available: false, version: null, reason: `${this.name} does not offer git.` };
+    }
+    return ((await response.json()) as { data: unknown }).data;
   }
 
   /**

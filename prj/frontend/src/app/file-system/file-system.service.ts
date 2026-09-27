@@ -1,5 +1,6 @@
 import { Service, inject } from '@angular/core';
 import { FsEditFeature } from './features/fs-edit.feature';
+import { FsGitFeature } from './features/fs-git.feature';
 import { FsOperationsFeature } from './features/fs-operations.feature';
 import { FsReadFeature } from './features/fs-read.feature';
 import { FsSystemFeature } from './features/fs-system.feature';
@@ -48,4 +49,7 @@ export class FileSystemService {
 
   /** Opening entries with the computer's own applications, and revealing them (PRD 003, §5). */
   readonly systemFt = new FsSystemFeature(this);
+
+  /** Git in the folders of the root (PRD 011, §1). */
+  readonly gitFt = new FsGitFeature(this);
 }

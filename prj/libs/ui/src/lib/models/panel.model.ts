@@ -15,16 +15,27 @@ export interface UiTab {
   readonly pinned?: boolean;
 }
 
+/** One line of a diff, by what it is: added, removed, unchanged, a hunk header, or git's own header. */
+export interface UiDiffLine {
+  readonly kind: 'add' | 'remove' | 'context' | 'hunk' | 'meta';
+  readonly text: string;
+}
+
 /** A file rendered read-only in a panel, instead of a directory listing. */
 export interface UiDocumentModel {
   /** Path shown in the viewer's status line, e.g. `docs/prd/001.md`. */
   readonly path: string;
-  /** `markdown` renders `html`, `text` renders `text`, `image` renders `src`. */
-  readonly kind: 'markdown' | 'text' | 'image';
+  /**
+   * `markdown` renders `html`, `text` renders `text`, `image` renders `src`,
+   * and `diff` renders `lines`, coloured by kind (PRD 011, §1).
+   */
+  readonly kind: 'markdown' | 'text' | 'image' | 'diff';
   /** Sanitised HTML, already rendered by the app. Only for `kind: 'markdown'`. */
   readonly html?: string;
   /** Raw file text. Only for `kind: 'text'`. */
   readonly text?: string;
+  /** A unified diff, split into lines by the application. Only for `kind: 'diff'`. */
+  readonly lines?: readonly UiDiffLine[];
   /**
    * Where the image bytes are, as a URL the browser can load — in practice an
    * object URL the application made and owns. Only for `kind: 'image'`; the

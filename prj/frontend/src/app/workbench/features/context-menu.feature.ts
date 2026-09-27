@@ -77,6 +77,16 @@ const RECENT: Layout = [
   '-', 'file.reveal', 'file.copyPath',
 ];
 
+/** The Git pane's `…` (PRD 011, §1): the repository's commands, by what they are about. */
+const GIT: Layout = [
+  'git.pull', 'git.push', 'git.fetch', 'git.sync',
+  '-', 'git.checkout', 'git.createBranch', 'git.deleteBranch',
+  '-', 'git.commit', 'git.commitAmend',
+  '-', 'git.stageAll', 'git.unstageAll', 'git.discardAll',
+  '-', 'git.stash', 'git.stashPop',
+  '-', 'git.init', 'git.refresh',
+];
+
 /**
  * The right-click menus (PRD 003, §5) — on an entry, on a listing's blank
  * space, on a folder in the explorer, on a tab — and `Shift`+`F10` for each.
@@ -138,6 +148,11 @@ export class ContextMenuFeature {
     const layout = section === 'bookmark' ? BOOKMARK : section === 'recent' ? RECENT : PLACE;
     const label = section === 'bookmark' ? 'Bookmark actions' : section === 'recent' ? 'Recent folder actions' : 'Place actions';
     this.show(request, label, layout, { groupId: this.parent.activeGroupId(), paths: [], folder: path });
+  }
+
+  /** The Git pane's `…` button, opening below it (PRD 011, §1). */
+  openGitMenu(x: number, y: number): void {
+    this.show({ target: null, x, y }, 'Git actions', GIT, this.parent.commandsFt.activeTarget());
   }
 
   /** A row was chosen: the menu closes, and its command runs against what was right-clicked. */

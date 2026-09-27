@@ -330,6 +330,8 @@ export class EditorGroupsFeature {
         return this.parent.fileBrowserFt;
       case 'archive':
         return this.parent.archiveBrowserFt;
+      case 'diff':
+        return this.parent.gitDiffFt;
     }
   }
 
@@ -480,7 +482,7 @@ export class EditorGroupsFeature {
   private tabs(group: PanelGroupState): readonly UiTab[] {
     const files = this.parent.fileViewModel;
     return group.tabs.map((tab) => {
-      const isFile = tab.kind === 'file';
+      const isFile = tab.kind === 'file' || tab.kind === 'diff';
       return {
         id: tab.id,
         label: tab.label,

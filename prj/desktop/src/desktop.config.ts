@@ -119,6 +119,8 @@ export class DesktopConfig {
       PORT: String(this.port),
       FILES_ROOT: this.filesRoot,
       LOG_LEVEL: this.development ? 'debug' : 'info',
+      // The user's own computer and repositories (PRD 011, §1): git is theirs to run.
+      GIT_ENABLED: 'true',
       ...this.authEnv(),
     };
   }

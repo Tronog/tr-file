@@ -15,6 +15,8 @@ import {
   UiPropertyList,
   UiSash,
   UiSidebar,
+  UiSourceControl,
+  UiButton,
   UiStatusBar,
   UiTitleBar,
   UiTransferList,
@@ -46,6 +48,8 @@ const FOCUSABLE =
     UiContextMenu,
     UiFileBrowser,
     UiPane,
+    UiSourceControl,
+    UiButton,
     UiPanelGrid,
     UiPanelGroup,
     UiPermissionGrid,
@@ -87,6 +91,8 @@ export class Workbench {
     // The first listings are fetched here rather than in the service, so that
     // constructing the service in a test performs no I/O.
     this.workbench.start();
+    // Git (PRD 011, §1) follows the active panel from here on, for the same reason.
+    this.workbench.gitFt.start();
 
     // A feature asked for files — or a folder (PRD 003, §6); only the component may open the picker.
     effect(() => {

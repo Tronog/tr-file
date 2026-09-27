@@ -5,6 +5,8 @@ import type {
   FsArchiveListing,
   FsClipboardFiles,
   FsDownload,
+  FsGitAction,
+  FsGitFields,
   FsOperationJob,
   FsPlaces,
   FsOperationRequest,
@@ -173,4 +175,13 @@ export interface FsTransport {
 
   /** Stops a job; answers with how it stands. */
   cancelOperation(id: string): Promise<FsOperationJob>;
+
+  /* -- git (PRD 011, §1) ---------------------------------------------------- */
+
+  /**
+   * One git action on the backend — `/api/git/<action>`, or the bridge's
+   * `git` command — answering with what that action answers. The typed calls
+   * are `FsGitFeature`'s; a transport only carries them.
+   */
+  git<T>(action: FsGitAction, fields?: FsGitFields): Promise<T>;
 }

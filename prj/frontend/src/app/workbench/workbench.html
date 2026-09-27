@@ -17,6 +17,8 @@
 @let search = workbench.searchFt;
 @let places = workbench.placesFt;
 @let archive = workbench.archiveBrowserFt;
+@let git = workbench.gitFt;
+@let diff = workbench.gitDiffFt;
 
 <ui-workbench
   [leftWidth]="workbench.leftSidebarWidth()"
@@ -227,6 +229,17 @@
                     />
                   }
                 }
+                <!-- A file's git changes (PRD 011, §1): read-only, as VS Code's diff editor. -->
+                @case ('diff') {
+                  @if (diff.browser(groupId); as browser) {
+                    <ui-file-browser
+                      [browser]="browser"
+                      (toolbarAction)="diff.runToolbarAction(groupId, $event)"
+                      (breadcrumbSelect)="diff.openBreadcrumb(groupId, $event)"
+                      (command)="diff.runKey(groupId, $event.command)"
+                    />
+                  }
+                }
                 <!-- Inside a zip (PRD 003, §6): read-only, one folder of it at a time. -->
                 @case ('archive') {
                   @if (archive.browser(groupId); as browser) {
@@ -349,12 +362,44 @@
       <ui-pane
         title="Actions"
         [expanded]="panes.isExpanded('open-with')"
-        [grow]="true"
         (toggle)="panes.toggle('open-with')"
       >
         <ui-action-list [items]="details.actions()" (select)="details.runAction($event)" />
       </ui-pane>
     }
+
+    <!-- Git (PRD 011, §1): the repository the active panel's folder is in, whatever is selected. -->
+    <ui-pane
+      title="Git"
+      [expanded]="panes.isExpanded('git')"
+      [actions]="git.paneActions()"
+      [grow]="true"
+      (toggle)="panes.toggle('git')"
+      (actionSelect)="git.runPaneAction($event)"
+      (actionAt)="$event.id === 'more' && contextMenu.openGitMenu($event.x, $event.y)"
+    >
+      @if (git.scm(); as scm) {
+        <ui-source-control
+          [scm]="scm"
+          (messageChange)="git.setMessage($event)"
+          (commit)="git.commit()"
+          (branchSelect)="git.pickBranch()"
+          (syncSelect)="git.sync()"
+          (groupToggle)="git.toggleGroup($event)"
+          (groupAction)="git.groupAction($event)"
+          (itemOpen)="git.openChange($event)"
+          (itemAction)="git.itemAction($event)"
+          (moreCommits)="git.moreCommits()"
+        />
+      } @else if (git.notice(); as notice) {
+        <p class="sidebar-note">{{ notice }}</p>
+        @if (git.canInit()) {
+          <div class="git-init">
+            <button uiButton type="button" (click)="git.init()">Initialize Repository</button>
+          </div>
+        }
+      }
+    </ui-pane>
   </ui-sidebar>
 
   <ui-status-bar

@@ -48,6 +48,14 @@ export class AppConfig {
   readonly auth: AuthCredentials | null;
   /** A session nobody uses for this long is signed out. */
   readonly sessionIdleMs: number;
+  /**
+   * Whether `/api/git` may run `git` (PRD 011, §1). Git runs a repository's
+   * hooks and follows its configuration, which can name programs — so a
+   * production server offers it only when `GIT_ENABLED=true` says so. On
+   * elsewhere, and the desktop shell turns it on: there it is the user's own
+   * computer, and their own repositories.
+   */
+  readonly gitEnabled: boolean;
 
   private constructor(env: NodeJS.ProcessEnv, platform: NodeJS.Platform) {
     this.nodeEnv = AppConfig.readEnum<NodeEnv>(
@@ -69,6 +77,7 @@ export class AppConfig {
     this.uploadMaxBytes = AppConfig.readByteSize(env['UPLOAD_MAX_BYTES'], 512 * 1024 * 1024);
     this.auth = AppConfig.readAuth(env, this.nodeEnv);
     this.sessionIdleMs = AppConfig.readHours(env['AUTH_SESSION_IDLE_HOURS'], 12) * 60 * 60 * 1000;
+    this.gitEnabled = AppConfig.readFlag(env['GIT_ENABLED'], 'GIT_ENABLED', this.nodeEnv !== 'production');
   }
 
   static fromEnv(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): AppConfig {
@@ -111,6 +120,17 @@ export class AppConfig {
       );
     }
     return null;
+  }
+
+  private static readFlag(raw: string | undefined, name: string, fallback: boolean): boolean {
+    const flag = raw?.trim().toLowerCase();
+    if (flag === undefined || flag === '') {
+      return fallback;
+    }
+    if (!['true', 'false', '1', '0'].includes(flag)) {
+      throw new Error(`Invalid ${name} value: "${raw}"; expected true or false`);
+    }
+    return flag === 'true' || flag === '1';
   }
 
   private static readHours(raw: string | undefined, fallback: number): number {

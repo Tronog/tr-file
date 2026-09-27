@@ -17,6 +17,7 @@ import type { ArchiveListingDto } from '../archive/archive.model.js';
 import type { AuthStatusDto } from '../auth/auth.model.js';
 import type { DirectoryListingDto, FileDetailsDto, FileEntryType, PlacesDto, SearchResultDto } from '../files/models/index.js';
 import type { WatchResultDto } from '../files/watch.service.js';
+import type { GitRequest } from '../git/git-request.js';
 import type { ConflictPolicy, OperationJobDto, OperationsInfoDto } from '../operations/operation.model.js';
 
 /** Every operation the bridge offers. */
@@ -48,7 +49,8 @@ export type FsBridgeCommand =
   | 'places'
   | 'archive-list'
   | 'op-compress'
-  | 'op-extract';
+  | 'op-extract'
+  | 'git';
 
 /**
  * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
@@ -244,7 +246,17 @@ export interface FsOpExtractRequest {
   readonly conflict: ConflictPolicy;
 }
 
+/**
+ * Git (PRD 011, §1) — `/api/git/<action>`, one command for all of it: the
+ * fields beside `action` are that action's query or body, as HTTP sends them.
+ */
+export interface FsGitRequest {
+  readonly command: 'git';
+  readonly git: GitRequest;
+}
+
 export type FsBridgeRequest =
+  | FsGitRequest
   | FsArchiveListRequest
   | FsOpCompressRequest
   | FsOpExtractRequest
@@ -334,6 +346,8 @@ export interface FsBridgeResults {
   readonly 'archive-list': ArchiveListingDto;
   readonly 'op-compress': OperationJobDto;
   readonly 'op-extract': OperationJobDto;
+  /** What the action answers: `GitInfoDto`, `GitStatusDto`, `GitLogDto`, … */
+  readonly git: unknown;
 }
 
 export interface FsBridgeSuccess<T> {

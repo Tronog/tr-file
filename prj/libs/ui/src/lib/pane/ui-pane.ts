@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
-import type { UiIconAction } from '../models';
+import type { UiIconAction, UiIconActionAt } from '../models';
 
 /**
  * A collapsible section inside a side bar (Explorer's "tr-file", Details'
@@ -40,8 +40,17 @@ export class UiPane {
   /** Emits the `id` of the clicked header action. */
   readonly actionSelect = output<string>();
 
+  /** The same click, with where the button is — for a `…` that opens a menu beside it. */
+  readonly actionAt = output<UiIconActionAt>();
+
   /** Instance counter — a unique body id without pulling in a service. */
   private static nextId = 0;
 
   protected readonly bodyId = `ui-pane-${UiPane.nextId++}`;
+
+  protected select(id: string, event: MouseEvent): void {
+    this.actionSelect.emit(id);
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.actionAt.emit({ id, x: rect.left, y: rect.bottom });
+  }
 }

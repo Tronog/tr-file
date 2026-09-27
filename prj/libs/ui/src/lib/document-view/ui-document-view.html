@@ -11,6 +11,8 @@
       <!-- Sanitised by Angular's default sanitiser on binding; the HTML itself
            was rendered from markdown by the application, never by this library. -->
       <div class="markdown" [innerHTML]="html()"></div>
+    } @else if (isDiff()) {
+      <pre class="text diff">@for (line of lines(); track $index) {<span class="line" [class]="'is-' + line.kind">{{ line.text || ' ' }}</span>}</pre>
     } @else {
       <pre class="text">{{ text() }}</pre>
     }

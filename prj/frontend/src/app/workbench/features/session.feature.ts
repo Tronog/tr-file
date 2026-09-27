@@ -2,7 +2,7 @@ import { effect, untracked } from '@angular/core';
 import type { UiGridNode, UiPanelView } from '@tr-file/ui';
 import type { SettingsStore } from '../../settings/settings.service';
 import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
-import type { PanelGroupState, PanelSort, PanelTabState } from '../panel-group.model';
+import type { PanelDiffSpec, PanelGroupState, PanelSort, PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
 
 /** Settings key of the last session's layout; the backend it was on is appended. */
@@ -15,7 +15,7 @@ export const RESTORE_SESSION_KEY = 'tr-file.restore-session.v1';
 const SAVE_DELAY_MS = 400;
 
 const VIEWS: ReadonlySet<string> = new Set<UiPanelView>(['list', 'grid', 'tree']);
-const TAB_KINDS: ReadonlySet<string> = new Set<PanelTabState['kind']>(['folder', 'file', 'archive']);
+const TAB_KINDS: ReadonlySet<string> = new Set<PanelTabState['kind']>(['folder', 'file', 'archive', 'diff']);
 const SORT_KEYS: ReadonlySet<string> = new Set<PanelSort['key']>(['name', 'size', 'type', 'modified']);
 
 /** Everything a session remembers (PRD 003, §6). */
@@ -244,6 +244,10 @@ export class SessionFeature {
       return null;
     }
     const raw = value as Record<string, unknown>;
+    const diff = SessionFeature.diff(raw['diff']);
+    if (raw['kind'] === 'diff' && diff === null) {
+      return null;
+    }
     if (
       typeof raw['id'] !== 'string' ||
       typeof raw['label'] !== 'string' ||
@@ -260,7 +264,19 @@ export class SessionFeature {
       kind: raw['kind'] as PanelTabState['kind'],
       ...(raw['active'] === true ? { active: true } : {}),
       ...(typeof raw['inner'] === 'string' ? { inner: raw['inner'] } : {}),
+      ...(diff === null ? {} : { diff }),
     };
+  }
+
+  /** A diff tab's repository, file and side (PRD 011, §1), or `null` when it is not one. */
+  private static diff(value: unknown): PanelDiffSpec | null {
+    if (typeof value !== 'object' || value === null) {
+      return null;
+    }
+    const raw = value as Record<string, unknown>;
+    return typeof raw['root'] === 'string' && typeof raw['file'] === 'string' && typeof raw['staged'] === 'boolean'
+      ? { root: raw['root'], file: raw['file'], staged: raw['staged'] }
+      : null;
   }
 
   /** Whether `value` is a grid node; collects its leaves' group ids. */

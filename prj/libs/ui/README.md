@@ -56,7 +56,7 @@ structural helpers. No component hardcodes a colour.
 | --- | --- |
 | Shell | `UiWorkbench`, `UiTitleBar`, `UiActivityBar`, `UiStatusBar` |
 | Sidebars | `UiSidebar`, `UiPane`, `UiTree` |
-| Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList` |
+| Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
 | Panel content | `UiFileBrowser` (with `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
 | Bottom panel | `UiBottomPanel`, `UiTransferList` (Transfers and Progress; `cancellable` rows report `cancel`) |
@@ -138,6 +138,16 @@ The library reports these; what they do is the application's.
   document keeps the browser's own menu), `UiTree.contextMenu` and
   `UiTabBar` / `UiPanelGroup.tabContextMenu`. `UiContextMenu`, when `fixed`
   and opening from its top-left corner, moves back inside the viewport.
+
+## Git (PRD 011, §1)
+
+`UiSourceControl` draws a `UiScmModel`: the branch button (`branchSelect`),
+the sync button (`syncSelect`), a commit message box whose `Ctrl`+`Enter` is
+the Commit button (`commit`), the changes by group — each row reports
+`itemOpen`, its buttons `itemAction`, a group's header buttons `groupAction`
+— and the latest commits (`moreCommits`). `UiDocumentView` takes a
+`kind: 'diff'` document of `UiDiffLine`s, coloured by kind. `UiPane.actionAt`
+reports a header button together with where it is, for a `…` menu.
 
 ## Deviations from the mockup
 

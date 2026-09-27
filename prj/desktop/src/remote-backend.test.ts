@@ -363,3 +363,35 @@ describe('RemoteBackend places and archives (PRD 003, §6)', () => {
     }
   });
 });
+
+describe('RemoteBackend git (PRD 011, §1)', () => {
+  it('reads with GET and changes with POST, on the server’s repositories', async () => {
+    const remote = await connected();
+    const info = dataOf<{ available: boolean }>(await remote.dispatch({ command: 'git', action: 'info' }));
+    if (!info.available) {
+      return; // No git on this machine: nothing more to translate.
+    }
+    await writeFile(join(root, 'tracked.txt'), 'one\n');
+    const created = dataOf<{ repository: { root: string } | null }>(await remote.dispatch({ command: 'git', action: 'init', path: '' }));
+    assert.equal(created.repository?.root, '');
+
+    const staged = dataOf<{ repository: { changes: { file: string; area: string }[] } }>(
+      await remote.dispatch({ command: 'git', action: 'stage', path: '', files: ['tracked.txt'] }),
+    );
+    assert.deepEqual(
+      staged.repository.changes.find((change) => change.file === 'tracked.txt'),
+      { path: 'tracked.txt', file: 'tracked.txt', area: 'staged', kind: 'added' },
+    );
+    const diff = dataOf<{ text: string; staged: boolean }>(
+      await remote.dispatch({ command: 'git', action: 'diff', path: '', file: 'tracked.txt', staged: true }),
+    );
+    assert.equal(diff.staged, true);
+    assert.match(diff.text, /^\+one$/m);
+    const log = dataOf<{ commits: unknown[] }>(await remote.dispatch({ command: 'git', action: 'log', path: '', limit: 5 }));
+    assert.deepEqual(log.commits, []);
+
+    assert.equal(errorOf(await remote.dispatch({ command: 'git', action: 'stage', path: '', files: ['../x'] })).code, 'BAD_REQUEST');
+    await rm(join(root, '.git'), { recursive: true, force: true });
+    await rm(join(root, 'tracked.txt'));
+  });
+});

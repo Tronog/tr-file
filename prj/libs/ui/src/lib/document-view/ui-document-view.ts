@@ -47,4 +47,8 @@ export class UiDocumentView {
   protected readonly html = computed(() => this.document().html ?? '');
 
   protected readonly text = computed(() => this.document().text ?? '');
+
+  protected readonly isDiff = computed(() => this.document().kind === 'diff');
+
+  protected readonly lines = computed(() => this.document().lines ?? []);
 }

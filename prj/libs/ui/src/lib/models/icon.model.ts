@@ -19,6 +19,8 @@ export type UiIconName =
   | 'check'
   | 'dots'
   | 'git-branch'
+  | 'git-commit'
+  | 'arrow-back-up'
   | 'layout-grid'
   | 'settings'
   | 'user'
@@ -86,6 +88,16 @@ export type UiIconSize = 'sm' | 'md' | 'lg' | 'xl';
  * to tint a file-type icon.
  */
 export type UiIconTint = 'folder' | 'ts' | 'html' | 'css' | 'json' | 'md' | 'img' | 'yaml' | 'generic';
+
+/**
+ * A pane header's button was pressed, and where it is on screen — its
+ * bottom-left corner, in viewport pixels — for a menu to open beside it.
+ */
+export interface UiIconActionAt {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+}
 
 /** A clickable icon in a toolbar, pane header or tab bar. */
 export interface UiIconAction {

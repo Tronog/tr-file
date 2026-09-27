@@ -5,6 +5,8 @@ import type {
   FsDetails,
   FsDirectoryListing,
   FsDownload,
+  FsGitAction,
+  FsGitFields,
   FsDownloadResult,
   FsArchiveListing,
   FsClipboardFiles,
@@ -468,6 +470,12 @@ export class FsBridgeService implements FsTransport {
 
   async cancelOperation(id: string): Promise<FsOperationJob> {
     return this.invoke<FsOperationJob>({ command: 'op-cancel', jobId: id });
+  }
+
+  /* -- git (PRD 011, §1) ---------------------------------------------------- */
+
+  async git<T>(action: FsGitAction, fields: FsGitFields = {}): Promise<T> {
+    return this.invoke<T>({ command: 'git', ...fields, action });
   }
 
   private abandon(uploadId: string | undefined): void {

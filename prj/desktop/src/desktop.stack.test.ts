@@ -149,6 +149,7 @@ describe('DesktopConfig', () => {
   it('leaves signing in off unless an account is named', () => {
     const plain = DesktopConfig.resolve(environment({ TR_FILE_STATIC_ROOT: staticRoot, AUTH_USERNAME: 'ignored' }));
     assert.equal(plain.serverEnv()['AUTH_ENABLED'], 'false');
+    assert.equal(plain.serverEnv()['GIT_ENABLED'], 'true');
 
     const locked = DesktopConfig.resolve(
       environment({ TR_FILE_STATIC_ROOT: staticRoot, TR_FILE_AUTH_USERNAME: 'ana', TR_FILE_AUTH_PASSWORD: 'secret' }),

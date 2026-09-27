@@ -68,9 +68,19 @@ export class AutoRefreshFeature {
     return [...folders].slice(0, WATCH_LIMIT);
   }
 
+  /**
+   * What is asked about: the folders on screen, and the shown repository's
+   * `.git` (PRD 011, §1) — where a commit or a checkout made elsewhere lands.
+   */
+  private foldersWatched(): readonly string[] {
+    const folders = this.foldersShown();
+    const git = this.parent.gitFt.watchedFolders().filter((path) => !folders.includes(path));
+    return [...folders.slice(0, WATCH_LIMIT - git.length), ...git];
+  }
+
   /** One ask: what changed among the folders on screen. Public so a test can drive it. */
   async poll(): Promise<void> {
-    const folders = this.foldersShown();
+    const folders = this.foldersWatched();
     this.forgetUnwatched(folders);
     let delay = WATCH_POLL_MS;
     try {
@@ -118,7 +128,9 @@ export class AutoRefreshFeature {
     if (changed.length === 0) {
       return;
     }
-    for (const path of changed) {
+    this.parent.gitFt.noticeChanges(changed);
+    const git = this.parent.gitFt.watchedFolders();
+    for (const path of changed.filter((candidate) => !git.includes(candidate))) {
       void this.parent.fsDataFt.reloadListing(path);
     }
     const selected = this.parent.selectedEntryId();

@@ -18,6 +18,8 @@ import type {
   FsArchiveListing,
   FsClipboardFiles,
   FsEnvelope,
+  FsGitAction,
+  FsGitFields,
   FsOperationJob,
   FsPlaces,
   FsOperationRequest,
@@ -401,6 +403,21 @@ export class FsHttpService implements FsTransport {
     );
   }
 
+  /* -- git (PRD 011, §1) ---------------------------------------------------- */
+
+  /** A read is a `GET` with its fields in the query; anything that changes a repository is a `POST`. */
+  async git<T>(action: FsGitAction, fields: FsGitFields = {}): Promise<T> {
+    if (!READ_GIT_ACTIONS.has(action)) {
+      return this.request(this.http.post<FsEnvelope<T>>(`/api/git/${action}`, fields));
+    }
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(fields)) {
+      params = params.set(key, String(value));
+    }
+    const query = params.toString();
+    return this.request(this.http.get<FsEnvelope<T>>(`/api/git/${action}${query === '' ? '' : `?${query}`}`));
+  }
+
   private async request<T>(response: Observable<FsEnvelope<T>>): Promise<T> {
     try {
       return (await firstValueFrom(response)).data;
@@ -469,6 +486,9 @@ export class FsHttpService implements FsTransport {
     );
   }
 }
+
+/** The git actions that only read, and so are `GET`s. */
+const READ_GIT_ACTIONS: ReadonlySet<FsGitAction> = new Set<FsGitAction>(['info', 'status', 'log', 'branches', 'diff']);
 
 /** Maps an `HttpProgressEvent` onto the contract-free progress shape. */
 function toProgress(event: HttpProgressEvent): FsUploadProgress {

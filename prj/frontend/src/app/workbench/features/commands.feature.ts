@@ -175,6 +175,12 @@ export class CommandsFeature {
       return target.paths.length === 0 && target.folder !== '' ? target.folder : null;
     };
     const listing = (target: CommandTarget): boolean => target.folder !== null && group(target) !== undefined;
+    /* Git (PRD 011, §1): about the repository the Git pane shows, whatever the target. */
+    const git = p.gitFt;
+    const repo = (): boolean => git.repository() !== null && !git.busy();
+    const changes = (area?: string): number => git.repository()?.changes.filter((change) => (area === undefined ? true : area === 'unstaged' ? change.area === 'unstaged' || change.area === 'untracked' : change.area === area)).length ?? 0;
+    const tracking = (): boolean => repo() && git.repository()?.upstream !== null;
+    const remote = (): boolean => repo() && git.repository()?.hasRemote === true;
 
     return [
       /* File */
@@ -433,6 +439,36 @@ export class CommandsFeature {
         run: (t) => this.walk(t.groupId, () => p.fileBrowserFt.navigateUp(t.groupId)),
       },
       { id: 'go.location', category: 'Go', label: 'Go to Location…', keybinding: 'Ctrl+L', enabled: (t) => group(t) !== undefined, run: (t) => p.fileBrowserFt.editLocation(t.groupId) },
+
+      /* Git (PRD 011, §1) */
+      {
+        id: 'git.commit',
+        category: 'Git',
+        label: 'Commit',
+        enabled: repo,
+        run: () => (git.canCommit() ? void git.commit() : git.focusMessage()),
+      },
+      { id: 'git.commitAmend', category: 'Git', label: 'Commit (Amend)', enabled: () => repo() && git.repository()?.head !== null, run: () => void git.commit(true) },
+      { id: 'git.stageAll', category: 'Git', label: 'Stage All Changes', enabled: () => repo() && changes('unstaged') + changes('conflict') > 0, run: () => void git.stageAll() },
+      { id: 'git.unstageAll', category: 'Git', label: 'Unstage All Changes', enabled: () => repo() && changes('staged') > 0, run: () => void git.unstageAll() },
+      { id: 'git.discardAll', category: 'Git', label: 'Discard All Changes…', enabled: () => repo() && changes('unstaged') > 0, run: () => void git.discardAll() },
+      { id: 'git.sync', category: 'Git', label: 'Sync', enabled: tracking, run: () => void git.sync() },
+      { id: 'git.pull', category: 'Git', label: 'Pull', enabled: tracking, run: () => void git.pull() },
+      {
+        id: 'git.push',
+        category: 'Git',
+        label: () => (git.repository()?.upstream === null ? 'Publish Branch' : 'Push'),
+        enabled: () => remote() && git.repository()?.branch !== null,
+        run: () => void git.push(),
+      },
+      { id: 'git.fetch', category: 'Git', label: 'Fetch', enabled: remote, run: () => void git.fetch() },
+      { id: 'git.checkout', category: 'Git', label: 'Checkout to…', enabled: repo, run: () => void git.pickBranch() },
+      { id: 'git.createBranch', category: 'Git', label: 'Create Branch…', enabled: repo, run: () => void git.createBranch() },
+      { id: 'git.deleteBranch', category: 'Git', label: 'Delete Branch…', enabled: repo, run: () => void git.deleteBranch() },
+      { id: 'git.stash', category: 'Git', label: 'Stash…', enabled: () => repo() && changes() > 0, run: () => void git.stash() },
+      { id: 'git.stashPop', category: 'Git', label: 'Pop Latest Stash', enabled: () => repo() && (git.repository()?.stashes ?? 0) > 0, run: () => void git.popStash() },
+      { id: 'git.init', category: 'Git', label: 'Initialize Repository', enabled: () => git.canInit(), run: () => void git.init() },
+      { id: 'git.refresh', category: 'Git', label: 'Refresh', enabled: () => git.available() && !git.busy(), run: () => void git.refresh() },
 
       /* Tabs — from a tab's context menu only */
       { id: 'tab.close', category: 'Tab', label: 'Close', keybinding: 'Ctrl+W', palette: false, enabled: (t) => t.tabId !== undefined, run: (t) => p.editorGroupsFt.closeTab(t.groupId, t.tabId as string) },

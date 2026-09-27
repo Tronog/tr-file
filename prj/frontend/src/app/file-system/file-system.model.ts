@@ -306,3 +306,113 @@ export interface FsClipboardFiles {
   /** Files on the clipboard this window cannot reach: outside its root, or on another computer. */
   readonly outside: number;
 }
+
+/* -- git (PRD 011, §1) ------------------------------------------------------ */
+
+/** What `/api/git/<action>` answers to. Reads are the first five; the rest change a repository. */
+export type FsGitReadAction = 'info' | 'status' | 'log' | 'branches' | 'diff';
+export type FsGitWriteAction =
+  | 'init'
+  | 'stage'
+  | 'unstage'
+  | 'discard'
+  | 'commit'
+  | 'checkout'
+  | 'branch-create'
+  | 'branch-delete'
+  | 'fetch'
+  | 'pull'
+  | 'push'
+  | 'stash'
+  | 'stash-pop';
+export type FsGitAction = FsGitReadAction | FsGitWriteAction;
+
+/** The fields of an action: its query, or its body. */
+export type FsGitFields = Readonly<Record<string, string | number | boolean | readonly string[]>>;
+
+/** `GET /api/git/info`: whether the backend can run git at all. */
+export interface FsGitInfo {
+  readonly available: boolean;
+  readonly version: string | null;
+  /** Why not: not installed, or switched off on the server. */
+  readonly reason: string | null;
+}
+
+export type FsGitChangeArea = 'staged' | 'unstaged' | 'untracked' | 'conflict';
+export type FsGitChangeKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'copied' | 'type-changed' | 'untracked' | 'conflict';
+
+/** One changed file in one area. */
+export interface FsGitChange {
+  /** Root-relative, for opening. */
+  readonly path: string;
+  /** Relative to the repository — what a request sends back. */
+  readonly file: string;
+  /** A rename's source, relative to the repository. */
+  readonly from?: string;
+  readonly area: FsGitChangeArea;
+  readonly kind: FsGitChangeKind;
+  /** An untracked folder, listed whole. */
+  readonly folder?: boolean;
+}
+
+export interface FsGitRepository {
+  /** Root-relative folder holding `.git`. */
+  readonly root: string;
+  /** `null` when HEAD is detached. */
+  readonly branch: string | null;
+  /** Short hash; `null` before the first commit. */
+  readonly head: string | null;
+  readonly upstream: string | null;
+  readonly ahead: number;
+  readonly behind: number;
+  readonly hasRemote: boolean;
+  readonly operation: 'merge' | 'rebase' | 'cherry-pick' | 'revert' | null;
+  readonly stashes: number;
+  readonly changes: readonly FsGitChange[];
+  readonly truncated: boolean;
+}
+
+/** `GET /api/git/status`, and the answer of every change. */
+export interface FsGitStatus {
+  readonly path: string;
+  /** `null`: the folder is in no repository. */
+  readonly repository: FsGitRepository | null;
+}
+
+export interface FsGitCommit {
+  readonly hash: string;
+  readonly short: string;
+  readonly author: string;
+  readonly email: string;
+  readonly date: string;
+  readonly subject: string;
+  readonly refs: readonly string[];
+}
+
+export interface FsGitLog {
+  readonly root: string;
+  readonly commits: readonly FsGitCommit[];
+  readonly more: boolean;
+}
+
+export interface FsGitBranch {
+  readonly name: string;
+  readonly remote: boolean;
+  readonly current: boolean;
+  readonly commit: string;
+  readonly upstream: string | null;
+}
+
+export interface FsGitBranches {
+  readonly root: string;
+  readonly branches: readonly FsGitBranch[];
+}
+
+export interface FsGitDiff {
+  readonly root: string;
+  readonly file: string;
+  readonly staged: boolean;
+  readonly text: string;
+  readonly binary: boolean;
+  readonly truncated: boolean;
+}

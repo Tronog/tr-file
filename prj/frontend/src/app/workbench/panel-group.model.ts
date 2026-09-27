@@ -1,16 +1,16 @@
 import type { UiPanelView } from '@tr-file/ui';
 
 /**
- * What a tab is showing: a directory listing, one file read-only, or a
- * folder inside a zip (PRD 003, §6).
+ * What a tab is showing: a directory listing, one file read-only, a folder
+ * inside a zip (PRD 003, §6), or a file's git changes (PRD 011, §1).
  */
-export type PanelTabKind = 'folder' | 'file' | 'archive';
+export type PanelTabKind = 'folder' | 'file' | 'archive' | 'diff';
 
 /**
  * Which kind of panel content renders a tab — one component and one feature
  * class per kind. File management is the only one so far.
  */
-export type PanelContentType = 'files' | 'archive';
+export type PanelContentType = 'files' | 'archive' | 'diff';
 
 /**
  * The content each tab kind is rendered by. A `Record`, so a new tab kind
@@ -20,7 +20,17 @@ export const PANEL_CONTENT: Readonly<Record<PanelTabKind, PanelContentType>> = {
   folder: 'files',
   file: 'files',
   archive: 'archive',
+  diff: 'diff',
 };
+
+/** Which changes a diff tab shows: a file of a repository, staged or not (PRD 011, §1). */
+export interface PanelDiffSpec {
+  /** Root-relative folder of the repository. */
+  readonly root: string;
+  /** The file, relative to the repository. */
+  readonly file: string;
+  readonly staged: boolean;
+}
 
 /** One tab of a panel group. */
 export interface PanelTabState {
@@ -33,6 +43,8 @@ export interface PanelTabState {
   readonly active?: boolean;
   /** An archive tab's folder inside the archive; `''` or absent is its top. */
   readonly inner?: string;
+  /** A diff tab's repository, file and side. */
+  readonly diff?: PanelDiffSpec;
 }
 
 /** What a listing can be ordered by: its columns (PRD 003, §5). */

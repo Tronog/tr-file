@@ -44,6 +44,15 @@
   font-size: var(--vsc-font-size-sm);
 }
 
+/* The Git pane's one button, where a folder is in no repository (PRD 011, §1). */
+.git-init {
+  padding: 2px 14px 8px;
+
+  button {
+    width: 100%;
+  }
+}
+
 .panel-note {
   margin: 0;
   padding: 6px 2px;

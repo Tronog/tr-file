@@ -21,6 +21,7 @@ import {
   WatchService,
   type PlacesProvider,
 } from './modules/files/index.js';
+import { GitRoutes, GitService } from './modules/git/index.js';
 import { HealthRoutes, HealthService } from './modules/health/index.js';
 import {
   OperationsRoutes,
@@ -82,6 +83,8 @@ export class App {
   private readonly filesService: FilesService;
   private readonly places: PlacesService;
   private readonly archives: ArchiveService;
+  /** Git for the folders of the root (PRD 011, §1); shared by the routes and the bridge. */
+  private readonly git: GitService;
   private readonly filesLogger: Logger;
 
   constructor(
@@ -102,6 +105,7 @@ export class App {
     this.places = new PlacesService(resolver, options.places ?? NO_PLACES, this.filesLogger);
     this.archives = new ArchiveService(resolver, this.filesLogger);
     this.operations = new OperationsService(resolver, trash, this.logger.child({ module: 'operations' }), this.archives);
+    this.git = new GitService(resolver, this.logger.child({ module: 'git' }), { enabled: this.config.gitEnabled });
     this.auth = new AuthService(
       this.config.auth,
       this.config.sessionIdleMs,
@@ -110,7 +114,16 @@ export class App {
     if (!this.auth.required) {
       this.logger.warn('signing in is switched off: anyone who can reach this server can use it');
     }
-    this.bridge = new FileSystemBridge(this.filesService, this.filesLogger, this.auth, this.operations, this.watches, this.places, this.archives);
+    this.bridge = new FileSystemBridge(
+      this.filesService,
+      this.filesLogger,
+      this.auth,
+      this.operations,
+      this.watches,
+      this.places,
+      this.archives,
+      this.git,
+    );
 
     this.instance = express();
     this.configure();
@@ -148,6 +161,7 @@ export class App {
       new FilesRoutes(this.filesService, this.filesLogger, this.watches, this.places),
       new OperationsRoutes(this.operations),
       new ArchiveRoutes(this.archives, this.filesLogger),
+      new GitRoutes(this.git),
     ];
   }
 

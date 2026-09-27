@@ -37,6 +37,35 @@
   white-space: pre;
 }
 
+/* ── diff (PRD 011, §1) ─────────────────────────────────────────────────── */
+
+/* Each line is a block, so its background runs the width of the longest one. */
+.diff {
+  display: grid;
+  min-width: max-content;
+  padding-inline: 0;
+}
+
+.line {
+  padding-inline: 16px;
+
+  &.is-add {
+    background: var(--vsc-diff-inserted-bg);
+  }
+
+  &.is-remove {
+    background: var(--vsc-diff-removed-bg);
+  }
+
+  &.is-hunk {
+    color: var(--vsc-diff-hunk);
+  }
+
+  &.is-meta {
+    color: var(--vsc-fg-muted);
+  }
+}
+
 /* ── status line ────────────────────────────────────────────────────────── */
 
 .status {

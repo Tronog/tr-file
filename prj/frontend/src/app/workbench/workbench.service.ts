@@ -42,6 +42,8 @@ import { PlacesFeature } from './features/places.feature';
 import { SessionFeature, type SessionSnapshot } from './features/session.feature';
 import { ArchiveBrowserFeature } from './features/archive-browser.feature';
 import { ThumbnailsFeature } from './features/thumbnails.feature';
+import { GitFeature } from './features/git.feature';
+import { GitDiffFeature } from './features/git-diff.feature';
 import type { MockWorkbenchLayout } from './mock-data/mock-data.model';
 
 /**
@@ -183,6 +185,10 @@ export class WorkbenchService {
   readonly undoFt = new UndoFeature(this);
   /** Open with the system's application; reveal in its file manager (PRD 003, §5). */
   readonly systemOpenFt = new SystemOpenFeature(this);
+  /** The Git pane: the repository the active panel's folder is in (PRD 011, §1); made before the command table, which names its commands. */
+  readonly gitFt = new GitFeature(this);
+  /** A file's git changes, as a panel tab of their own (PRD 011, §1). */
+  readonly gitDiffFt = new GitDiffFeature(this);
   /** The one table of commands the menus, context menus, palette and keys share (PRD 003, §4–5). */
   readonly commandsFt = new CommandsFeature(this);
   /** Right-click menus on entries, blank space, the tree and tabs (PRD 003, §5). */

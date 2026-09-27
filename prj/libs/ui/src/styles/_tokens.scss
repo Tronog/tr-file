@@ -74,6 +74,12 @@
   --vsc-git-untracked: #73c991;
   --vsc-git-ignored: #949494;
   --vsc-git-conflict: #e4676b;
+  --vsc-git-deleted: #e06c65;
+
+  /* diffs (PRD 011, §1): VS Code's inserted / removed line backgrounds */
+  --vsc-diff-inserted-bg: rgb(155 185 85 / 20%);
+  --vsc-diff-removed-bg: rgb(255 0 0 / 20%);
+  --vsc-diff-hunk: #3794ff;
 
   /* file type accents */
   --vsc-ic-folder: #dcb67a;

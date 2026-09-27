@@ -11,6 +11,7 @@ export type {
   FsBridgeSuccess,
   FsCreateRequest,
   FsDetailsRequest,
+  FsGitRequest,
   FsListRequest,
   FsLocalPath,
   FsOpDeleteRequest,

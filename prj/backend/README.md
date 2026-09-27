@@ -27,6 +27,7 @@ pnpm hash-password  # reads a password on stdin, prints an AUTH_PASSWORD_HASH
 | `AUTH_PASSWORD` / `AUTH_PASSWORD_HASH` | unset | Its password, plain or as made by `pnpm hash-password` (preferred) |
 | `AUTH_ENABLED` | see below | `false` runs with no login; `true` refuses to start without an account |
 | `AUTH_SESSION_IDLE_HOURS` | `12` | A session unused this long is signed out |
+| `GIT_ENABLED` | `true`, `false` in production | Whether `/api/git` may run `git` (PRD 011, §1) — see below |
 
 ## Signing in and CSRF (PRD 003, §2)
 
@@ -290,6 +291,47 @@ Compress and extract are jobs, at `/api/ops` beside the others:
 
 Both report `outcome` — the first source and the zip made, the archive and
 what it made at the top — which Undo trashes.
+
+## `/api/git` — git (PRD 011, §1)
+
+The `git` module runs the system's `git` program — optional: without one,
+`info` says so and every other action answers `503 GIT_UNAVAILABLE`. It is
+**off in production unless `GIT_ENABLED=true`**: git runs a repository's
+hooks and follows its configuration, which can name programs, so on a server
+anyone who can write files into a repository could have code run. The desktop
+turns it on — there it is the user's own computer.
+
+A folder is in a repository when it, or a folder above it *inside the root*,
+holds a `.git` (a folder, or the file a worktree or submodule has); a
+repository around the root is never found. Every request names a folder
+(`path`) and acts on its repository; `files` are relative to the repository,
+as its status names them. Git is run without a shell, in the repository's
+folder, with no terminal to prompt on (`GIT_TERMINAL_PROMPT=0`, its own
+session on POSIX) and a deadline — a minute, ten for commit, fetch, pull and
+push — so a push that needs a password no helper has fails instead of
+hanging. Changes to one repository run one at a time.
+
+| Method | Path | Answers with |
+| --- | --- | --- |
+| `GET` | `/api/git/info` | `{ available, version, reason }` |
+| `GET` | `/api/git/status?path=` | `{ path, repository }` — `null`, or `{ root, branch, head, upstream, ahead, behind, hasRemote, operation, stashes, changes: [{ path, file, from?, area, kind, folder? }], truncated }`; `area` is `staged`, `unstaged`, `untracked` or `conflict` |
+| `GET` | `/api/git/log?path=&limit=&skip=` | `{ root, commits: [{ hash, short, author, email, date, subject, refs }], more }` |
+| `GET` | `/api/git/branches?path=` | `{ root, branches: [{ name, remote, current, commit, upstream }] }` |
+| `GET` | `/api/git/diff?path=&file=&staged=` | `{ root, file, staged, text, binary, truncated }` — a new file is diffed against nothing; cut at 2 MiB |
+| `POST` | `/api/git/init` `{ path }` | makes the folder a repository |
+| `POST` | `/api/git/stage` / `unstage` `{ path, files }` | `files: []` is every change |
+| `POST` | `/api/git/discard` `{ path, files }` | a tracked file back to the index; an untracked one **deleted** |
+| `POST` | `/api/git/commit` `{ path, message, amend?, all? }` | `all` stages everything first; the message goes on stdin |
+| `POST` | `/api/git/checkout` `{ path, branch }` | a remote branch (`origin/x`) checks out the local one tracking it, made if need be |
+| `POST` | `/api/git/branch-create` `{ path, name, checkout? }` / `branch-delete` `{ path, name, force? }` | |
+| `POST` | `/api/git/fetch` / `pull` / `push` `{ path }` | a branch with no upstream is pushed to `origin` (or the only remote) and tracks it |
+| `POST` | `/api/git/stash` `{ path, message? }` / `stash-pop` `{ path }` | new files are stashed too |
+
+Every `POST` answers with the repository's status afterwards. Refusals:
+`400` for a file that is not the repository's or a branch name git would not
+take, `409 NOT_A_REPOSITORY`, `422 GIT_FAILED` with git's own reason (its
+`hint:` lines left out), `504 GIT_TIMEOUT`. The bridge has the same as one
+command, `{ command: 'git', action, …fields }`.
 
 ## `/api/ops` — file operations (PRD 005, §1)
 

@@ -1,0 +1,134 @@
+@let model = scm();
+
+<div class="head">
+  <button type="button" class="branch" [attr.title]="model.branchTitle" [disabled]="model.busy ?? false" (click)="branchSelect.emit()">
+    <ui-icon name="git-branch" />
+    <span class="branch-name">{{ model.branch }}</span>
+  </button>
+  @if (model.sync) {
+    <button type="button" class="sync" [attr.title]="model.syncTitle" [attr.aria-label]="model.syncTitle" [disabled]="model.busy ?? false" (click)="syncSelect.emit()">
+      <ui-icon name="sync" />
+      <span>{{ model.sync }}</span>
+    </button>
+  }
+</div>
+
+@if (model.note) {
+  <p class="note" [class.is-error]="model.noteTone === 'error'" [attr.role]="model.noteTone === 'error' ? 'alert' : 'status'">{{ model.note }}</p>
+}
+
+<div class="commit-box">
+  <textarea
+    #message
+    class="message"
+    rows="3"
+    aria-label="Commit message"
+    [placeholder]="model.messagePlaceholder"
+    [value]="model.message"
+    [disabled]="model.busy ?? false"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  ></textarea>
+  <button uiButton type="button" class="commit" [disabled]="!model.canCommit || (model.busy ?? false)" (click)="commit.emit()">
+    <ui-icon name="check" />
+    <span>{{ model.commitLabel }}</span>
+  </button>
+</div>
+
+@if (model.clean) {
+  <p class="note">{{ model.clean }}</p>
+}
+
+@for (group of model.groups; track group.id) {
+  <section class="group" [attr.aria-label]="group.label">
+    <div class="group-head">
+      <button type="button" class="group-toggle" [attr.aria-expanded]="!group.collapsed" (click)="groupToggle.emit(group.id)">
+        <ui-icon class="twisty" [name]="group.collapsed ? 'chevron-right' : 'chevron-down'" />
+        <span class="branch-name">{{ group.label }}</span>
+      </button>
+      <span class="group-actions">
+        @for (action of group.actions; track action.id) {
+          <button
+            type="button"
+            class="icon-btn"
+            [disabled]="(action.disabled ?? false) || (model.busy ?? false)"
+            [attr.title]="action.label"
+            [attr.aria-label]="action.label"
+            (click)="groupAction.emit({ targetId: group.id, actionId: action.id })"
+          >
+            <ui-icon [name]="action.icon" />
+          </button>
+        }
+      </span>
+      <span class="count" [attr.aria-label]="group.items.length + ' files'">{{ group.items.length }}</span>
+    </div>
+
+    @if (!group.collapsed) {
+      <ul class="items">
+        @for (item of group.items; track item.id) {
+          <li class="item" [attr.title]="item.title">
+            <button type="button" class="item-open" [attr.aria-label]="item.title" (click)="itemOpen.emit(item.id)">
+              <ui-icon [name]="item.icon" [tint]="item.tint" />
+              <span class="item-name" [class]="'tone-' + item.tone">{{ item.name }}</span>
+              @if (item.description) {
+                <span class="item-description">{{ item.description }}</span>
+              }
+            </button>
+            <span class="item-actions">
+              @for (action of item.actions; track action.id) {
+                <button
+                  type="button"
+                  class="icon-btn"
+                  [disabled]="(action.disabled ?? false) || (model.busy ?? false)"
+                  [attr.title]="action.label"
+                  [attr.aria-label]="action.label + ': ' + item.name"
+                  (click)="itemAction.emit({ targetId: item.id, actionId: action.id })"
+                >
+                  <ui-icon [name]="action.icon" />
+                </button>
+              }
+            </span>
+            <span class="letter" [class]="'tone-' + item.tone" aria-hidden="true">{{ item.letter }}</span>
+          </li>
+        }
+      </ul>
+      @if (group.note) {
+        <p class="note">{{ group.note }}</p>
+      }
+    }
+  </section>
+}
+
+<section class="group commits" aria-label="Commits">
+  <div class="group-head">
+    <button type="button" class="group-toggle" [attr.aria-expanded]="!model.commitsCollapsed" (click)="groupToggle.emit('commits')">
+      <ui-icon class="twisty" [name]="model.commitsCollapsed ? 'chevron-right' : 'chevron-down'" />
+      <span class="branch-name">Commits</span>
+    </button>
+  </div>
+  @if (!model.commitsCollapsed) {
+    @if (model.commits.length === 0) {
+      <p class="note">No commits yet.</p>
+    } @else {
+      <ul class="items">
+        @for (commit of model.commits; track commit.id) {
+          <li class="commit-row" [attr.title]="commit.title ?? commit.subject">
+            <ui-icon name="git-commit" />
+            <span class="commit-text">
+              <span class="commit-subject">
+                {{ commit.subject }}
+                @for (ref of commit.refs ?? []; track ref) {
+                  <span class="ref">{{ ref }}</span>
+                }
+              </span>
+              <span class="commit-detail">{{ commit.short }} · {{ commit.detail }}</span>
+            </span>
+          </li>
+        }
+      </ul>
+      @if (model.moreCommits) {
+        <button uiButton variant="secondary" type="button" class="more" [disabled]="model.busy ?? false" (click)="moreCommits.emit()">Load more commits</button>
+      }
+    }
+  }
+</section>

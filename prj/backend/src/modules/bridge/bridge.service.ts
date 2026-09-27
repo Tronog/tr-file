@@ -9,6 +9,7 @@ import { HttpError, type Logger } from '../../core/index.js';
 import type { ArchiveService } from '../archive/index.js';
 import type { AuthService } from '../auth/index.js';
 import { WATCH_MAX_PATHS, type FileDetails, type FilesService, type PlacesService, type WatchService } from '../files/index.js';
+import { isGitAction, parseGitRequest, type GitService } from '../git/index.js';
 import { parseOperationRequest, type OperationsService } from '../operations/index.js';
 import {
   FS_BRIDGE_CHUNK_BYTES,
@@ -83,6 +84,7 @@ export class FileSystemBridge {
     private readonly watches: WatchService,
     private readonly placesService: PlacesService,
     private readonly archives: ArchiveService,
+    private readonly git: GitService,
   ) {}
 
   /** A connection that has not signed in; the channel keeps one per window. */
@@ -116,7 +118,9 @@ export class FileSystemBridge {
                   ? { paths: parsed.paths.length }
                   : 'ids' in parsed
                     ? { ids: parsed.ids.length }
-                    : {}),
+                    : 'git' in parsed
+                      ? { action: parsed.git.action, ...('path' in parsed.git ? { path: parsed.git.path } : {}) }
+                      : {}),
         ...('to' in parsed ? { to: parsed.to } : {}),
         durationMs: Number((performance.now() - startedAt).toFixed(3)),
       });
@@ -337,6 +341,8 @@ export class FileSystemBridge {
           destination: request.destination,
           conflict: request.conflict,
         });
+      case 'git':
+        return this.git.handle(request.git);
     }
   }
 
@@ -663,6 +669,13 @@ export class FileSystemBridge {
           query: FileSystemBridge.readString(value, 'query'),
           ...(limit === undefined ? {} : { limit }),
         };
+      }
+      case 'git': {
+        const action = (value as { action?: unknown }).action;
+        if (!isGitAction(action)) {
+          throw HttpError.badRequest(`Unknown git action: ${String(action)}`);
+        }
+        return { command, git: parseGitRequest(action, value) };
       }
       case 'watch': {
         const watchId = (value as { watchId?: unknown }).watchId ?? null;

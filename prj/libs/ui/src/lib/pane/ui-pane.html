@@ -20,7 +20,7 @@
           [disabled]="action.disabled ?? false"
           [attr.title]="action.label"
           [attr.aria-label]="action.label"
-          (click)="actionSelect.emit(action.id)"
+          (click)="select(action.id, $event)"
         >
           <ui-icon [name]="action.icon" />
         </button>

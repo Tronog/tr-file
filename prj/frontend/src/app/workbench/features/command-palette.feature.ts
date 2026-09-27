@@ -22,7 +22,7 @@ export interface PaletteCommand {
  * `validate` answers as the value changes; `accept` does the work, and
  * answers with why it could not, or `null` when it is done.
  */
-interface InputStep {
+export interface InputStep {
   readonly kind: 'input';
   readonly label: string;
   readonly placeholder: string;
@@ -38,7 +38,7 @@ interface InputStep {
  * filtered as the commands are, whose rows may carry buttons (edit, remove).
  * Either may move the palette on to another step, or close it.
  */
-interface PickStep {
+export interface PickStep {
   readonly kind: 'pick';
   readonly label: string;
   readonly placeholder: string;
@@ -48,7 +48,7 @@ interface PickStep {
   readonly button: (event: UiQuickPickButtonEvent) => void;
 }
 
-type Step = InputStep | PickStep;
+export type Step = InputStep | PickStep;
 
 /** The pick list's row for a new server; saved servers are listed above it. */
 const ADD_SERVER = 'remote.add';
@@ -185,6 +185,15 @@ export class CommandPaletteFeature {
       this.active.set(command.id);
       command.run();
     }
+  }
+
+  /**
+   * Opens the palette asking another feature's question — a pick list or an
+   * input box — as *Git: Checkout to…* does (PRD 011, §1).
+   */
+  prompt(step: Step): void {
+    this.show();
+    this.ask(step);
   }
 
   /** A command that asks its questions in a modal window rather than in the box: the box goes first. */

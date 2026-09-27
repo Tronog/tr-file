@@ -147,6 +147,20 @@ transport does not change; `WorkbenchService.backend` follows the connection, th
 bar names the server, a remote that needs signing in shows the normal sign-in screen, and
 Go › Local Computer disconnects.
 
+**Git (PRD 011, §1)** is optional — the backend's `git` module (`/api/git`, the bridge's `git`
+command, `RemoteBackend` maps it) runs the system's `git`, and says so when there is none; a
+production server needs `GIT_ENABLED=true`, the desktop turns it on. A folder is in a repository
+when it or a folder above it inside the root holds a `.git`. The right sidebar's **Git** pane is
+`GitFeature`: it follows the active panel's folder (an `effect`, started by the `Workbench`
+component, never by `WorkbenchService.start`, so specs ask nothing of git), keeps the status, log
+and a draft message per repository, and builds the `UiScmModel` the library's `UiSourceControl`
+draws — stage, unstage, discard (asked first), commit (offering to stage all), sync/pull/push/
+publish, fetch, stash/pop, init. Branches are picked and made in the command palette
+(`CommandPaletteFeature.prompt`); the pane's `…` is `ContextMenuFeature.openGitMenu` over the
+`git.*` commands of `CommandsFeature`. Choosing a change opens a `diff` tab (`GitDiffFeature`,
+drawn as a `kind: 'diff'` document). Auto-refresh also watches the repository's `.git`, so a
+commit made in a terminal shows up.
+
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a
 double chevron pointing the way the panel will move. Choosing a tab, including from the

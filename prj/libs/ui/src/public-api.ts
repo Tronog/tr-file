@@ -31,6 +31,7 @@ export { UiPropertyList } from './lib/details/ui-property-list';
 export { UiPermissionGrid } from './lib/details/ui-permission-grid';
 export { UiChipList } from './lib/details/ui-chip-list';
 export { UiActionList } from './lib/details/ui-action-list';
+export { UiSourceControl } from './lib/source-control/ui-source-control';
 
 /* controls ---------------------------------------------------------------- */
 export { UiIconButton } from './lib/controls/ui-icon-button';
