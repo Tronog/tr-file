@@ -1,9 +1,12 @@
 @use 'mixins' as *;
 
+// Leading items, the function-key strip, trailing items — in that order of
+// priority (PRD 001, Fix 2): the items keep their width, the strip has what is
+// left between them, and it gives way first. Only when there is no strip left
+// to give do the items themselves shrink, and clip.
 :host {
-  display: grid;
+  display: flex;
   flex: none;
-  grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr);
   align-items: center;
   height: var(--vsc-statusbar-height);
   background: var(--vsc-statusbar-bg);
@@ -11,17 +14,18 @@
   color: var(--vsc-fg);
   font-family: var(--vsc-font);
   font-size: var(--vsc-font-size-sm);
-  container-type: inline-size;
 }
 
 .status-group {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
   min-width: 0;
   overflow: hidden;
 
   &.is-trailing {
-    grid-column: 3;
+    // Pushed to the right edge even when there is no strip between.
+    margin-left: auto;
     justify-content: flex-end;
   }
 }
@@ -70,12 +74,22 @@
 // cyan block of the same width for every key, the keys flush against each
 // other — `1Help  2Menu  3View`. Monospace, so the blocks line up as they do
 // in a terminal.
+// The strip takes only the room the items leave (a zero basis, and it shrinks
+// ten times as readily as they do), centred in it. Keys that do not fit wrap
+// onto a second line, which the bar's height hides — so whole keys drop off
+// the end, never half a label.
 .function-keys {
   display: flex;
-  grid-column: 2;
+  flex: 1 10 0;
+  flex-wrap: wrap;
+  // Each line the bar's full height, so a second one is wholly below it.
+  align-content: flex-start;
   align-items: stretch;
   align-self: stretch;
+  justify-content: center;
   min-width: 0;
+  height: var(--vsc-statusbar-height);
+  padding: 0 8px;
   overflow: hidden;
   font-family: var(--vsc-font-mono);
 }
@@ -84,6 +98,7 @@
   display: inline-flex;
   flex: none;
   align-items: stretch;
+  height: var(--vsc-statusbar-height);
   padding: 0;
   border: 0;
   background: transparent;
@@ -122,12 +137,4 @@
   padding-right: 1ch;
   background: var(--vsc-function-key-bg);
   color: var(--vsc-function-key-fg);
-}
-
-// Where the bar is too narrow for the strip and the items both, the items win:
-// the strip only repeats keys the keyboard already has.
-@container (max-width: 1100px) {
-  .function-keys {
-    display: none;
-  }
 }

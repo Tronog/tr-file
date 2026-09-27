@@ -330,6 +330,17 @@ describe('RemoteBackend commands', () => {
   });
 });
 
+describe('RemoteBackend time (PRD 001, §13.1)', () => {
+  it('answers the server machine’s clock, from its health check', async () => {
+    const remote = await connected();
+    const time = dataOf<{ now: string; timeZone: string; utcOffsetMinutes: number }>(await remote.dispatch({ command: 'time' }));
+
+    assert.ok(Math.abs(Date.parse(time.now) - Date.now()) < 5000);
+    assert.equal(time.timeZone, Intl.DateTimeFormat().resolvedOptions().timeZone);
+    assert.equal(typeof time.utcOffsetMinutes, 'number');
+  });
+});
+
 describe('RemoteBackend places and archives (PRD 003, §6)', () => {
   it('answers the server’s places: its root and nothing else', async () => {
     const remote = await connected();

@@ -18,9 +18,9 @@
     "dev:static": "pnpm build && TR_FILE_DEV=1 TR_FILE_DEVTOOLS=1 electron .",
     "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
-    "package": "pnpm build && electron-builder --linux --win --publish never",
+    "package": "pnpm build && ELECTRON_BUILDER_WINE_TOOLSET_DIR=$PWD/scripts/nsis-toolset electron-builder --linux --win --publish never",
     "package:linux": "pnpm build && electron-builder --linux --publish never",
-    "package:win": "pnpm build && electron-builder --win --publish never",
+    "package:win": "pnpm build && ELECTRON_BUILDER_WINE_TOOLSET_DIR=$PWD/scripts/nsis-toolset electron-builder --win --publish never",
     "clean": "rm -rf dist release"
   },
   "//devDependencies": "Nothing here is a runtime dependency of the distributable: scripts/bundle.mjs compiles the backend and its Express/Busboy into dist/main.cjs, so the packaged app loads no node_modules at all (PRD 001, §8.3).",

@@ -9,6 +9,7 @@ import type {
   FsGitFields,
   FsOperationJob,
   FsPlaces,
+  FsServerTime,
   FsOperationRequest,
   FsOperationsInfo,
   FsSearchResult,
@@ -104,6 +105,9 @@ export interface FsTransport {
 
   /** Where to start, and what the Places pane lists; a server names only its root. */
   places(): Promise<FsPlaces>;
+
+  /** The backend machine's clock, for the status bar (PRD 001, §13.1). */
+  serverTime(): Promise<FsServerTime>;
 
   /** One folder of a zip; `inner` `''` is its top. */
   archiveList(path: string, inner: string): Promise<FsArchiveListing>;

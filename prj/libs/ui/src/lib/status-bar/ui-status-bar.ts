@@ -17,7 +17,9 @@ import type { UiFunctionKey, UiStatusItem } from '../models/chrome.model';
  * `id`. Pressing one does not take focus, so it acts on the panel the
  * keyboard was in, and the strip is not a tab stop: the keys it stands for
  * are the keyboard way to it. It is drawn as Midnight Commander draws it — a number, then a cyan label
- * block — and gives way first when the bar is narrow.
+ * block — and gives way first when the bar is narrow: it has only the room
+ * the items leave, and keys that do not fit are left off whole (PRD 001,
+ * Fix 2), so the strip never runs into the items beside it.
  */
 @Component({
   selector: 'ui-status-bar',

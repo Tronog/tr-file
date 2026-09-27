@@ -37,6 +37,11 @@ without a session. A production server with no account **refuses to start**;
 only `AUTH_ENABLED=false` (the desktop shell's default) or a development
 server with nothing configured runs open, and says so in its log.
 
+`GET /api/health` answers `{ status, uptimeSeconds, timestamp, version, nodeEnv, timeZone,
+utcOffsetMinutes }` — the last two since PRD 001, §13.1: the machine's IANA time zone and its
+offset from UTC now, in minutes east, so the status bar can show the server's own date and time
+(`serverTime()`, `modules/health/server-time.ts`).
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/auth/session` | `{ required, authenticated, username }` — always answered |
@@ -98,6 +103,7 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `op-empty-trash` | — | the job, started |
 | `op-status`, `op-cancel` | `jobId` | the job as it stands; `op-cancel` stops it first |
 | `places` | — | `GET /api/fs/places`'s answer |
+| `time` | — | the machine's clock: `{ now, timeZone, utcOffsetMinutes }`, as `GET /api/health` reports it (PRD 001, §13.1) |
 | `archive-list` | `path`, `inner` | `GET /api/archive/list`'s answer |
 | `op-compress` | `sources`, `destination`, `name`, `conflict` | the job, started — as `POST /api/ops/compress` |
 | `op-extract` | `path`, `destination`, `conflict` | the job, started — as `POST /api/ops/extract` |

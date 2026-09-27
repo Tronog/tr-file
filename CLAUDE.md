@@ -217,6 +217,12 @@ publish, fetch, stash/pop, init. Branches are picked and made in the command pal
 drawn as a `kind: 'diff'` document). Auto-refresh also watches the repository's `.git`, so a
 commit made in a terminal shows up.
 
+The status bar's last item is the backend machine's date and time (§13.1): `ServerClockFeature`
+asks the server (`/api/health`'s `timestamp`, `timeZone`, `utcOffsetMinutes`; the bridge's `time`,
+which `RemoteBackend` maps to a remote server's health) on start and every 10 minutes, keeps the
+difference from this computer's clock, ticks on the server's minute, and formats in the *server's*
+zone — started by the `Workbench` component, like Git, so specs ask nothing.
+
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a
 double chevron pointing the way the panel will move. Choosing a tab, including from the
@@ -377,6 +383,11 @@ backend, Express and all — into one `dist/main.cjs`, so the distributable carr
 `node_modules`, and `electron-builder.yml` turns that into a single file per platform
 (an AppImage, a portable `.exe`). Nothing in `prj/desktop/package.json` is a runtime
 dependency any more, which is why they are all `devDependencies`.
+Section 8.4 adds a Windows setup beside the portable `.exe`: electron-builder's NSIS target, one
+click and per user, whose pinned `nsis.guid` makes a later setup update the installed copy in place
+(settings kept) rather than install a second one. Building it on Linux needs no Wine:
+`desktop/scripts/nsis-toolset` stands in for it, reading the uninstaller out of electron-builder's
+stub with electron-builder's own reader (`prj/desktop/README.md`).
 
 File operations (PRD 005 §1) run in the backend on whichever side the window is on; on
 this computer `App` is given `ShellTrash`, so trash goes to the system trash

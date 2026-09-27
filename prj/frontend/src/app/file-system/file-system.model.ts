@@ -273,6 +273,18 @@ export interface FsPlace {
 }
 
 /** `GET /api/fs/places`: where a session starts, and what the Places pane lists. */
+/**
+ * The backend machine's clock (PRD 001, §13.1): now, its time zone and its
+ * offset from UTC. A server from before it named its zone sends the time
+ * alone.
+ */
+export interface FsServerTime {
+  /** An ISO 8601 instant. */
+  readonly now: string;
+  readonly timeZone?: string;
+  readonly utcOffsetMinutes?: number;
+}
+
 export interface FsPlaces {
   /** Root-relative; `''` is the root. */
   readonly home: string;

@@ -380,7 +380,7 @@ One file per platform, nothing to install:
 ```bash
 pnpm package          # both, from this package
 pnpm package:linux    # release/tr-file-0.1.0-x86_64.AppImage
-pnpm package:win      # release/tr-file-0.1.0-x64.exe
+pnpm package:win      # release/tr-file-0.1.0-x64.exe, release/tr-file-Setup-0.1.0-x64.exe
 ```
 
 From the workspace root: `pnpm desktop:package`, `…:linux`, `…:win`, which
@@ -392,6 +392,33 @@ that installs the app rather than the app itself, which §8.3 does not ask for.
 The Windows executable unpacks itself into a temporary directory and runs from
 there; `unpackDirName` pins that directory so repeated runs reuse it instead of
 leaving one behind per launch.
+
+### The Windows setup (PRD 001, §8.4)
+
+Beside the portable executable, `package:win` makes
+`tr-file-Setup-<version>-x64.exe`: one file that **installs** the app — or,
+run where it is installed already, **updates** that copy in place. It is
+electron-builder's NSIS target, set up in `electron-builder.yml` as:
+
+- **one click** — no wizard; running the file is the whole of installing or
+  updating, and it starts the app when it is done;
+- **per user** — into `%LOCALAPPDATA%\Programs\tr-file`, with a Start-menu and
+  a desktop shortcut: no administrator, no UAC prompt, for an update either;
+- **the same installation every time** — the setup finds the previous version
+  by its `guid` in the registry, runs that version's uninstaller silently and
+  installs over it. The user's settings survive (`deleteAppDataOnUninstall:
+  false`), and a copy still running is asked to close first. The `guid` is
+  pinned to exactly what electron-builder derives from `appId`, so it matches
+  installs made before it was pinned, and renaming `appId` can never turn an
+  update into a second, side-by-side install.
+
+Building the setup on Linux would normally take **Wine**: electron-builder runs
+a stub installer once, so that it writes its uninstaller. The package scripts
+avoid that — `scripts/nsis-toolset/` stands in for Wine and reads the
+uninstaller out of the stub with electron-builder's own reader instead (see its
+README). So `pnpm package:win` needs nothing installed: no Wine, no `sudo`, no
+Docker. (electron-builder's own downloadable Linux Wine, `toolsets.wine`, is no
+help here: its archive ships without Wine's Windows DLLs and cannot start.)
 
 ### Why the main process is bundled
 
@@ -426,8 +453,9 @@ first time anyone starts the app, not the first time someone ships it.
 
 ### Cross-building
 
-Both targets are built from Linux, and neither needs Wine: electron-builder
-carries its own NSIS, and stamps the executable's icon and version itself. What
+Every target is built from Linux. The AppImage and the portable executable
+need no Wine — electron-builder carries its own NSIS, and stamps the
+executable's icon and version itself; the setup does (see above). What
 it cannot do from here is *sign* either one, so both are unsigned — Windows
 will show a SmartScreen warning the first time one is run.
 

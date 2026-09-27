@@ -1,5 +1,5 @@
 import type { FileSystemService } from '../file-system.service';
-import type { FsArchiveListing, FsDetails, FsDirectoryListing, FsPlaces, FsSearchResult, FsWatchResult } from '../file-system.model';
+import type { FsArchiveListing, FsDetails, FsDirectoryListing, FsPlaces, FsSearchResult, FsServerTime, FsWatchResult } from '../file-system.model';
 
 /**
  * Reading the file system: directory listings and entry details.
@@ -36,6 +36,11 @@ export class FsReadFeature {
   /** Where a session starts, and what the Places pane lists (PRD 003, §6). */
   async places(): Promise<FsPlaces> {
     return this.parent.transport.places();
+  }
+
+  /** The backend machine's clock (PRD 001, §13.1). */
+  async serverTime(): Promise<FsServerTime> {
+    return this.parent.transport.serverTime();
   }
 
   /** One folder of a zip (PRD 003, §6); `inner` `''` is its top. */

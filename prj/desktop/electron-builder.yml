@@ -1,5 +1,6 @@
 # Distributables for PRD 001, §8.3: one executable per platform, nothing to
-# install and nothing to unpack beside it.
+# install and nothing to unpack beside it — and, since §8.4, a Windows setup
+# too: one file that installs the app, or updates the copy already installed.
 #
 # There is no node_modules in here. scripts/bundle.mjs compiles the backend,
 # Express and Busboy into dist/main.cjs, so the only thing the packager has to
@@ -48,10 +49,12 @@ linux:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 win:
-  # `portable` is the single-exe target: the app unpacks itself to a temporary
-  # directory and runs. `nsis` would be an installer instead.
+  # `portable` is the single-exe target of §8.3: the app unpacks itself to a
+  # temporary directory and runs. `nsis` is the setup of §8.4, which installs
+  # it. Both come from one `pnpm package:win`.
   target:
     - portable
+    - nsis
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 portable:
@@ -60,3 +63,37 @@ portable:
   # directory rather than growing a new one per run.
   requestExecutionLevel: user
   unpackDirName: tr-file
+
+# The setup's uninstaller is normally written by running a stub under Wine.
+# The package scripts point ELECTRON_BUILDER_WINE_TOOLSET_DIR at
+# scripts/nsis-toolset instead, which reads it out of the stub without Wine —
+# see the README there.
+
+nsis:
+  # §8.4: a single-file setup that installs the app — or, run where it is
+  # installed already, updates that copy in place. What makes it the *same*
+  # installation is this GUID: the setup finds the previous version under it in
+  # the registry, runs that version's uninstaller silently (which leaves the
+  # user's settings alone: `deleteAppDataOnUninstall` is false) and installs
+  # over it, shortcuts and all. electron-builder derives the GUID from `appId`;
+  # it is pinned here — to exactly what it derives for `com.tronog.tr-file` —
+  # so that renaming the appId can never turn an update into a second install.
+  guid: 853819c6-793f-5011-846c-3b8cd99508d0
+  # One click, no wizard: the setup is the single file, and running it is
+  # the whole of installing — or updating.
+  oneClick: true
+  # For the user, into %LOCALAPPDATA%\Programs\tr-file: no administrator, no
+  # UAC prompt, and an update needs none either.
+  perMachine: false
+  allowElevation: false
+  # A copy still running is asked to close before its files are replaced;
+  # the app holds a single-instance lock, so there is only ever one.
+  runAfterFinish: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: tr-file
+  deleteAppDataOnUninstall: false
+  # Its own name, so it cannot be mistaken for — or overwrite — the portable
+  # executable beside it in release/.
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+

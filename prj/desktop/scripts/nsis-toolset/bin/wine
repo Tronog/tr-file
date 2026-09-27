@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Not Wine. electron-builder runs the setup it has just built "under Wine" for
+# one reason only: the stub writes its uninstaller and exits. This extracts the
+# uninstaller from the stub instead, with electron-builder's own reader — see
+# ../README.md.
+exec node "$(dirname "$0")/../extract-uninstaller.cjs" "$@"

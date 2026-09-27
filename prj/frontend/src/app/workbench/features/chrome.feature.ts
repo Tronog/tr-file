@@ -266,15 +266,21 @@ export class ChromeFeature {
     return items;
   });
 
-  readonly statusTrailingItems = computed<readonly UiStatusItem[]>(() => [
-    { id: 'selection', label: this.selectionSummary() },
-    {
-      id: 'hidden',
-      label: `Hidden files: ${this.parent.showHidden() ? 'shown' : 'hidden'}`,
-      title: 'Toggle hidden files',
-    },
-    { id: 'sort', label: this.sortSummary(), title: 'Turn the order round' },
-  ]);
+  readonly statusTrailingItems = computed<readonly UiStatusItem[]>(() => {
+    const clock = this.parent.serverClockFt;
+    const time = clock.label();
+    return [
+      { id: 'selection', label: this.selectionSummary() },
+      {
+        id: 'hidden',
+        label: `Hidden files: ${this.parent.showHidden() ? 'shown' : 'hidden'}`,
+        title: 'Toggle hidden files',
+      },
+      { id: 'sort', label: this.sortSummary(), title: 'Turn the order round' },
+      // The server's date and time, last, at the far right (PRD 001, §13.1) — once it has said.
+      ...(time === null ? [] : [{ id: 'clock', label: time, icon: 'clock' as const, ...(clock.title() === null ? {} : { title: clock.title() as string }) }]),
+    ];
+  });
 
   /** `Sorted by Size, descending` — the active panel's order (PRD 003, §5). */
   private readonly sortSummary = computed(() => {

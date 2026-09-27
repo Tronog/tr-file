@@ -136,6 +136,14 @@ describe('FsBridgeService', () => {
     expect(fake.sent).toEqual([{ command: 'list', path: 'docs' }]);
   });
 
+  it('asks the machine’s clock with one command (PRD 001, §13.1)', async () => {
+    const time = { now: '2026-09-27T10:05:30.000Z', timeZone: 'Europe/Zagreb', utcOffsetMinutes: 120 };
+    fake.answer = { data: time };
+
+    await expect(fs.readFt.serverTime()).resolves.toEqual(time);
+    expect(fake.sent).toEqual([{ command: 'time' }]);
+  });
+
   it('describes an entry with one command', async () => {
     fake.answer = { data: DETAILS };
 

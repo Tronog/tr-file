@@ -321,7 +321,24 @@ export class RemoteBackend {
         return this.git(request.git);
       case 'host-paths':
         return this.hostPaths(request.paths);
+      case 'time':
+        return this.time();
     }
+  }
+
+  /**
+   * The server machine's clock (PRD 001, §13.1), from its health check. A
+   * server from before it named its time zone gives the time alone: the app
+   * then shows it in this computer's zone, which is all it can do.
+   */
+  private async time(): Promise<unknown> {
+    const response = await this.request('GET', '/health', {});
+    const health = ((await response.json()) as { data: { timestamp: string; timeZone?: string; utcOffsetMinutes?: number } }).data;
+    return {
+      now: health.timestamp,
+      ...(health.timeZone === undefined ? {} : { timeZone: health.timeZone }),
+      ...(health.utcOffsetMinutes === undefined ? {} : { utcOffsetMinutes: health.utcOffsetMinutes }),
+    };
   }
 
   /**

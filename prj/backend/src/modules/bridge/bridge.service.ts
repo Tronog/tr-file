@@ -10,6 +10,7 @@ import type { ArchiveService } from '../archive/index.js';
 import type { AuthService } from '../auth/index.js';
 import { WATCH_MAX_PATHS, type FileDetails, type FilesService, type PlacesService, type WatchService } from '../files/index.js';
 import { isGitAction, parseGitRequest, type GitService } from '../git/index.js';
+import { serverTime } from '../health/server-time.js';
 import { parseOperationRequest, type OperationsService } from '../operations/index.js';
 import {
   FS_BRIDGE_CHUNK_BYTES,
@@ -345,6 +346,8 @@ export class FileSystemBridge {
         return this.git.handle(request.git);
       case 'host-paths':
         return { paths: this.files.hostPaths(request.paths) };
+      case 'time':
+        return serverTime();
     }
   }
 
@@ -606,6 +609,7 @@ export class FileSystemBridge {
       case 'op-info':
       case 'op-empty-trash':
       case 'places':
+      case 'time':
         return { command };
       case 'archive-list':
         return {

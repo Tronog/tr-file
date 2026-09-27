@@ -18,6 +18,7 @@ import type { AuthStatusDto } from '../auth/auth.model.js';
 import type { DirectoryListingDto, FileDetailsDto, FileEntryType, PlacesDto, SearchResultDto } from '../files/models/index.js';
 import type { WatchResultDto } from '../files/watch.service.js';
 import type { GitRequest } from '../git/git-request.js';
+import type { ServerTimeDto } from '../health/server-time.js';
 import type { ConflictPolicy, OperationJobDto, OperationsInfoDto } from '../operations/operation.model.js';
 
 /** Every operation the bridge offers. */
@@ -51,7 +52,8 @@ export type FsBridgeCommand =
   | 'op-compress'
   | 'op-extract'
   | 'git'
-  | 'host-paths';
+  | 'host-paths'
+  | 'time';
 
 /**
  * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
@@ -262,7 +264,13 @@ export interface FsHostPathsRequest {
   readonly paths: readonly string[];
 }
 
+/** The backend machine's clock (PRD 001, §13.1) — `GET /api/health`. */
+export interface FsTimeRequest {
+  readonly command: 'time';
+}
+
 export type FsBridgeRequest =
+  | FsTimeRequest
   | FsHostPathsRequest
   | FsGitRequest
   | FsArchiveListRequest
@@ -357,6 +365,7 @@ export interface FsBridgeResults {
   /** What the action answers: `GitInfoDto`, `GitStatusDto`, `GitLogDto`, … */
   readonly git: unknown;
   readonly 'host-paths': { readonly paths: readonly string[] };
+  readonly time: ServerTimeDto;
 }
 
 export interface FsBridgeSuccess<T> {

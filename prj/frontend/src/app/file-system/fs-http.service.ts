@@ -22,6 +22,7 @@ import type {
   FsGitFields,
   FsOperationJob,
   FsPlaces,
+  FsServerTime,
   FsOperationRequest,
   FsOperationsInfo,
   FsSearchResult,
@@ -334,6 +335,16 @@ export class FsHttpService implements FsTransport {
       }
       throw FsError.from(error);
     }
+  }
+
+  /** From the health check, which says what time it is on the server, and where (PRD 001, §13.1). */
+  async serverTime(): Promise<FsServerTime> {
+    const health = await this.request(this.http.get<FsEnvelope<{ timestamp: string; timeZone?: string; utcOffsetMinutes?: number }>>('/api/health'));
+    return {
+      now: health.timestamp,
+      ...(health.timeZone === undefined ? {} : { timeZone: health.timeZone }),
+      ...(health.utcOffsetMinutes === undefined ? {} : { utcOffsetMinutes: health.utcOffsetMinutes }),
+    };
   }
 
   async archiveList(path: string, inner: string): Promise<FsArchiveListing> {

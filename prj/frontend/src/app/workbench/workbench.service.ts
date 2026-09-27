@@ -36,6 +36,7 @@ import { FunctionKeysFeature } from './features/function-keys.feature';
 import { KeybindingsFeature } from './features/keybindings.feature';
 import { PreferencesFeature } from './features/preferences.feature';
 import { SettingsEditorFeature } from './features/settings-editor.feature';
+import { ServerClockFeature } from './features/server-clock.feature';
 import { ContextMenuFeature } from './features/context-menu.feature';
 import { FileEditFeature } from './features/file-edit.feature';
 import { SearchFeature } from './features/search.feature';
@@ -215,6 +216,8 @@ export class WorkbenchService {
   readonly keybindingsFt = new KeybindingsFeature(this);
   /** The settings window itself (PRD 010). */
   readonly settingsEditorFt = new SettingsEditorFeature(this);
+  /** The backend machine's date and time, at the right of the status bar (PRD 001, §13.1). */
+  readonly serverClockFt = new ServerClockFeature(this);
 
   /** What the root is called: the backend's name for it (PRD 003, §6). */
   readonly workspaceName = computed(() => this.placesFt.rootLabel());

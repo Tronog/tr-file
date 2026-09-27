@@ -406,6 +406,19 @@ describe('localPath', () => {
   });
 });
 
+/** PRD 001, §13.1 — the backend machine's clock, for the status bar. */
+describe('FileSystemBridge time', () => {
+  it("answers the machine's time, its time zone and its offset from UTC", async () => {
+    const before = Date.now();
+    const answer = await bridge.dispatch({ command: 'time' });
+    assert.ok('data' in answer);
+    const time = answer.data as { now: string; timeZone: string; utcOffsetMinutes: number };
+    assert.ok(Date.parse(time.now) >= before && Date.parse(time.now) <= Date.now());
+    assert.equal(time.timeZone, Intl.DateTimeFormat().resolvedOptions().timeZone);
+    assert.equal(time.utcOffsetMinutes, -new Date().getTimezoneOffset() || 0);
+  });
+});
+
 /** PRD 004, §1.3.2 — the same full paths over the bridge as over `/api/fs/host-paths`. */
 describe('FileSystemBridge host-paths', () => {
   it('answers where entries are on disk, and refuses what is not a list of paths', async () => {

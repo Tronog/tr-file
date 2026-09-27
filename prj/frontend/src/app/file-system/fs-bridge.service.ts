@@ -12,6 +12,7 @@ import type {
   FsClipboardFiles,
   FsOperationJob,
   FsPlaces,
+  FsServerTime,
   FsOperationRequest,
   FsOperationsInfo,
   FsSearchResult,
@@ -361,6 +362,11 @@ export class FsBridgeService implements FsTransport {
 
   async places(): Promise<FsPlaces> {
     return this.invoke<FsPlaces>({ command: 'places' });
+  }
+
+  /** This computer's clock — or, connected to a server, the server's (PRD 001, §13.1). */
+  async serverTime(): Promise<FsServerTime> {
+    return this.invoke<FsServerTime>({ command: 'time' });
   }
 
   async archiveList(path: string, inner: string): Promise<FsArchiveListing> {
