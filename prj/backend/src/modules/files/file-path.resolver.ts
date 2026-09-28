@@ -117,6 +117,12 @@ export class FilePathResolver {
       throw error;
     }
     const relative = this.toRootRelative(real);
+    if (relative === null && this.allDrives) {
+      // Over every drive nothing escapes: a mapped network drive's real path
+      // is its share (`\\server\share`), a mounted volume's a `\\?\Volume{…}`
+      // one — no drive letter, but still this computer's files.
+      return candidate;
+    }
     if (relative === null) {
       throw HttpError.forbidden('Path escapes the configured files root');
     }

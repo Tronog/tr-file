@@ -469,7 +469,8 @@ export class OperationsService {
     }
     const made = this.child(plan.destination, name);
     const archiveReal = await realpath(plan.archive.absolute);
-    if (overwrite && (archiveReal === made.absolute || archiveReal.startsWith(made.absolute + sep))) {
+    const madeReal = join(await realpath(plan.destination.absolute), name);
+    if (overwrite && (archiveReal === madeReal || archiveReal.startsWith(madeReal + sep))) {
       throw HttpError.badRequest(`'${name}' holds the archive itself, so it cannot be replaced`);
     }
 

@@ -267,6 +267,10 @@ export class ArchiveService {
     const reader = await ArchiveService.open(plan.archive);
     const root = resolvePath(into);
     const inside = (absolute: string): boolean => absolute === root || absolute.startsWith(root + sep);
+    // What the disk says a folder is must be compared with what it says the
+    // root is: on a mapped network drive both are the share, not `S:\`.
+    const realRoot = await realpath(root);
+    const insideReal = (absolute: string): boolean => absolute === realRoot || absolute.startsWith(realRoot + sep);
     const links: { entry: ZipEntry; absolute: string }[] = [];
     const folders: { entry: ZipEntry; absolute: string }[] = [];
     try {
@@ -292,7 +296,7 @@ export class ArchiveService {
         await mkdir(dirname(absolute), { recursive: true });
         // The folder it lands in must still be inside: an archive can't have
         // made a link on the way, since links come last — but the disk may.
-        if (!inside(await realpath(dirname(absolute)))) {
+        if (!insideReal(await realpath(dirname(absolute)))) {
           progress.onSkip();
           continue;
         }
