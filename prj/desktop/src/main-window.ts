@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, shell } from 'electron';
 
 import { DARK_BACKGROUND } from './window-background.js';
+import { DEFAULT_WINDOW_STATE, fitToScreens, MIN_WINDOW_SIZE, type WindowRect, type WindowState, type WindowStateFile } from './window-state.js';
 import { toggleVisibility } from './window-visibility.js';
 import { WINDOW_STATE_EVENT, WindowControlsChannel } from './window-controls.channel.js';
 
@@ -46,6 +47,10 @@ export class MainWindow {
     private readonly devTools: boolean,
     /** What is painted before the first frame — the theme's background; see `windowBackground`. */
     private readonly background: string = DARK_BACKGROUND,
+    /** Where the window's size, place and state are kept between starts (PRD 001, §8.2.1). */
+    private readonly stateFile: WindowStateFile | null = null,
+    /** The screens' work areas, the primary one first — so a remembered place is one that can still be reached. */
+    private readonly workAreas: readonly WindowRect[] = [],
   ) {}
 
   get isOpen(): boolean {
@@ -59,11 +64,14 @@ export class MainWindow {
       return;
     }
 
+    // As it was left (PRD 001, §8.2.1), on a screen that is still there.
+    const saved = this.stateFile === null ? DEFAULT_WINDOW_STATE : fitToScreens(this.stateFile.read(), this.workAreas);
     const window = new BrowserWindow({
-      width: 1440,
-      height: 900,
-      minWidth: 800,
-      minHeight: 560,
+      ...(saved.x !== undefined && saved.y !== undefined ? { x: saved.x, y: saved.y } : {}),
+      width: saved.width,
+      height: saved.height,
+      minWidth: MIN_WINDOW_SIZE.width,
+      minHeight: MIN_WINDOW_SIZE.height,
       title: 'tr-file',
       ...MainWindow.frameOptions(),
       // Painted before the first frame, so the workbench does not flash
@@ -82,6 +90,13 @@ export class MainWindow {
 
     this.window = window;
     this.harden(window);
+    // Maximised or full screen over the restored size and place, so un-maximising goes back to them.
+    if (saved.fullScreen) {
+      window.setFullScreen(true);
+    } else if (saved.maximized) {
+      window.maximize();
+    }
+    this.remember(window, saved);
 
     window.once('ready-to-show', () => window.show());
     window.on('closed', () => {
@@ -168,6 +183,46 @@ export class MainWindow {
     window.on('unmaximize', publish);
     window.on('enter-full-screen', publish);
     window.on('leave-full-screen', publish);
+  }
+
+  /**
+   * Keeps the window's state as it changes (PRD 001, §8.2.1): the size and
+   * place it has when neither maximised nor full screen — what restoring it
+   * goes back to, which `getBounds` of a maximised window is not — and
+   * whether it is either. A minimised window keeps what it was before; it is
+   * written for good as the window closes.
+   */
+  private remember(window: BrowserWindow, saved: WindowState): void {
+    const file = this.stateFile;
+    if (file === null) {
+      return;
+    }
+    let normal: WindowRect | null = saved.x !== undefined && saved.y !== undefined ? { x: saved.x, y: saved.y, width: saved.width, height: saved.height } : null;
+    let maximized = saved.maximized;
+    let fullScreen = saved.fullScreen;
+    const note = (): void => {
+      if (window.isDestroyed() || window.isMinimized()) {
+        return;
+      }
+      fullScreen = window.isFullScreen();
+      maximized = window.isMaximized();
+      if (!maximized && !fullScreen) {
+        normal = window.getBounds();
+      }
+      const place = normal ?? { ...window.getBounds(), width: saved.width, height: saved.height };
+      file.keep({ ...place, maximized, fullScreen });
+    };
+
+    window.on('resize', note);
+    window.on('move', note);
+    window.on('maximize', note);
+    window.on('unmaximize', note);
+    window.on('enter-full-screen', note);
+    window.on('leave-full-screen', note);
+    window.on('close', () => {
+      note();
+      file.flush();
+    });
   }
 
   /** Keeps the renderer on the stack's origin, and popups out of the app. */

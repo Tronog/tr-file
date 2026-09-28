@@ -495,6 +495,12 @@ region and the window buttons in it. `WindowControlsChannel` plus the preload gi
 page four verbs over its own window, `DesktopWindowService` is the frontend seam, and
 `WindowControlsFeature` decides what the bar shows — nothing in a browser, no buttons
 but a gap on macOS (the traffic lights stay), all three everywhere else.
+The window comes back as it was left (§8.2.1): `MainWindow` keeps its restored size and place,
+and whether it was maximised or full screen, in `window-state.json` in the user-data folder
+(`WindowStateFile` — the main process's own, not the page's settings, which *Reset Layout* clears),
+written a moment after each change and as it closes; `fitToScreens` drops a place no screen shows
+any more and shrinks a size larger than the screen. On Wayland the compositor places windows, so
+there only the size and the state come back.
 
 # Docker
 Refer to `docs/ai/DOCKER.md`. Two Compose environments live at the workspace root:

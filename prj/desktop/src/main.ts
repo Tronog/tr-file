@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { app, BrowserWindow, dialog, globalShortcut, nativeTheme, shell, type MessageBoxOptions } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, nativeTheme, screen, shell, type MessageBoxOptions } from 'electron';
 
 import { installAppMenu } from './app-menu.js';
 import { DesktopConfig } from './desktop.config.js';
@@ -16,6 +16,7 @@ import { SaveFileChannel } from './save-file.channel.js';
 import { SettingsChannel } from './settings.channel.js';
 import { SettingsStore } from './settings-store.js';
 import { windowBackground } from './window-background.js';
+import { WindowStateFile } from './window-state.js';
 import { SystemClipboard } from './system-clipboard.js';
 import { ShellTrash } from './shell-trash.js';
 import { SystemPlaces } from './system-places.js';
@@ -190,7 +191,16 @@ class DesktopApplication {
     }
 
     const background = windowBackground(this.settingsStore?.all() ?? {}, !nativeTheme.shouldUseDarkColors);
-    this.window = new MainWindow(this.pageUrl ?? this.stack.address, this.config.devTools, background);
+    // Where the window was, and how (PRD 001, §8.2.1) — checked against the screens there are now.
+    const primary = screen.getPrimaryDisplay();
+    const workAreas = [primary, ...screen.getAllDisplays().filter((display) => display.id !== primary.id)].map((display) => display.workArea);
+    this.window = new MainWindow(
+      this.pageUrl ?? this.stack.address,
+      this.config.devTools,
+      background,
+      new WindowStateFile(join(app.getPath('userData'), 'window-state.json')),
+      workAreas,
+    );
     await this.window.open();
   }
 

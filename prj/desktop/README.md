@@ -297,6 +297,15 @@ buttons of its own, leaves a gap for them, and lets the platform handle the
 title-bar double-click too. `WindowControlsFeature` in the frontend is where
 those three cases (browser, macOS, everywhere else) are decided.
 
+The window comes back as it was left (§8.2.1): its size and place when neither
+maximised nor full screen, and whether it was either — never minimised. They
+are kept in `window-state.json` in the user-data folder (`window-state.ts`, no
+`electron` import), a moment after each move or resize and once more as the
+window closes. A place that no screen shows any more — a monitor unplugged — is
+dropped and the OS centres the window; a size larger than the screen is cut to
+it. Wayland compositors place windows themselves, so there only the size and
+the state are restored.
+
 ## Layout
 
 | File | Role |
