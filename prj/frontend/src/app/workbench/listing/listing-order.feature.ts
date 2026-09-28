@@ -143,11 +143,18 @@ export class ListingOrderFeature {
    * being one (a link, once it is known where it leads).
    */
   private carries(key: string, sort: PanelSort, entries: readonly FsEntry[]): boolean {
-    const delta = deltaOf(entries);
-    if (sort.key !== 'name' || delta === undefined || this.asked.get(key) !== delta.from || entries.length !== delta.from.length) {
+    const source = this.asked.get(key);
+    if (sort.key !== 'name' || source === undefined || entries.length !== source.length || !descendsFrom(entries, source)) {
       return false;
     }
-    return delta.changed.every((index) => isFolder(delta.from[index] as FsEntry) === isFolder(entries[index] as FsEntry));
+    // However many updates since, none turned out a folder or stopped being one: a link once its
+    // target is known, or an entry whose type the directory did not record, once it is described.
+    for (let index = 0; index < entries.length; index++) {
+      if (isFolder(entries[index] as FsEntry) !== isFolder(source[index] as FsEntry)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** Where each entry lands in `order`: the inverse of it, worked out once per order. */
@@ -315,7 +322,11 @@ export class ListingOrderFeature {
       this.again.delete(key);
       const entries = this.parent.fsDataFt.entries(again.path);
       if (entries.length >= WORKER_SORT_THRESHOLD && this.asked.get(key) !== entries) {
-        this.ask(again.path, again.sort, entries);
+        if (this.carries(key, again.sort, entries)) {
+          this.asked.set(key, entries);
+        } else {
+          this.ask(again.path, again.sort, entries);
+        }
       }
     }
   }

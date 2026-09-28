@@ -205,8 +205,17 @@ export class FsDataFeature {
     }
     const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
     const entries = this.listings().get(parentPath)?.listing?.entries ?? NO_ENTRIES;
+    // A large folder read in this session knows its places already.
+    const places = this.places.get(entries);
+    if (places !== undefined) {
+      const at = places.get(path);
+      return at === undefined ? undefined : entries[at];
+    }
     return this.indexOf(entries).get(path);
   }
+
+  /** Where each path is in a large folder's listing, as `readLarge` kept it — by listing array. */
+  private readonly places = new WeakMap<readonly FsEntry[], ReadonlyMap<string, number>>();
 
   /** `path` if the listing of `folder` shows it — hidden entries only while they are shown. */
   shownEntryAt(folder: string, path: string): FsEntry | undefined {
@@ -429,7 +438,13 @@ export class FsDataFeature {
     const prefix = first.path === '' ? '' : `${first.path}/`;
     // Index-aligned with the backend's names: details say which slot they fill; a vanished entry leaves `null`.
     const slots: (FsEntry | null)[] = [];
-    const named = (name: string, type: FsEntry['type']): FsEntry => ({ name, path: prefix + name, type, size: 0, hidden: name.startsWith('.'), modifiedAt: '', createdAt: '', partial: true });
+    // Where each path's entry is, kept as the names come — a chunk at a time, not a million in one go
+    // the first time something looks an entry up (`entryAt`). Holds while no entry has gone.
+    const places = new Map<string, number>();
+    const named = (name: string, type: FsEntry['type']): FsEntry => {
+      places.set(prefix + name, slots.length);
+      return { name, path: prefix + name, type, size: 0, hidden: name.startsWith('.'), modifiedAt: '', createdAt: '', partial: true };
+    };
     let detailsFrom = 0;
     let total: number | null = null;
     let namesDone = false;
@@ -454,6 +469,9 @@ export class FsDataFeature {
         recordDelta(entries, published, [...described].filter((index) => index < (published as readonly FsEntry[]).length));
       }
       published = entries;
+      if (!goneAny) {
+        this.places.set(entries, places);
+      }
       described.clear();
       const listing: FsDirectoryListing = { path: first.path, parent: first.parent, entries };
       const progress: FsListingProgressState = { total, named: slots.length, detailed: detailsFrom, namesDone };

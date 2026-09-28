@@ -378,20 +378,25 @@ Specs of the layout's mechanics start from one panel instead (`provideOnePanel()
 
 **Large folders (PRD 004, §3.1).** A folder of 1000 entries or more is never read in one go. The
 backend counts to 1000 as it reads names (`FilesService.listDirectory`); past that it answers at once
-with `progressive: { token }` and hands the folder to a worker thread (`LargeListings`,
+with `progressive: { token, names }` — the first 1000 names, shown straight away — and hands the
+folder to a worker thread (which goes on after those names) (`LargeListings`,
 `large-listing.worker.ts` — a source string started with `eval: true`, so tsx, the ES build and the
 desktop's single CommonJS bundle all run it): the names with the directory's own types, handed
-over in chunks as they are read (no count first — how many is known with the last), then
+over in chunks of 10 000 as they are read (no count first — how many is known with the last), then
 `lstat` in batches; links' targets are judged against the root on the host. `GET
 /api/fs/list-progress` (bridge `list-progress`, mapped by `RemoteBackend`) serves it by cursor. The
-frontend follows it in `FsDataFeature.readLarge`: a "Reading the entries… N names so far" placeholder, then
-every entry shown `partial` (name and type; blank size and date), then details filled in — asking
+frontend follows it in `FsDataFeature.readLarge`: the first names on screen at once, the list growing
+once a second as names come (`· reading…`; a refresh keeps its old listing up until they are all in),
+every entry `partial` (name and type; blank size and date), then details filled in — asking
 once a second (at once while chunks are full) and putting the screen right at most once a second. A
 large listing is ordered in a Web Worker (`ListingOrderFeature`, `listing-order.worker.ts`, the same
 `compareKeys` as `sortEntries`), asked by an `effect` for what is on screen (`ordersWanted`); until
 there is an order the panel says it is sorting rather than showing the disk's order, and a new sort
-keeps the last order up meanwhile. Each update is made from the last where only details changed
-(`listing/array-delta.ts`: the hidden filter, the path index, the order laid over, the rows), rows
+keeps the last order up meanwhile. Each update is made from the last — names added after it, some entries described
+(`listing/array-delta.ts`, one step kept, `descendsFrom` by line and generation so no old listing is
+held alive: the hidden filter, the order laid over — an order of an earlier listing is laid over the
+start of a later one, the newest names after it — and the rows); the path index is kept by
+`readLarge` as names come; the worker is asked one question at a time per order, rows
 are built for the showing view only, their cells formatted when first read, and selection, focus
 and cut are laid over a copy of the base rows — so a keypress in a folder of half a million costs a
 copy of an array. Keep new per-entry work off those paths. A large folder is never polled

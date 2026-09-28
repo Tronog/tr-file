@@ -1303,15 +1303,16 @@ export class FileBrowserFeature implements PanelContentFeature {
       if (delta !== undefined && before !== undefined) {
         const rows = before.rows.slice();
         for (const at of delta.changed) {
-          rows[at] = this.rowBaseOf(entries[at] as FsEntry, false);
+          rows[at] = this.rowBase(entries[at] as FsEntry);
         }
         for (let at = delta.from.length; at < entries.length; at++) {
-          rows.push(this.rowBaseOf(entries[at] as FsEntry, false));
+          rows.push(this.rowBase(entries[at] as FsEntry));
           before.index?.set((entries[at] as FsEntry).path, at);
         }
         made = before.index === undefined ? { rows } : { rows, index: before.index };
       } else {
-        made = { rows: entries.map((entry) => this.rowBaseOf(entry, false)) };
+        // In another order — a new sort, a large folder's order come in: the same rows, found again.
+        made = { rows: entries.map((entry) => this.rowBase(entry)) };
       }
       this.rowLists.set(entries, made);
     }
@@ -1328,7 +1329,7 @@ export class FileBrowserFeature implements PanelContentFeature {
    * with none of it is the kept object itself.
    */
   private row(entry: FsEntry, group: PanelGroupState, active: boolean, selection: ReadonlySet<string>, expanded = false): UiFileRow {
-    const base = this.rowBaseOf(entry, expanded);
+    const base = expanded ? this.rowBaseOf(entry, true) : this.rowBase(entry);
     const selected = selection.has(entry.path);
     const focused = active && group.focusedEntryId === entry.path;
     const cut = this.parent.fileClipboardFt.isCut(entry.path);
@@ -1345,6 +1346,17 @@ export class FileBrowserFeature implements PanelContentFeature {
   }
 
   private readonly itemBases = new WeakMap<FsEntry, UiIconViewItem>();
+  private readonly rowBases = new WeakMap<FsEntry, UiFileRow>();
+
+  /** An entry's row, made once per entry object and found again when the listing is put in another order. */
+  private rowBase(entry: FsEntry): UiFileRow {
+    let row = this.rowBases.get(entry);
+    if (row === undefined) {
+      row = this.rowBaseOf(entry, false);
+      this.rowBases.set(entry, row);
+    }
+    return row;
+  }
 
   /**
    * What a row shows of the entry alone; a folder takes drops (PRD 005, §2).
