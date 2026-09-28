@@ -132,7 +132,8 @@ export type UiPanelCommand =
   | 'select-pattern'
   | 'unselect-pattern'
   | 'previous-image'
-  | 'next-image';
+  | 'next-image'
+  | 'stop-loading';
 
 /**
  * One `UiPanelCommand`, with the entry focus sat on when the key was hit.

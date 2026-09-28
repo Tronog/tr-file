@@ -31,6 +31,8 @@ export interface FsListingState {
    * (§3.1.1): it is read again only when someone asks, with Refresh.
    */
   readonly large?: true;
+  /** Its reading was stopped with `Escape` (§3.1.4): `listing` is what had come by then. */
+  readonly stopped?: true;
 }
 
 const NO_ENTRIES: readonly FsEntry[] = [];
@@ -386,9 +388,12 @@ export class FsDataFeature {
   /**
    * Stops reading a large folder nobody is looking at any more — the panel
    * that showed it went elsewhere (PRD 004, §3.1.2): no more questions to the
-   * backend, whose worker is stopped too, and no read queued after it.
+   * backend, whose worker is stopped too, and no read queued after it. With
+   * `keep` — `Escape` in the panel showing it (§3.1.4) — what has been read of
+   * a first reading stays on screen, `stopped`; a refresh goes back to the
+   * whole listing it had.
    */
-  abortLarge(path: string): void {
+  abortLarge(path: string, keep = false): void {
     const reading = this.largeReads.get(path);
     if (reading === undefined) {
       // Left while its first answer is still on the way: given up the moment it turns out large.
@@ -403,6 +408,19 @@ export class FsDataFeature {
     reading.aborted = true;
     reading.wake?.();
     this.staleListings.delete(path);
+    // The backend's worker stops too, whichever way the screen is left.
+    void this.parent.fileSystem.readFt.listCancel(reading.token).catch(() => undefined);
+    // Stopped where it is (§3.1.4): what has come stays on screen, said to be all there is so far.
+    if (keep && reading.previous === undefined) {
+      const current = this.listings().get(path)?.listing;
+      this.patchListing(path, {
+        status: 'ready',
+        listing: current ?? { path, parent: path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : path === '' ? null : '', entries: [] },
+        large: true,
+        stopped: true,
+      });
+      return;
+    }
     // At once, not when the question on its way comes back: the last whole listing if there was
     // one, else nothing — so the folder is read afresh when it is next opened.
     if (reading.previous !== undefined) {
@@ -414,7 +432,6 @@ export class FsDataFeature {
         return next;
       });
     }
-    void this.parent.fileSystem.readFt.listCancel(reading.token).catch(() => undefined);
   }
 
   /** A folder shown again: whatever its reading was given up for, it is wanted after all. */

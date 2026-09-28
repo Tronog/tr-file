@@ -151,6 +151,7 @@ export const UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'go.location', key: 'Ctrl+L', when: 'panel' },
   { command: 'file.newFolder', key: 'Ctrl+Shift+N', when: 'panel' },
   { command: 'view.refresh', key: 'Ctrl+R', when: 'panel' },
+  { command: 'view.stopLoading', key: 'Escape', when: 'panel' },
   { command: 'file.copyPath', key: 'Ctrl+Shift+C', when: 'panel' },
   { command: 'panel.contextMenu', key: 'Shift+F10', when: 'panel' },
   { command: 'panel.contextMenu', key: 'ContextMenu', when: 'panel' },

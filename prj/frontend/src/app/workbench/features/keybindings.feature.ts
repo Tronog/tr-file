@@ -49,6 +49,7 @@ const KEY_ONLY_COMMANDS: Readonly<Record<string, { readonly category: string; re
   'view.splitRight': { category: 'Panel', label: 'Split Panel Right' },
   'tab.previous': { category: 'Tab', label: 'Previous Tab' },
   'tab.next': { category: 'Tab', label: 'Next Tab' },
+  'view.stopLoading': { category: 'View', label: 'Stop Reading the Folder' },
   'image.previous': { category: 'Image', label: 'Previous Image in Folder' },
   'image.next': { category: 'Image', label: 'Next Image in Folder' },
   'image.zoomIn': { category: 'Image', label: 'Zoom In' },

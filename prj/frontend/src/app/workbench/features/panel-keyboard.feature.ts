@@ -59,6 +59,15 @@ export class PanelKeyboardFeature {
         }
         break;
 
+      case 'stop-loading': {
+        // `Escape` in a large folder being read (PRD 004, §3.1.4): stopped, what came kept.
+        const path = this.parent.editorGroupsFt.pathOf(groupId);
+        if (path !== undefined) {
+          this.parent.fsDataFt.abortLarge(path, true);
+        }
+        break;
+      }
+
       case 'previous-image':
       case 'next-image':
         // The viewer stays where it is and keeps the keyboard; only its picture changes.

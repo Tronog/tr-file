@@ -413,6 +413,10 @@ folder or closed, and no other panel, tree or image still showing it — stops b
 an `effect` in `FileBrowserFeature` sees it leave the screen and calls `FsDataFeature.abortLarge`,
 which ends the polling, cancels the backend's worker (`DELETE /api/fs/list-progress`, bridge
 `list-cancel`) and puts back the last whole listing, or forgets the folder so it is read afresh.
+`Escape` in the panel stops it where it is (§3.1.4; keymap `view.stopLoading`, claimed by
+`UiFileBrowser` only while the model is `stoppable`): `abortLarge(path, true)` keeps what came as
+the listing, `stopped` (`· stopped, refresh to read it all`); a refresh stopped goes back to the
+whole listing it had.
 A large folder's *entry count* (its details: selecting it in its parent) stops at 1000 and says so
 (`entryCountMore`, shown `1000+ items`, §3.1.3); pressing that value (a `UiProperty` with an `action`)
 counts it through (`?recount=1`, bridge `recount`), once — the backend keeps the number

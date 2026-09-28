@@ -44,6 +44,7 @@ const PANEL_COMMANDS = [
   'panel.contextMenu',
   'image.previous',
   'image.next',
+  'view.stopLoading',
 ] as const;
 
 /** The panel commands that walk from folder to folder; see `onBodyKeydown`. */
@@ -255,7 +256,9 @@ export class UiFileBrowser {
    * - `Shift`+`F10` or the menu key: the context menu of the entry focus is
    *   on, beside it;
    * - `PageUp` / `PageDown` over an image: the previous or next image of its
-   *   folder (PRD 012, §1.1).
+   *   folder (PRD 012, §1.1);
+   * - `Escape` while a large folder is being read: stop reading it (PRD 004,
+   *   §3.1.4) — only then; otherwise the key is left alone.
    *
    * None is claimed inside a text field. Handled before the key reaches the
    * group around it, which claims the tab chords. The browser knows which
@@ -336,6 +339,13 @@ export class UiFileBrowser {
         this.contextMenu.emit({ target: entryId, x: rect.left + 16, y: rect.top + Math.min(rect.height, 22) });
         return true;
       }
+      case 'view.stopLoading':
+        // Only while there is something to stop (PRD 004, §3.1.4); else `Escape` is not the browser's.
+        if (!this.browser().stoppable) {
+          return false;
+        }
+        this.command.emit({ command: 'stop-loading', entryId: null });
+        return true;
       case 'image.previous':
       case 'image.next':
         // Over an image only (PRD 012, §1.1); in a listing the page keys move the cursor.

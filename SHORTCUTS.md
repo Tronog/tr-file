@@ -70,6 +70,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `Alt`+`←` / `Alt`+`→` | Back / forward in the panel's history | In a panel |
 | `Alt`+`↑` | Up one folder | In a panel |
 | `Ctrl`+`R` | Refresh (large folders are refreshed only this way) | In a panel |
+| `Escape` | Stop reading a large folder — what has come stays (only while one is being read) | In a panel |
 | `Ctrl`+`L` | Edit the path bar — go to a location | In a panel |
 | `Ctrl`+`F` | Filter the folder | In a panel |
 | `Ctrl`+`Shift`+`N` | New folder… | In a panel |

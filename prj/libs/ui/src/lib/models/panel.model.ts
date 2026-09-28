@@ -96,6 +96,11 @@ export interface UiFileBrowserModel {
   readonly location?: string;
   /** Places the path bar suggests for what is typed in it (PRD 004, §4.2); see `UiFileBrowser.locationInput`. */
   readonly locationSuggestions?: readonly UiPathSuggestion[];
+  /**
+   * Something is being read that `Escape` stops — a large folder (PRD 004,
+   * §3.1.4). While it is not, `Escape` is left alone.
+   */
+  readonly stoppable?: boolean;
   /** The listing can be sorted by clicking its column headers. */
   readonly sortable?: boolean;
   /**

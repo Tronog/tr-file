@@ -183,6 +183,43 @@ describe('A large folder', () => {
       http.match(() => true);
     });
 
+    /** §3.1.4 — `Escape`: stopped where it is, what came kept. */
+    it('stops on Escape, keeping what came, and says so', async () => {
+      await openBigAndAnswerOnce();
+      expect(workbench.fileBrowserFt.browser(group())?.stoppable).toBe(true);
+
+      workbench.panelKeyboardFt.run(group(), { command: 'stop-loading', entryId: null });
+      await settled();
+      expect(cancels()).toHaveLength(1);
+      polls().forEach((request) => request.flush({ error: { code: 'NOT_FOUND', message: 'gone' } }, { status: 404, statusText: 'Not Found' }));
+      clock += 5000;
+      await settled();
+
+      expect(polls()).toEqual([]);
+      expect(workbench.fsDataFt.listingState('big')).toMatchObject({ status: 'ready', stopped: true, large: true });
+      const browser = workbench.fileBrowserFt.browser(group());
+      expect(browser?.rows.map((row) => row.name)).toEqual(['a']);
+      expect(browser?.summary).toBe('1 item · stopped, refresh to read it all');
+      expect(browser?.stoppable).toBeUndefined();
+      http.match(() => true);
+    });
+
+    it('goes back to the whole listing it had when a refresh is stopped', async () => {
+      await open('big');
+      http.expectOne(listUrl('big')).flush(progressive());
+      await answer(0, 0, progress({ path: 'big', total: 1, names: [{ name: 'old', type: 'file' }], namesDone: true, done: true }));
+      workbench.fileBrowserFt.runToolbarAction(group(), 'refresh');
+      await settled();
+      http.expectOne(listUrl('big')).flush(progressive());
+      await answer(0, 0, progress({ path: 'big' }));
+
+      workbench.panelKeyboardFt.run(group(), { command: 'stop-loading', entryId: null });
+      expect(workbench.fsDataFt.listingState('big')).toMatchObject({ status: 'ready', large: true });
+      expect(workbench.fsDataFt.listingState('big')?.stopped).toBeUndefined();
+      expect(workbench.fsDataFt.entries('big').map((entry) => entry.name)).toEqual(['old']);
+      http.match(() => true);
+    });
+
     it('goes on while another panel still shows it', async () => {
       await openBigAndAnswerOnce();
       workbench.editorGroupsFt.runAction(group(), 'split-right');

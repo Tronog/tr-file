@@ -570,6 +570,25 @@ describe('panel keys', () => {
    * bar's own buttons emit, so the two paths cannot drift.
    */
   /** PRD 012, §1.1 — the page keys step through a folder's images over one, and move the cursor otherwise. */
+  /** PRD 004, §3.1.4 — `Escape` stops a large folder being read, and is left alone otherwise. */
+  describe('Escape', () => {
+    const escape = () => {
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      contentBody().dispatchEvent(event);
+      fixture.detectChanges();
+      return event;
+    };
+
+    it('stops what is being read — only while there is something to stop', () => {
+      expect(escape().defaultPrevented).toBe(false);
+      expect(commands).toEqual([]);
+
+      show({ stoppable: true });
+      expect(escape().defaultPrevented).toBe(true);
+      expect(commands).toEqual([{ command: 'stop-loading', entryId: null }]);
+    });
+  });
+
   describe('PgUp and PgDown', () => {
     const page = (key: 'PageUp' | 'PageDown', target: Element) => {
       const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
