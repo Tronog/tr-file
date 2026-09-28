@@ -29,6 +29,7 @@ const WHEN_LABELS: Readonly<Record<UiKeyContext, string>> = {
   window: 'Anywhere',
   panel: 'In a panel',
   list: 'On a row',
+  image: 'In the image viewer',
 };
 
 /**

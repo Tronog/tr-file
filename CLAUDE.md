@@ -126,6 +126,9 @@ contain (§7.3.1). The viewer's model lives in `UiImageViewService`, provided pe
 `UiFileBrowser` only while it shows one) step the tab through its folder's images, in the order the
 panel sorts that folder and round at the ends (`FilePreviewFeature.stepImage`): the next picture is
 loaded before the tab moves to it, and a press meanwhile counts on from the one loading.
+In the viewer itself (§1.2) `+` / `-` zoom, `1` is 100 % and `0` the default fit — keymap commands
+in their own context, `when: 'image'`, so a digit is never taken from type-to-find in a listing —
+and the arrows pan an image larger than the view (`UiImageViewService.panBy`; navigation, so fixed).
 Selecting an image also shows it on the details card, fitted `contain` and non-interactive
 (§9); the panel and the sidebar read from the same cache, so a file is fetched once.
 

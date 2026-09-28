@@ -214,6 +214,67 @@ describe('UiImageView', () => {
     });
   });
 
+  /** PRD 012, §1.2 — the viewer's keys. */
+  describe('the keyboard', () => {
+    const press = (key: string, init: KeyboardEventInit = {}): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+      viewport().dispatchEvent(event);
+      fixture.detectChanges();
+      return event;
+    };
+
+    it('zooms in and out on + and -, as the buttons do', () => {
+      press('+');
+      const zoomedIn = scale();
+      expect(zoomedIn).toBeGreaterThan(0.4);
+      button('Zoom out').click();
+      fixture.detectChanges();
+      expect(scale()).toBeCloseTo(0.4);
+
+      expect(press('-').defaultPrevented).toBe(true);
+      expect(scale()).toBeLessThan(0.4);
+    });
+
+    it('shows 100% on 1, and the default fit on 0', () => {
+      press('1');
+      expect(scale()).toBe(1);
+      expect(zoomLabel()).toBe('100%');
+
+      press('0');
+      expect(scale()).toBeCloseTo(0.4);
+    });
+
+    it('pans a zoomed image with the arrows, as far as its edges', () => {
+      press('1');
+      press('ArrowRight');
+      expect(translate()).toEqual({ x: -48, y: 0 });
+      press('ArrowLeft');
+      press('ArrowLeft');
+      expect(translate()).toEqual({ x: 48, y: 0 });
+
+      for (let i = 0; i < 10; i++) {
+        press('ArrowDown');
+      }
+      // 1000px tall in a 400px frame: 300px each way, and no further.
+      expect(translate().y).toBe(-300);
+      expect(press('ArrowDown').defaultPrevented).toBe(false);
+    });
+
+    it('leaves the arrows alone while the whole image is visible, and chords to others', () => {
+      expect(press('ArrowRight').defaultPrevented).toBe(false);
+      expect(press('ArrowLeft', { altKey: true }).defaultPrevented).toBe(false);
+      expect(press('PageDown').defaultPrevented).toBe(false);
+      expect(scale()).toBeCloseTo(0.4);
+    });
+
+    it('does nothing as a thumbnail', () => {
+      fixture.componentRef.setInput('interactive', false);
+      fixture.detectChanges();
+      press('1');
+      expect(scale()).toBeCloseTo(0.4);
+    });
+  });
+
   it('returns to contain on a double click', () => {
     button('Actual size (100%)').click();
     fixture.detectChanges();

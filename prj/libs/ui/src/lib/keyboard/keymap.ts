@@ -8,12 +8,13 @@ import { Service, signal } from '@angular/core';
  * - `panel` — anywhere in a panel but a text field (`UiFileBrowser`,
  *   `UiPanelGroup`, and the application's `Tab` between panels);
  * - `window` — anywhere in the window; the application binds these.
+ * - `image` — in the image viewer (PRD 012, §1.2): zoom and fit.
  *
  * A key pressed on a row is offered to the row first, then to the panel,
  * then to the window, and the first binding that takes it wins — so one key
  * can mean one thing on a row and another elsewhere.
  */
-export type UiKeyContext = 'list' | 'panel' | 'window';
+export type UiKeyContext = 'list' | 'panel' | 'window' | 'image';
 
 /** One key bound to one command, in one context. */
 export interface UiKeybinding {
@@ -160,6 +161,10 @@ export const UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'tab.next', key: 'Ctrl+PageDown', when: 'panel' },
   { command: 'image.previous', key: 'PageUp', when: 'panel' },
   { command: 'image.next', key: 'PageDown', when: 'panel' },
+  { command: 'image.zoomIn', key: 'Plus', when: 'image' },
+  { command: 'image.zoomOut', key: '-', when: 'image' },
+  { command: 'image.actualSize', key: '1', when: 'image' },
+  { command: 'image.fit', key: '0', when: 'image' },
 ];
 
 /**

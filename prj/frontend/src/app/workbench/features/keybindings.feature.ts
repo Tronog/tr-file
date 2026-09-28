@@ -51,6 +51,10 @@ const KEY_ONLY_COMMANDS: Readonly<Record<string, { readonly category: string; re
   'tab.next': { category: 'Tab', label: 'Next Tab' },
   'image.previous': { category: 'Image', label: 'Previous Image in Folder' },
   'image.next': { category: 'Image', label: 'Next Image in Folder' },
+  'image.zoomIn': { category: 'Image', label: 'Zoom In' },
+  'image.zoomOut': { category: 'Image', label: 'Zoom Out' },
+  'image.actualSize': { category: 'Image', label: 'Actual Size (100%)' },
+  'image.fit': { category: 'Image', label: 'Fit Whole Image' },
   'workbench.focusNextPart': { category: 'View', label: 'Focus Next Part' },
   'workbench.focusPreviousPart': { category: 'View', label: 'Focus Previous Part' },
   'workbench.nextPanel': { category: 'View', label: 'Focus Next Panel' },
@@ -127,7 +131,7 @@ export class KeybindingsFeature {
 
   /** The keys of `command`, the ones a panel answers first, then a row, then the window. */
   keysFor(command: string): readonly string[] {
-    const order: readonly UiKeyContext[] = ['panel', 'list', 'window'];
+    const order: readonly UiKeyContext[] = ['panel', 'list', 'image', 'window'];
     return order.flatMap((when) => this.bindings().filter((binding) => binding.command === command && binding.when === when).map((binding) => binding.key));
   }
 
@@ -331,7 +335,7 @@ export class KeybindingsFeature {
         item !== null &&
         typeof (item as UiKeybinding).command === 'string' &&
         typeof (item as UiKeybinding).key === 'string' &&
-        ['list', 'panel', 'window'].includes((item as UiKeybinding).when),
+        ['list', 'panel', 'window', 'image'].includes((item as UiKeybinding).when),
     );
   }
 }

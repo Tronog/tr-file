@@ -8,7 +8,21 @@ import {
   type ElementRef,
 } from '@angular/core';
 import { UiIconButton } from '../controls/ui-icon-button';
+import { UiKeymap } from '../keyboard/keymap';
 import { UiImageViewService } from './ui-image-view.service';
+
+/** The keymap commands the viewer answers (`when: 'image'`). */
+const IMAGE_COMMANDS = ['image.zoomIn', 'image.zoomOut', 'image.actualSize', 'image.fit'] as const;
+
+/** How far an arrow key pans, in screen pixels. */
+const PAN_STEP = 48;
+
+const PAN_KEYS: Readonly<Record<string, readonly [number, number]>> = {
+  ArrowLeft: [-PAN_STEP, 0],
+  ArrowRight: [PAN_STEP, 0],
+  ArrowUp: [0, -PAN_STEP],
+  ArrowDown: [0, PAN_STEP],
+};
 
 /**
  * The read-only image viewer (PRD 001, §7.3.1).
@@ -51,6 +65,8 @@ export class UiImageView {
 
   /** The model every binding below reads; one per viewer. */
   protected readonly view = inject(UiImageViewService);
+
+  private readonly keymap = inject(UiKeymap);
 
   private readonly viewportRef = viewChild.required<ElementRef<HTMLElement>>('viewport');
   private readonly imageRef = viewChild.required<ElementRef<HTMLImageElement>>('image');
@@ -132,6 +148,39 @@ export class UiImageView {
     }
     this.dragging.set(null);
     this.viewportRef().nativeElement.releasePointerCapture?.(event.pointerId);
+  }
+
+  /**
+   * The viewer's keys (PRD 012, §1.2): `+` / `-` zoom about the centre, `1` is
+   * 100 % and `0` the default fit — keymap commands, `when: 'image'` — and the
+   * arrows pan an image larger than the view. A key with nothing to do here
+   * goes on its way: `PgUp` / `PgDown` to the panel, an arrow at the edge.
+   */
+  protected onKeydown(event: KeyboardEvent): void {
+    if (!this.interactive() || !this.view.ready) {
+      return;
+    }
+    switch (this.keymap.commandFor(event, 'image', IMAGE_COMMANDS)) {
+      case 'image.zoomIn':
+        this.view.step(1);
+        break;
+      case 'image.zoomOut':
+        this.view.step(-1);
+        break;
+      case 'image.actualSize':
+        this.view.fit('actual');
+        break;
+      case 'image.fit':
+        this.view.fit('contain');
+        break;
+      default: {
+        const [dx, dy] = PAN_KEYS[event.key] ?? [0, 0];
+        if ((dx === 0 && dy === 0) || event.ctrlKey || event.metaKey || event.altKey || !this.view.panBy(dx, dy)) {
+          return;
+        }
+      }
+    }
+    event.preventDefault();
   }
 
   /** Double click returns to the default fit, as the PRD asks. */

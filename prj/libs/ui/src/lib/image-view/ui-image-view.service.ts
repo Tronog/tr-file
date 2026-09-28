@@ -131,6 +131,18 @@ export class UiImageViewService {
     return this.clampedPan();
   }
 
+  /**
+   * Moves the view by `dx`, `dy` over an image larger than it — an arrow key
+   * (PRD 012, §1.2): positive shows more of the right and the bottom, as
+   * scrolling would. `false` when there was nowhere to go that way.
+   */
+  panBy(dx: number, dy: number): boolean {
+    const from = this.clampedPan();
+    this.pan.set({ x: from.x - dx, y: from.y - dy });
+    const to = this.clampedPan();
+    return to.x !== from.x || to.y !== from.y;
+  }
+
   /** Moves the image; the clamp is applied when it is read back. */
   panTo(point: UiImagePoint): void {
     this.pan.set(point);
