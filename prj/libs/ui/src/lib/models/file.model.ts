@@ -96,3 +96,15 @@ export interface UiBreadcrumb {
   readonly label: string;
   readonly icon?: UiIconName;
 }
+
+/**
+ * A place the path bar suggests as it is typed in (PRD 004, §4.2): `value`
+ * is the whole path it stands for, as it would be typed (`/docs/prd`).
+ */
+export interface UiPathSuggestion {
+  readonly value: string;
+  readonly label: string;
+  readonly icon: UiIconName;
+  /** A folder: completing it with `Tab` adds a `/`, to go on typing inside it. */
+  readonly folder?: boolean;
+}

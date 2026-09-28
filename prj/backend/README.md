@@ -195,6 +195,11 @@ Notes worth knowing before you call it:
 - **`mimeType` is a guess from the extension** (small built-in table, no
   dependency) and is `null` for directories and unknown extensions; downloads
   fall back to `application/octet-stream`.
+- **Case.** A path that differs from the real one in letter case alone — typed on a
+  file system that ignores case, Windows or a Samba share — is answered with the real
+  spelling (`path` in a listing or the details), so everything opened from it matches
+  what listings report (PRD 004, §4.1). On a drive mapped to a share the share's spelling
+  is taken. A link is never swapped for where it leads.
 - **Symlinks** are reported as `type: 'symlink'`, with `targetType` saying what
   the link leads to — `'directory'`, `'file'`, `'other'`, or `null` when it is
   dangling or leads outside the root. A link to a folder inside the root lists

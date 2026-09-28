@@ -1,6 +1,9 @@
-import { Component, ElementRef, afterRenderEffect, input, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, afterRenderEffect, computed, input, linkedSignal, output, signal, viewChild } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
-import type { UiBreadcrumb } from '../models';
+import type { UiBreadcrumb, UiPathSuggestion } from '../models';
+
+/** Instance counter, for the suggestion list's ids. */
+let nextBar = 0;
 
 /**
  * The path bar above a panel body.
@@ -15,6 +18,13 @@ import type { UiBreadcrumb } from '../models';
  * reports what was typed as `submit`; `Escape`, or leaving the field, puts
  * the crumbs back. Either way focus goes back to where it was, and where the
  * path leads is the application's business.
+ *
+ * While it is typed in, the field suggests places below it (PRD 004, §4.2):
+ * each change is reported as `pathInput` — and so is the path as the edit
+ * begins — and the application answers with `suggestions`. `↓`/`↑` choose
+ * one, `Enter` goes to it (or to what is typed), `Tab` completes the text to
+ * it — a folder with a `/` after it, to go on inside — `Escape` closes the
+ * list, and again, the edit. A pointer goes to one by pressing it.
  */
 @Component({
   selector: 'ui-breadcrumbs',
@@ -42,6 +52,25 @@ export class UiBreadcrumbs {
   /** A path typed into the bar and confirmed with `Enter` — not `submit`, for the same reason. */
   readonly pathSubmit = output<string>();
 
+  /** Places that fit what is typed, best first; see `pathInput`. */
+  readonly suggestions = input<readonly UiPathSuggestion[]>([]);
+
+  /** What the field holds now — as the edit begins, and at each change. */
+  readonly pathInput = output<string>();
+
+  /** The suggestion `↓`/`↑` stand on; none — `-1` — whenever they change. */
+  protected readonly active = linkedSignal<readonly UiPathSuggestion[], number>({
+    source: () => this.suggestions(),
+    computation: () => -1,
+  });
+
+  /** Closed by `Escape`, open again with the next change. */
+  protected readonly listOpen = signal(true);
+
+  protected readonly shown = computed(() => (this.editing() && this.listOpen() ? this.suggestions() : []));
+
+  protected readonly listId = `ui-path-suggestions-${nextBar++}`;
+
   /** Whether the bar is a text field right now. */
   protected readonly editing = signal(false);
 
@@ -67,7 +96,21 @@ export class UiBreadcrumbs {
       return;
     }
     this.previous = document.activeElement;
+    this.listOpen.set(true);
     this.editing.set(true);
+    this.pathInput.emit(this.location() ?? '');
+  }
+
+  protected onFieldInput(event: Event): void {
+    this.listOpen.set(true);
+    this.pathInput.emit((event.target as HTMLInputElement).value);
+  }
+
+  /** A suggestion pressed: gone to. `mousedown`, so the field is not left — and the edit given up — first. */
+  protected onSuggestionPress(event: MouseEvent, suggestion: UiPathSuggestion): void {
+    event.preventDefault();
+    this.stop();
+    this.pathSubmit.emit(suggestion.value);
   }
 
   /** A click on the bar itself — not on a crumb — edits the path, as a file manager's address bar does. */
@@ -78,12 +121,27 @@ export class UiBreadcrumbs {
   }
 
   protected onFieldKeydown(event: KeyboardEvent): void {
+    const field = event.target as HTMLInputElement;
+    const shown = this.shown();
     if (event.key === 'Enter') {
-      const value = (event.target as HTMLInputElement).value;
+      const chosen = shown[this.active()];
       this.stop();
-      this.pathSubmit.emit(value);
+      this.pathSubmit.emit(chosen?.value ?? field.value);
     } else if (event.key === 'Escape') {
-      this.stop();
+      // The list first, then the edit.
+      if (shown.length > 0) {
+        this.listOpen.set(false);
+      } else {
+        this.stop();
+      }
+    } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && shown.length > 0) {
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      const at = this.active();
+      this.active.set(at === -1 ? (step === 1 ? 0 : shown.length - 1) : (at + step + shown.length) % shown.length);
+    } else if (event.key === 'Tab' && !event.shiftKey && shown.length > 0) {
+      const chosen = shown[Math.max(this.active(), 0)] as UiPathSuggestion;
+      field.value = chosen.folder ? `${chosen.value}/` : chosen.value;
+      this.pathInput.emit(field.value);
     } else {
       return;
     }

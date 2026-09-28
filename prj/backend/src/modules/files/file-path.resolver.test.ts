@@ -105,3 +105,21 @@ describe('FilePathResolver.drives (PRD 003, §6)', () => {
     assert.equal(resolver.toRootRelative('\\\\server\\share\\x'), null);
   });
 });
+
+/**
+ * PRD 004, §4.1 — `s:\tronog` typed for `S:\Tronog`: on a drive mapped to a
+ * share the real path is the share's, and the path asked for takes its case.
+ */
+describe('FilePathResolver.caseFromShare', () => {
+  it('spells the path as the share does, keeping the drive', () => {
+    assert.equal(FilePathResolver.caseFromShare('S:\\tronog\\sub', '\\\\server\\share\\Tronog\\Sub'), 'S:\\Tronog\\Sub');
+    // A drive mapped to a folder inside the share: only as many segments as were asked for.
+    assert.equal(FilePathResolver.caseFromShare('S:\\tronog', '\\\\server\\share\\deep\\Tronog'), 'S:\\Tronog');
+  });
+
+  it('leaves alone what differs by more than case, or is already right', () => {
+    assert.equal(FilePathResolver.caseFromShare('S:\\link\\sub', '\\\\server\\share\\target\\Sub'), null);
+    assert.equal(FilePathResolver.caseFromShare('S:\\', '\\\\server\\share'), null);
+    assert.equal(FilePathResolver.caseFromShare('S:\\Tronog', '\\\\server\\share\\Tronog'), null);
+  });
+});

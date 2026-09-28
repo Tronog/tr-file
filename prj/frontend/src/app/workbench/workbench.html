@@ -259,6 +259,7 @@
                       (sortChange)="files.toggleSort(groupId, $event)"
                       (filterChange)="files.setFilter(groupId, $event)"
                       (pathSubmit)="files.goToLocation(groupId, $event)"
+                      (locationInput)="files.locationInput(groupId, $event)"
                       (contextMenu)="contextMenu.openInPanel(groupId, $event)"
                       [nativeDrag]="files.nativeDrag()"
                       (nativeDragStart)="files.startNativeDrag($event)"

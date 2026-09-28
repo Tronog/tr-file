@@ -139,7 +139,10 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | --- | --- |
 | `Escape` (filter box) | Clear the filter; again, back to the listing |
 | `↓`, `Enter` (filter box) | Back to the listing |
-| `Enter` / `Escape` (path bar) | Go to the path typed / cancel |
+| `Enter` (path bar) | Go to the suggestion chosen, or to the path typed |
+| `↓` / `↑` (path bar) | Choose among the places suggested for what is typed |
+| `Tab` (path bar) | Complete to the suggestion chosen (or the first) — a folder with `/`, to go on inside it |
+| `Escape` (path bar) | Close the suggestions; again, cancel the edit |
 
 ### Image viewer
 

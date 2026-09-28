@@ -319,7 +319,13 @@ tree) are the *folder's* (PRD 004, §1.3.1): `FolderViewsFeature` keeps them per
 chosen for keeps its panel's last (`PanelGroupState.view` / `sort`) — and
 filter with the toolbar box (`Ctrl`+`F`, cleared on leaving the folder); the path
 bar is an address bar (`Ctrl`+`L`, `goToLocation` — a file opens its folder,
-selected); the toolbar has Back and Forward. What the app cannot preview (PDF,
+selected; it goes where the backend's details say, so `s:\tronog` typed opens as `S:/Tronog` —
+PRD 004, §4.1: `FilePathResolver.resolveReal` answers a path differing from the real one in case
+alone with the real one, and on a drive mapped to a share takes the share's spelling,
+`caseFromShare`) — and suggests as it is typed in (§4.2): `UiBreadcrumbs` reports `pathInput`
+and draws `suggestions` (a combobox: `↓`/`↑`, `Enter`, `Tab` completes, `Escape`), and
+`FileBrowserFeature.locationInput` reads the folder typed in and ranks its entries
+(`listing/location-suggest.ts`: folders first, prefix before substring, case ignored, `*`/`?`); the toolbar has Back and Forward. What the app cannot preview (PDF,
 Office, archives, too large) opens with `SystemOpenFeature` — the default app on
 the desktop (the main process asks before running a program), a new browser tab
 served `inline` otherwise; *Reveal* exists only on the desktop, for local files. *Copy Path* (`Ctrl`+`Shift`+`C` in a panel — the `copy-path` panel key) copies

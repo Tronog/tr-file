@@ -57,6 +57,7 @@ nav {
 }
 
 .location-bar {
+  position: relative;
   display: flex;
   align-items: center;
   height: 22px;
@@ -139,4 +140,65 @@ nav {
     width: 14px;
     height: 14px;
   }
+}
+
+/* What the path bar suggests while it is typed in (PRD 004, §4.2): a list under the field, over the listing. */
+.suggestions {
+  position: absolute;
+  top: 100%;
+  right: 6px;
+  left: 6px;
+  z-index: 20;
+  max-height: 320px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--vsc-menu-border);
+  border-radius: 5px;
+  background: var(--vsc-menu-bg);
+  box-shadow: var(--vsc-shadow);
+  list-style: none;
+}
+
+.suggestion {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--vsc-radius);
+  color: var(--vsc-fg);
+  font-size: var(--vsc-font-size-sm);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-list-hover);
+  }
+
+  &.is-active {
+    background: var(--vsc-list-active);
+    color: var(--vsc-fg-bright);
+  }
+
+  ui-icon {
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.suggestion-label {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-path {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vsc-fg-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

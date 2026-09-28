@@ -315,13 +315,16 @@ export class CommandPaletteFeature {
         return null;
       },
       accept: async (value) => {
-        const path = value.trim().replace(/\\/g, '/').split('/').filter(Boolean).join('/');
-        const shown = `/${path}`;
+        const typed = value.trim().replace(/\\/g, '/').split('/').filter(Boolean).join('/');
+        const shown = `/${typed}`;
+        let path: string;
         try {
-          const details = await this.parent.fileSystem.readFt.details(path);
+          const details = await this.parent.fileSystem.readFt.details(typed);
           if (!isFolder(details)) {
             return `'${shown}' is a file, not a folder`;
           }
+          // As the disk spells it (PRD 004, §4.1).
+          path = details.path;
         } catch (error) {
           const failure = FsError.from(error);
           return failure.code === 'NOT_FOUND' ? `There is no folder at '${shown}'` : failure.message;

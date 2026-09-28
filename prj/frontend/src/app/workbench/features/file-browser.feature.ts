@@ -9,11 +9,13 @@ import type {
   UiIconAction,
   UiIconViewItem,
   UiPanelView,
+  UiPathSuggestion,
   UiSelectionChange,
 } from '@tr-file/ui';
 import type { FsEntry } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import { nameFilter } from '../listing/listing-order';
+import { locationQuery, suggestPlaces } from '../listing/location-suggest';
 import { deltaOf } from '../listing/array-delta';
 import { namePattern, patternProblem } from '../listing/name-pattern';
 import type { PanelContentFeature } from '../panel-content.model';
@@ -497,11 +499,56 @@ export class FileBrowserFeature implements PanelContentFeature {
   }
 
   /**
+   * The path bar is typed in (PRD 004, §4.2): what it holds is kept, for its
+   * suggestions, and the folder being typed in is read — an action, so a
+   * fetch may start here; a folder already read is not read again.
+   */
+  locationInput(groupId: string, text: string): void {
+    this.locationTyped.update((all) => ({ ...all, [groupId]: text }));
+    const query = locationQuery(text);
+    if (query !== null) {
+      this.parent.fsDataFt.ensureListing(query.folder);
+    }
+  }
+
+  /** What each panel's path bar holds while it is typed in. */
+  private readonly locationTyped = signal<Readonly<Record<string, string>>>({});
+
+  /**
+   * The places a panel's path bar suggests for what is typed in it (PRD 004,
+   * §4.2): entries of the folder typed so far whose names fit the rest, case
+   * ignored — kept per panel while neither the text nor the folder changes,
+   * as a panel is drawn far more often than typed in.
+   */
+  private locationSuggestions(groupId: string): readonly UiPathSuggestion[] {
+    const text = this.locationTyped()[groupId];
+    const query = text === undefined ? null : locationQuery(text);
+    if (query === null) {
+      return [];
+    }
+    const entries = this.parent.fsDataFt.entries(query.folder);
+    const kept = this.suggested.get(groupId);
+    if (kept !== undefined && kept.text === text && kept.entries === entries) {
+      return kept.suggestions;
+    }
+    const files = this.parent.fileViewModel;
+    const suggestions = suggestPlaces(entries, query.fragment).map(
+      (entry): UiPathSuggestion => ({ value: `/${entry.path}`, label: entry.name, icon: files.icon(entry), ...(isFolder(entry) ? { folder: true } : {}) }),
+    );
+    this.suggested.set(groupId, { text: text as string, entries, suggestions });
+    return suggestions;
+  }
+
+  private readonly suggested = new Map<string, { readonly text: string; readonly entries: readonly FsEntry[]; readonly suggestions: readonly UiPathSuggestion[] }>();
+
+  /**
    * A path typed into a panel's path bar (PRD 003, §5), absolute within the
    * workspace: a folder is shown in the panel, a file in the folder it is in —
    * selected, so it is where the keyboard lands. What is not there is said so.
    */
   async goToLocation(groupId: string, text: string): Promise<void> {
+    // The edit is over: nothing more to suggest until the next.
+    this.locationTyped.update(({ [groupId]: _done, ...rest }) => rest);
     const segments = text.trim().replace(/\\/g, '/').split('/').filter((segment) => segment !== '' && segment !== '.');
     const shown = `/${segments.join('/')}`;
     if (segments.includes('..')) {
@@ -512,9 +559,11 @@ export class FileBrowserFeature implements PanelContentFeature {
       });
       return;
     }
-    const path = segments.join('/');
     try {
-      const details = await this.parent.fileSystem.readFt.details(path);
+      const details = await this.parent.fileSystem.readFt.details(segments.join('/'));
+      // The path as the disk spells it — `s:\tronog` typed is `S:/Tronog` — or nothing opened from
+      // it would match the paths its listing reports (PRD 004, §4.1).
+      const path = details.path;
       if (isFolder(details)) {
         this.openFolder(groupId, path, this.labelFor(path));
       } else {
@@ -1004,6 +1053,7 @@ export class FileBrowserFeature implements PanelContentFeature {
     return {
       breadcrumbs: this.breadcrumbs(group.path),
       location: `/${group.path}`,
+      locationSuggestions: this.locationSuggestions(group.id),
       view,
       toolbarActions: this.folderToolbar(group),
       showViewSwitch: true,

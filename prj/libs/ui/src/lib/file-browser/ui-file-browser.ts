@@ -153,6 +153,9 @@ export class UiFileBrowser {
   /** A path typed into the path bar, confirmed with `Enter`. */
   readonly pathSubmit = output<string>();
 
+  /** What the path bar holds as it is typed in — for `locationSuggestions` (PRD 004, §4.2). */
+  readonly locationInput = output<string>();
+
   /** A right-click, `Shift`+`F10` or the menu key, on an entry or on blank space. */
   readonly contextMenu = output<UiContextMenuRequest>();
 

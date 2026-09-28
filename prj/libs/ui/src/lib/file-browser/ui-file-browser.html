@@ -5,6 +5,8 @@
     [location]="browser().location"
     (crumbSelect)="breadcrumbSelect.emit($event)"
     (pathSubmit)="pathSubmit.emit($event)"
+    [suggestions]="browser().locationSuggestions ?? []"
+    (pathInput)="locationInput.emit($event)"
   />
 }
 

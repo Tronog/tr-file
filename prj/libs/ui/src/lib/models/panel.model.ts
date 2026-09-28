@@ -1,4 +1,4 @@
-import type { UiBreadcrumb, UiFileColumn, UiFileRow, UiIconViewItem } from './file.model';
+import type { UiBreadcrumb, UiFileColumn, UiFileRow, UiIconViewItem, UiPathSuggestion } from './file.model';
 import type { UiIconAction, UiIconName, UiIconTint } from './icon.model';
 
 /** A tab in an editor group's tab bar. */
@@ -94,6 +94,8 @@ export interface UiFileBrowserModel {
    * bar is edited (PRD 003, §5). Omit it and the path bar cannot be edited.
    */
   readonly location?: string;
+  /** Places the path bar suggests for what is typed in it (PRD 004, §4.2); see `UiFileBrowser.locationInput`. */
+  readonly locationSuggestions?: readonly UiPathSuggestion[];
   /** The listing can be sorted by clicking its column headers. */
   readonly sortable?: boolean;
   /**

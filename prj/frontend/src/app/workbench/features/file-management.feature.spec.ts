@@ -161,6 +161,35 @@ describe('File management (PRD 003, §5)', () => {
       expect(workbench.editorGroupsFt.stateOf(group)).toMatchObject({ path: 'docs', selection: ['docs/x.md'] });
     });
 
+    /** PRD 004, §4.1 — `s:\\tronog` typed on a disk that ignores case: gone to as the disk spells it. */
+    it('goes to a typed path as the backend spells it', async () => {
+      const going = workbench.fileBrowserFt.goToLocation(group, 's:\\tronog');
+      http.expectOne(detailsUrl('s:/tronog')).flush(fsEnvelope(fsDirectoryDetails('S:/Tronog')));
+      await going;
+      await answerListing('S:/Tronog', [fsEntry('S:/Tronog/x.md')]);
+      expect(workbench.editorGroupsFt.pathOf(group)).toBe('S:/Tronog');
+
+      const file = workbench.fileBrowserFt.goToLocation(group, 's:/tronog/X.MD');
+      http.expectOne(detailsUrl('s:/tronog/X.MD')).flush(fsEnvelope(fsDetails('S:/Tronog/x.md')));
+      await file;
+      expect(workbench.editorGroupsFt.stateOf(group)).toMatchObject({ path: 'S:/Tronog', selection: ['S:/Tronog/x.md'] });
+    });
+
+    /** PRD 004, §4.2 — the path bar suggests what fits as it is typed in. */
+    it('suggests places in the folder typed in, reading it once, and nothing once it has gone somewhere', async () => {
+      workbench.fileBrowserFt.locationInput(group, '/DOCS/X');
+      await answerListing('DOCS', [fsEntry('docs/x.md'), fsEntry('docs/other.md')]);
+      expect(browser()?.locationSuggestions).toEqual([{ value: '/docs/x.md', label: 'x.md', icon: 'file' }]);
+      workbench.fileBrowserFt.locationInput(group, '/DOCS/');
+      expect(browser()?.locationSuggestions?.map((suggestion) => suggestion.label)).toEqual(['other.md', 'x.md']);
+
+      const going = workbench.fileBrowserFt.goToLocation(group, '/docs/x.md');
+      expect(browser()?.locationSuggestions).toEqual([]);
+      http.expectOne(detailsUrl('docs/x.md')).flush(fsEnvelope(fsDetails('docs/x.md')));
+      await going;
+      http.match(() => true);
+    });
+
     it('says so when there is nothing at a typed path, and refuses ..', async () => {
       const message = vi.spyOn(workbench.modal, 'message').mockResolvedValue();
       const going = workbench.fileBrowserFt.goToLocation(group, '/nope');

@@ -7,10 +7,34 @@
       spellcheck="false"
       autocomplete="off"
       aria-label="Location"
+      role="combobox"
+      aria-autocomplete="list"
+      [attr.aria-expanded]="shown().length > 0"
+      [attr.aria-controls]="listId"
+      [attr.aria-activedescendant]="active() >= 0 && shown().length > 0 ? listId + '-' + active() : null"
       [value]="location() ?? ''"
+      (input)="onFieldInput($event)"
       (keydown)="onFieldKeydown($event)"
       (blur)="onFieldBlur()"
     />
+    @if (shown().length > 0) {
+      <ul class="suggestions" role="listbox" [id]="listId" aria-label="Suggested places">
+        @for (suggestion of shown(); track suggestion.value; let index = $index) {
+          <li
+            class="suggestion"
+            role="option"
+            [id]="listId + '-' + index"
+            [class.is-active]="index === active()"
+            [attr.aria-selected]="index === active()"
+            (mousedown)="onSuggestionPress($event, suggestion)"
+          >
+            <ui-icon [name]="suggestion.icon" />
+            <span class="suggestion-label">{{ suggestion.label }}</span>
+            <span class="suggestion-path">{{ suggestion.value }}</span>
+          </li>
+        }
+      </ul>
+    }
   </div>
 } @else {
   <nav

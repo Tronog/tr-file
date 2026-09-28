@@ -106,6 +106,13 @@ export class FilePathResolver {
   /**
    * Lexical resolution plus a `realpath` check, so symlinks pointing outside
    * the root are rejected as well.
+   *
+   * On a file system that ignores case — Windows, a Samba share — a path
+   * typed in another case than the disk's (`s:\tronog` for `S:\Tronog`)
+   * finds the entry, but every path made from it would differ from the ones
+   * listings report. So when the real path differs from the one asked for in
+   * case alone, the real one is what comes back (PRD 004, §4.1). A link is
+   * never swapped for where it leads: that differs by more than case.
    */
   async resolveReal(requested: string | undefined): Promise<ResolvedPath> {
     const candidate = this.resolve(requested);
@@ -125,8 +132,10 @@ export class FilePathResolver {
     if (relative === null && this.allDrives) {
       // Over every drive nothing escapes: a mapped network drive's real path
       // is its share (`\\server\share`), a mounted volume's a `\\?\Volume{…}`
-      // one — no drive letter, but still this computer's files.
-      return candidate;
+      // one — no drive letter, but still this computer's files. Its case is
+      // still the disk's: the path as asked, spelt as the share spells it.
+      const corrected = FilePathResolver.caseFromShare(candidate.absolute, real);
+      return corrected === null ? candidate : new ResolvedPath(corrected, this.toRootRelative(corrected) as string);
     }
     if (relative === null) {
       throw HttpError.forbidden('Path escapes the configured files root');
@@ -135,7 +144,31 @@ export class FilePathResolver {
     if (this.isReserved(relative)) {
       throw HttpError.forbidden('That folder belongs to the server');
     }
+    if (real !== candidate.absolute && real.toLowerCase() === candidate.absolute.toLowerCase()) {
+      return new ResolvedPath(real, relative);
+    }
     return candidate;
+  }
+
+  /**
+   * `S:\tronog\sub` spelt as its real path on a share spells it —
+   * `\\server\share\Tronog\Sub` makes it `S:\Tronog\Sub` (PRD 004, §4.1): the
+   * drive kept, its path's last segments taken from the share's when they are
+   * the same names but for case. `null` when they are not — a link on the way,
+   * say — or there is nothing past the drive.
+   */
+  static caseFromShare(asked: string, real: string): string | null {
+    const [drive, ...rest] = asked.split(/[\\/]+/).filter((segment) => segment !== '');
+    const segments = real.split(/[\\/]+/).filter((segment) => segment !== '');
+    if (drive === undefined || rest.length === 0 || segments.length < rest.length) {
+      return null;
+    }
+    const tail = segments.slice(segments.length - rest.length);
+    if (!tail.every((segment, index) => segment.toLowerCase() === (rest[index] as string).toLowerCase())) {
+      return null;
+    }
+    const corrected = `${drive}\\${tail.join('\\')}`;
+    return corrected === asked ? null : corrected;
   }
 
   /**
