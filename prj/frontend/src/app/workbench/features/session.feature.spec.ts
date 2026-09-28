@@ -156,33 +156,36 @@ describe('SessionFeature', () => {
   describe('Reset Layout', () => {
     const settle = () => new Promise((resolve) => setTimeout(resolve));
 
+    // What the reset does to the settings, not what `localStorage` holds afterwards: another
+    // spec's workbench may still write its session there on its 400 ms timer.
     function setUp(answer: boolean) {
       localStorage.setItem(`${SESSION_KEY}:local`, JSON.stringify(SAVED));
       create();
       return {
+        set: vi.spyOn(workbench.settings, 'set'),
         reload: vi.spyOn(workbench.sessionFt, 'reload').mockImplementation(() => undefined),
         confirm: vi.spyOn(workbench.modal, 'confirm').mockResolvedValue(answer),
       };
     }
 
     it('forgets the layout and starts over, once confirmed', async () => {
-      const { reload, confirm } = setUp(true);
+      const { reload, confirm, set } = setUp(true);
 
       workbench.commandsFt.run('view.resetLayout');
       await settle();
 
       expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: 'Reset Layout' }));
-      expect(localStorage.getItem(`${SESSION_KEY}:local`)).toBeNull();
+      expect(set).toHaveBeenCalledWith(`${SESSION_KEY}:local`, null);
       expect(reload).toHaveBeenCalled();
     });
 
     it('keeps everything when the dialog is cancelled', async () => {
-      const { reload } = setUp(false);
+      const { reload, set } = setUp(false);
 
       workbench.commandsFt.run('view.resetLayout');
       await settle();
 
-      expect(localStorage.getItem(`${SESSION_KEY}:local`)).not.toBeNull();
+      expect(set).not.toHaveBeenCalledWith(`${SESSION_KEY}:local`, null);
       expect(reload).not.toHaveBeenCalled();
     });
 

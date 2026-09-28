@@ -102,7 +102,10 @@ outside the panel — and that includes opening a folder by double click. An emp
 has nothing focusable in it, so the content's `uiPanelBody` carries `tabindex="-1"` and
 takes focus itself; otherwise a keyboard user could walk into one and not get out.
 Double-clicking a tab maximizes or restores its group (§6.1.1) — the bar reports the
-gesture, the app decides what it means. Choosing a tab (a click, not an arrow-key rove),
+gesture, the app decides what it means. So does `Ctrl`+`↑` (PRD 002, §2.8: keymap
+`view.toggleMaximize`, a command of the table, answered on the group's host); the list and the icon
+view let a `Ctrl` chord bound above them pass instead of moving their cursor (`isBoundAbove`), so
+`Ctrl`+`↓` is still a cursor move that leaves the selection alone. Choosing a tab (a click, not an arrow-key rove),
 or pressing blank space anywhere in a panel — its body, the tab bar beside the tabs, the
 loading rail, the gaps of the content's toolbar (PRD 002, §3.1; an element that answers a
 press itself, like the editable path bar, is marked `data-own-press`) — hands focus to that

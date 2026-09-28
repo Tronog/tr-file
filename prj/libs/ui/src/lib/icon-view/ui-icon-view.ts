@@ -14,7 +14,7 @@ import {
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
 import { UiKeymap } from '../keyboard/keymap';
-import { isPanelCharacter, LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
+import { isBoundAbove, isPanelCharacter, LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
 import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
 import type { UiIconViewItem, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
@@ -361,6 +361,10 @@ export class UiIconView {
       return;
     }
     const command = event.ctrlKey || event.metaKey;
+    // A `Ctrl` chord the panel binds — `Ctrl`+`↑` maximizes it (PRD 002, §2.8) — is not a cursor move.
+    if (command && isBoundAbove(this.keymap, event)) {
+      return;
+    }
 
     const target = this.movementTarget(event.key, index);
     if (target !== null) {

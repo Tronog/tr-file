@@ -648,6 +648,19 @@ describe('panel keys', () => {
       expect(opened).toEqual([ROWS[0]?.id]);
     });
 
+    it('maximizes on Ctrl+Up — from a row too, whose cursor stays put (PRD 002, §2.8)', () => {
+      const row = fixture.nativeElement.querySelectorAll('tbody tr')[1] as HTMLElement;
+      row.focus();
+      chord('ArrowUp', row);
+      chord('ArrowUp', fixture.nativeElement.querySelector('.tab-main'));
+
+      expect(actions).toEqual(['maximize', 'maximize']);
+      expect(document.activeElement).toBe(row);
+      // Ctrl+Down is still the list's: the cursor moves, the selection does not.
+      chord('ArrowDown', row);
+      expect(actions).toEqual(['maximize', 'maximize']);
+    });
+
     it('leaves / to a text field', () => {
       const field = document.createElement('input');
       contentBody().appendChild(field);

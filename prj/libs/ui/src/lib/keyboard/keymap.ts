@@ -156,6 +156,7 @@ export const UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'panel.contextMenu', key: 'ContextMenu', when: 'panel' },
   { command: 'view.splitRight', key: '/', when: 'panel' },
   { command: 'tab.new', key: 'Ctrl+T', when: 'panel' },
+  { command: 'view.toggleMaximize', key: 'Ctrl+Up', when: 'panel' },
   { command: 'tab.close', key: 'Ctrl+W', when: 'panel' },
   { command: 'tab.previous', key: 'Ctrl+PageUp', when: 'panel' },
   { command: 'tab.next', key: 'Ctrl+PageDown', when: 'panel' },

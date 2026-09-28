@@ -537,6 +537,13 @@ export class CommandsFeature {
 
       /* Tabs */
       { id: 'tab.new', category: 'Tab', label: 'New Tab', run: (t) => p.editorGroupsFt.newTab(t.groupId) },
+      {
+        id: 'view.toggleMaximize',
+        category: 'View',
+        label: 'Toggle Maximized Panel',
+        checked: (t) => p.panelLayoutFt.isMaximized(t.groupId),
+        run: (t) => p.editorGroupsFt.runAction(t.groupId, 'maximize'),
+      },
       /* … the rest from a tab's context menu only */
       { id: 'tab.close', category: 'Tab', label: 'Close', palette: false, enabled: (t) => t.tabId !== undefined, run: (t) => p.editorGroupsFt.closeTab(t.groupId, t.tabId as string) },
       {

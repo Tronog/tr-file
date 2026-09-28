@@ -72,9 +72,15 @@ export function listKeyShortcuts(keymap: UiKeymap): string {
  * command's character is.
  */
 export function isPanelCharacter(keymap: UiKeymap, event: KeyboardEvent, typing: boolean): boolean {
+  return !typing && event.key.length === 1 && isBoundAbove(keymap, event);
+}
+
+/**
+ * Whether the panel or the window binds this chord — `Ctrl`+`↑` maximizes the
+ * panel (PRD 002, §2.8) — so a list lets it pass rather than moving its
+ * cursor, as it would with an unbound `Ctrl`+arrow.
+ */
+export function isBoundAbove(keymap: UiKeymap, event: KeyboardEvent): boolean {
   const chord = chordOf(event);
-  if (chord === null || typing || event.key.length !== 1) {
-    return false;
-  }
-  return keymap.bindings().some((binding) => (binding.when === 'panel' || binding.when === 'window') && binding.key === chord);
+  return chord !== null && keymap.bindings().some((binding) => (binding.when === 'panel' || binding.when === 'window') && binding.key === chord);
 }

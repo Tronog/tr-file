@@ -276,6 +276,7 @@ describe('CommandPaletteFeature', () => {
       'Preferences: Open Keyboard Shortcuts',
       'Go: Go to Location…',
       'Tab: New Tab',
+      'View: Toggle Maximized Panel',
       'Remote: Connect to Remote Server…',
     ]);
     expect(palette().activeId()).toBe('go.jumpToFolder');

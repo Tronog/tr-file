@@ -75,7 +75,7 @@ function isTextField(target: EventTarget | null): boolean {
 }
 
 /** The chords of the group itself; see `onGroupKeydown`. */
-const GROUP_COMMANDS = ['view.splitRight', 'tab.new', 'tab.close', 'tab.next', 'tab.previous'] as const;
+const GROUP_COMMANDS = ['view.splitRight', 'tab.new', 'view.toggleMaximize', 'tab.close', 'tab.next', 'tab.previous'] as const;
 
 /**
  * One editor group: the shell around whatever its active tab shows.
@@ -306,7 +306,8 @@ export class UiPanelGroup {
    * Bound on the host rather than the body, so they work with focus anywhere
    * in the group — in its content, or on a tab in the bar. `/` and `Ctrl`+`W`
    * emit exactly what the tab bar's split and close buttons emit, `Ctrl`+`T`
-   * asks for a new tab (`new-tab`, PRD 002, §2.2), and `Ctrl`+`PageUp`/
+   * asks for a new tab (`new-tab`, PRD 002, §2.2), `Ctrl`+`↑` maximizes or
+   * restores the group as its maximize button does (§2.8), and `Ctrl`+`PageUp`/
    * `PageDown` (§6.2.4) emits what clicking the neighbouring tab emits — so
    * the pointer and the keyboard can never drift apart. A chord without
    * `Ctrl` or `Alt` — `/` — typed into a text field is text, not a command.
@@ -326,6 +327,9 @@ export class UiPanelGroup {
         break;
       case 'tab.new':
         this.actionSelect.emit('new-tab');
+        break;
+      case 'view.toggleMaximize':
+        this.actionSelect.emit('maximize');
         break;
       case 'tab.close': {
         // The focused tab is the active one; a group with none has nothing to
