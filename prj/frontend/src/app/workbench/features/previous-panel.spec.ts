@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { WorkbenchService } from '../workbench.service';
+import { provideOnePanel } from '../testing/one-panel';
 
 /**
  * PRD 002, §2.7 — the active panel and the one active before it: a file
@@ -13,7 +14,7 @@ describe('The previous panel', () => {
   let panels: readonly [string, string, string];
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideOnePanel()] });
     workbench = TestBed.inject(WorkbenchService);
     vi.spyOn(workbench.fsDataFt, 'ensureListing').mockImplementation(() => undefined);
     // Three panels side by side, each on a folder of its own: A | B | C.

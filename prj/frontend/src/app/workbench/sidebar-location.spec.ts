@@ -7,6 +7,7 @@ import type { UiSashResize } from '@tr-file/ui';
 import { MemorySettingsStore, SettingsService } from '../settings/settings.service';
 import { PREFERENCES_KEY } from './features/preferences.feature';
 import { WorkbenchService } from './workbench.service';
+import { provideOnePanel } from './testing/one-panel';
 
 /**
  * PRD 010, §3 — the Explorer and Details sidebars, each at either side of the
@@ -131,7 +132,7 @@ describe('Sidebar location (PRD 010, §3)', () => {
     beforeEach(() => {
       store = new MemorySettingsStore();
       TestBed.configureTestingModule({
-        providers: [provideHttpClient(), provideHttpClientTesting(), { provide: SettingsService, useValue: store }],
+        providers: [provideHttpClient(), provideHttpClientTesting(), provideOnePanel(), { provide: SettingsService, useValue: store }],
       });
       workbench = TestBed.inject(WorkbenchService);
     });

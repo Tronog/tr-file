@@ -3,13 +3,14 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import type { UiGridNode } from '@tr-file/ui';
 import { WorkbenchService } from '../workbench.service';
+import { provideOnePanel } from '../testing/one-panel';
 
 describe('PanelLayoutFeature', () => {
   let workbench: WorkbenchService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideOnePanel()],
     });
     workbench = TestBed.inject(WorkbenchService);
   });

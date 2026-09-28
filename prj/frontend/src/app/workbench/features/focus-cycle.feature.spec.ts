@@ -2,13 +2,14 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { WorkbenchService } from '../workbench.service';
+import { provideOnePanel } from '../testing/one-panel';
 
 /** PRD 002, §2.6 — `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` between panels and panes; `Tab` / `Shift`+`Tab` between panels only. */
 describe('FocusCycleFeature', () => {
   let workbench: WorkbenchService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideOnePanel()] });
     workbench = TestBed.inject(WorkbenchService);
   });
 

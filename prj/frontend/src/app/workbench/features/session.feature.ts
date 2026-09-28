@@ -95,7 +95,25 @@ export class SessionFeature {
     this.parent.settings.set(RESTORE_SESSION_KEY, on);
   }
 
-  /** *Reset Layout*: forgets the session and starts the window over, fresh. */
+  /**
+   * *Reset Layout* — the title bar's layout button (PRD 001, §15.1.1), the
+   * View and Settings menus, the palette: asks first, since the panels, their
+   * tabs and folders, the sidebars and the panes all go back to the default
+   * and the window starts over.
+   */
+  async confirmResetLayout(): Promise<void> {
+    const sure = await this.parent.modal.confirm({
+      severity: 'warning',
+      message: 'Reset the layout to its default?',
+      detail: 'Panels, tabs, sidebars and panes go back to how a fresh window has them, and the window reloads.',
+      confirmLabel: 'Reset Layout',
+    });
+    if (sure) {
+      this.resetLayout();
+    }
+  }
+
+  /** Forgets the session and starts the window over, fresh. */
   resetLayout(): void {
     this.started = false;
     if (this.timer !== null) {

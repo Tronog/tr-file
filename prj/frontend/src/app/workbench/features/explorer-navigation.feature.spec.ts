@@ -13,6 +13,7 @@ import {
   settled,
 } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
+import { provideOnePanel } from '../testing/one-panel';
 
 const ROOT_ENTRIES = [fsDirectory('docs'), fsDirectory('prj'), fsEntry('README.md', { size: 27 })];
 const DOCS_ENTRIES = [fsDirectory('docs/prd'), fsEntry('docs/NOTES.md', { size: 2048 })];
@@ -23,7 +24,7 @@ describe('ExplorerNavigationFeature', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideOnePanel()],
     });
     workbench = TestBed.inject(WorkbenchService);
     http = TestBed.inject(HttpTestingController);

@@ -133,6 +133,9 @@ bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`
 `openMenu`, `closeSettingsMenu`) shows `UiContextMenu` fixed beside it, opening upward. Its
 items are commands of the table, laid out in `MockDataWorkbenchService.settingsMenuItems`:
 hidden files, restore the layout on start, reset it, clear recent folders (PRD 003, §6).
+The title bar's last button, the layout grid (PRD 001, §15.1.1), is *Reset Layout* too
+(`ChromeFeature.runTitleBarAction`); `view.resetLayout` asks first wherever it is run from
+(`SessionFeature.confirmResetLayout`), since the window then reloads fresh.
 
 The main menu (PRD 008, §1) is File, Edit, Selection, View and Go, from
 `MockDataWorkbenchService.menuItems`; `UiTitleBar` draws the menus, `ChromeFeature` holds
@@ -348,7 +351,9 @@ Since Section 7.1 the workbench runs on real data: `prj/frontend/src/app/file-sy
 sidebar all read from. Fetches are only ever started by an action (expanding a node, opening a
 folder, selecting an entry) — never from a `computed`, which would write signals during change
 detection. What is left of `MockData*` is the shell the session starts with: menus, activity bar
-and the initial layout.
+and the initial layout — two panels side by side on the root, the left one active (PRD 002, §1.3).
+Specs of the layout's mechanics start from one panel instead (`provideOnePanel()`,
+`workbench/testing/one-panel.ts`).
 
 **No blank frames.** A reload keeps what is on screen: `FsDataFeature`, `FilePreviewFeature` and
 `ImageSourceService` go to `status: 'loading'` *with* the previous listing / details / document /

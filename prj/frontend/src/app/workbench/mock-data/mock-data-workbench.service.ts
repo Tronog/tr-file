@@ -13,13 +13,23 @@ import type { MockWorkbenchLayout } from './mock-data.model';
 @Service()
 export class MockDataWorkbenchService {
   /**
-   * Layout at start-up: one group on the workspace root. The backend decides
-   * what is in it; the workbench only says where to look first — and on the
-   * desktop it starts in the home folder instead (PRD 003, §6). A restored
-   * session's layout replaces this altogether (`SessionFeature`).
+   * Layout at start-up: two groups side by side on the workspace root
+   * (PRD 002, §1.3) — a source and a target, as a two-panel file manager
+   * starts; the left one active, so a copy from it goes to the right. The
+   * backend decides what is in them; the workbench only says where to look
+   * first — and on the desktop they start in the home folder instead
+   * (PRD 003, §6). A restored session's layout replaces this altogether
+   * (`SessionFeature`).
    */
   readonly layout: MockWorkbenchLayout = {
-    grid: { kind: 'leaf', groupId: 'group-root', size: 1 },
+    grid: {
+      kind: 'split',
+      direction: 'row',
+      children: [
+        { kind: 'leaf', groupId: 'group-root', size: 1 },
+        { kind: 'leaf', groupId: 'group-2', size: 1 },
+      ],
+    },
     groups: [
       {
         id: 'group-root',
@@ -27,6 +37,13 @@ export class MockDataWorkbenchService {
         view: 'list',
         selection: [],
         tabs: [{ id: 'tab-root', label: 'tr-file', path: '', kind: 'folder', active: true }],
+      },
+      {
+        id: 'group-2',
+        path: '',
+        view: 'list',
+        selection: [],
+        tabs: [{ id: 'tab-group-2', label: 'tr-file', path: '', kind: 'folder', active: true }],
       },
     ],
     selectedEntryId: '',
@@ -137,7 +154,7 @@ export class MockDataWorkbenchService {
     { id: 'toggle-left', label: 'Toggle left sidebar', icon: 'sidebar-left', active: true },
     { id: 'toggle-panel', label: 'Toggle bottom panel', icon: 'panel-bottom', active: true },
     { id: 'toggle-right', label: 'Toggle right sidebar', icon: 'sidebar-right', active: true },
-    { id: 'customize', label: 'Customize layout', icon: 'layout-grid' },
+    { id: 'customize', label: 'Reset Layout', icon: 'layout-grid' },
   ];
 
   readonly activityBottomItems: readonly UiActivityItem[] = [

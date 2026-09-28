@@ -65,10 +65,15 @@ describe('SessionFeature', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts from the default layout when nothing was saved', () => {
+  it('starts from the default layout when nothing was saved: two panels side by side (PRD 002, §1.3)', () => {
     create();
     expect(workbench.restored).toBeNull();
-    expect(workbench.editorGroupsFt.states().map((group) => group.path)).toEqual(['']);
+    expect(workbench.editorGroupsFt.states().map((group) => group.path)).toEqual(['', '']);
+    expect(workbench.panelLayoutFt.grid()).toMatchObject({ kind: 'split', direction: 'row' });
+    expect(workbench.panelLayoutFt.groupIds()).toEqual(['group-root', 'group-2']);
+    // The left one is the source; a copy from it offers the right one.
+    expect(workbench.activeGroupId()).toBe('group-root');
+    expect(workbench.editorGroupsFt.createId()).toBe('group-3');
   });
 
   it('restores the last session: panels, tabs, views, sorts, sizes, panes and the bottom panel', () => {
@@ -147,14 +152,49 @@ describe('SessionFeature', () => {
     expect(saved?.paneOrder).toEqual({ explorer: ['explorer-tree', 'places', 'bookmarks', 'recent'] });
   });
 
-  it('forgets the layout and starts over on Reset Layout', () => {
-    localStorage.setItem(`${SESSION_KEY}:local`, JSON.stringify(SAVED));
-    create();
-    const reload = vi.spyOn(workbench.sessionFt, 'reload').mockImplementation(() => undefined);
+  /** PRD 001, §15.1.1 — the title bar's layout button, and every other way to Reset Layout, ask first. */
+  describe('Reset Layout', () => {
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
 
-    workbench.commandsFt.run('view.resetLayout');
+    function setUp(answer: boolean) {
+      localStorage.setItem(`${SESSION_KEY}:local`, JSON.stringify(SAVED));
+      create();
+      return {
+        reload: vi.spyOn(workbench.sessionFt, 'reload').mockImplementation(() => undefined),
+        confirm: vi.spyOn(workbench.modal, 'confirm').mockResolvedValue(answer),
+      };
+    }
 
-    expect(localStorage.getItem(`${SESSION_KEY}:local`)).toBeNull();
-    expect(reload).toHaveBeenCalled();
+    it('forgets the layout and starts over, once confirmed', async () => {
+      const { reload, confirm } = setUp(true);
+
+      workbench.commandsFt.run('view.resetLayout');
+      await settle();
+
+      expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: 'Reset Layout' }));
+      expect(localStorage.getItem(`${SESSION_KEY}:local`)).toBeNull();
+      expect(reload).toHaveBeenCalled();
+    });
+
+    it('keeps everything when the dialog is cancelled', async () => {
+      const { reload } = setUp(false);
+
+      workbench.commandsFt.run('view.resetLayout');
+      await settle();
+
+      expect(localStorage.getItem(`${SESSION_KEY}:local`)).not.toBeNull();
+      expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('is what the title bar\'s layout button does', async () => {
+      const { reload, confirm } = setUp(true);
+      expect(workbench.chromeFt.titleBarActions.at(-1)).toEqual({ id: 'customize', label: 'Reset Layout', icon: 'layout-grid' });
+
+      workbench.chromeFt.runTitleBarAction('customize');
+      await settle();
+
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(reload).toHaveBeenCalled();
+    });
   });
 });

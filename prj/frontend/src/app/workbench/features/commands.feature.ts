@@ -472,7 +472,7 @@ export class CommandsFeature {
         checked: () => p.preferencesFt.value('window.restoreLayout'),
         run: () => p.preferencesFt.set('window.restoreLayout', !p.preferencesFt.value('window.restoreLayout')),
       },
-      { id: 'view.resetLayout', category: 'View', label: 'Reset Layout', run: () => p.sessionFt.resetLayout() },
+      { id: 'view.resetLayout', category: 'View', label: 'Reset Layout', run: () => void p.sessionFt.confirmResetLayout() },
 
       /* The settings window (PRD 010) */
       { id: 'workbench.openSettings', category: 'Preferences', label: 'Open Settings', run: () => p.settingsEditorFt.open('general') },

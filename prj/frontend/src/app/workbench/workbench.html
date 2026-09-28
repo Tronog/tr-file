@@ -53,6 +53,7 @@
     [leadingInset]="windowControls.leadingInset()"
     (windowControlSelect)="windowControls.run($event)"
     (commandSelect)="palette.show()"
+    (actionSelect)="chrome.runTitleBarAction($event)"
     (menuOpenChange)="chrome.setMenuOpen($event)"
     (menuItemSelect)="chrome.runMenuItem($event)"
     (dragAreaDoubleClick)="windowControls.toggleFromDragArea()"
