@@ -220,6 +220,7 @@ answered by `FocusCycleFeature` because they move DOM focus. Navigation keys (ar
 page keys, type-to-find, `Escape`, keys inside menus and dialogs) are not commands and stay fixed.
 A new key for the app: a binding in one of the default tables, and the component asks the keymap
 for its command id.
+Every default key is listed in `SHORTCUTS.md` beside this file — keep it in step with the tables.
 
 **Git (PRD 011, §1)** is optional — the backend's `git` module (`/api/git`, the bridge's `git`
 command, `RemoteBackend` maps it) runs the system's `git`, and says so when there is none; a
