@@ -43,6 +43,12 @@ export interface FsUploadOptions {
   readonly overwrite?: boolean;
 }
 
+/** How to describe an entry. */
+export interface FsDetailsOptions {
+  /** A manual refresh: count a large folder's entries again rather than reuse the count (PRD 004, §3.1). */
+  readonly recount?: boolean;
+}
+
 /** The primitives every transport provides. Nothing here is UI-aware. */
 export interface FsTransport {
   /** Which implementation this is; for diagnostics, not for branching. */
@@ -58,7 +64,7 @@ export interface FsTransport {
   listCancel(token: string): Promise<void>;
 
   /** Describes one file or directory in full. */
-  details(path: string): Promise<FsDetails>;
+  details(path: string, options?: FsDetailsOptions): Promise<FsDetails>;
 
   /**
    * Reads a file's bytes, for the app itself to use (a preview, a thumbnail).

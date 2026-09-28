@@ -284,7 +284,7 @@ export class FileSystemBridge {
         this.files.cancelListing(request.token);
         return { cancelled: true };
       case 'details':
-        return (await this.files.getDetails(request.path)).toJSON();
+        return (await this.files.getDetails(request.path, { recount: request.recount === true })).toJSON();
       case 'read':
         return this.read(request);
       case 'upload-begin':
@@ -586,8 +586,13 @@ export class FileSystemBridge {
           password: FileSystemBridge.readString(value, 'password'),
         };
       case 'list':
-      case 'details':
         return { command, path: FileSystemBridge.readString(value, 'path') };
+      case 'details':
+        return {
+          command,
+          path: FileSystemBridge.readString(value, 'path'),
+          ...((value as { recount?: unknown }).recount === true ? { recount: true } : {}),
+        };
       case 'list-cancel':
         return { command, token: FileSystemBridge.readString(value, 'token') };
       case 'list-progress': {

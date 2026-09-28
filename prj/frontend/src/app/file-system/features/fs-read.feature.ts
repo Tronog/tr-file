@@ -1,3 +1,4 @@
+import type { FsDetailsOptions } from '../fs-transport';
 import type { FileSystemService } from '../file-system.service';
 import type { FsArchiveListing, FsDetails, FsDirectoryListing, FsListingProgress, FsPlaces, FsSearchResult, FsServerTime, FsWatchResult } from '../file-system.model';
 
@@ -31,8 +32,8 @@ export class FsReadFeature {
   }
 
   /** Describes one file or directory in full. */
-  async details(path: string): Promise<FsDetails> {
-    return this.parent.transport.details(path);
+  async details(path: string, options: FsDetailsOptions = {}): Promise<FsDetails> {
+    return this.parent.transport.details(path, options);
   }
 
   /**

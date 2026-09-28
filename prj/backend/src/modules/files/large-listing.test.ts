@@ -147,6 +147,31 @@ describe('LargeListings', () => {
     service.cancelListing('never-was');
   });
 
+  /**
+   * Selecting a large folder describes it — and on a network share a count of
+   * millions is thousands of requests: counted once, then kept until a manual
+   * refresh asks again.
+   */
+  it('counts a large folder once, and again only when a refresh asks', async () => {
+    const total = FILES + 3;
+    const [first, joined] = await Promise.all([service.getDetails('big'), service.getDetails('big')]);
+    assert.equal(first.toJSON().entryCount, total);
+    assert.equal(joined.toJSON().entryCount, total);
+
+    await writeFile(join(root, 'big', 'one-more.txt'), '');
+    assert.equal((await service.getDetails('big')).toJSON().entryCount, total, 'kept, not counted again');
+    assert.equal((await service.getDetails('big', { recount: true })).toJSON().entryCount, total + 1);
+    assert.equal((await service.getDetails('big')).toJSON().entryCount, total + 1);
+    await rm(join(root, 'big', 'one-more.txt'));
+    await service.getDetails('big', { recount: true });
+
+    // A small folder is counted every time, as ever.
+    assert.equal((await service.getDetails('small')).toJSON().entryCount, 9);
+    await rm(join(root, 'small', 's-0'));
+    assert.equal((await service.getDetails('small')).toJSON().entryCount, 8);
+    await writeFile(join(root, 'small', 's-0'), '');
+  });
+
   it('says so when a token is unknown or forgotten', () => {
     assert.throws(
       () => service.listProgress('no-such-token'),

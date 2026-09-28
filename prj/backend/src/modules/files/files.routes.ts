@@ -98,7 +98,9 @@ export class FilesRoutes implements RouteModule {
     this.router.get(
       '/details',
       asyncHandler(async (req, res) => {
-        const details = await this.filesService.getDetails(FilesRoutes.readPath(req));
+        // `recount=1`: a manual refresh, which alone counts a large folder's entries again.
+        const recount = FilesRoutes.readQueryString(req, 'recount') === '1';
+        const details = await this.filesService.getDetails(FilesRoutes.readPath(req), { recount });
         res.json({ data: details.toJSON() });
       }),
     );

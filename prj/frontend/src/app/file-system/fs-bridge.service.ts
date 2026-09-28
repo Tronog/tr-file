@@ -24,7 +24,7 @@ import type {
   FsWatchResult,
 } from './file-system.model';
 import { FS_ABORTED, FsError } from './fs-error';
-import type { FsTransport, FsUploadOptions } from './fs-transport';
+import type { FsDetailsOptions, FsTransport, FsUploadOptions } from './fs-transport';
 
 /**
  * What a bridge command answers with. Mirrors the backend's
@@ -166,8 +166,8 @@ export class FsBridgeService implements FsTransport {
     return this.invoke<FsListingProgress>({ command: 'list-progress', token, namesFrom, detailsFrom });
   }
 
-  async details(path: string): Promise<FsDetails> {
-    return this.invoke<FsDetails>({ command: 'details', path });
+  async details(path: string, options: FsDetailsOptions = {}): Promise<FsDetails> {
+    return this.invoke<FsDetails>({ command: 'details', path, ...(options.recount === true ? { recount: true } : {}) });
   }
 
   /**

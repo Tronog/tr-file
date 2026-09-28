@@ -713,6 +713,12 @@ export class FileBrowserFeature implements PanelContentFeature {
           for (const path of this.openFoldersShown(group)) {
             void this.parent.fsDataFt.reloadListing(path);
           }
+          // The entry described beside it, if it is in this folder — or is this folder: a manual
+          // refresh is what counts a large folder's entries again (PRD 004, §3.1).
+          const selected = this.parent.selectedEntryId();
+          if (selected !== '' && (selected === group.path || parentOf(selected) === group.path)) {
+            this.parent.fsDataFt.reloadDetails(selected, true);
+          }
         }
         break;
       case 'upload':

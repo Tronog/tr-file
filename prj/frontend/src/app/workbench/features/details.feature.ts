@@ -205,7 +205,8 @@ export class DetailsFeature {
         void this.parent.systemOpenFt.copyPaths([details.path]);
         break;
       case 'refresh':
-        this.parent.fsDataFt.reloadDetails(details.path);
+        // By hand: a large folder's entries are counted again (PRD 004, §3.1).
+        this.parent.fsDataFt.reloadDetails(details.path, true);
         if (this.wantsPicture(details.path)) {
           void this.parent.images.reload(details.path);
         }

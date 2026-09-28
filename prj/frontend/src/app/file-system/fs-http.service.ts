@@ -35,7 +35,7 @@ import type {
 } from './file-system.model';
 import type { AuthStatus } from '../auth/auth.model';
 import { FS_ABORTED, FsError } from './fs-error';
-import type { FsTransport, FsUploadOptions } from './fs-transport';
+import type { FsDetailsOptions, FsTransport, FsUploadOptions } from './fs-transport';
 
 const IDLE_PROGRESS: FsUploadProgress = { loaded: 0, total: null, percent: null };
 
@@ -85,8 +85,15 @@ export class FsHttpService implements FsTransport {
     }
   }
 
-  async details(path: string): Promise<FsDetails> {
-    return this.get<FsDetails>('details', path);
+  async details(path: string, options: FsDetailsOptions = {}): Promise<FsDetails> {
+    if (options.recount !== true) {
+      return this.get<FsDetails>('details', path);
+    }
+    try {
+      return (await firstValueFrom(this.http.get<FsEnvelope<FsDetails>>(`${this.url('details', path)}&recount=1`))).data;
+    } catch (error) {
+      throw FsError.from(error);
+    }
   }
 
   /**

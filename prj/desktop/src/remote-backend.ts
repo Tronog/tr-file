@@ -245,7 +245,7 @@ export class RemoteBackend {
           query: { token: request.token, namesFrom: String(request.namesFrom ?? 0), detailsFrom: String(request.detailsFrom ?? 0) },
         });
       case 'details':
-        return this.json('GET', '/fs/details', { query: { path: request.path } });
+        return this.json('GET', '/fs/details', { query: { path: request.path, ...(request.recount === true ? { recount: '1' } : {}) } });
       case 'read':
         return this.read(request.path, request.offset ?? 0, request.length, request.maxBytes);
       case 'upload-begin':

@@ -136,7 +136,8 @@ describe('DetailsFeature', () => {
       await selectImage('logo.png');
 
       workbench.detailsFt.runAction('refresh');
-      http.expectOne(detailsUrl('logo.png')).flush(fsEnvelope(fsDetails('logo.png')));
+      // By hand: a large folder's entries would be counted again (PRD 004, §3.1).
+      http.expectOne(`${detailsUrl('logo.png')}&recount=1`).flush(fsEnvelope(fsDetails('logo.png')));
       http.expectOne(downloadUrl('logo.png')).flush(new Blob(['NEWER'], { type: 'image/png' }));
       await settled();
 
@@ -288,7 +289,7 @@ describe('DetailsFeature', () => {
       await selectAndFlush('README.md');
 
       workbench.detailsFt.runAction('refresh');
-      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md', { size: 99 })));
+      http.expectOne(`${detailsUrl('README.md')}&recount=1`).flush(fsEnvelope(fsDetails('README.md', { size: 99 })));
       await settled();
 
       expect(workbench.detailsFt.preview()?.subtitle).toBe('MD · 99 B');

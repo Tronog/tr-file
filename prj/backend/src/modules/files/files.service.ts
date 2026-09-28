@@ -42,6 +42,9 @@ export const SEARCH_LIMITS = {
   concurrency: 16,
 } as const;
 
+/** Large folders whose entry count is kept (see `FilesService.countEntries`). */
+const COUNTS_KEPT = 256;
+
 /** The most paths one `hostPaths` call answers for. */
 export const HOST_PATHS_MAX = 10_000;
 
@@ -241,8 +244,12 @@ export class FilesService {
   }
 
   /** Full detail view of one entry, as served by `GET /fs/details`. */
-  async getDetails(requestedPath: string | undefined): Promise<FileDetails> {
-    return this.describe(await this.resolver.resolveReal(requestedPath));
+  /**
+   * `recount` is a manual refresh (PRD 004, §3.1): the only thing that counts
+   * a large folder's entries again — see `countEntries`.
+   */
+  async getDetails(requestedPath: string | undefined, options: { readonly recount?: boolean } = {}): Promise<FileDetails> {
+    return this.describe(await this.resolver.resolveReal(requestedPath), options.recount === true);
   }
 
   /**
@@ -250,7 +257,7 @@ export class FilesService {
    * `lstat`ed, so a link that was just renamed or made is described even when
    * what it leads to is outside the root.
    */
-  private async describe(target: ResolvedPath): Promise<FileDetails> {
+  private async describe(target: ResolvedPath, recount = false): Promise<FileDetails> {
     if (this.isDriveList(target)) {
       return FileDetails.fromStats('', VIRTUAL_FOLDER_STATS, { entryCount: (await this.listDrives()).length });
     }
@@ -259,7 +266,7 @@ export class FilesService {
     const folder = stats.isDirectory() || targetType === 'directory';
 
     return FileDetails.fromStats(target.relative, stats, {
-      entryCount: folder ? await this.countEntries(target) : null,
+      entryCount: folder ? await this.countEntries(target, recount) : null,
       symlinkTarget: stats.isSymbolicLink() ? await this.readSymlinkTarget(target) : null,
       ...(targetType === undefined ? {} : { targetType }),
     });
@@ -676,11 +683,51 @@ export class FilesService {
 
   /**
    * Child count of a directory; an unreadable directory reports `null`.
-   * Counted as the names stream past rather than read into one array, which
-   * for a folder of millions (PRD 004, §3.1) is seconds and hundreds of
-   * megabytes of this thread.
+   *
+   * A large folder's (PRD 004, §3.1) is counted once and kept: on a network
+   * share a count of millions is thousands of requests to the file server,
+   * and selecting the folder, auto-refresh reloading its details or another
+   * window asking must not start one again. Only `recount` — a manual refresh
+   * — does. A count already running is joined, never repeated beside it.
+   * Smaller folders are counted every time, as ever: that costs nothing.
    */
-  private async countEntries(target: ResolvedPath): Promise<number | null> {
+  private countEntries(target: ResolvedPath, recount: boolean): Promise<number | null> {
+    const key = target.absolute;
+    const kept = this.counts.get(key);
+    if (!recount && kept !== undefined) {
+      return Promise.resolve(kept);
+    }
+    const running = this.counting.get(key);
+    if (running !== undefined) {
+      return running;
+    }
+    const counting = this.countAll(target)
+      .then((count) => {
+        this.counts.delete(key);
+        if (count !== null && count >= this.largeListings.threshold) {
+          this.counts.set(key, count);
+          if (this.counts.size > COUNTS_KEPT) {
+            const [oldest] = this.counts.keys();
+            this.counts.delete(oldest as string);
+          }
+        }
+        return count;
+      })
+      .finally(() => this.counting.delete(key));
+    this.counting.set(key, counting);
+    return counting;
+  }
+
+  /** Large folders' entry counts, by absolute path, until a manual refresh; the oldest go first. */
+  private readonly counts = new Map<string, number>();
+  private readonly counting = new Map<string, Promise<number | null>>();
+
+  /**
+   * A directory's children, counted as the names stream past rather than read
+   * into one array, which for a folder of millions (PRD 004, §3.1) is seconds
+   * and hundreds of megabytes of this thread; an unreadable one reports `null`.
+   */
+  private async countAll(target: ResolvedPath): Promise<number | null> {
     try {
       let count = 0;
       for await (const _dirent of await opendir(target.absolute, { bufferSize: 1024 })) {

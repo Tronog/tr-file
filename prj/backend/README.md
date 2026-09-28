@@ -84,7 +84,7 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `list` | `path` | the listing `GET /api/fs/list` serves |
 | `list-progress` | `token`, `namesFrom?`, `detailsFrom?` | `GET /api/fs/list-progress`'s answer |
 | `list-cancel` | `token` | `DELETE /api/fs/list-progress`'s answer |
-| `details` | `path` | the entry `GET /api/fs/details` serves |
+| `details` | `path`, `recount?` | the entry `GET /api/fs/details` serves |
 | `read` | `path`, `offset?`, `length?`, `maxBytes?` | one chunk: `{ name, size, mimeType, offset, content: Uint8Array }` |
 | `upload-begin` | `path`, `filename`, `overwrite` | `{ uploadId }` — or the `CONFLICT` / `BAD_REQUEST` an upload would get, before any bytes |
 | `upload-chunk` | `uploadId`, `content` | `{ received }` once the chunk is on its way to disk |
@@ -156,7 +156,7 @@ path reaches the file system.
 | GET | `/api/fs/list?path=` | Directory listing: folders (and links to folders) first, then the rest, in natural order (`file2` before `file10`). A folder of 1000 entries or more comes back with no entries and `progressive: { token }` — see below |
 | GET | `/api/fs/list-progress?token=&namesFrom=&detailsFrom=` | A large folder's reading (PRD 004, §3.1): `{ path, total, names, namesDone, details, gone, done }` — the count (`null` until known), then the names after `namesFrom` (with the type the directory records), then, once every name is out, the details after `detailsFrom` (`index` into the names, `type`, `size`, dates, `targetType` for links). Answers are capped (100 000 names, 50 000 details) and the same cursors get the same answer; `404` once the reading is forgotten (a minute unasked) |
 | DELETE | `/api/fs/list-progress?token=` | Stops reading a large folder nobody wants any more (PRD 004, §3.1.2) and forgets it; an unknown token is no error |
-| GET | `/api/fs/details?path=` | Full metadata for one entry |
+| GET | `/api/fs/details?path=&recount=` | Full metadata for one entry. A folder of 1000 entries or more is counted once and its `entryCount` kept (a network share would otherwise be read through on every look); `recount=1` — a manual refresh — counts it again |
 | GET | `/api/fs/places` | `{ home, places: [{ id, label, kind, path }] }`: where a session starts, and the Places pane (PRD 003, §6) |
 | GET | `/api/fs/download?path=&inline=` | Stream a file (`Accept-Ranges`, `Content-Disposition: attachment`, or `inline` for `inline=true`); a range past the end — any range on an empty file — is `416` |
 | POST | `/api/fs/upload?path=&overwrite=` | Upload one file, `multipart/form-data`, field `file` |

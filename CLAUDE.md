@@ -401,6 +401,10 @@ folder or closed, and no other panel, tree or image still showing it — stops b
 an `effect` in `FileBrowserFeature` sees it leave the screen and calls `FsDataFeature.abortLarge`,
 which ends the polling, cancels the backend's worker (`DELETE /api/fs/list-progress`, bridge
 `list-cancel`) and puts back the last whole listing, or forgets the folder so it is read afresh.
+A large folder's *entry count* (its details: selecting it in its parent) is counted once by the
+backend and kept (`FilesService.countEntries`, concurrent asks joined) — only a manual refresh
+recounts: `reloadDetails(path, true)` from the details' *Refresh details* and from a panel's Refresh
+of the folder the selection is in (`?recount=1`, bridge `recount`); auto-refresh never does.
 
 **No blank frames.** A reload keeps what is on screen: `FsDataFeature`, `FilePreviewFeature` and
 `ImageSourceService` go to `status: 'loading'` *with* the previous listing / details / document /

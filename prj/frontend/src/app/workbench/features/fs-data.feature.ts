@@ -511,24 +511,36 @@ export class FsDataFeature {
     void this.fetchDetails(path);
   }
 
-  reloadDetails(path: string): void {
+  /**
+   * `recount` is a manual refresh: the backend counts a large folder's entries
+   * again rather than reuse the count it kept (PRD 004, §3.1). Asked for while
+   * a read is on its way, it follows that one rather than being lost.
+   */
+  reloadDetails(path: string, recount = false): void {
     if (!this.pendingDetails.has(path)) {
-      void this.fetchDetails(path);
+      void this.fetchDetails(path, recount);
+    } else if (recount) {
+      this.recountAfter.add(path);
     }
   }
 
-  private async fetchDetails(path: string): Promise<void> {
+  private readonly recountAfter = new Set<string>();
+
+  private async fetchDetails(path: string, recount = false): Promise<void> {
     this.pendingDetails.add(path);
     // As with listings: a reload keeps what is shown until the answer replaces it.
     const previous = this.details().get(path)?.details;
     this.patchDetails(path, { status: 'loading', ...(previous ? { details: previous } : {}) });
     try {
-      const details = await this.parent.fileSystem.readFt.details(path);
+      const details = await this.parent.fileSystem.readFt.details(path, recount ? { recount: true } : {});
       this.patchDetails(path, { status: 'ready', details });
     } catch (error) {
       this.patchDetails(path, { status: 'error', error: FsError.from(error) });
     } finally {
       this.pendingDetails.delete(path);
+      if (this.recountAfter.delete(path)) {
+        void this.fetchDetails(path, true);
+      }
     }
   }
 

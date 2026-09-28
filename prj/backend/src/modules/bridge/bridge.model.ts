@@ -107,6 +107,8 @@ export interface FsListCancelRequest {
 export interface FsDetailsRequest {
   readonly command: 'details';
   readonly path: string;
+  /** A manual refresh: count a large folder's entries again rather than reuse the count. */
+  readonly recount?: boolean;
 }
 
 /**
