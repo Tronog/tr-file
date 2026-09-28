@@ -6,7 +6,6 @@ import { FsError } from '../../file-system/fs-error';
 import { sniffText, type SniffResult, type TextEncoding } from '../../file-system/text-sniff';
 import type { WorkbenchService } from '../workbench.service';
 import { isFile } from '../../file-system/fs-entry-kind';
-import { sortEntries } from '../listing/listing-order';
 
 /** Files past this size are not previewed; the user downloads them instead. */
 const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
@@ -196,11 +195,10 @@ export class FilePreviewFeature {
     if (fs.listingState(folder)?.listing === undefined) {
       await fs.reloadListing(folder);
     }
-    const images = sortEntries(
-      fs.entries(folder).filter((entry) => isFile(entry) && this.parent.images.isImage(entry.path)),
-      this.parent.fileBrowserFt.sortIn(groupId, folder),
-      (entry) => this.parent.fileViewModel.typeLabel(entry),
-    );
+    // In the panel's order — for a large folder, the Web Worker's (PRD 004, §3.1).
+    const images = this.parent.fileBrowserFt
+      .ordered(folder, this.parent.fileBrowserFt.sortIn(groupId, folder))
+      .filter((entry) => isFile(entry) && this.parent.images.isImage(entry.path));
     const at = images.findIndex((entry) => entry.path === from);
     if (images.length < 2 || at === -1) {
       return;

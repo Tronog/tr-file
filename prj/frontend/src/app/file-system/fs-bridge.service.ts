@@ -4,6 +4,7 @@ import { SessionExpiryService } from '../auth/session-expiry.service';
 import type {
   FsDetails,
   FsDirectoryListing,
+  FsListingProgress,
   FsDownload,
   FsGitAction,
   FsGitFields,
@@ -155,6 +156,10 @@ export class FsBridgeService implements FsTransport {
 
   async list(path: string): Promise<FsDirectoryListing> {
     return this.invoke<FsDirectoryListing>({ command: 'list', path });
+  }
+
+  async listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress> {
+    return this.invoke<FsListingProgress>({ command: 'list-progress', token, namesFrom, detailsFrom });
   }
 
   async details(path: string): Promise<FsDetails> {

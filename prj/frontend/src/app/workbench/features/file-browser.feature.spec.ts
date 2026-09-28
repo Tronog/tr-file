@@ -212,6 +212,7 @@ describe('FileBrowserFeature', () => {
       expect(rows.find((row) => row.focused)?.id).toBe('main.ts');
       expect(workbench.selectedEntryId()).toBe('main.ts');
       // The grid shows the same selection.
+      workbench.fileBrowserFt.setView('group-root', 'grid');
       expect(workbench.fileBrowserFt.browser('group-root')?.items.filter((item) => item.selected)).toHaveLength(2);
     });
 
@@ -242,6 +243,7 @@ describe('FileBrowserFeature', () => {
       expect(workbench.activeGroupId()).toBe('group-root');
       expect(rowOf('group-root', 'README.md')).toMatchObject({ selected: true, focused: true });
       expect(rowOf('group-root', 'main.ts')?.selected).toBeUndefined();
+      workbench.fileBrowserFt.setView('group-root', 'grid');
       expect(
         workbench.fileBrowserFt
           .browser('group-root')

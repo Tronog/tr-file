@@ -49,8 +49,15 @@ export class FileViewModelFeature {
     return TINT_BY_EXTENSION[this.extension(entry.name)] ?? 'generic';
   }
 
-  /** `'1.1 KB'`, `'318 KB'`, `'942 B'`; directories report no size. */
-  sizeLabel(entry: Pick<FsEntry, 'type' | 'size' | 'targetType'>): string {
+  /**
+   * `'1.1 KB'`, `'318 KB'`, `'942 B'`; directories report no size, and an
+   * entry of a large folder whose details are still coming (PRD 004, §3.1)
+   * none yet.
+   */
+  sizeLabel(entry: Pick<FsEntry, 'type' | 'size' | 'targetType' | 'partial'>): string {
+    if (entry.partial) {
+      return '';
+    }
     return isFolder(entry) ? '—' : this.formatBytes(entry.size);
   }
 
@@ -71,6 +78,10 @@ export class FileViewModelFeature {
 
   /** `'Sep 20, 13:04'` — the column is narrow, so the year is dropped. */
   modifiedLabel(entry: Pick<FsEntry, 'modifiedAt'>): string {
+    if (entry.modifiedAt === '') {
+      // Not known yet: an entry of a large folder (PRD 004, §3.1).
+      return '';
+    }
     const date = new Date(entry.modifiedAt);
     return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${this.time(date)}`;
   }

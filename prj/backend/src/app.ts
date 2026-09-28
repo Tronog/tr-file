@@ -137,6 +137,7 @@ export class App {
    */
   close(): void {
     this.watches.close();
+    this.filesService.largeListings.close();
   }
 
   private configure(): void {

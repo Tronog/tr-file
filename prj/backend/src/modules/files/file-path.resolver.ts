@@ -92,6 +92,11 @@ export class FilePathResolver {
     return new ResolvedPath(absolute, relative);
   }
 
+  /** The names directly in the root that belong to the server, which no listing shows. */
+  get reservedNames(): readonly string[] {
+    return this.reserved;
+  }
+
   /** Whether a root-relative path is, or is inside, one of the reserved names. */
   isReserved(relative: string): boolean {
     const first = relative.split('/', 1)[0] as string;

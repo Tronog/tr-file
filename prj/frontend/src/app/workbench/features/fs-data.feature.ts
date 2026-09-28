@@ -2,16 +2,37 @@ import { computed, signal, type Signal, type WritableSignal } from '@angular/cor
 import type { FsDetails, FsDirectoryListing, FsEntry } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
+import { deltaOf, recordDelta } from '../listing/array-delta';
 
 /** Where a cached request stands. */
 export type FsLoadStatus = 'loading' | 'ready' | 'error';
+
+/** How far a large folder's reading has got (PRD 004, §3.1). */
+export interface FsListingProgressState {
+  /** How many entries there are; `null` while they are being counted. */
+  readonly total: number | null;
+  /** Names received. */
+  readonly named: number;
+  /** Entries described — their size and dates known. */
+  readonly detailed: number;
+}
 
 /** One cached directory listing. */
 export interface FsListingState {
   readonly status: FsLoadStatus;
   readonly listing?: FsDirectoryListing;
   readonly error?: FsError;
+  /** A large folder still being read: count, names, details. Gone once it is all in. */
+  readonly progress?: FsListingProgressState;
 }
+
+const NO_ENTRIES: readonly FsEntry[] = [];
+
+/** A large folder's reading is asked after, and put on screen, at most this often (PRD 004, §3.1). */
+export const LARGE_LISTING_INTERVAL_MS = 1000;
+
+/** An answer carrying this many names or details says more are waiting: ask again at once. */
+const FULL_ANSWER = 10_000;
 
 /** One cached entry's details. */
 export interface FsDetailsState {
@@ -84,8 +105,61 @@ export class FsDataFeature {
    * are still the previous entries, so nothing on screen blanks meanwhile.
    */
   entries(path: string): readonly FsEntry[] {
-    const entries = this.listings().get(path)?.listing?.entries ?? [];
-    return this.parent.showHidden() ? entries : entries.filter((entry) => !entry.hidden);
+    const entries = this.listings().get(path)?.listing?.entries ?? NO_ENTRIES;
+    if (this.parent.showHidden()) {
+      return entries;
+    }
+    // The same array for the same listing: a large folder's order is kept per array (PRD 004, §3.1).
+    let shown = this.withoutHidden.get(entries);
+    if (shown === undefined) {
+      shown = this.hideIn(entries);
+      this.withoutHidden.set(entries, shown);
+    }
+    return shown;
+  }
+
+  private readonly withoutHidden = new WeakMap<readonly FsEntry[], readonly FsEntry[]>();
+  /** Where each entry of a listing sits once its hidden ones are left out; `-1` for a hidden one. */
+  private readonly shownAt = new WeakMap<readonly FsEntry[], Int32Array>();
+
+  /**
+   * `entries` without the hidden ones — the listing itself when it has none.
+   * A listing that is the last one with a few entries described (PRD 004,
+   * §3.1) is made from the last result, those few put in their places.
+   */
+  private hideIn(entries: readonly FsEntry[]): readonly FsEntry[] {
+    const delta = deltaOf(entries);
+    const before = delta === undefined ? undefined : this.withoutHidden.get(delta.from);
+    if (delta !== undefined && before !== undefined) {
+      if (before === delta.from) {
+        return entries;
+      }
+      const positions = this.shownAt.get(before);
+      if (positions !== undefined) {
+        const shown = before.slice();
+        const changed: number[] = [];
+        for (const index of delta.changed) {
+          const at = positions[index] ?? -1;
+          if (at >= 0) {
+            shown[at] = entries[index] as FsEntry;
+            changed.push(at);
+          }
+        }
+        this.shownAt.set(shown, positions);
+        recordDelta(shown, before, changed);
+        return shown;
+      }
+    }
+    if (!entries.some((entry) => entry.hidden)) {
+      return entries;
+    }
+    const positions = new Int32Array(entries.length);
+    const shown: FsEntry[] = [];
+    entries.forEach((entry, index) => {
+      positions[index] = entry.hidden ? -1 : shown.push(entry) - 1;
+    });
+    this.shownAt.set(shown, positions);
+    return shown;
   }
 
   /**
@@ -97,9 +171,47 @@ export class FsDataFeature {
       return undefined;
     }
     const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-    const entries = this.listings().get(parentPath)?.listing?.entries ?? [];
-    return entries.find((entry) => entry.path === path);
+    const entries = this.listings().get(parentPath)?.listing?.entries ?? NO_ENTRIES;
+    return this.indexOf(entries).get(path);
   }
+
+  /** `path` if the listing of `folder` shows it — hidden entries only while they are shown. */
+  shownEntryAt(folder: string, path: string): FsEntry | undefined {
+    const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    if (parentPath !== folder) {
+      return undefined;
+    }
+    const entry = this.entryAt(path);
+    return entry !== undefined && (this.parent.showHidden() || !entry.hidden) ? entry : undefined;
+  }
+
+  /**
+   * A listing's entries by path, made once per listing: menus, commands and
+   * the details sidebar look entries up many times a render, and a folder of
+   * a million (PRD 004, §3.1) cannot be searched from the top each time.
+   */
+  private indexOf(entries: readonly FsEntry[]): ReadonlyMap<string, FsEntry> {
+    let index = this.indexes.get(entries);
+    if (index === undefined) {
+      // A listing a few entries on from the last: the last one's index, those few updated. The
+      // older listing's lookups then answer with the newer entries, which is what anyone wants.
+      const delta = deltaOf(entries);
+      const before = delta === undefined ? undefined : this.indexes.get(delta.from);
+      if (delta !== undefined && before !== undefined) {
+        for (const at of delta.changed) {
+          const entry = entries[at] as FsEntry;
+          before.set(entry.path, entry);
+        }
+        index = before;
+      } else {
+        index = new Map(entries.map((entry) => [entry.path, entry]));
+      }
+      this.indexes.set(entries, index);
+    }
+    return index;
+  }
+
+  private readonly indexes = new WeakMap<readonly FsEntry[], Map<string, FsEntry>>();
 
   /**
    * Fetches a directory unless it is already cached or in flight.
@@ -173,7 +285,11 @@ export class FsDataFeature {
     this.patchListing(path, { status: 'loading', ...(previous ? { listing: previous } : {}) });
     try {
       const listing = await this.parent.fileSystem.readFt.list(path);
-      this.patchListing(path, { status: 'ready', listing });
+      if (listing.progressive === undefined) {
+        this.patchListing(path, { status: 'ready', listing });
+      } else {
+        await this.readLarge(path, listing, listing.progressive.token, previous);
+      }
     } catch (error) {
       this.patchListing(path, { status: 'error', error: FsError.from(error) });
     } finally {
@@ -182,6 +298,93 @@ export class FsDataFeature {
         void this.fetchListing(path);
       }
     }
+  }
+
+  /**
+   * A large folder (PRD 004, §3.1), read by stages — the backend's worker
+   * counts it, names it, then describes it in batches, and this asks after
+   * each from where it has got to:
+   *
+   * - until every name is in, the listing on screen stays what it was (a
+   *   reload keeps the old one; a first read has none, and the panel says how
+   *   many entries are being read);
+   * - then the entries are shown, `partial` — names and types, no sizes or
+   *   dates yet;
+   * - then their details fill in, batch by batch.
+   *
+   * The screen is updated at most once a second, and the backend asked about
+   * as often — at once, though, while it still has big chunks waiting, so a
+   * million names do not take a second per hundred thousand. Resolves once
+   * everything is in, which is what keeps the path `pending` meanwhile.
+   */
+  private async readLarge(path: string, first: FsDirectoryListing, token: string, previous: FsDirectoryListing | undefined): Promise<void> {
+    const read = this.parent.fileSystem.readFt;
+    const prefix = first.path === '' ? '' : `${first.path}/`;
+    // Index-aligned with the backend's names: details say which slot they fill; a vanished entry leaves `null`.
+    const slots: (FsEntry | null)[] = [];
+    let detailsFrom = 0;
+    let shown = Number.NEGATIVE_INFINITY;
+    let namesShown = false;
+    // What changed since the listing last put on screen: while only details came, the next
+    // listing is that one with a few entries replaced, and says so (`recordDelta`).
+    let published: readonly FsEntry[] | null = null;
+    const described = new Set<number>();
+    let reshaped = false;
+    let goneAny = false;
+
+    for (;;) {
+      const asked = Date.now();
+      const answer = await read.listProgress(token, slots.length, detailsFrom);
+      for (const { name, type } of answer.names) {
+        slots.push({ name, path: prefix + name, type, size: 0, hidden: name.startsWith('.'), modifiedAt: '', createdAt: '', partial: true });
+        reshaped = true;
+      }
+      for (const detail of answer.details) {
+        const slot = slots[detail.index];
+        if (slot) {
+          const { index: _index, ...known } = detail;
+          slots[detail.index] = { name: slot.name, path: slot.path, hidden: slot.hidden, ...known };
+          described.add(detail.index);
+        }
+      }
+      for (const index of answer.gone) {
+        slots[index] = null;
+        reshaped = true;
+        goneAny = true;
+      }
+      detailsFrom += answer.details.length + answer.gone.length;
+
+      // Once a second — and the moment the names are all in, and when everything is.
+      const now = Date.now();
+      if (answer.done || (answer.namesDone && !namesShown) || now - shown >= LARGE_LISTING_INTERVAL_MS) {
+        shown = now;
+        const progress: FsListingProgressState = { total: answer.total, named: slots.length, detailed: detailsFrom };
+        if (!answer.namesDone) {
+          this.patchListing(path, { status: 'loading', progress, ...(previous ? { listing: previous } : {}) });
+        } else {
+          namesShown = true;
+          const entries = goneAny ? slots.filter((slot): slot is FsEntry => slot !== null) : (slots.slice() as FsEntry[]);
+          if (published !== null && !reshaped) {
+            recordDelta(entries, published, [...described]);
+          }
+          published = entries;
+          described.clear();
+          reshaped = false;
+          const listing: FsDirectoryListing = { path: first.path, parent: first.parent, entries };
+          this.patchListing(path, answer.done ? { status: 'ready', listing } : { status: 'loading', listing, progress });
+        }
+      }
+      if (answer.done) {
+        return;
+      }
+      const full = answer.names.length >= FULL_ANSWER || answer.details.length >= FULL_ANSWER;
+      await this.wait(full ? 0 : Math.max(0, LARGE_LISTING_INTERVAL_MS - (Date.now() - asked)));
+    }
+  }
+
+  /** A pause between questions about a large folder; a seam, so specs need not wait. */
+  wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private patchListing(path: string, state: FsListingState): void {

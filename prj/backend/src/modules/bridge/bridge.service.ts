@@ -278,6 +278,8 @@ export class FileSystemBridge {
     switch (request.command) {
       case 'list':
         return (await this.files.listDirectory(request.path)).toJSON();
+      case 'list-progress':
+        return this.files.listProgress(request.token, request.namesFrom, request.detailsFrom);
       case 'details':
         return (await this.files.getDetails(request.path)).toJSON();
       case 'read':
@@ -583,6 +585,17 @@ export class FileSystemBridge {
       case 'list':
       case 'details':
         return { command, path: FileSystemBridge.readString(value, 'path') };
+      case 'list-progress': {
+        const cursors = {
+          namesFrom: FileSystemBridge.readOptionalCount(value, 'namesFrom'),
+          detailsFrom: FileSystemBridge.readOptionalCount(value, 'detailsFrom'),
+        };
+        return {
+          command,
+          token: FileSystemBridge.readString(value, 'token'),
+          ...Object.fromEntries(Object.entries(cursors).filter(([, count]) => count !== undefined)),
+        };
+      }
       case 'read': {
         const optional = {
           offset: FileSystemBridge.readOptionalCount(value, 'offset'),

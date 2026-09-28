@@ -238,6 +238,10 @@ export class RemoteBackend {
     switch (request.command) {
       case 'list':
         return this.json('GET', '/fs/list', { query: { path: request.path } });
+      case 'list-progress':
+        return this.json('GET', '/fs/list-progress', {
+          query: { token: request.token, namesFrom: String(request.namesFrom ?? 0), detailsFrom: String(request.detailsFrom ?? 0) },
+        });
       case 'details':
         return this.json('GET', '/fs/details', { query: { path: request.path } });
       case 'read':

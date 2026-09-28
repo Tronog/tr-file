@@ -45,6 +45,11 @@ export class ThumbnailsFeature {
 
   constructor(private readonly parent: WorkbenchService) {}
 
+  /** The paths there is a thumbnail of — of some version — at most `KEEP` of them. */
+  paths(): Iterable<string> {
+    return this.thumbnails().keys();
+  }
+
   /** The thumbnail of an entry, if there is one of this version of it. */
   urlFor(entry: FsEntry): string | undefined {
     // Off in the settings (PRD 010, §1): the icon view draws file icons.

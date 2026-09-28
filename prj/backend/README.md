@@ -82,6 +82,7 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | Command | Fields | Answers with |
 | --- | --- | --- |
 | `list` | `path` | the listing `GET /api/fs/list` serves |
+| `list-progress` | `token`, `namesFrom?`, `detailsFrom?` | `GET /api/fs/list-progress`'s answer |
 | `details` | `path` | the entry `GET /api/fs/details` serves |
 | `read` | `path`, `offset?`, `length?`, `maxBytes?` | one chunk: `{ name, size, mimeType, offset, content: Uint8Array }` |
 | `upload-begin` | `path`, `filename`, `overwrite` | `{ uploadId }` — or the `CONFLICT` / `BAD_REQUEST` an upload would get, before any bytes |
@@ -151,7 +152,8 @@ path reaches the file system.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/fs/list?path=` | Directory listing: folders (and links to folders) first, then the rest, in natural order (`file2` before `file10`) |
+| GET | `/api/fs/list?path=` | Directory listing: folders (and links to folders) first, then the rest, in natural order (`file2` before `file10`). A folder of 1000 entries or more comes back with no entries and `progressive: { token }` — see below |
+| GET | `/api/fs/list-progress?token=&namesFrom=&detailsFrom=` | A large folder's reading (PRD 004, §3.1): `{ path, total, names, namesDone, details, gone, done }` — the count (`null` until known), then the names after `namesFrom` (with the type the directory records), then, once every name is out, the details after `detailsFrom` (`index` into the names, `type`, `size`, dates, `targetType` for links). Answers are capped (100 000 names, 50 000 details) and the same cursors get the same answer; `404` once the reading is forgotten (a minute unasked) |
 | GET | `/api/fs/details?path=` | Full metadata for one entry |
 | GET | `/api/fs/places` | `{ home, places: [{ id, label, kind, path }] }`: where a session starts, and the Places pane (PRD 003, §6) |
 | GET | `/api/fs/download?path=&inline=` | Stream a file (`Accept-Ranges`, `Content-Disposition: attachment`, or `inline` for `inline=true`); a range past the end — any range on an empty file — is `416` |

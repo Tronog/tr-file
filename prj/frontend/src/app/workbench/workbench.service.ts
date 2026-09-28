@@ -18,6 +18,7 @@ import { PanelKeyboardFeature } from './features/panel-keyboard.feature';
 import { PanelLayoutFeature } from './features/panel-layout.feature';
 import { PreviewRetentionFeature } from './features/preview-retention.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
+import { ListingOrderFeature } from './listing/listing-order.feature';
 import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
@@ -174,6 +175,7 @@ export class WorkbenchService {
   readonly editorGroupsFt = new EditorGroupsFeature(this);
   /** File management: what folder and file tabs show, and navigating in them. */
   readonly fileBrowserFt = new FileBrowserFeature(this);
+  readonly listingOrderFt = new ListingOrderFeature(this);
   /** Inside a zip, as a panel tab of its own (PRD 003, §6). */
   readonly archiveBrowserFt = new ArchiveBrowserFeature(this);
   /** The trash, as a Places row and a panel tab of its own (PRD 001, §14.1). */

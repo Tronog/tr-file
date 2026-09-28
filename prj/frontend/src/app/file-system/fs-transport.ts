@@ -2,6 +2,7 @@ import type { AuthStatus } from '../auth/auth.model';
 import type {
   FsDetails,
   FsDirectoryListing,
+  FsListingProgress,
   FsArchiveListing,
   FsClipboardFiles,
   FsDownload,
@@ -49,6 +50,9 @@ export interface FsTransport {
 
   /** Lists a directory. `''` is the configured files root. */
   list(path: string): Promise<FsDirectoryListing>;
+
+  /** A large folder's reading (PRD 004, §3.1): what came in after the cursors. */
+  listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress>;
 
   /** Describes one file or directory in full. */
   details(path: string): Promise<FsDetails>;

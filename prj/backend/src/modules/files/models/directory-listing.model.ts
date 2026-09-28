@@ -7,6 +7,11 @@ export interface DirectoryListingDto {
   readonly path: string;
   readonly parent: string | null;
   readonly entries: readonly FileEntryDto[];
+  /**
+   * A large folder (PRD 004, §3.1): `entries` is empty, and the folder is
+   * being read by stages — asked after with `GET /api/fs/list-progress`.
+   */
+  readonly progressive?: { readonly token: string };
 }
 
 /** A directory and the entries it directly contains. */
@@ -14,6 +19,8 @@ export class DirectoryListing {
   constructor(
     readonly path: string,
     readonly entries: readonly FileEntry[],
+    /** A large folder's reading, by stages; see `DirectoryListingDto.progressive`. */
+    readonly progressiveToken: string | null = null,
   ) {}
 
   /** Root-relative parent path, or `null` when this is the root itself. */
@@ -37,7 +44,7 @@ export class DirectoryListing {
       }
       return NATURAL_ORDER.compare(a.name, b.name);
     });
-    return new DirectoryListing(this.path, entries);
+    return new DirectoryListing(this.path, entries, this.progressiveToken);
   }
 
   toJSON(): DirectoryListingDto {
@@ -45,6 +52,7 @@ export class DirectoryListing {
       path: this.path,
       parent: this.parent,
       entries: this.entries.map((entry) => entry.toJSON()),
+      ...(this.progressiveToken === null ? {} : { progressive: { token: this.progressiveToken } }),
     };
   }
 }

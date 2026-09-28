@@ -13,6 +13,7 @@ import { firstValueFrom, type Observable, type Subscription } from 'rxjs';
 import type {
   FsDetails,
   FsDirectoryListing,
+  FsListingProgress,
   FsDownload,
   FsDownloadResult,
   FsArchiveListing,
@@ -65,6 +66,15 @@ export class FsHttpService implements FsTransport {
 
   async list(path: string): Promise<FsDirectoryListing> {
     return this.get<FsDirectoryListing>('list', path);
+  }
+
+  async listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress> {
+    const params = new HttpParams().set('token', token).set('namesFrom', namesFrom).set('detailsFrom', detailsFrom);
+    try {
+      return (await firstValueFrom(this.http.get<FsEnvelope<FsListingProgress>>(`${this.baseUrl}/list-progress?${params.toString()}`))).data;
+    } catch (error) {
+      throw FsError.from(error);
+    }
   }
 
   async details(path: string): Promise<FsDetails> {

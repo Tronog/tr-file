@@ -370,6 +370,25 @@ and the initial layout — two panels side by side on the root, the left one act
 Specs of the layout's mechanics start from one panel instead (`provideOnePanel()`,
 `workbench/testing/one-panel.ts`).
 
+**Large folders (PRD 004, §3.1).** A folder of 1000 entries or more is never read in one go. The
+backend counts to 1000 as it reads names (`FilesService.listDirectory`); past that it answers at once
+with `progressive: { token }` and hands the folder to a worker thread (`LargeListings`,
+`large-listing.worker.ts` — a source string started with `eval: true`, so tsx, the ES build and the
+desktop's single CommonJS bundle all run it): count, names with the directory's own types, then
+`lstat` in batches; links' targets are judged against the root on the host. `GET
+/api/fs/list-progress` (bridge `list-progress`, mapped by `RemoteBackend`) serves it by cursor. The
+frontend follows it in `FsDataFeature.readLarge`: a "Counting… / Reading N entries…" placeholder, then
+every entry shown `partial` (name and type; blank size and date), then details filled in — asking
+once a second (at once while chunks are full) and putting the screen right at most once a second. A
+large listing is ordered in a Web Worker (`ListingOrderFeature`, `listing-order.worker.ts`, the same
+`compareKeys` as `sortEntries`), asked by an `effect` for what is on screen (`ordersWanted`); until
+there is an order the panel says it is sorting rather than showing the disk's order, and a new sort
+keeps the last order up meanwhile. Each update is made from the last where only details changed
+(`listing/array-delta.ts`: the hidden filter, the path index, the order laid over, the rows), rows
+are built for the showing view only, their cells formatted when first read, and selection, focus
+and cut are laid over a copy of the base rows — so a keypress in a folder of half a million costs a
+copy of an array. Keep new per-entry work off those paths.
+
 **No blank frames.** A reload keeps what is on screen: `FsDataFeature`, `FilePreviewFeature` and
 `ImageSourceService` go to `status: 'loading'` *with* the previous listing / details / document /
 object URL, which is replaced (and, for a URL, revoked) only when the answer lands; a reload asked

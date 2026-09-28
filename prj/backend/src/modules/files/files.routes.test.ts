@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,6 +72,45 @@ describe('GET /api/fs/list', () => {
 
   it('no longer answers the module root', async () => {
     assert.equal((await fetch(`${base}/`)).status, 404);
+  });
+});
+
+/** PRD 004, §3.1 — a large folder is read by stages; `list-progress` says how far. */
+describe('GET /api/fs/list-progress', () => {
+  it('follows a large folder from its token to the last detail', async () => {
+    const big = join(root, 'big');
+    await mkdir(big);
+    try {
+      await Promise.all(Array.from({ length: 1200 }, (_, index) => writeFile(join(big, `f${index}`), '')));
+      const listed = (await (await fetch(`${base}/list?path=big`)).json()) as { data: { entries: unknown[]; progressive?: { token: string } } };
+      assert.equal(listed.data.entries.length, 0);
+      const token = listed.data.progressive?.token as string;
+
+      let names = 0;
+      let details = 0;
+      let total: number | null = null;
+      for (let round = 0; round < 200; round++) {
+        const response = await fetch(`${base}/list-progress?token=${token}&namesFrom=${names}&detailsFrom=${details}`);
+        assert.equal(response.status, 200);
+        const answer = ((await response.json()) as { data: { total: number | null; names: unknown[]; details: unknown[]; gone: unknown[]; done: boolean } }).data;
+        total = answer.total;
+        names += answer.names.length;
+        details += answer.details.length + answer.gone.length;
+        if (answer.done) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.equal(total, 1200);
+      assert.equal(names, 1200);
+      assert.equal(details, 1200);
+
+      assert.equal(await errorCodeOf(await fetch(`${base}/list-progress?token=${token}&namesFrom=x`)), 'BAD_REQUEST');
+      assert.equal(await errorCodeOf(await fetch(`${base}/list-progress`)), 'BAD_REQUEST');
+      assert.equal((await fetch(`${base}/list-progress?token=nope`)).status, 404);
+    } finally {
+      await rm(big, { recursive: true, force: true });
+    }
   });
 });
 

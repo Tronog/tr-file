@@ -13,7 +13,8 @@ import type {
 } from '@tr-file/ui';
 import type { FsEntry } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
-import { nameFilter, sortEntries } from '../listing/listing-order';
+import { nameFilter } from '../listing/listing-order';
+import { deltaOf } from '../listing/array-delta';
 import { namePattern, patternProblem } from '../listing/name-pattern';
 import type { PanelContentFeature } from '../panel-content.model';
 import {
@@ -25,8 +26,9 @@ import {
   type PanelTabState,
 } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
+import type { FileViewModelFeature } from './file-view-model.feature';
 import type { EditorGroupsFeature } from './editor-groups.feature';
-import type { FsListingState } from './fs-data.feature';
+import type { FsListingProgressState, FsListingState } from './fs-data.feature';
 import { isFolder } from '../../file-system/fs-entry-kind';
 
 /** Columns of the list view; the backend supplies every value, and each can sort it (PRD 003, §5). */
@@ -56,6 +58,41 @@ const EMPTY_FOLDER = {
   title: 'This folder is empty',
   hint: 'Drop files here to upload them',
 } as const;
+
+/** A listing's rows as they are made once per array; `index` (path → place) only once something needed it. */
+interface BaseRows {
+  readonly rows: readonly UiFileRow[];
+  index?: Map<string, number>;
+}
+
+interface BaseItems {
+  readonly items: readonly UiIconViewItem[];
+  index?: Map<string, number>;
+}
+
+/** A row's cells, each label made the first time it is read, and kept. */
+class RowCells {
+  private sizeText: string | undefined;
+  private typeText: string | undefined;
+  private modifiedText: string | undefined;
+
+  constructor(
+    private readonly entry: FsEntry,
+    private readonly files: FileViewModelFeature,
+  ) {}
+
+  get size(): string {
+    return (this.sizeText ??= this.files.sizeLabel(this.entry));
+  }
+
+  get type(): string {
+    return (this.typeText ??= this.files.typeLabel(this.entry));
+  }
+
+  get modified(): string {
+    return (this.modifiedText ??= this.files.modifiedLabel(this.entry));
+  }
+}
 
 /** What the filter box says while it is empty. */
 const FILTER_PLACEHOLDER = 'Filter (Ctrl+F)';
@@ -232,9 +269,52 @@ export class FileBrowserFeature implements PanelContentFeature {
    * list, grid, tree — and every command about "what is on screen" reads this.
    */
   visibleEntries(groupId: string, path: string): readonly FsEntry[] {
-    const matches = nameFilter(this.filterOf(groupId));
-    const entries = this.parent.fsDataFt.entries(path).filter((entry) => matches(entry.name));
-    return sortEntries(entries, this.sortOf(groupId), (entry) => this.parent.fileViewModel.typeLabel(entry));
+    const sorted = this.ordered(path, this.sortOf(groupId));
+    const filter = this.filterOf(groupId);
+    if (filter.trim() === '') {
+      return sorted;
+    }
+    const matches = nameFilter(filter);
+    return sorted.filter((entry) => matches(entry.name));
+  }
+
+  /**
+   * A folder's entries in `sort`'s order — for a large one, as the Web Worker
+   * last worked it out (`ListingOrderFeature`, PRD 004, §3.1). Sorted before
+   * the filter is applied, so typing in the box never asks for a new order.
+   */
+  ordered(path: string, sort: PanelSort): readonly FsEntry[] {
+    return this.parent.listingOrderFt.sorted(path, this.parent.fsDataFt.entries(path), sort, (entry) =>
+      this.parent.fileViewModel.typeLabel(entry),
+    );
+  }
+
+  /**
+   * Every folder on screen and the order it is shown in — a panel's own, one
+   * open in its tree, and the folder of an image a panel shows, which
+   * `PgUp`/`PgDown` step through: what `ListingOrderFeature` keeps ordered.
+   */
+  ordersWanted(): readonly { readonly path: string; readonly sort: PanelSort }[] {
+    const wanted: { path: string; sort: PanelSort }[] = [];
+    for (const group of this.groups.states()) {
+      const tab = this.groups.activeTabOf(group);
+      if (tab?.kind === 'file') {
+        const folder = parentOf(tab.path);
+        wanted.push({ path: folder, sort: this.sortIn(group.id, folder) });
+        continue;
+      }
+      if (tab?.kind !== 'folder') {
+        continue;
+      }
+      const sort = this.sortOf(group.id);
+      wanted.push({ path: group.path, sort });
+      if (this.viewFor(group) === 'tree') {
+        for (const path of this.openFoldersShown(group)) {
+          wanted.push({ path, sort });
+        }
+      }
+    }
+    return wanted;
   }
 
   /** The entries a panel is showing, in order — its folder's, and in the tree view those of open folders. */
@@ -809,11 +889,11 @@ export class FileBrowserFeature implements PanelContentFeature {
       return undefined;
     }
 
-    const own = this.parent.fsDataFt.entries(group.path).find((entry) => entry.path === entryId);
+    const own = this.parent.fsDataFt.shownEntryAt(group.path, entryId);
     if (own || !this.isShownInTree(group, entryId)) {
       return own;
     }
-    return this.parent.fsDataFt.entries(parentOf(entryId)).find((entry) => entry.path === entryId);
+    return this.parent.fsDataFt.shownEntryAt(parentOf(entryId), entryId);
   }
 
   private expandedIn(groupId: string): ReadonlySet<string> {
@@ -885,6 +965,10 @@ export class FileBrowserFeature implements PanelContentFeature {
   private folderViewModel(group: PanelGroupState, active: boolean): UiFileBrowserModel {
     const state = this.parent.fsDataFt.listingState(group.path);
     const all = this.parent.fsDataFt.entries(group.path);
+    // A large folder with no order worked out yet is not shown in the disk's order, to jump a moment later.
+    if (state?.listing && !this.parent.listingOrderFt.ready(group.path, all, this.sortOf(group.id))) {
+      return this.sortingViewModel(group, all.length);
+    }
     const entries = this.visibleEntries(group.id, group.path);
     const filter = this.filterOf(group.id);
     const view = this.viewFor(group);
@@ -900,14 +984,36 @@ export class FileBrowserFeature implements PanelContentFeature {
       sortable: true,
       ...this.focusTokens(group.id),
       columns: columnsFor(this.sortOf(group.id)),
+      // Only what the view shows: a folder of a million entries is a million of each (PRD 004, §3.1).
       rows:
         view === 'tree'
           ? this.treeRows(group, group.path, 0, active)
-          : entries.map((entry) => this.row(entry, group, active)),
-      items: entries.map((entry) => this.item(entry, group, active)),
+          : view === 'list'
+            ? this.rowsOf(entries, group, active)
+            : [],
+      items: view === 'grid' ? this.itemsOf(entries, group, active) : [],
       // Kept through a reload, like the rows: the count changes when the answer does.
-      ...(state?.listing ? { summary: this.summary(entries.length, all.length, filter), dropFolder: true } : {}),
+      ...(state?.listing ? { summary: this.summary(entries.length, all.length, filter, state.progress), dropFolder: true } : {}),
       ...this.placeholder(state, entries.length, all.length, filter),
+    };
+  }
+
+  /** A large folder whose order the Web Worker is still working out (PRD 004, §3.1). */
+  private sortingViewModel(group: PanelGroupState, count: number): UiFileBrowserModel {
+    return {
+      breadcrumbs: this.breadcrumbs(group.path),
+      location: `/${group.path}`,
+      view: this.viewFor(group),
+      toolbarActions: this.folderToolbar(group),
+      showViewSwitch: true,
+      searchPlaceholder: FILTER_PLACEHOLDER,
+      filterText: this.filterOf(group.id),
+      sortable: true,
+      ...this.focusTokens(group.id),
+      columns: columnsFor(this.sortOf(group.id)),
+      rows: [],
+      items: [],
+      empty: { icon: 'clock', title: `Sorting ${count.toLocaleString('en-US')} entries…`, hint: 'A large folder is put in order in the background.' },
     };
   }
 
@@ -970,6 +1076,17 @@ export class FileBrowserFeature implements PanelContentFeature {
         },
       };
     }
+    // A large folder still being counted and named (PRD 004, §3.1), with nothing of it to show yet.
+    if (!state?.listing && state?.progress) {
+      const { total: all, named } = state.progress;
+      return {
+        empty: {
+          icon: 'clock',
+          title: all === null ? 'Counting the entries of this folder…' : `Reading ${all.toLocaleString('en-US')} entries…`,
+          hint: all === null ? 'A large folder is read in the background.' : `${named.toLocaleString('en-US')} names so far`,
+        },
+      };
+    }
     if (state?.listing && count === 0 && total > 0 && filter.trim() !== '') {
       return {
         empty: {
@@ -985,10 +1102,20 @@ export class FileBrowserFeature implements PanelContentFeature {
     return {};
   }
 
-  /** `6 items` — or, while a filter hides some, `2 of 6 items`. */
-  private summary(count: number, total: number, filter: string): string {
+  /**
+   * `6 items` — or, while a filter hides some, `2 of 6 items`; and while a
+   * large folder's details are still coming (PRD 004, §3.1), how far along.
+   */
+  private summary(count: number, total: number, filter: string, progress?: FsListingProgressState): string {
     const noun = total === 1 ? 'item' : 'items';
-    return filter.trim() === '' || count === total ? `${count} ${count === 1 ? 'item' : 'items'}` : `${count} of ${total} ${noun}`;
+    const items =
+      filter.trim() === '' || count === total
+        ? `${count.toLocaleString('en-US')} ${count === 1 ? 'item' : 'items'}`
+        : `${count.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} ${noun}`;
+    if (progress === undefined || progress.named === 0) {
+      return items;
+    }
+    return `${items} · details ${Math.floor((progress.detailed / progress.named) * 100)}%`;
   }
 
   private breadcrumbs(path: string): readonly UiBreadcrumb[] {
@@ -1014,9 +1141,8 @@ export class FileBrowserFeature implements PanelContentFeature {
     const matches = nameFilter(this.filterOf(group.id));
     // Unfiltered here: an open folder whose own name does not match stays, for
     // the matches inside it; `visibleEntries` still gives the panel's order.
-    const entries = sortEntries(this.parent.fsDataFt.entries(path), this.sortOf(group.id), (entry) =>
-      this.parent.fileViewModel.typeLabel(entry),
-    );
+    const entries = this.ordered(path, this.sortOf(group.id));
+    const selection = new Set(group.selection);
     return entries.flatMap((entry) => {
       const expandable = isFolder(entry);
       const expanded = expandable && open.has(entry.path);
@@ -1024,7 +1150,7 @@ export class FileBrowserFeature implements PanelContentFeature {
       const state = expanded ? this.parent.fsDataFt.listingState(entry.path) : undefined;
       const loading = state?.status === 'loading' && !state.listing;
       const row: UiFileRow = {
-        ...this.row(entry, group, active, expanded),
+        ...this.row(entry, group, active, selection, expanded),
         depth,
         expandable,
         ...(expandable ? { expanded } : {}),
@@ -1038,47 +1164,197 @@ export class FileBrowserFeature implements PanelContentFeature {
     });
   }
 
-  private row(entry: FsEntry, group: PanelGroupState, active: boolean, expanded = false): UiFileRow {
+  /**
+   * A listing's rows. The entries' own parts are made once per listing
+   * (`baseRows`); what the panel adds — selected, focused, cut — is laid over
+   * a copy, on the few rows it concerns. So moving the cursor through a folder
+   * of a million (PRD 004, §3.1) costs a copy of an array, not a million rows.
+   */
+  private rowsOf(entries: readonly FsEntry[], group: PanelGroupState, active: boolean): UiFileRow[] {
+    const made = this.baseRows(entries);
+    const rows = made.rows.slice();
+    const selection = new Set(group.selection);
+    for (const [, at] of this.placesOf(this.flagged(group, active), entries, made)) {
+      rows[at] = this.row(entries[at] as FsEntry, group, active, selection);
+    }
+    return rows;
+  }
+
+  /**
+   * Where `paths` are among `entries`. A few are looked for from the top; many
+   * — everything selected — through an index of every path, made then and
+   * kept with the rows, which for one cursor in a million entries would be
+   * the dearer of the two.
+   */
+  private placesOf(paths: ReadonlySet<string>, entries: readonly FsEntry[], made: { index?: Map<string, number> }): [string, number][] {
+    if (paths.size === 0) {
+      return [];
+    }
+    if (paths.size > 8 || made.index !== undefined) {
+      made.index ??= new Map(entries.map((entry, at) => [entry.path, at]));
+      const index = made.index;
+      return [...paths].flatMap((path) => {
+        const at = index.get(path);
+        return at === undefined ? [] : [[path, at] as [string, number]];
+      });
+    }
+    const found: [string, number][] = [];
+    for (let at = 0; at < entries.length && found.length < paths.size; at++) {
+      const path = (entries[at] as FsEntry).path;
+      if (paths.has(path)) {
+        found.push([path, at]);
+      }
+    }
+    return found;
+  }
+
+  /** The icon view's tiles, made as the rows are: the entries' own parts once, the panel's laid over a few. */
+  private itemsOf(entries: readonly FsEntry[], group: PanelGroupState, active: boolean): UiIconViewItem[] {
+    const made = this.baseItems(entries);
+    const items = made.items.slice();
+    const selection = new Set(group.selection);
+    const paths = this.flagged(group, active);
+    for (const path of this.parent.thumbnailsFt.paths()) {
+      paths.add(path);
+    }
+    for (const [, at] of this.placesOf(paths, entries, made)) {
+      items[at] = this.item(entries[at] as FsEntry, group, active, selection);
+    }
+    return items;
+  }
+
+  private baseItems(entries: readonly FsEntry[]): BaseItems {
+    let made = this.itemLists.get(entries);
+    if (made === undefined) {
+      const delta = deltaOf(entries);
+      const before = delta === undefined ? undefined : this.itemLists.get(delta.from);
+      if (delta !== undefined && before !== undefined) {
+        const items = before.items.slice();
+        for (const at of delta.changed) {
+          items[at] = this.itemBase(entries[at] as FsEntry);
+        }
+        made = before.index === undefined ? { items } : { items, index: before.index };
+      } else {
+        made = { items: entries.map((entry) => this.itemBase(entry)) };
+      }
+      this.itemLists.set(entries, made);
+    }
+    return made;
+  }
+
+  private readonly itemLists = new WeakMap<readonly FsEntry[], BaseItems>();
+
+  /** The paths whose rows the panel draws differently: selected, focused, cut. */
+  private flagged(group: PanelGroupState, active: boolean): Set<string> {
+    const paths = new Set(group.selection);
+    if (active && group.focusedEntryId !== undefined) {
+      paths.add(group.focusedEntryId);
+    }
+    for (const path of this.parent.fileClipboardFt.cutSet()) {
+      paths.add(path);
+    }
+    return paths;
+  }
+
+  /** The rows of `entries` with nothing laid over them, and where each path's row is — made once per array. */
+  private baseRows(entries: readonly FsEntry[]): BaseRows {
+    let made = this.rowLists.get(entries);
+    if (made === undefined) {
+      // The rows last made, a few of their entries described since (PRD 004, §3.1): those few made again.
+      const delta = deltaOf(entries);
+      const before = delta === undefined ? undefined : this.rowLists.get(delta.from);
+      if (delta !== undefined && before !== undefined) {
+        const rows = before.rows.slice();
+        for (const at of delta.changed) {
+          rows[at] = this.rowBaseOf(entries[at] as FsEntry, false);
+        }
+        made = before.index === undefined ? { rows } : { rows, index: before.index };
+      } else {
+        made = { rows: entries.map((entry) => this.rowBaseOf(entry, false)) };
+      }
+      this.rowLists.set(entries, made);
+    }
+    return made;
+  }
+
+  private readonly rowLists = new WeakMap<readonly FsEntry[], BaseRows>();
+
+  /**
+   * A row: the entry's own parts — labels, icon, tint — made once per entry
+   * object and kept (an entry is a new object when anything about it changes),
+   * so a listing of a million redrawn once a second formats nothing twice
+   * (PRD 004, §3.1). What depends on the panel is laid over them, and a row
+   * with none of it is the kept object itself.
+   */
+  private row(entry: FsEntry, group: PanelGroupState, active: boolean, selection: ReadonlySet<string>, expanded = false): UiFileRow {
+    const base = this.rowBaseOf(entry, expanded);
+    const selected = selection.has(entry.path);
+    const focused = active && group.focusedEntryId === entry.path;
+    const cut = this.parent.fileClipboardFt.isCut(entry.path);
+    if (!selected && !focused && !cut) {
+      return base;
+    }
+    return {
+      ...base,
+      ...(selected && active ? { selected: true } : {}),
+      ...(selected && !active ? { inactiveSelected: true } : {}),
+      ...(focused ? { focused: true } : {}),
+      ...(cut ? { cut: true } : {}),
+    };
+  }
+
+  private readonly itemBases = new WeakMap<FsEntry, UiIconViewItem>();
+
+  /**
+   * What a row shows of the entry alone; a folder takes drops (PRD 005, §2).
+   * Its cells are worked out when first read — which the list does only for
+   * the rows near its viewport — so a folder of a million (PRD 004, §3.1) is
+   * a million small objects, not a million sizes and dates formatted.
+   */
+  private rowBaseOf(entry: FsEntry, expanded: boolean): UiFileRow {
     const files = this.parent.fileViewModel;
-    const selected = group.selection.includes(entry.path);
     return {
       id: entry.path,
       name: entry.name,
       icon: files.icon(entry, expanded),
       tint: files.tint(entry),
-      cells: {
-        size: files.sizeLabel(entry),
-        type: files.typeLabel(entry),
-        modified: files.modifiedLabel(entry),
-      },
+      cells: new RowCells(entry, files) as unknown as Readonly<Record<string, string>>,
       ...(entry.hidden ? { decoration: 'ignored' as const } : {}),
-      ...(selected && active ? { selected: true } : {}),
-      ...(selected && !active ? { inactiveSelected: true } : {}),
-      ...(active && group.focusedEntryId === entry.path ? { focused: true } : {}),
-      ...this.dragFlags(entry),
-    };
-  }
-
-  /** A folder takes drops; an entry on the clipboard to be moved is drawn faded (PRD 005, §2). */
-  private dragFlags(entry: FsEntry): { dropTarget?: true; cut?: true } {
-    return {
       ...(isFolder(entry) ? { dropTarget: true as const } : {}),
-      ...(this.parent.fileClipboardFt.isCut(entry.path) ? { cut: true as const } : {}),
     };
   }
 
-  private item(entry: FsEntry, group: PanelGroupState, active: boolean): UiIconViewItem {
-    const files = this.parent.fileViewModel;
+  private itemBase(entry: FsEntry): UiIconViewItem {
+    let base = this.itemBases.get(entry);
+    if (base === undefined) {
+      const files = this.parent.fileViewModel;
+      base = {
+        id: entry.path,
+        label: entry.name,
+        icon: files.icon(entry),
+        tint: files.tint(entry),
+        ...(isFolder(entry) ? { dropTarget: true as const } : {}),
+      };
+      this.itemBases.set(entry, base);
+    }
+    return base;
+  }
+
+  private item(entry: FsEntry, group: PanelGroupState, active: boolean, selection: ReadonlySet<string>): UiIconViewItem {
+    const base = this.itemBase(entry);
     const thumbnail = this.parent.thumbnailsFt.urlFor(entry);
+    const selected = selection.has(entry.path);
+    const focused = active && group.focusedEntryId === entry.path;
+    const cut = this.parent.fileClipboardFt.isCut(entry.path);
+    if (thumbnail === undefined && !selected && !focused && !cut) {
+      return base;
+    }
     return {
-      id: entry.path,
-      label: entry.name,
-      icon: files.icon(entry),
-      tint: files.tint(entry),
+      ...base,
       ...(thumbnail === undefined ? {} : { thumbnail }),
-      ...(group.selection.includes(entry.path) ? { selected: true } : {}),
-      ...(active && group.focusedEntryId === entry.path ? { focused: true } : {}),
-      ...this.dragFlags(entry),
+      ...(selected ? { selected: true } : {}),
+      ...(focused ? { focused: true } : {}),
+      ...(cut ? { cut: true } : {}),
     };
   }
 }

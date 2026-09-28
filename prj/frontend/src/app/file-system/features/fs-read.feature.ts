@@ -1,5 +1,5 @@
 import type { FileSystemService } from '../file-system.service';
-import type { FsArchiveListing, FsDetails, FsDirectoryListing, FsPlaces, FsSearchResult, FsServerTime, FsWatchResult } from '../file-system.model';
+import type { FsArchiveListing, FsDetails, FsDirectoryListing, FsListingProgress, FsPlaces, FsSearchResult, FsServerTime, FsWatchResult } from '../file-system.model';
 
 /**
  * Reading the file system: directory listings and entry details.
@@ -18,6 +18,11 @@ export class FsReadFeature {
   /** Lists a directory. `''` is the configured files root. */
   async list(path: string): Promise<FsDirectoryListing> {
     return this.parent.transport.list(path);
+  }
+
+  /** A large folder's reading (PRD 004, §3.1), from the caller's cursors. */
+  async listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress> {
+    return this.parent.transport.listProgress(token, namesFrom, detailsFrom);
   }
 
   /** Describes one file or directory in full. */

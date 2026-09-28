@@ -70,7 +70,11 @@ describe('EditorGroupsFeature', () => {
       expect(workbench.editorGroupsFt.group('group-root')?.loading).toBeUndefined();
       const browser = workbench.fileBrowserFt.browser('group-root');
       expect(browser?.rows.map((row) => row.id)).toEqual(['docs', 'main.ts', 'README.md']);
-      expect(browser?.items.map((item) => item.id)).toEqual(['docs', 'main.ts', 'README.md']);
+      // The grid's items are built only while the grid shows (PRD 004, §3.1).
+      expect(browser?.items).toEqual([]);
+      workbench.fileBrowserFt.setView('group-root', 'grid');
+      expect(workbench.fileBrowserFt.browser('group-root')?.items.map((item) => item.id)).toEqual(['docs', 'main.ts', 'README.md']);
+      workbench.fileBrowserFt.setView('group-root', 'list');
       expect(browser?.summary).toBe('3 items');
       expect(browser?.columns.map((column) => column.key)).toEqual(['name', 'size', 'type', 'modified']);
       expect(rowOf('group-root', 'README.md')?.cells).toMatchObject({

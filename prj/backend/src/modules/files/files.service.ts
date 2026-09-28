@@ -1,12 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { createWriteStream, type Stats } from 'node:fs';
-import { lstat, mkdir, open, readdir, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, opendir, readdir, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import { basename, dirname, isAbsolute, join, posix, resolve as resolvePath, sep } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
 import { FilePathResolver, ResolvedPath } from './file-path.resolver.js';
+import { LargeListings, type ListingProgressDto } from './large-listing.service.js';
 import {
   DirectoryListing,
   FileDetails,
@@ -118,6 +120,8 @@ export class FilesService {
     private readonly logger: Logger,
     /** Hard ceiling for a single uploaded file body, in bytes. */
     private readonly uploadMaxBytes: number,
+    /** Where large folders are read (PRD 004, §3.1). */
+    readonly largeListings: LargeListings = new LargeListings(resolver, logger),
   ) {}
 
   get root(): string {
@@ -132,6 +136,12 @@ export class FilesService {
    * after another, a folder of ten thousand entries is ten thousand round
    * trips before the first byte of the answer, which on a network mount is
    * the difference between instant and minutes.
+   *
+   * A folder of `LargeListings.threshold` entries or more is not read here at
+   * all (PRD 004, §3.1): counting stops at the threshold, and a worker thread
+   * reads the folder by stages — the listing comes back empty, with the token
+   * `listProgress` answers for. Below it nothing changes, and the names read
+   * while counting are the ones listed, so a small folder is read once.
    */
   async listDirectory(requestedPath: string | undefined): Promise<DirectoryListing> {
     const target = await this.resolver.resolveReal(requestedPath);
@@ -144,9 +154,12 @@ export class FilesService {
       throw HttpError.badRequest(`Not a directory: ${target.relative || '/'}`);
     }
 
-    const dirents = (await this.readdirOrFail(target)).filter(
-      (dirent) => target.relative !== '' || !this.resolver.isReserved(dirent.name),
-    );
+    const skip = target.relative === '' ? this.resolver.reservedNames : [];
+    const read = await this.readBelowOrFail(target, this.largeListings.threshold, skip);
+    if (read === null) {
+      return new DirectoryListing(target.relative, [], this.largeListings.start(target, skip));
+    }
+    const dirents = read;
     const entries = await mapLimited(dirents, LISTING_CONCURRENCY, (dirent) => {
       const childRelative =
         target.relative === '' ? dirent.name : `${target.relative}/${dirent.name}`;
@@ -661,10 +674,19 @@ export class FilesService {
     }
   }
 
-  /** Child count of a directory; an unreadable directory reports `null`. */
+  /**
+   * Child count of a directory; an unreadable directory reports `null`.
+   * Counted as the names stream past rather than read into one array, which
+   * for a folder of millions (PRD 004, §3.1) is seconds and hundreds of
+   * megabytes of this thread.
+   */
   private async countEntries(target: ResolvedPath): Promise<number | null> {
     try {
-      return (await readdir(target.absolute)).length;
+      let count = 0;
+      for await (const _dirent of await opendir(target.absolute, { bufferSize: 1024 })) {
+        count++;
+      }
+      return count;
     } catch (error) {
       // Details of an unreadable directory are still useful; report no count.
       this.logger.debug('failed to count directory entries', {
@@ -727,9 +749,31 @@ export class FilesService {
     }
   }
 
-  private async readdirOrFail(target: ResolvedPath) {
+  /** Where a large folder's reading has got to (PRD 004, §3.1), from the caller's cursors. */
+  listProgress(token: string, namesFrom?: number, detailsFrom?: number): ListingProgressDto {
+    return this.largeListings.progress(token, namesFrom, detailsFrom);
+  }
+
+  /**
+   * A folder's entries, reserved names left out — or `null` once there are
+   * `limit` of them, which is as far as it reads: a large folder is the
+   * worker's to read, not this thread's.
+   */
+  private async readBelowOrFail(target: ResolvedPath, limit: number, skip: readonly string[]): Promise<Dirent[] | null> {
+    const dirents: Dirent[] = [];
     try {
-      return await readdir(target.absolute, { withFileTypes: true });
+      const handle = await opendir(target.absolute, { bufferSize: 256 });
+      for await (const dirent of handle) {
+        if (skip.includes(dirent.name)) {
+          continue;
+        }
+        dirents.push(dirent);
+        if (dirents.length >= limit) {
+          // Leaving the loop early closes the handle.
+          return null;
+        }
+      }
+      return dirents;
     } catch (error) {
       throw FilesService.toHttpError(error, target);
     }

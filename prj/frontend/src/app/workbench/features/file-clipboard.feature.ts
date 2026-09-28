@@ -50,6 +50,11 @@ export class FileClipboardFeature {
     return new Set(content?.mode === 'cut' ? content.paths : []);
   });
 
+  /** Every path waiting to be moved. */
+  cutSet(): ReadonlySet<string> {
+    return this.cutPaths();
+  }
+
   /** Whether `path` is waiting to be moved; its row is drawn faded. */
   isCut(path: string): boolean {
     return this.cutPaths().has(path);

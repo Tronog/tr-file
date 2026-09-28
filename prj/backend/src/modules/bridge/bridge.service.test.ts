@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -16,6 +16,7 @@ import {
   type FsUploadBeginResult,
 } from './bridge.model.js';
 import type { DirectoryListingDto, FileDetailsDto } from '../files/models/index.js';
+import type { ListingProgressDto } from '../files/large-listing.service.js';
 
 /** Small enough that one short string trips the limit, as in the routes test. */
 const UPLOAD_LIMIT = 32;
@@ -71,6 +72,35 @@ describe('list', () => {
 
     assert.equal(error.code, 'NOT_FOUND');
     assert.equal(error.status, 404);
+  });
+
+  /** PRD 004, §3.1 — a folder of a thousand entries or more is read by stages, and asked after. */
+  it('hands a large folder to a worker, whose progress list-progress reports', async () => {
+    await mkdir(join(root, 'big'));
+    await Promise.all(Array.from({ length: 1000 }, (_, index) => writeFile(join(root, 'big', `f${index}`), '')));
+
+    const listing = dataOf<DirectoryListingDto>(await bridge.dispatch({ command: 'list', path: 'big' }));
+    assert.equal(listing.entries.length, 0);
+    const token = listing.progressive?.token as string;
+
+    let names = 0;
+    let details = 0;
+    for (let round = 0; round < 200; round++) {
+      const answer = dataOf<ListingProgressDto>(
+        await bridge.dispatch({ command: 'list-progress', token, namesFrom: names, detailsFrom: details }),
+      );
+      names += answer.names.length;
+      details += answer.details.length + answer.gone.length;
+      if (answer.done) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(names, 1000);
+    assert.equal(details, 1000);
+
+    const error = errorOf(await bridge.dispatch({ command: 'list-progress', token, namesFrom: -1 } as never));
+    assert.equal(error.code, 'BAD_REQUEST');
   });
 });
 

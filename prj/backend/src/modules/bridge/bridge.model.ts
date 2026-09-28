@@ -31,6 +31,7 @@ import type {
 /** Every operation the bridge offers. */
 export type FsBridgeCommand =
   | 'list'
+  | 'list-progress'
   | 'details'
   | 'read'
   | 'upload-begin'
@@ -85,6 +86,14 @@ export const FS_BRIDGE_CHUNK_BYTES = 1024 * 1024;
 export interface FsListRequest {
   readonly command: 'list';
   readonly path: string;
+}
+
+/** Where a large folder's reading has got to (PRD 004, §3.1) — `GET /api/fs/list-progress`. */
+export interface FsListProgressRequest {
+  readonly command: 'list-progress';
+  readonly token: string;
+  readonly namesFrom?: number;
+  readonly detailsFrom?: number;
 }
 
 /** Full metadata for one entry. */
@@ -309,6 +318,7 @@ export type FsBridgeRequest =
   | FsLoginRequest
   | FsLogoutRequest
   | FsListRequest
+  | FsListProgressRequest
   | FsDetailsRequest
   | FsReadRequest
   | FsUploadBeginRequest

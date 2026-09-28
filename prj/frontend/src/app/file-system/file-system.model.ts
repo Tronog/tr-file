@@ -34,6 +34,11 @@ export interface FsEntry {
   readonly createdAt: string;
   /** Symlinks only: what the link leads to. Absent for every other type. */
   readonly targetType?: FsTargetType;
+  /**
+   * An entry of a large folder (PRD 004, §3.1) whose details have not come
+   * yet: its name and type are known, its size and dates are not.
+   */
+  readonly partial?: true;
 }
 
 /** The payload of `GET /api/fs/list`. */
@@ -43,6 +48,44 @@ export interface FsDirectoryListing {
   readonly parent: string | null;
   /** Folders (links to folders included) first, then the rest, in natural order. */
   readonly entries: readonly FsEntry[];
+  /**
+   * A large folder (PRD 004, §3.1): `entries` is empty, and the folder is
+   * read by stages — asked after with `listProgress(token, …)`.
+   */
+  readonly progressive?: { readonly token: string };
+}
+
+/** A name of a large folder, as the directory records it. */
+export interface FsListingName {
+  readonly name: string;
+  readonly type: FsEntryType;
+}
+
+/** What is known of one entry of a large folder, by its index among the names. */
+export interface FsListingDetail {
+  readonly index: number;
+  readonly type: FsEntryType;
+  readonly size: number;
+  readonly modifiedAt: string;
+  readonly createdAt: string;
+  readonly targetType?: FsTargetType;
+}
+
+/**
+ * The payload of `GET /api/fs/list-progress`: a large folder's reading, from
+ * the caller's cursors — the names after `namesFrom`, the details after
+ * `detailsFrom`. Asking again from the same place gets the same answer.
+ */
+export interface FsListingProgress {
+  readonly path: string;
+  /** `null` while the entries are still being counted. */
+  readonly total: number | null;
+  readonly names: readonly FsListingName[];
+  readonly namesDone: boolean;
+  readonly details: readonly FsListingDetail[];
+  /** Indexes of entries that vanished before they could be described. */
+  readonly gone: readonly number[];
+  readonly done: boolean;
 }
 
 /** One `rwx` triplet of a POSIX mode. */

@@ -58,6 +58,21 @@ export class FilesRoutes implements RouteModule {
       }),
     );
 
+    // GET /api/fs/list-progress?token=&namesFrom=&detailsFrom= — a large folder's reading
+    // (PRD 004, §3.1): what has come in since the caller's cursors.
+    this.router.get(
+      '/list-progress',
+      asyncHandler(async (req, res) => {
+        const token = FilesRoutes.readQueryString(req, 'token');
+        if (token === undefined || token === '') {
+          throw HttpError.badRequest('Query parameter "token" is required');
+        }
+        res.json({
+          data: this.filesService.listProgress(token, FilesRoutes.readCursor(req, 'namesFrom'), FilesRoutes.readCursor(req, 'detailsFrom')),
+        });
+      }),
+    );
+
     // GET /api/fs/places — where to start, and the Places pane (PRD 003, §6).
     this.router.get(
       '/places',
@@ -335,6 +350,18 @@ export class FilesRoutes implements RouteModule {
       throw HttpError.badRequest(`Query parameter "${name}" must be a single string value`);
     }
     return value;
+  }
+
+  /** A cursor into a large listing's progress: a whole number, `0` when absent. */
+  private static readCursor(req: Request, name: string): number {
+    const value = FilesRoutes.readQueryString(req, name);
+    if (value === undefined || value === '') {
+      return 0;
+    }
+    if (!/^\d+$/.test(value)) {
+      throw HttpError.badRequest(`Query parameter "${name}" must be a whole number`);
+    }
+    return Number(value);
   }
 
   /** `limit` of a search: a whole number of at least 1, clamped to the most allowed. */
