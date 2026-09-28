@@ -323,7 +323,9 @@ selected; it goes where the backend's details say, so `s:\tronog` typed opens as
 PRD 004, §4.1: `FilePathResolver.resolveReal` answers a path differing from the real one in case
 alone with the real one, and on a drive mapped to a share takes the share's spelling,
 `caseFromShare`) — and suggests as it is typed in (§4.2): `UiBreadcrumbs` reports `pathInput`
-and draws `suggestions` (a combobox: `↓`/`↑`, `Enter`, `Tab` completes, `Escape`), and
+and draws `suggestions`, the first chosen already so `Enter` opens it (a combobox: `↓`/`↑`, `Enter`,
+`Tab` completes, `Escape`; a folder typed with a `/` suggests itself first, and a name typed whole
+ranks first), and
 `FileBrowserFeature.locationInput` reads the folder typed in and ranks its entries
 (`listing/location-suggest.ts`: folders first, prefix before substring, case ignored, `*`/`?`); the toolbar has Back and Forward. What the app cannot preview (PDF,
 Office, archives, too large) opens with `SystemOpenFeature` — the default app on

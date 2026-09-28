@@ -15,7 +15,7 @@ import type {
 import type { FsEntry } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import { nameFilter } from '../listing/listing-order';
-import { locationQuery, suggestPlaces } from '../listing/location-suggest';
+import { locationQuery, SUGGESTIONS_SHOWN, suggestPlaces } from '../listing/location-suggest';
 import { deltaOf } from '../listing/array-delta';
 import { namePattern, patternProblem } from '../listing/name-pattern';
 import type { PanelContentFeature } from '../panel-content.model';
@@ -532,9 +532,20 @@ export class FileBrowserFeature implements PanelContentFeature {
       return kept.suggestions;
     }
     const files = this.parent.fileViewModel;
-    const suggestions = suggestPlaces(entries, query.fragment).map(
+    const found = suggestPlaces(entries, query.fragment).map(
       (entry): UiPathSuggestion => ({ value: `/${entry.path}`, label: entry.name, icon: files.icon(entry), ...(isFolder(entry) ? { folder: true } : {}) }),
     );
+    // A folder typed with a `/` after it is itself the first suggestion: the first is chosen, and
+    // `Enter` must go to the folder typed, not to whatever sorts first inside it (PRD 004, §4.2).
+    const listing = this.parent.fsDataFt.listingState(query.folder)?.listing;
+    const folder = listing?.path ?? query.folder;
+    const itself: UiPathSuggestion = {
+      value: `/${folder}`,
+      label: folder === '' ? this.parent.workspaceName() : (folder.split('/').at(-1) ?? folder),
+      icon: 'folder-open',
+      folder: true,
+    };
+    const suggestions = query.fragment === '' && listing !== undefined ? [itself, ...found.slice(0, SUGGESTIONS_SHOWN - 1)] : found;
     this.suggested.set(groupId, { text: text as string, entries, suggestions });
     return suggestions;
   }

@@ -96,13 +96,28 @@ describe('PanelLayoutFeature', () => {
   });
 
   describe('remove', () => {
-    it('drops the leaf and leaves its siblings alone', () => {
+    it('drops the leaf and gives its share to the one beside it — the panel it was split from', () => {
       threeInARow();
 
       workbench.panelLayoutFt.remove('group-c');
 
       expect(workbench.panelLayoutFt.groupIds()).toEqual(['group-root', 'group-b']);
-      expect(children()[1]).toEqual({ kind: 'leaf', groupId: 'group-b', size: 0.5 });
+      expect(children()[0]).toMatchObject({ groupId: 'group-root', size: 1 });
+      expect(children()[1]).toEqual({ kind: 'leaf', groupId: 'group-b', size: 1 });
+    });
+
+    it('leaves the layout as it was when a panel split off is closed again', () => {
+      threeInARow();
+      const before = workbench.panelLayoutFt.grid();
+
+      workbench.panelLayoutFt.insertBeside('group-b', 'group-d', 'right');
+      workbench.panelLayoutFt.remove('group-d');
+      expect(workbench.panelLayoutFt.grid()).toEqual(before);
+
+      // Split to the left, the newcomer first: its share goes to the one after it.
+      workbench.panelLayoutFt.insertBeside('group-root', 'group-e', 'left');
+      workbench.panelLayoutFt.remove('group-e');
+      expect(workbench.panelLayoutFt.grid()).toEqual(before);
     });
 
     it("collapses a split left with one child, the survivor taking the split's size", () => {

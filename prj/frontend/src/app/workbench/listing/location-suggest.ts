@@ -25,7 +25,7 @@ export function locationQuery(text: string): { readonly folder: string; readonly
 
 /**
  * The entries of a folder that fit what was typed of a name, case ignored,
- * best first: folders before files, then names that start with it before
+ * best first: the very name typed, then folders before files, then names that start with it before
  * names that only hold it — or, with `*` or `?` in it, names the pattern
  * matches whole — each in natural order. Nothing typed: the first of them all.
  */
@@ -39,7 +39,7 @@ export function suggestPlaces(entries: readonly FsEntry[], fragment: string, lim
       return glob.test(name) ? 0 : null;
     }
     const lower = name.toLowerCase();
-    return lower.startsWith(query) ? 0 : lower.includes(query) ? 1 : null;
+    return lower === query ? -1 : lower.startsWith(query) ? 0 : lower.includes(query) ? 1 : null;
   };
   const found: { entry: FsEntry; folder: boolean; rank: number }[] = [];
   for (const entry of entries) {
@@ -48,8 +48,9 @@ export function suggestPlaces(entries: readonly FsEntry[], fragment: string, lim
       found.push({ entry, folder: isFolder(entry), rank: at });
     }
   }
+  // The very name typed first — it is what `Enter` opens (PRD 004, §4.2) — then folders, then the rest.
   return found
-    .sort((a, b) => Number(b.folder) - Number(a.folder) || a.rank - b.rank || NATURAL.compare(a.entry.name, b.entry.name))
+    .sort((a, b) => Number(b.rank === -1) - Number(a.rank === -1) || Number(b.folder) - Number(a.folder) || a.rank - b.rank || NATURAL.compare(a.entry.name, b.entry.name))
     .slice(0, limit)
     .map(({ entry }) => entry);
 }

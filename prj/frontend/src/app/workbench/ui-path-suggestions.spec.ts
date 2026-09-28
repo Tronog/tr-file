@@ -53,15 +53,31 @@ describe('UiBreadcrumbs suggestions', () => {
     expect(field().getAttribute('role')).toBe('combobox');
   });
 
-  it('chooses with the arrows and goes there with Enter — or where typed, with none chosen', () => {
+  it('chooses the first at once, so Enter goes to it', () => {
     suggest(SUGGESTIONS);
-    key('ArrowDown');
-    key('ArrowDown');
-    key('ArrowUp');
     expect(options()[0]?.getAttribute('aria-selected')).toBe('true');
     expect(field().getAttribute('aria-activedescendant')).toBe(options()[0]?.id);
     key('Enter');
     expect(submitted).toEqual(['/docs/prd']);
+  });
+
+  it('chooses another with the arrows, round at the ends', () => {
+    suggest(SUGGESTIONS);
+    key('ArrowDown');
+    expect(options()[1]?.getAttribute('aria-selected')).toBe('true');
+    key('ArrowDown');
+    key('ArrowUp');
+    expect(options()[1]?.getAttribute('aria-selected')).toBe('true');
+    key('Enter');
+    expect(submitted).toEqual(['/docs/Prd-notes.md']);
+  });
+
+  it('goes where typed once the list is closed, or when nothing fits', () => {
+    suggest(SUGGESTIONS);
+    field().value = '/docs/somewhere';
+    key('Escape');
+    key('Enter');
+    expect(submitted).toEqual(['/docs/somewhere']);
   });
 
   it('completes the text with Tab — a folder with a slash, to go on inside it', () => {

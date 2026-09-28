@@ -180,8 +180,10 @@ describe('File management (PRD 003, §5)', () => {
       workbench.fileBrowserFt.locationInput(group, '/DOCS/X');
       await answerListing('DOCS', [fsEntry('docs/x.md'), fsEntry('docs/other.md')]);
       expect(browser()?.locationSuggestions).toEqual([{ value: '/docs/x.md', label: 'x.md', icon: 'file' }]);
+      // A folder typed with a slash: the folder itself first, so Enter goes to it (PRD 004, §4.2).
       workbench.fileBrowserFt.locationInput(group, '/DOCS/');
-      expect(browser()?.locationSuggestions?.map((suggestion) => suggestion.label)).toEqual(['other.md', 'x.md']);
+      expect(browser()?.locationSuggestions?.map((suggestion) => suggestion.label)).toEqual(['DOCS', 'other.md', 'x.md']);
+      expect(browser()?.locationSuggestions?.[0]).toMatchObject({ value: '/DOCS', folder: true });
 
       const going = workbench.fileBrowserFt.goToLocation(group, '/docs/x.md');
       expect(browser()?.locationSuggestions).toEqual([]);

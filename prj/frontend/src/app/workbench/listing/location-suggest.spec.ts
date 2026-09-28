@@ -19,5 +19,9 @@ describe('location suggestions', () => {
     expect(suggestPlaces(entries, '').map((entry) => entry.name)).toEqual(['other', 'prd', 'appendix-PR.txt', 'Prd-notes.md']);
     expect(suggestPlaces(entries, '', 2)).toHaveLength(2);
     expect(suggestPlaces(entries, 'zzz')).toEqual([]);
+    // The very name typed first — what Enter opens — even before a folder.
+    expect(suggestPlaces(entries, 'prd-NOTES.md').map((entry) => entry.name)).toEqual(['Prd-notes.md']);
+    const typedWhole = [fsDirectory('docs/readme-old'), fsEntry('docs/README')];
+    expect(suggestPlaces(typedWhole, 'readme').map((entry) => entry.name)).toEqual(['README', 'readme-old']);
   });
 });

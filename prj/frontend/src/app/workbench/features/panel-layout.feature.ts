@@ -129,9 +129,26 @@ export class PanelLayoutFeature {
       return node.groupId === groupId ? null : node;
     }
 
-    const children = node.children
-      .map((child) => this.prune(child, groupId))
-      .filter((child): child is UiGridNode => child !== null);
+    // A child that goes gives its share to the one beside it — the one before, or the one after when
+    // it was first: the panel it was split from gets its room back, and splitting a panel and closing
+    // it again leaves the layout as it was, the others as they were.
+    const children: UiGridNode[] = [];
+    let unclaimed = 0;
+    for (const child of node.children) {
+      const kept = this.prune(child, groupId);
+      if (kept === null) {
+        const share = child.size ?? 1;
+        const before = children.pop();
+        if (before === undefined) {
+          unclaimed += share;
+        } else {
+          children.push({ ...before, size: (before.size ?? 1) + share });
+        }
+        continue;
+      }
+      children.push(unclaimed === 0 ? kept : { ...kept, size: (kept.size ?? 1) + unclaimed });
+      unclaimed = 0;
+    }
 
     if (children.length === 0) {
       return null;

@@ -21,8 +21,9 @@ let nextBar = 0;
  *
  * While it is typed in, the field suggests places below it (PRD 004, §4.2):
  * each change is reported as `pathInput` — and so is the path as the edit
- * begins — and the application answers with `suggestions`. `↓`/`↑` choose
- * one, `Enter` goes to it (or to what is typed), `Tab` completes the text to
+ * begins — and the application answers with `suggestions`, the first chosen
+ * already. `↓`/`↑` choose another, `Enter` goes to the one chosen (or, the
+ * list closed or empty, to what is typed), `Tab` completes the text to
  * it — a folder with a `/` after it, to go on inside — `Escape` closes the
  * list, and again, the edit. A pointer goes to one by pressing it.
  */
@@ -58,10 +59,13 @@ export class UiBreadcrumbs {
   /** What the field holds now — as the edit begins, and at each change. */
   readonly pathInput = output<string>();
 
-  /** The suggestion `↓`/`↑` stand on; none — `-1` — whenever they change. */
+  /**
+   * The suggestion `↓`/`↑` stand on — the first, whenever they change and
+   * there are any (PRD 004, §4.2), so `Enter` goes to the best fit at once.
+   */
   protected readonly active = linkedSignal<readonly UiPathSuggestion[], number>({
     source: () => this.suggestions(),
-    computation: () => -1,
+    computation: (suggestions) => (suggestions.length > 0 ? 0 : -1),
   });
 
   /** Closed by `Escape`, open again with the next change. */
