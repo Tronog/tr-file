@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { watch, type FSWatcher } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { lstat, opendir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import { HttpError, type Logger } from '../../core/index.js';
 import type { FilePathResolver } from './file-path.resolver.js';
@@ -13,6 +14,17 @@ const WATCH_IDLE_MS = 60_000;
 
 /** Sessions kept at once; past this, the one idle longest makes room. */
 const MAX_SESSIONS = 1024;
+
+/**
+ * A folder with this many entries or more is not snapshotted when watched
+ * (it would cost as much as listing it): only entries coming, going or being
+ * renamed count as changes in it — see `WatchedFolder.children`. The same
+ * line as a large listing's (PRD 004, §3.1).
+ */
+export const WATCH_SNAPSHOT_MAX = 1000;
+
+/** Content changes checked per folder per poll; the rest wait for the next poll. */
+const VERIFY_PER_POLL = 256;
 
 /** Serialised shape returned by `POST /fs/watch`. */
 export interface WatchResultDto {
@@ -46,6 +58,19 @@ interface WatchedFolder {
   stamp: string | null;
   /** Which folder this is: a folder deleted and made again is another one. */
   identity: string;
+  /**
+   * What a listing shows of each child — type, size, modified — as it was
+   * when the watcher started, and as each change was checked since; `null`
+   * for a folder too large to snapshot, where a child's content changes are
+   * not watched at all. A `'change'` event is only a change if this differs:
+   * Windows reports access-time and attribute updates as `'change'` too, and
+   * a share whose files are dated ahead of its server's clock updates access
+   * times on every read — reading the folder, which would report it changed,
+   * which would read it again, for ever.
+   */
+  children: Map<string, string> | null;
+  /** Children a `'change'` event named, to be checked at the next poll. */
+  readonly pending: Set<string>;
 }
 
 /** One client's view: what it watches, and what has changed since it last asked. */
@@ -232,7 +257,7 @@ export class WatchService {
 
     let folder = this.folders.get(relative);
     if (folder === undefined) {
-      folder = { relative, absolute, sessions: new Set(), watcher: null, stamp: null, identity };
+      folder = { relative, absolute, sessions: new Set(), watcher: null, stamp: null, identity, children: null, pending: new Set() };
       this.folders.set(relative, folder);
     }
     if (folder.watcher === null && folder.stamp === null) {
@@ -258,7 +283,7 @@ export class WatchService {
   /** A watcher, or — when the system has none to give — the polling fallback. */
   private async start(folder: WatchedFolder): Promise<void> {
     try {
-      const watcher = this.watchFn(folder.absolute, { persistent: false }, () => this.changed(folder));
+      const watcher = this.watchFn(folder.absolute, { persistent: false }, (event, filename) => this.noticed(folder, event, filename));
       watcher.on('error', (error: unknown) => {
         this.logger.debug('folder watcher failed', {
           path: folder.relative || '/',
@@ -268,6 +293,8 @@ export class WatchService {
       });
       watcher.on('close', () => this.broken(folder, watcher));
       folder.watcher = watcher;
+      folder.pending.clear();
+      folder.children = await WatchService.snapshotOf(folder.absolute);
     } catch (error) {
       this.logger.debug('cannot watch folder; comparing its times instead', {
         path: folder.relative || '/',
@@ -288,6 +315,7 @@ export class WatchService {
       if (folder === undefined) {
         continue;
       }
+      await this.verify(folder);
       let identity: string | null = null;
       let stamp: string | null = null;
       try {
@@ -306,6 +334,86 @@ export class WatchService {
         this.changed(folder);
       }
     }
+  }
+
+  /**
+   * A watcher's event. An entry coming, going or renamed (`'rename'`) is a
+   * change; a `'change'` — its content, or only its access time — is checked
+   * at the next poll against what a listing shows of it, and in a folder too
+   * large to snapshot, not watched at all.
+   */
+  private noticed(folder: WatchedFolder, event: string, filename: string | Buffer | null): void {
+    const name = filename === null ? null : filename.toString();
+    if (event === 'rename' || name === null) {
+      if (name !== null) {
+        folder.children?.delete(name);
+      }
+      this.changed(folder);
+    } else if (folder.children !== null) {
+      folder.pending.add(name);
+    }
+  }
+
+  /** Checks the children `'change'` events named: a change only if what a listing shows of one differs. */
+  private async verify(folder: WatchedFolder): Promise<void> {
+    const children = folder.children;
+    if (children === null || folder.pending.size === 0) {
+      return;
+    }
+    const names = [...folder.pending].slice(0, VERIFY_PER_POLL);
+    let ignored = 0;
+    for (const name of names) {
+      folder.pending.delete(name);
+      const seen = await WatchService.shownOf(join(folder.absolute, name));
+      if (seen === children.get(name)) {
+        ignored++;
+        continue;
+      }
+      if (seen === null) {
+        children.delete(name);
+      } else {
+        children.set(name, seen);
+      }
+      this.changed(folder);
+    }
+    if (ignored > 0) {
+      this.logger.debug('ignored folder events that change nothing a listing shows', { path: folder.relative || '/', ignored });
+    }
+  }
+
+  /** What a listing shows of one child — or `null` when it is gone. */
+  private static async shownOf(absolute: string): Promise<string | null> {
+    try {
+      const stats = await lstat(absolute);
+      const type = stats.isSymbolicLink() ? 'l' : stats.isDirectory() ? 'd' : stats.isFile() ? 'f' : 'o';
+      return `${type}:${stats.size}:${stats.mtimeMs}`;
+    } catch {
+      return null;
+    }
+  }
+
+  /** What a listing shows of every child of a folder — `null` once there are `WATCH_SNAPSHOT_MAX` of them. */
+  private static async snapshotOf(absolute: string): Promise<Map<string, string> | null> {
+    const names: string[] = [];
+    try {
+      for await (const dirent of await opendir(absolute, { bufferSize: 256 })) {
+        names.push(dirent.name);
+        if (names.length >= WATCH_SNAPSHOT_MAX) {
+          return null;
+        }
+      }
+    } catch {
+      return null;
+    }
+    const shown = await Promise.all(names.map((name) => WatchService.shownOf(join(absolute, name))));
+    const children = new Map<string, string>();
+    names.forEach((name, index) => {
+      const seen = shown[index];
+      if (seen !== null && seen !== undefined) {
+        children.set(name, seen);
+      }
+    });
+    return children;
   }
 
   private changed(folder: WatchedFolder): void {

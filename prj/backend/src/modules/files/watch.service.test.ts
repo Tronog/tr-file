@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, beforeEach, describe, it } from 'node:test';
 
 import { HttpError, Logger } from '../../core/index.js';
 import { FilePathResolver } from './file-path.resolver.js';
-import { WATCH_MAX_PATHS, WatchService, type WatchServiceOptions } from './watch.service.js';
+import { WATCH_MAX_PATHS, WATCH_SNAPSHOT_MAX, WatchService, type WatchServiceOptions } from './watch.service.js';
 
 /** PRD 003, §5 — auto-refresh by polling: which of the folders on screen changed. */
 
@@ -156,5 +157,65 @@ describe('WatchService', () => {
 
     assert.equal(watches.watchedFolders, 0);
     await assert.rejects(watches.watch(null, ['docs']));
+  });
+
+  /**
+   * Windows reports access-time and attribute updates as `'change'` — and a
+   * share whose files are dated ahead of its server's clock updates access
+   * times on every read, so reading a folder would report it changed, for ever.
+   */
+  describe('events that change nothing a listing shows', () => {
+    /** A watcher whose events the test fires, by folder. */
+    let fire: Map<string, (event: string, filename: string | null) => void>;
+
+    function fakeWatching(): void {
+      fire = new Map();
+      fresh({
+        watch: ((path: string, _options: unknown, listener: (event: string, filename: string | null) => void) => {
+          fire.set(path, listener);
+          return Object.assign(new EventEmitter(), { close: () => undefined });
+        }) as unknown as NonNullable<WatchServiceOptions['watch']>,
+      });
+    }
+
+    const event = (folder: string, kind: string, name: string | null) => (fire.get(join(root, folder)) as (event: string, filename: string | null) => void)(kind, name);
+
+    it('are not changes: an access time touched is passed over, a size or a date changed is not', async () => {
+      await writeFile(join(root, 'docs', 'note.txt'), 'hello');
+      fakeWatching();
+      const { watchId } = await watches.watch(null, ['docs']);
+
+      // Read — its access time moves, and nothing a listing shows.
+      await readFile(join(root, 'docs', 'note.txt'));
+      event('docs', 'change', 'note.txt');
+      assert.deepEqual((await watches.watch(watchId, ['docs'])).changed, []);
+
+      await writeFile(join(root, 'docs', 'note.txt'), 'hello, longer');
+      event('docs', 'change', 'note.txt');
+      assert.deepEqual((await watches.watch(watchId, ['docs'])).changed, ['docs']);
+      // Checked once: the same state again is no news.
+      event('docs', 'change', 'note.txt');
+      assert.deepEqual((await watches.watch(watchId, ['docs'])).changed, []);
+    });
+
+    it('always counts an entry coming, going or renamed', async () => {
+      fakeWatching();
+      const { watchId } = await watches.watch(null, ['docs']);
+      event('docs', 'rename', 'anything');
+      assert.deepEqual((await watches.watch(watchId, ['docs'])).changed, ['docs']);
+    });
+
+    it('in a folder too large to snapshot, counts only entries coming, going or renamed', async () => {
+      await mkdir(join(root, 'big'));
+      await Promise.all(Array.from({ length: WATCH_SNAPSHOT_MAX }, (_, index) => writeFile(join(root, 'big', `f${index}`), '')));
+      fakeWatching();
+      const { watchId } = await watches.watch(null, ['big']);
+
+      await writeFile(join(root, 'big', 'f1'), 'grown');
+      event('big', 'change', 'f1');
+      assert.deepEqual((await watches.watch(watchId, ['big'])).changed, []);
+      event('big', 'rename', 'f-new');
+      assert.deepEqual((await watches.watch(watchId, ['big'])).changed, ['big']);
+    });
   });
 });

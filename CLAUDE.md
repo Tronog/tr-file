@@ -330,7 +330,11 @@ is not a secure context; a failure is said, never swallowed.
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what
-changed; folders leaving the screen are `expire`d in `FsDataFeature`, read again
+changed — which the backend's `WatchService` judges by what a listing shows: an entry coming, going
+or renamed, or (in a folder under `WATCH_SNAPSHOT_MAX` entries, snapshotted as the watcher starts)
+a child's type, size or modified time. Windows reports access-time updates as changes too, and a
+Samba share whose files are dated ahead of its server's clock updates them on every read, so a
+folder reading itself would otherwise be re-read for ever; folders leaving the screen are `expire`d in `FsDataFeature`, read again
 when next shown.
 
 **A whole computer's files (PRD 003, §6).** On the desktop the root is `/` — on Windows every
