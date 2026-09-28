@@ -229,6 +229,12 @@ double chevron pointing the way the panel will move. Choosing a tab, including f
 activity bar, opens it again; `BottomPanelFeature` owns all of that and `UiBottomPanel` only
 takes a `collapsed` input.
 
+The workbench remembers the active panel and the one active before it (PRD 002, §2.7):
+`WorkbenchService.previousGroupId`, kept by `EditorGroupsFeature` — every change of active panel goes
+through its `activate()`. A file action's source is the active panel and its destination the previous
+one: *Copy To…* / *Move To…* (and `F5` / `F6`) offer that panel's folder, falling back to the next
+folder panel in layout order when it has gone or shows no folder.
+
 File operations (PRD 005 §1) — copy, move, move to trash, empty trash — are backend jobs,
 started and followed by `OperationsFeature`: it asks first (destination, what to do with
 taken names, and *always* a confirmation before anything is trashed or the trash emptied),

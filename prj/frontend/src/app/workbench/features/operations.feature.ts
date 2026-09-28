@@ -650,12 +650,20 @@ export class OperationsFeature {
   }
 
   /**
-   * Where a copy or move goes unless told otherwise: the folder of the next
-   * panel showing one — two panels side by side are a source and a target —
-   * or, with one panel, the folder it is in.
+   * Where a copy or move goes unless told otherwise (PRD 002, §2.7): the
+   * folder of the panel that was active before this one — the source is the
+   * panel the user is in, the destination the one they came from, however
+   * many panels are on screen. When that panel has gone, or shows no folder,
+   * the next panel that shows one — two panels side by side are a source and
+   * a target — or, with one panel, the folder it is in.
    */
   private defaultDestination(groupId: string): string {
     const groups = this.parent.editorGroupsFt;
+    const previousId = this.parent.previousGroupId();
+    const previous = previousId === null || previousId === groupId ? undefined : groups.stateOf(previousId);
+    if (previous !== undefined && groups.activeTabOf(previous)?.kind === 'folder') {
+      return previous.path;
+    }
     const ids = this.parent.panelLayoutFt.groupIds();
     const start = ids.indexOf(groupId);
     for (let step = 1; step < ids.length; step += 1) {

@@ -114,6 +114,15 @@ export class WorkbenchService {
   /** The focused panel group: only its tabs and selection render as active. */
   readonly activeGroupId = signal(this.layout.activeGroupId);
 
+  /**
+   * The panel group that was active before the active one (PRD 002, §2.7) —
+   * one level deep, `null` until there has been another. With three or more
+   * panels on screen it is what makes a file action's *destination*: the
+   * source is the panel the user is in, the destination the one they were in
+   * before. Kept by `EditorGroupsFeature`, the one place the active group changes.
+   */
+  readonly previousGroupId = signal<string | null>(null);
+
   /** Dot-files are hidden until the status bar says otherwise. */
   readonly showHidden = signal(this.restored?.showHidden ?? false);
 

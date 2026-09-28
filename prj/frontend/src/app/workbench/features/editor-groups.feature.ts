@@ -103,9 +103,23 @@ export class EditorGroupsFeature {
   }
 
   focus(id: string): void {
-    if (this.parent.activeGroupId() !== id) {
-      this.parent.activeGroupId.set(id);
+    this.activate(id);
+  }
+
+  /**
+   * Makes `id` the active group, remembering the one it takes over from as
+   * the previous (PRD 002, §2.7). A group that has just been removed is not
+   * remembered: there is nowhere left to send anything.
+   */
+  private activate(id: string): void {
+    const current = this.parent.activeGroupId();
+    if (current === id) {
+      return;
     }
+    if (this.stateOf(current) !== undefined) {
+      this.parent.previousGroupId.set(current);
+    }
+    this.parent.activeGroupId.set(id);
   }
 
   /* -- operations for content features ----------------------------------- */
@@ -158,7 +172,7 @@ export class EditorGroupsFeature {
     const newGroupId = this.createId();
     this.groups.update((groups) => [...groups, this.cloneGroup(group, newGroupId, [makeTab(newGroupId)])]);
     this.parent.panelLayoutFt.insertBeside(groupId, newGroupId, zone);
-    this.parent.activeGroupId.set(newGroupId);
+    this.activate(newGroupId);
     return newGroupId;
   }
 
@@ -280,7 +294,7 @@ export class EditorGroupsFeature {
     ]);
 
     this.parent.panelLayoutFt.insertBeside(target.id, newGroupId, drop.zone);
-    this.parent.activeGroupId.set(newGroupId);
+    this.activate(newGroupId);
     this.loadTab(tab);
 
     if (remaining.length === 0) {
@@ -354,6 +368,9 @@ export class EditorGroupsFeature {
 
   private removeGroup(groupId: string): void {
     this.parent.panelHistoryFt.forget(groupId);
+    if (this.parent.previousGroupId() === groupId) {
+      this.parent.previousGroupId.set(null);
+    }
     const remaining = this.groups().filter((group) => group.id !== groupId);
 
     if (remaining.length === 0) {
@@ -361,7 +378,7 @@ export class EditorGroupsFeature {
       this.parent.panelHistoryFt.record(empty.id, empty.path);
       this.groups.set([empty]);
       this.parent.panelLayoutFt.reset(empty.id);
-      this.parent.activeGroupId.set(empty.id);
+      this.activate(empty.id);
       return;
     }
 
@@ -371,7 +388,7 @@ export class EditorGroupsFeature {
     if (this.parent.activeGroupId() === groupId) {
       const next = this.parent.panelLayoutFt.groupIds()[0] ?? remaining[0]?.id;
       if (next) {
-        this.parent.activeGroupId.set(next);
+        this.activate(next);
       }
     }
   }
@@ -398,7 +415,7 @@ export class EditorGroupsFeature {
       }),
     );
 
-    this.parent.activeGroupId.set(target.id);
+    this.activate(target.id);
     this.loadTab(tab);
 
     if (remaining.length === 0) {
