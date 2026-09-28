@@ -333,7 +333,11 @@ describe('CommandPaletteFeature', () => {
       await jump();
 
       palette().setQuery('docs');
-      expect(palette().message()).toEqual({ severity: 'error', text: "An absolute path starts with '/'" });
+      expect(palette().message()).toEqual({ severity: 'error', text: "An absolute path starts with '/', or with a drive, like 'C:/'" });
+
+      // A drive's path is absolute without a leading `/` (PRD 004, §1.4).
+      palette().setQuery('C:/Windows');
+      expect(palette().message()?.severity).not.toBe('error');
 
       palette().setQuery('/docs/../etc');
       expect(palette().message()?.text).toContain("'..'");

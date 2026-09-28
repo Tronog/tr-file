@@ -10,6 +10,7 @@ import type {
 import { FsError } from '../../file-system/fs-error';
 import { OperationProgressModal } from '../operations/operation-progress-modal';
 import type { WorkbenchService } from '../workbench.service';
+import { shownPath } from '../../file-system/fs-path';
 
 /** How often a running job is asked how far it has got (PRD 005, §1). */
 export const OPERATION_POLL_MS = 1000;
@@ -219,7 +220,7 @@ export class OperationsFeature {
     const answer = await this.parent.modal.prompt({
       message: `${kind === 'copy' ? 'Copy' : 'Move'} ${what} to:`,
       label: 'Destination folder',
-      value: `/${this.defaultDestination(groupId)}`,
+      value: shownPath(this.defaultDestination(groupId)),
       confirmLabel: kind === 'copy' ? 'Copy' : 'Move',
       validate: (value) => (value.trim() === '' ? 'Type the folder to put them in, from / up.' : null),
     });
@@ -245,7 +246,7 @@ export class OperationsFeature {
     const stem = suggested.replace(/\.zip$/i, '');
     const what = sources.length === 1 ? `'${OperationsFeature.nameOf(sources[0] as string)}'` : `${sources.length} items`;
     const answer = await this.parent.modal.prompt({
-      message: `Compress ${what} to a zip archive in '/${folder}':`,
+      message: `Compress ${what} to a zip archive in '${shownPath(folder)}':`,
       label: 'Archive name',
       value: `${stem}.zip`,
       selection: [0, stem.length],
@@ -278,7 +279,7 @@ export class OperationsFeature {
       const answer = await this.parent.modal.prompt({
         message: `Extract '${OperationsFeature.nameOf(path)}' to:`,
         label: 'Destination folder',
-        value: `/${OperationsFeature.parentOf(path)}`,
+        value: shownPath(OperationsFeature.parentOf(path)),
         confirmLabel: 'Extract',
         validate: (value) => (value.trim() === '' ? 'Type the folder to extract into, from / up.' : null),
       });
@@ -369,7 +370,7 @@ export class OperationsFeature {
     const job = record.job;
     return {
       title: job.title,
-      current: job.current === null ? null : `/${job.current}`,
+      current: job.current === null ? null : shownPath(job.current),
       progress: OperationsFeature.percentOf(job),
       status: job.state === 'done' ? this.summaryOf(job, 'Done') : this.summaryOf(job),
       // Waiting on an answer is still underway, as far as the progress window goes.
@@ -464,7 +465,7 @@ export class OperationsFeature {
       const result = await this.parent.modal.show({
         severity: 'error',
         message: `Cannot ${OperationsFeature.verbOf(job)} '${OperationsFeature.nameOf(problem.path)}'`,
-        detail: `${problem.message}\n/${problem.path}`,
+        detail: `${problem.message}\n${shownPath(problem.path)}`,
         buttons: [
           { id: 'skip', label: 'Skip' },
           { id: 'skip-all', label: 'Skip All' },
@@ -590,7 +591,7 @@ export class OperationsFeature {
    * request. Closing it, or *Cancel*, starts nothing.
    */
   private async askAboutConflicts(names: readonly string[], destination: string): Promise<FsConflictPolicy | null> {
-    const where = `/${destination}`;
+    const where = shownPath(destination);
     const result = await this.parent.modal.show({
       severity: 'warning',
       message:
@@ -720,7 +721,7 @@ export class OperationsFeature {
           iconColor: 'var(--vsc-severity-warning)',
           progress: OperationsFeature.percentOf(job),
           statusLabel: record.cancelling ? 'cancelling…' : 'waiting',
-          ...(job.problem ? { detail: `${job.problem.message} — /${job.problem.path}` } : {}),
+          ...(job.problem ? { detail: `${job.problem.message} — ${shownPath(job.problem.path)}` } : {}),
           ...(record.cancelling ? {} : { cancellable: true }),
         };
       default: {
@@ -732,7 +733,7 @@ export class OperationsFeature {
           iconColor: 'var(--vsc-accent)',
           progress: percent,
           statusLabel: record.cancelling ? 'cancelling…' : percent === null ? 'working…' : `${percent}%`,
-          ...(job.current === null ? {} : { detail: `/${job.current}` }),
+          ...(job.current === null ? {} : { detail: shownPath(job.current) }),
           ...(record.cancelling ? {} : { cancellable: true }),
         };
       }

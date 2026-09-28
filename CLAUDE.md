@@ -351,7 +351,8 @@ folder reading itself would otherwise be re-read for ever; folders leaving the s
 when next shown.
 
 **A whole computer's files (PRD 003, §6).** On the desktop the root is `/` — on Windows every
-drive, `FilePathResolver.drives()`, paths like `C:/Users` — and a fresh window starts in the
+drive, `FilePathResolver.drives()`, paths like `C:/Users`, shown so and never `/C:/Users` (PRD 004,
+§1.4: `shownPath` in `file-system/fs-path.ts`, `FilePathResolver.shown` in the backend) — and a fresh window starts in the
 home folder `/api/fs/places` names. `PlacesFeature` fills the explorer's Places pane (root,
 home, user folders, drives, mounts — a server names its root only, so in a browser the pane
 starts closed and asks when opened), Bookmarks and Recent; the activity bar's Bookmarks opens

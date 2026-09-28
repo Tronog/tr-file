@@ -36,6 +36,7 @@ import type {
 import type { AuthStatus } from '../auth/auth.model';
 import { FS_ABORTED, FsError } from './fs-error';
 import type { FsDetailsOptions, FsTransport, FsUploadOptions } from './fs-transport';
+import { shownPath } from './fs-path';
 
 const IDLE_PROGRESS: FsUploadProgress = { loaded: 0, total: null, percent: null };
 
@@ -582,11 +583,6 @@ export class FsHttpService implements FsTransport {
       },
     );
   }
-}
-
-/** A root-relative path as the app shows it: `/docs/a.md`; a drive, over every drive, as `C:/Users`. */
-function shownPath(path: string): string {
-  return /^[A-Za-z]:(\/|$)/.test(path) ? path : `/${path}`;
 }
 
 /** Copies `text` by selecting it in a hidden field — for pages the Clipboard API is not open to. */

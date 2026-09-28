@@ -58,6 +58,14 @@ export class FilePathResolver {
     return new FilePathResolver('', reserved, true);
   }
 
+  /**
+   * A root-relative path as the app shows it: from `/` — `/docs/a.md` — but a
+   * drive's as Windows writes it, `C:/Windows`, never `/C:/Windows` (PRD 004, §1.4).
+   */
+  static shown(relative: string): string {
+    return /^[A-Za-z]:(\/|$)/.test(relative) ? relative : `/${relative}`;
+  }
+
   get rootPath(): string {
     return this.root;
   }

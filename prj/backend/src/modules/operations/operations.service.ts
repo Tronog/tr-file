@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
 import type { ArchiveService } from '../archive/index.js';
-import { FilesService, type FilePathResolver, type ResolvedPath } from '../files/index.js';
+import { FilePathResolver, FilesService, type ResolvedPath } from '../files/index.js';
 import { OperationJob } from './operation-job.js';
 import type {
   CompressOperationRequest,
@@ -224,7 +224,7 @@ export class OperationsService {
     const what = count === 1 ? `'${posix.basename(request.sources[0] as string)}'` : `${count} items`;
     const job = new OperationJob(
       request.kind,
-      `${request.kind === 'copy' ? 'Copying' : 'Moving'} ${what} to /${destination.relative}`,
+      `${request.kind === 'copy' ? 'Copying' : 'Moving'} ${what} to ${FilePathResolver.shown(destination.relative)}`,
       request.errors,
     );
     job.affected.add(destination.relative);
@@ -476,7 +476,7 @@ export class OperationsService {
 
     const job = new OperationJob(
       'extract',
-      `Extracting ${posix.basename(plan.archive.relative)} to /${plan.destination.relative}`,
+      `Extracting ${posix.basename(plan.archive.relative)} to ${FilePathResolver.shown(plan.destination.relative)}`,
     );
     job.affected.add(plan.destination.relative);
     job.totalBytes = plan.totalBytes;

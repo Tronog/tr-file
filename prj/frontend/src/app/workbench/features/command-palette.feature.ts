@@ -7,6 +7,7 @@ import { fuzzyMatch } from '../command-palette/fuzzy-match';
 import { describeRemoteTarget, parseRemoteTarget, type RemoteTarget } from '../command-palette/remote-target';
 import type { SavedServer } from './saved-servers.feature';
 import type { WorkbenchService } from '../workbench.service';
+import { isAbsoluteShown, shownPath } from '../../file-system/fs-path';
 
 /** One command the palette offers. */
 export interface PaletteCommand {
@@ -303,11 +304,11 @@ export class CommandPaletteFeature {
       label: 'Jump to folder',
       placeholder: '/path/to/folder',
       prompt: "Enter an absolute path, e.g. /docs/prd. Press 'Enter' to go there or 'Escape' to cancel.",
-      value: current === undefined ? '/' : `/${current}`,
+      value: current === undefined ? '/' : shownPath(current),
       validate: (value) => {
         const path = value.trim().replace(/\\/g, '/');
-        if (!path.startsWith('/')) {
-          return "An absolute path starts with '/'";
+        if (!isAbsoluteShown(path)) {
+          return "An absolute path starts with '/', or with a drive, like 'C:/'";
         }
         if (path.split('/').some((segment) => segment === '.' || segment === '..')) {
           return "Leave out '.' and '..'; give the folder's own path";
@@ -316,7 +317,7 @@ export class CommandPaletteFeature {
       },
       accept: async (value) => {
         const typed = value.trim().replace(/\\/g, '/').split('/').filter(Boolean).join('/');
-        const shown = `/${typed}`;
+        const shown = shownPath(typed);
         let path: string;
         try {
           const details = await this.parent.fileSystem.readFt.details(typed);

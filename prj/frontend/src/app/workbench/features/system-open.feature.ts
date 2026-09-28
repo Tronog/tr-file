@@ -1,6 +1,7 @@
 import { computed } from '@angular/core';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
+import { shownPath } from '../../file-system/fs-path';
 
 /** Which system the window runs on, as far as naming things after it goes. */
 type Platform = 'windows' | 'mac' | 'other';
@@ -84,7 +85,7 @@ export class SystemOpenFeature {
     } catch (error) {
       await this.parent.modal.message({
         severity: 'error',
-        message: `Could not show '/${path}' in its folder.`,
+        message: `Could not show '${shownPath(path)}' in its folder.`,
         detail: FsError.from(error).message,
       });
     }

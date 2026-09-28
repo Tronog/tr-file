@@ -4,6 +4,7 @@ import type { FsEntry } from '../../file-system/file-system.model';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
+import { shownPath } from '../../file-system/fs-path';
 
 /** How long typing has to pause before a search starts: a walk of the disk per key would be wasteful. */
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -58,7 +59,7 @@ export class SearchFeature {
   /** `in /docs`, or `in the whole workspace`. */
   readonly scopeLabel = computed(() => {
     const folder = this.scopeFolder();
-    return folder === null || folder === '' ? 'In the whole workspace' : `In /${folder}`;
+    return folder === null || folder === '' ? 'In the whole workspace' : `In ${shownPath(folder)}`;
   });
 
   /** The pane header's buttons: scope to the active panel's folder or widen it, and run again. */
@@ -104,7 +105,7 @@ export class SearchFeature {
       icon: files.icon(entry),
       tint: files.tint(entry),
       expandable: false,
-      meta: `/${parentOf(entry.path)}`,
+      meta: shownPath(parentOf(entry.path)),
       guides: [],
       ...(entry.hidden ? { decoration: 'ignored' as const } : {}),
       ...(entry.path === picked ? { selected: true, focused: true } : {}),

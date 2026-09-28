@@ -32,6 +32,7 @@ import type { FileViewModelFeature } from './file-view-model.feature';
 import type { EditorGroupsFeature } from './editor-groups.feature';
 import type { FsListingProgressState, FsListingState } from './fs-data.feature';
 import { isFolder } from '../../file-system/fs-entry-kind';
+import { shownPath } from '../../file-system/fs-path';
 
 /** Columns of the list view; the backend supplies every value, and each can sort it (PRD 003, §5). */
 const COLUMNS: readonly (UiFileColumn & { readonly key: PanelSortKey })[] = [
@@ -533,14 +534,14 @@ export class FileBrowserFeature implements PanelContentFeature {
     }
     const files = this.parent.fileViewModel;
     const found = suggestPlaces(entries, query.fragment).map(
-      (entry): UiPathSuggestion => ({ value: `/${entry.path}`, label: entry.name, icon: files.icon(entry), ...(isFolder(entry) ? { folder: true } : {}) }),
+      (entry): UiPathSuggestion => ({ value: shownPath(entry.path), label: entry.name, icon: files.icon(entry), ...(isFolder(entry) ? { folder: true } : {}) }),
     );
     // A folder typed with a `/` after it is itself the first suggestion: the first is chosen, and
     // `Enter` must go to the folder typed, not to whatever sorts first inside it (PRD 004, §4.2).
     const listing = this.parent.fsDataFt.listingState(query.folder)?.listing;
     const folder = listing?.path ?? query.folder;
     const itself: UiPathSuggestion = {
-      value: `/${folder}`,
+      value: shownPath(folder),
       label: folder === '' ? this.parent.workspaceName() : (folder.split('/').at(-1) ?? folder),
       icon: 'folder-open',
       folder: true,
@@ -561,7 +562,7 @@ export class FileBrowserFeature implements PanelContentFeature {
     // The edit is over: nothing more to suggest until the next.
     this.locationTyped.update(({ [groupId]: _done, ...rest }) => rest);
     const segments = text.trim().replace(/\\/g, '/').split('/').filter((segment) => segment !== '' && segment !== '.');
-    const shown = `/${segments.join('/')}`;
+    const shown = shownPath(segments.join('/'));
     if (segments.includes('..')) {
       await this.parent.modal.message({
         severity: 'error',
@@ -1063,7 +1064,7 @@ export class FileBrowserFeature implements PanelContentFeature {
 
     return {
       breadcrumbs: this.breadcrumbs(group.path),
-      location: `/${group.path}`,
+      location: shownPath(group.path),
       locationSuggestions: this.locationSuggestions(group.id),
       // `Escape` stops a large folder being read (PRD 004, §3.1.4).
       ...(state?.large && state.status === 'loading' ? { stoppable: true } : {}),
@@ -1093,7 +1094,7 @@ export class FileBrowserFeature implements PanelContentFeature {
   private sortingViewModel(group: PanelGroupState, count: number): UiFileBrowserModel {
     return {
       breadcrumbs: this.breadcrumbs(group.path),
-      location: `/${group.path}`,
+      location: shownPath(group.path),
       view: this.viewFor(group),
       toolbarActions: this.folderToolbar(group),
       showViewSwitch: true,
@@ -1120,7 +1121,7 @@ export class FileBrowserFeature implements PanelContentFeature {
 
     return {
       breadcrumbs: this.breadcrumbs(tab.path),
-      location: `/${tab.path}`,
+      location: shownPath(tab.path),
       ...this.focusTokens(group.id),
       view: group.view,
       toolbarActions: this.fileToolbar(),

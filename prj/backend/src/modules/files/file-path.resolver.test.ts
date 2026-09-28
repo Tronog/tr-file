@@ -110,6 +110,15 @@ describe('FilePathResolver.drives (PRD 003, §6)', () => {
  * PRD 004, §4.1 — `s:\tronog` typed for `S:\Tronog`: on a drive mapped to a
  * share the real path is the share's, and the path asked for takes its case.
  */
+describe('FilePathResolver.shown (PRD 004, §1.4)', () => {
+  it('shows a path from /, and a drive as Windows writes it', () => {
+    assert.equal(FilePathResolver.shown(''), '/');
+    assert.equal(FilePathResolver.shown('docs/prd'), '/docs/prd');
+    assert.equal(FilePathResolver.shown('C:'), 'C:');
+    assert.equal(FilePathResolver.shown('C:/Windows'), 'C:/Windows');
+  });
+});
+
 describe('FilePathResolver.caseFromShare', () => {
   it('spells the path as the share does, keeping the drive', () => {
     assert.equal(FilePathResolver.caseFromShare('S:\\tronog\\sub', '\\\\server\\share\\Tronog\\Sub'), 'S:\\Tronog\\Sub');

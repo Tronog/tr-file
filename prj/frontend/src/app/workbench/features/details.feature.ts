@@ -4,6 +4,7 @@ import type { FsDetails } from '../../file-system/file-system.model';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import type { WorkbenchService } from '../workbench.service';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
+import { shownPath } from '../../file-system/fs-path';
 
 /** Where the backend stops counting a folder's entries until asked (PRD 004, §3.1.3). */
 const LARGE_FOLDER_ENTRIES = 1000;
@@ -142,8 +143,8 @@ export class DetailsFeature {
     const group = groups.stateOf(groupId);
     const source = group !== undefined && groups.activeTabOf(group)?.kind === 'folder' ? group.path : null;
     return [
-      { label: 'Source', value: source === null ? '—' : `/${source}`, mono: true },
-      { label: 'Destination', value: `/${this.parent.operationsFt.defaultDestination(groupId)}`, mono: true },
+      { label: 'Source', value: source === null ? '—' : shownPath(source), mono: true },
+      { label: 'Destination', value: shownPath(this.parent.operationsFt.defaultDestination(groupId)), mono: true },
     ];
   });
 
@@ -265,7 +266,7 @@ export class DetailsFeature {
     if (details.parent === null) {
       return '/';
     }
-    return details.parent === '' ? '/' : `/${details.parent}`;
+    return details.parent === '' ? '/' : shownPath(details.parent);
   }
 
   private entriesLabel(details: FsDetails): string {

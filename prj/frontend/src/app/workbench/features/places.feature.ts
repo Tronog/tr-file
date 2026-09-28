@@ -3,6 +3,7 @@ import type { UiContextMenuRequest, UiIconName, UiTreeNode } from '@tr-file/ui';
 import type { FsPlaceKind, FsPlaces } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
 import { TRASH_PLACE } from './trash.feature';
+import { shownPath } from '../../file-system/fs-path';
 
 /** Settings keys of the user's own places; the backend they belong to is appended. */
 export const BOOKMARKS_KEY = 'tr-file.bookmarks.v1';
@@ -207,7 +208,7 @@ export class PlacesFeature {
       return;
     }
     const label = await this.parent.modal.prompt({
-      message: `Rename the bookmark for /${path}`,
+      message: `Rename the bookmark for ${shownPath(path)}`,
       detail: 'Only the bookmark is renamed; the folder keeps its name.',
       label: 'Bookmark name',
       value: bookmark.label,

@@ -15,6 +15,7 @@ import { FsError } from '../../file-system/fs-error';
 import type { PanelContentFeature } from '../panel-content.model';
 import { PANEL_CONTENT, type PanelGroupState, type PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
+import { shownPath } from '../../file-system/fs-path';
 
 /** The Places row that opens the trash; not a path, so no folder can be mistaken for it. */
 export const TRASH_PLACE = 'trash:';
@@ -277,7 +278,7 @@ export class TrashFeature implements PanelContentFeature {
 
   /** A server trash's location is root-relative: shown from `/`, like every path in the app. */
   private locationLabel(location: string): string {
-    return this.state()?.listing?.trash === 'server' ? `/${location}` : location;
+    return this.state()?.listing?.trash === 'server' ? shownPath(location) : location;
   }
 
   private toViewModel(group: PanelGroupState, active: boolean): UiFileBrowserModel {

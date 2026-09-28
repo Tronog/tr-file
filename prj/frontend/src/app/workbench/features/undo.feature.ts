@@ -2,6 +2,7 @@ import { computed, signal } from '@angular/core';
 import type { FsOperationJob } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
+import { shownPath } from '../../file-system/fs-path';
 
 /** How many changes Undo remembers; older ones fall off the bottom. */
 const DEPTH = 20;
@@ -169,7 +170,7 @@ export class UndoFeature {
         paths.length === 1
           ? `Undo the copy by moving '${nameOf(paths[0] as string)}' to the trash?`
           : `Undo the copy by moving the ${paths.length} copies to the trash?`,
-      detail: `They are in '/${parentOf(paths[0] as string)}'.`,
+      detail: `They are in '${shownPath(parentOf(paths[0] as string))}'.`,
       confirmLabel: 'Move to Trash',
     });
     if (confirmed) {

@@ -1,6 +1,7 @@
 import type { FsDetails } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
+import { shownPath } from '../../file-system/fs-path';
 
 /** Parent of a root-relative path; the root's children answer `''`. */
 function parentOf(path: string): string {
@@ -140,7 +141,7 @@ export class FileEditFeature {
   private async create(kind: 'file' | 'folder', folder: string, groupId: string | null): Promise<void> {
     let value = kind === 'folder' ? 'New Folder' : 'New File.txt';
     let problem: string | null = null;
-    const where = folder === '' ? '/' : `/${folder}`;
+    const where = folder === '' ? '/' : shownPath(folder);
     for (;;) {
       const answer = await this.parent.modal.prompt({
         message: kind === 'folder' ? `New folder in '${where}':` : `New file in '${where}':`,
