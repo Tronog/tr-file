@@ -6,6 +6,7 @@ import { FsError } from '../../file-system/fs-error';
 import { sniffText, type SniffResult, type TextEncoding } from '../../file-system/text-sniff';
 import type { WorkbenchService } from '../workbench.service';
 import { isFile } from '../../file-system/fs-entry-kind';
+import { sortEntries } from '../listing/listing-order';
 
 /** Files past this size are not previewed; the user downloads them instead. */
 const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
@@ -61,6 +62,10 @@ interface PreviewState {
 export class FilePreviewFeature {
   private readonly previews: WritableSignal<ReadonlyMap<string, PreviewState>>;
   private readonly pending = new Set<string>();
+  private readonly inflight = new Map<string, Promise<void>>();
+
+  /** Per group, the image a `PgUp`/`PgDown` is loading to show next — where the next press counts from. */
+  private readonly stepping = new Map<string, string>();
 
   /** Configured once: GitHub-flavoured line breaks, no deprecated options. */
   private readonly markdown = new Marked({ gfm: true, breaks: false });
@@ -155,16 +160,69 @@ export class FilePreviewFeature {
    * for an image, unless the picture itself is still in the shared cache,
    * which lets go of pictures nobody was showing.
    */
-  load(path: string): void {
+  load(path: string): Promise<void> {
     if (this.pending.has(path)) {
-      return;
+      return this.inflight.get(path) ?? Promise.resolve();
     }
     const cached = this.previews().get(path);
     const evicted = cached?.document?.kind === 'image' && this.parent.images.urlFor(path) === undefined;
     if (cached !== undefined && !evicted) {
+      return Promise.resolve();
+    }
+    return this.fetch(path, false);
+  }
+
+  /**
+   * `PgUp` / `PgDown` over an image (PRD 012, §1.1): the previous or next
+   * image of its folder, in the order the panel would list it, round at
+   * either end. The tab itself goes there — a viewer stepping through a
+   * folder, not a new tab per picture — and the details sidebar with it.
+   *
+   * No blank frames: the picture on screen stays until the next one has
+   * loaded. A press while one is loading counts on from *that* one, and only
+   * the latest is shown, so holding the key runs through the folder.
+   */
+  async stepImage(groupId: string, direction: -1 | 1): Promise<void> {
+    const groups = this.parent.editorGroupsFt;
+    const group = groups.stateOf(groupId);
+    const tab = group === undefined ? undefined : groups.activeTabOf(group);
+    if (tab === undefined || tab.kind !== 'file' || !this.parent.images.isImage(tab.path)) {
       return;
     }
-    void this.fetch(path, false);
+    const from = this.stepping.get(groupId) ?? tab.path;
+    const folder = from.includes('/') ? from.slice(0, from.lastIndexOf('/')) : '';
+    const fs = this.parent.fsDataFt;
+    // Opened from somewhere other than its folder's listing — the tree, a search: read it.
+    if (fs.listingState(folder)?.listing === undefined) {
+      await fs.reloadListing(folder);
+    }
+    const images = sortEntries(
+      fs.entries(folder).filter((entry) => isFile(entry) && this.parent.images.isImage(entry.path)),
+      this.parent.fileBrowserFt.sortIn(groupId, folder),
+      (entry) => this.parent.fileViewModel.typeLabel(entry),
+    );
+    const at = images.findIndex((entry) => entry.path === from);
+    if (images.length < 2 || at === -1) {
+      return;
+    }
+    const next = images[(at + direction + images.length) % images.length] as (typeof images)[number];
+    this.stepping.set(groupId, next.path);
+    await this.load(next.path);
+    if (this.stepping.get(groupId) !== next.path) {
+      return;
+    }
+    this.stepping.delete(groupId);
+    // Still the tab the key was pressed in, still on show?
+    const now = groups.stateOf(groupId);
+    if (now === undefined || groups.activeTabOf(now)?.id !== tab.id) {
+      return;
+    }
+    groups.setTabs(
+      groupId,
+      now.tabs.map((candidate) => (candidate.id === tab.id ? { ...candidate, path: next.path, label: next.name } : candidate)),
+      tab.id,
+    );
+    this.parent.select(next.path);
   }
 
   /** Re-reads a file that is already open (the group's Refresh action). */
@@ -174,7 +232,14 @@ export class FilePreviewFeature {
     }
   }
 
-  private async fetch(path: string, force: boolean): Promise<void> {
+  private fetch(path: string, force: boolean): Promise<void> {
+    const read = this.read(path, force);
+    this.inflight.set(path, read);
+    void read.finally(() => this.inflight.delete(path));
+    return read;
+  }
+
+  private async read(path: string, force: boolean): Promise<void> {
     this.pending.add(path);
     // A reload keeps the document up until the new one replaces it.
     const previous = this.previews().get(path)?.document;

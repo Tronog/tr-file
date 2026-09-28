@@ -1,4 +1,4 @@
-import type { Provider } from '@angular/core';
+import { Injectable, type Provider } from '@angular/core';
 import { MockDataWorkbenchService } from '../mock-data/mock-data-workbench.service';
 import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
 
@@ -8,6 +8,7 @@ import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
  * layout they test from one panel instead, so each step's effect is the only
  * one in view.
  */
+@Injectable()
 class OnePanelWorkbench extends MockDataWorkbenchService {
   override readonly layout: MockWorkbenchLayout = {
     ...new MockDataWorkbenchService().layout,

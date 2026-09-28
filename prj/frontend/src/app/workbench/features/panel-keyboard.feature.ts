@@ -59,6 +59,12 @@ export class PanelKeyboardFeature {
         }
         break;
 
+      case 'previous-image':
+      case 'next-image':
+        // The viewer stays where it is and keeps the keyboard; only its picture changes.
+        void this.parent.filePreviewFt.stepImage(groupId, key.command === 'next-image' ? 1 : -1);
+        break;
+
       case 'select':
         if (key.entryId !== null) {
           files.selectEntry(groupId, key.entryId);

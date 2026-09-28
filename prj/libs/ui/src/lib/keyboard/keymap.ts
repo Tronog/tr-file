@@ -158,6 +158,8 @@ export const UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'tab.close', key: 'Ctrl+W', when: 'panel' },
   { command: 'tab.previous', key: 'Ctrl+PageUp', when: 'panel' },
   { command: 'tab.next', key: 'Ctrl+PageDown', when: 'panel' },
+  { command: 'image.previous', key: 'PageUp', when: 'panel' },
+  { command: 'image.next', key: 'PageDown', when: 'panel' },
 ];
 
 /**

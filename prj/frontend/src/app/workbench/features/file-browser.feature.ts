@@ -172,8 +172,16 @@ export class FileBrowserFeature implements PanelContentFeature {
    * (PRD 004, §1.3.1), else the panel's last.
    */
   sortOf(groupId: string): PanelSort {
+    return this.sortIn(groupId, this.groups.stateOf(groupId)?.path);
+  }
+
+  /**
+   * How a panel would order `folder` — the order chosen for it, else the
+   * panel's last — for a panel showing one of its files (PRD 012, §1.1).
+   */
+  sortIn(groupId: string, folder: string | undefined): PanelSort {
     const group = this.groups.stateOf(groupId);
-    return (group === undefined ? undefined : this.parent.folderViewsFt.sortOf(group.path)) ?? group?.sort ?? DEFAULT_SORT;
+    return (folder === undefined ? undefined : this.parent.folderViewsFt.sortOf(folder)) ?? group?.sort ?? DEFAULT_SORT;
   }
 
   /**

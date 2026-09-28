@@ -569,6 +569,37 @@ describe('panel keys', () => {
    * with focus anywhere in the panel — and they emit exactly what the tab
    * bar's own buttons emit, so the two paths cannot drift.
    */
+  /** PRD 012, §1.1 — the page keys step through a folder's images over one, and move the cursor otherwise. */
+  describe('PgUp and PgDown', () => {
+    const page = (key: 'PageUp' | 'PageDown', target: Element) => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      fixture.detectChanges();
+      return event;
+    };
+
+    it('go to the previous and next image over an image', () => {
+      show({ rows: [], document: { path: 'pics/a.png', kind: 'image', src: 'blob:a' } });
+      const viewport = fixture.nativeElement.querySelector('ui-image-view .viewport') as HTMLElement;
+
+      expect(page('PageDown', viewport).defaultPrevented).toBe(true);
+      page('PageUp', viewport);
+      expect(commands).toEqual([
+        { command: 'next-image', entryId: null },
+        { command: 'previous-image', entryId: null },
+      ]);
+    });
+
+    it('are left to other documents and to the listing', () => {
+      show({ rows: [], document: { path: 'docs/README.md', kind: 'text', text: 'hello' } });
+      page('PageDown', contentBody());
+      show({});
+      page('PageDown', fixture.nativeElement.querySelector('tbody tr') as HTMLElement);
+
+      expect(commands.filter((key) => key.command.endsWith('-image'))).toEqual([]);
+    });
+  });
+
   describe('/, Ctrl+T and Ctrl+W (PRD 002, §2.2)', () => {
     let actions: string[];
     let closed: string[];

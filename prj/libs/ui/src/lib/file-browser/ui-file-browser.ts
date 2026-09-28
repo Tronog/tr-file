@@ -42,6 +42,8 @@ const PANEL_COMMANDS = [
   'view.refresh',
   'file.copyPath',
   'panel.contextMenu',
+  'image.previous',
+  'image.next',
 ] as const;
 
 /** The panel commands that walk from folder to folder; see `onBodyKeydown`. */
@@ -248,7 +250,9 @@ export class UiFileBrowser {
    *   `Ctrl`+`Shift`+`C` to copy the full path of the entry focus is on, or of
    *   what the panel shows (PRD 004, §1.3.2);
    * - `Shift`+`F10` or the menu key: the context menu of the entry focus is
-   *   on, beside it.
+   *   on, beside it;
+   * - `PageUp` / `PageDown` over an image: the previous or next image of its
+   *   folder (PRD 012, §1.1).
    *
    * None is claimed inside a text field. Handled before the key reaches the
    * group around it, which claims the tab chords. The browser knows which
@@ -329,6 +333,14 @@ export class UiFileBrowser {
         this.contextMenu.emit({ target: entryId, x: rect.left + 16, y: rect.top + Math.min(rect.height, 22) });
         return true;
       }
+      case 'image.previous':
+      case 'image.next':
+        // Over an image only (PRD 012, §1.1); in a listing the page keys move the cursor.
+        if (this.document()?.kind !== 'image') {
+          return false;
+        }
+        this.command.emit({ command: command === 'image.next' ? 'next-image' : 'previous-image', entryId: null });
+        return true;
       default:
         return false;
     }

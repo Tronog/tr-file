@@ -130,7 +130,9 @@ export type UiPanelCommand =
   | 'paste'
   | 'copy-path'
   | 'select-pattern'
-  | 'unselect-pattern';
+  | 'unselect-pattern'
+  | 'previous-image'
+  | 'next-image';
 
 /**
  * One `UiPanelCommand`, with the entry focus sat on when the key was hit.

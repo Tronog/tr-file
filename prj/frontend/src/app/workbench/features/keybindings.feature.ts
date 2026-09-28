@@ -49,6 +49,8 @@ const KEY_ONLY_COMMANDS: Readonly<Record<string, { readonly category: string; re
   'view.splitRight': { category: 'Panel', label: 'Split Panel Right' },
   'tab.previous': { category: 'Tab', label: 'Previous Tab' },
   'tab.next': { category: 'Tab', label: 'Next Tab' },
+  'image.previous': { category: 'Image', label: 'Previous Image in Folder' },
+  'image.next': { category: 'Image', label: 'Next Image in Folder' },
   'workbench.focusNextPart': { category: 'View', label: 'Focus Next Part' },
   'workbench.focusPreviousPart': { category: 'View', label: 'Focus Previous Part' },
   'workbench.nextPanel': { category: 'View', label: 'Focus Next Panel' },
