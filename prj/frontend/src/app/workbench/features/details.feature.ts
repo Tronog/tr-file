@@ -1,9 +1,12 @@
-import { computed, linkedSignal } from '@angular/core';
+import { computed, linkedSignal, signal } from '@angular/core';
 import type { UiActionListItem, UiPermissions, UiPreview, UiProperty } from '@tr-file/ui';
 import type { FsDetails } from '../../file-system/file-system.model';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import type { WorkbenchService } from '../workbench.service';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
+
+/** Where the backend stops counting a folder's entries until asked (PRD 004, §3.1.3). */
+const LARGE_FOLDER_ENTRIES = 1000;
 
 /**
  * The right sidebar: everything `/api/fs/details` knows about the entry
@@ -81,7 +84,7 @@ export class DetailsFeature {
     ];
 
     if (isFolder(details)) {
-      properties.push({ label: 'Entries', value: this.entriesLabel(details) });
+      properties.push(this.entriesProperty(details));
     }
     if (details.mimeType) {
       properties.push({ label: 'Media type', value: details.mimeType, mono: true });
@@ -175,6 +178,44 @@ export class DetailsFeature {
     return entry === undefined || entry.size <= MAX_IMAGE_BYTES;
   }
 
+  /**
+   * The Entries row: the number — or, for a large folder not counted through
+   * (PRD 004, §3.1.3), `1000+ items`, pressed to count them all, and
+   * `Counting…` while that runs.
+   */
+  private entriesProperty(details: FsDetails): UiProperty {
+    if (this.counting() === details.path) {
+      return { label: 'Entries', value: 'Counting…' };
+    }
+    const value = this.entriesLabel(details);
+    return details.entryCountMore ? { label: 'Entries', value, action: 'count-entries', actionLabel: 'Count all entries' } : { label: 'Entries', value };
+  }
+
+  /** The folder whose entries are being counted through, if any. */
+  readonly counting = signal<string | null>(null);
+
+  /**
+   * Whether a manual refresh of `path`'s details counts its entries again:
+   * only for a large folder counted through before (PRD 004, §3.1.3) — one
+   * still showing `1000+` stays so until that is clicked.
+   */
+  recounts(path: string): boolean {
+    const details = this.parent.fsDataFt.detailsState(path)?.details;
+    return details !== undefined && details.entryCountMore !== true && (details.entryCount ?? 0) >= LARGE_FOLDER_ENTRIES;
+  }
+
+  /** `1000+ items` pressed: every entry counted, once, and the number kept (PRD 004, §3.1.3). */
+  private async countEntries(path: string): Promise<void> {
+    this.counting.set(path);
+    try {
+      await this.parent.fsDataFt.reloadDetails(path, true);
+    } finally {
+      if (this.counting() === path) {
+        this.counting.set(null);
+      }
+    }
+  }
+
   runAction(actionId: string): void {
     // Never the stale details: an action is about what is selected now.
     const details = this.current();
@@ -201,12 +242,15 @@ export class DetailsFeature {
       case 'rename':
         void this.parent.fileEditFt.rename(details.path, this.parent.activeGroupId());
         break;
+      case 'count-entries':
+        void this.countEntries(details.path);
+        break;
       case 'copy-path':
         void this.parent.systemOpenFt.copyPaths([details.path]);
         break;
       case 'refresh':
-        // By hand: a large folder's entries are counted again (PRD 004, §3.1).
-        this.parent.fsDataFt.reloadDetails(details.path, true);
+        // By hand: a large folder's count is made again — if one was made at all (PRD 004, §3.1.3).
+        this.parent.fsDataFt.reloadDetails(details.path, this.recounts(details.path));
         if (this.wantsPicture(details.path)) {
           void this.parent.images.reload(details.path);
         }
@@ -228,6 +272,9 @@ export class DetailsFeature {
     const count = details.entryCount;
     if (count === null) {
       return 'unreadable';
+    }
+    if (details.entryCountMore) {
+      return `${count}+ items`;
     }
     return `${count} ${count === 1 ? 'item' : 'items'}`;
   }

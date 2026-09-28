@@ -111,6 +111,9 @@ describe('LargeListings', () => {
     // No answer carried more than it may, and details only once every name was out.
     assert.ok(answers.every((answer) => answer.names.length <= 5 && answer.details.length <= 4));
     assert.ok(answers.every((answer) => answer.details.length === 0 || answer.namesDone));
+    // No count of its own: how many there are is known once the last name is in.
+    assert.ok(answers.every((answer) => answer.total !== null || !answer.namesDone));
+    assert.ok(answers.every((answer) => answer.total === null || answer.total === total));
 
     assert.equal(details.length, total);
     const detailOf = (name: string) => details.find((detail) => detail.index === names.findIndex((candidate) => candidate.name === name));
@@ -121,6 +124,34 @@ describe('LargeListings', () => {
     assert.equal(detailOf('link-in')?.targetType, 'directory');
     assert.equal(detailOf('link-out')?.targetType, null);
     assert.equal(detailOf('file-7.txt')?.targetType, undefined);
+  });
+
+  it('hands back the names it read on the way at once, and goes on from after them', async () => {
+    const listing = (await service.listDirectory('big')).toJSON();
+    const first = listing.progressive?.names ?? [];
+    assert.equal(first.length, 10, 'the threshold of names, read to find the folder large');
+
+    const token = listing.progressive?.token as string;
+    const names = [...first];
+    let detailsFrom = 0;
+    const described = new Map<number, number>();
+    for (let round = 0; round < 500; round++) {
+      const answer = service.listProgress(token, names.length, detailsFrom);
+      names.push(...answer.names);
+      for (const detail of answer.details) {
+        described.set(detail.index, detail.size);
+      }
+      detailsFrom += answer.details.length + answer.gone.length;
+      if (answer.done) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    // Every name once — the first ten not again — and their details at the places the caller has them.
+    assert.equal(names.length, FILES + 3);
+    assert.equal(new Set(names.map((name) => name.name)).size, FILES + 3);
+    const at = names.findIndex((name) => name.name === 'file-7.txt');
+    assert.equal(described.get(at), 7);
   });
 
   it('gives the same answer when asked again from the same place', async () => {
@@ -149,24 +180,27 @@ describe('LargeListings', () => {
 
   /**
    * Selecting a large folder describes it — and on a network share a count of
-   * millions is thousands of requests: counted once, then kept until a manual
-   * refresh asks again.
+   * millions is thousands of requests (PRD 004, §3.1.3): it says `1000+`
+   * (here, `10+`) until asked to count, then keeps the count until asked again.
    */
-  it('counts a large folder once, and again only when a refresh asks', async () => {
+  it('counts a large folder only up to the threshold until asked, then once, and keeps it', async () => {
     const total = FILES + 3;
-    const [first, joined] = await Promise.all([service.getDetails('big'), service.getDetails('big')]);
-    assert.equal(first.toJSON().entryCount, total);
+    const capped = (await service.getDetails('big')).toJSON();
+    assert.deepEqual([capped.entryCount, capped.entryCountMore], [10, true]);
+
+    const [counted, joined] = await Promise.all([service.getDetails('big', { recount: true }), service.getDetails('big', { recount: true })]);
+    assert.deepEqual([counted.toJSON().entryCount, counted.toJSON().entryCountMore], [total, undefined]);
     assert.equal(joined.toJSON().entryCount, total);
 
     await writeFile(join(root, 'big', 'one-more.txt'), '');
     assert.equal((await service.getDetails('big')).toJSON().entryCount, total, 'kept, not counted again');
     assert.equal((await service.getDetails('big', { recount: true })).toJSON().entryCount, total + 1);
-    assert.equal((await service.getDetails('big')).toJSON().entryCount, total + 1);
     await rm(join(root, 'big', 'one-more.txt'));
     await service.getDetails('big', { recount: true });
 
-    // A small folder is counted every time, as ever.
-    assert.equal((await service.getDetails('small')).toJSON().entryCount, 9);
+    // A small folder is counted every time, as ever — and all of it.
+    const small = (await service.getDetails('small')).toJSON();
+    assert.deepEqual([small.entryCount, small.entryCountMore], [9, undefined]);
     await rm(join(root, 'small', 's-0'));
     assert.equal((await service.getDetails('small')).toJSON().entryCount, 8);
     await writeFile(join(root, 'small', 's-0'), '');

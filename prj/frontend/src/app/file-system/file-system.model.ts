@@ -52,7 +52,11 @@ export interface FsDirectoryListing {
    * A large folder (PRD 004, §3.1): `entries` is empty, and the folder is
    * read by stages — asked after with `listProgress(token, …)`.
    */
-  readonly progressive?: { readonly token: string };
+  readonly progressive?: {
+    readonly token: string;
+    /** The first names, read on the way to finding the folder large; the progress goes on after them. */
+    readonly names?: readonly FsListingName[];
+  };
 }
 
 /** A name of a large folder, as the directory records it. */
@@ -122,6 +126,11 @@ export interface FsDetails extends FsEntry {
   readonly symlinkTarget: string | null;
   /** Directories only; `null` for anything else. */
   readonly entryCount: number | null;
+  /**
+   * `entryCount` is where the backend stopped counting, and there are more
+   * (PRD 004, §3.1.3): a large folder is counted through only when asked.
+   */
+  readonly entryCountMore?: true;
 }
 
 /** Every JSON success response is wrapped in this envelope. */

@@ -8,14 +8,16 @@
  *
  * What it does, in order, each step a message to the host:
  *
- * 1. reads every name, with the type the directory itself records — no
- *    `lstat` yet, so a million names cost one pass over the directory;
- * 2. `count`: how many there are;
- * 3. `names`: the names and their types, in chunks;
- * 4. `details`: `lstat` of each entry, a batch at a time, several at once —
+ * 1. `names`: every name the host has not already got (`known`, read on the
+ *    way to finding the folder large — they keep their places, first), with
+ *    the type the directory itself records — no `lstat` yet, so a million
+ *    names cost one pass over the directory — handed over in chunks as they
+ *    are read, not after the last;
+ * 2. `names-done`: that was all of them, and so how many there are;
+ * 3. `details`: `lstat` of each entry, a batch at a time, several at once —
  *    and, for a link, where it really leads, which the host judges against
  *    the root (the worker knows nothing of it);
- * 5. `done` — or `error`, when the folder itself cannot be read.
+ * 4. `done` — or `error`, when the folder itself cannot be read.
  *
  * Entries keep the index they were read at, so a batch of details says which
  * names it belongs to; one that vanished meanwhile is reported `gone`.
@@ -25,7 +27,7 @@ const { parentPort, workerData } = require('node:worker_threads');
 const fs = require('node:fs/promises');
 const { join } = require('node:path');
 
-const { dir, skip, namesChunk, statBatch, concurrency } = workerData;
+const { dir, skip, known, namesChunk, statBatch, concurrency } = workerData;
 const skipped = new Set(skip);
 
 function typeOf(stats) {
@@ -35,8 +37,11 @@ function typeOf(stats) {
   return 'other';
 }
 
-const names = [];
-const types = [];
+// The names the host already has — its caller read them — come first, where the host has them;
+// reading the folder again, they are passed over rather than listed twice.
+const names = known.map(([name]) => name);
+const types = known.map(([, type]) => type);
+const already = new Set(names);
 
 async function describe(index) {
   const absolute = join(dir, names[index]);
@@ -60,17 +65,21 @@ async function describe(index) {
 
 async function main() {
   const handle = await fs.opendir(dir, { bufferSize: 1024 });
+  let sent = names.length;
+  const send = () => {
+    if (sent < names.length) {
+      parentPort.postMessage({ kind: 'names', names: names.slice(sent), types: types.slice(sent) });
+      sent = names.length;
+    }
+  };
   for await (const dirent of handle) {
-    if (skipped.has(dirent.name)) continue;
+    if (skipped.has(dirent.name) || already.has(dirent.name)) continue;
     names.push(dirent.name);
     types.push(typeOf(dirent));
+    if (names.length - sent >= namesChunk) send();
   }
-  parentPort.postMessage({ kind: 'count', total: names.length });
-
-  for (let from = 0; from < names.length; from += namesChunk) {
-    parentPort.postMessage({ kind: 'names', names: names.slice(from, from + namesChunk), types: types.slice(from, from + namesChunk) });
-  }
-  parentPort.postMessage({ kind: 'names-done' });
+  send();
+  parentPort.postMessage({ kind: 'names-done', total: names.length });
 
   for (let from = 0; from < names.length; from += statBatch) {
     const end = Math.min(from + statBatch, names.length);

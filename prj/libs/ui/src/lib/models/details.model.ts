@@ -8,6 +8,13 @@ export interface UiProperty {
   readonly mono?: boolean;
   /** Tints the value with the matching git decoration colour. */
   readonly tone?: 'default' | 'modified' | 'untracked' | 'conflict';
+  /**
+   * Makes the value a button reporting this id (`UiPropertyList.action`) —
+   * `1000+ items`, clicked to count them all (PRD 004, §3.1.3).
+   */
+  readonly action?: string;
+  /** What the button does, for its tooltip and accessible name. */
+  readonly actionLabel?: string;
 }
 
 /** read/write/execute for one principal. */

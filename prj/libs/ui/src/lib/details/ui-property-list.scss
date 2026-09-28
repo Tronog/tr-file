@@ -1,3 +1,5 @@
+@use 'mixins' as *;
+
 :host {
   display: block;
 }
@@ -40,5 +42,24 @@ dd {
 
   &.tone-conflict {
     color: var(--vsc-git-conflict);
+  }
+}
+
+/* A value that does something when pressed: `1000+ items`, to count them all (PRD 004, §3.1.3). */
+.prop-action {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--vsc-link, var(--vsc-accent));
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
   }
 }

@@ -65,7 +65,7 @@ Code's to do so.
 | --- | --- |
 | Shell | `UiWorkbench` (`leftAt` / `rightAt` put each sidebar at either edge, both at one if need be — PRD 010, §3), `UiTitleBar`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
 | Sidebars | `UiSidebar`, `UiPane` (with a `paneId`, movable among its sidebar's panes by dragging its header or `Ctrl`+`↑`/`↓` — reported as a `UiPaneMove`, PRD 002, §5.1; and resizable by the sash on its top edge, shown by `UiSidebar` on every boundary with an expanded pane above and one at or below, collapsed headers riding along — reported as a `UiPaneResize` of every expanded pane's height, given back as `size` weights, §5.2), `UiTree` |
-| Details | `UiPreviewCard`, `UiPropertyList`, `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
+| Details | `UiPreviewCard`, `UiPropertyList` (a value with an `action` is a button reported by `action` — `1000+ items`, PRD 004, §3.1.3), `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
 | Panel content | `UiFileBrowser` (with `UiBreadcrumbs`, `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
 | Bottom panel | `UiBottomPanel`, `UiTransferList` (Transfers and Progress; `cancellable` rows report `cancel`) |

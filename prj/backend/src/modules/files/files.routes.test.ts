@@ -109,14 +109,16 @@ describe('GET /api/fs/list-progress', () => {
       assert.equal(await errorCodeOf(await fetch(`${base}/list-progress`)), 'BAD_REQUEST');
       assert.equal((await fetch(`${base}/list-progress?token=nope`)).status, 404);
 
-      // Its count is kept; `recount=1` — a manual refresh — counts again.
+      // Its details say `1000+` until `recount=1` counts it through; that count is kept (PRD 004, §3.1.3).
+      const countOf = async (query: string) => {
+        const data = ((await (await fetch(`${base}/details?path=big${query}`)).json()) as { data: { entryCount: number; entryCountMore?: true } }).data;
+        return [data.entryCount, data.entryCountMore === true];
+      };
+      assert.deepEqual(await countOf(''), [1000, true]);
+      assert.deepEqual(await countOf('&recount=1'), [1200, false]);
       await writeFile(join(big, 'extra'), '');
-      const countOf = async (query: string) =>
-        ((await (await fetch(`${base}/details?path=big${query}`)).json()) as { data: { entryCount: number } }).data.entryCount;
-      const kept = await countOf('');
-      await writeFile(join(big, 'extra-2'), '');
-      assert.equal(await countOf(''), kept);
-      assert.equal(await countOf('&recount=1'), kept + 1);
+      assert.deepEqual(await countOf(''), [1200, false]);
+      assert.deepEqual(await countOf('&recount=1'), [1201, false]);
 
       // PRD 004, §3.1.2 — cancelled: a write, so it needs the CSRF header like any other.
       assert.equal((await fetch(`${base}/list-progress?token=${token}`, { method: 'DELETE' })).status, 403);

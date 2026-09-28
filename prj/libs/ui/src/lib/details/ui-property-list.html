@@ -8,7 +8,19 @@
         [class.tone-untracked]="property.tone === 'untracked'"
         [class.tone-conflict]="property.tone === 'conflict'"
       >
-        {{ property.value }}
+        @if (property.action; as id) {
+          <button
+            type="button"
+            class="prop-action"
+            [attr.title]="property.actionLabel ?? null"
+            [attr.aria-label]="property.actionLabel ? property.value + ' — ' + property.actionLabel : null"
+            (click)="action.emit(id)"
+          >
+            {{ property.value }}
+          </button>
+        } @else {
+          {{ property.value }}
+        }
       </dd>
     </div>
   }

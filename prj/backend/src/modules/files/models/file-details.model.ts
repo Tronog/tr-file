@@ -30,6 +30,11 @@ export interface FileDetailsDto extends FileEntryDto {
   readonly mimeType: string | null;
   readonly symlinkTarget: string | null;
   readonly entryCount: number | null;
+  /**
+   * `entryCount` is where counting stopped, and there are more (PRD 004,
+   * §3.1.3): a large folder is counted through only when asked (`recount`).
+   */
+  readonly entryCountMore?: true;
 }
 
 /**
@@ -145,6 +150,7 @@ export class FileDetails {
   readonly sizeOnDisk: number;
   readonly symlinkTarget: string | null;
   readonly entryCount: number | null;
+  readonly entryCountMore: boolean;
 
   constructor(props: {
     entry: FileEntry;
@@ -157,6 +163,7 @@ export class FileDetails {
     sizeOnDisk: number;
     symlinkTarget: string | null;
     entryCount: number | null;
+    entryCountMore?: boolean;
   }) {
     this.entry = props.entry;
     this.accessedAt = props.accessedAt;
@@ -168,6 +175,7 @@ export class FileDetails {
     this.sizeOnDisk = props.sizeOnDisk;
     this.symlinkTarget = props.symlinkTarget;
     this.entryCount = props.entryCount;
+    this.entryCountMore = props.entryCountMore ?? false;
   }
 
   /**
@@ -181,6 +189,7 @@ export class FileDetails {
     extras: {
       symlinkTarget?: string | null;
       entryCount?: number | null;
+      entryCountMore?: boolean;
       targetType?: FileEntryTargetType;
     } = {},
   ): FileDetails {
@@ -195,6 +204,7 @@ export class FileDetails {
       sizeOnDisk: stats.blocks * BLOCK_SIZE,
       symlinkTarget: extras.symlinkTarget ?? null,
       entryCount: extras.entryCount ?? null,
+      entryCountMore: extras.entryCountMore ?? false,
     });
   }
 
@@ -262,6 +272,7 @@ export class FileDetails {
       mimeType: this.mimeType,
       symlinkTarget: this.symlinkTarget,
       entryCount: this.entryCount,
+      ...(this.entryCountMore ? { entryCountMore: true as const } : {}),
     };
   }
 }

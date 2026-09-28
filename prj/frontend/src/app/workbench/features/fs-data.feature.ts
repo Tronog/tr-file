@@ -15,6 +15,8 @@ export interface FsListingProgressState {
   readonly named: number;
   /** Entries described — their size and dates known. */
   readonly detailed: number;
+  /** Every name is in; what is still coming are details. */
+  readonly namesDone: boolean;
 }
 
 /** One cached directory listing. */
@@ -151,10 +153,12 @@ export class FsDataFeature {
     const delta = deltaOf(entries);
     const before = delta === undefined ? undefined : this.withoutHidden.get(delta.from);
     if (delta !== undefined && before !== undefined) {
-      if (before === delta.from) {
+      const from = delta.from.length;
+      const added = entries.length - from;
+      if (before === delta.from && !entries.slice(from).some((entry) => entry.hidden)) {
         return entries;
       }
-      const positions = this.shownAt.get(before);
+      const positions = before === delta.from ? Int32Array.from({ length: from }, (_, index) => index) : this.shownAt.get(before);
       if (positions !== undefined) {
         const shown = before.slice();
         const changed: number[] = [];
@@ -165,7 +169,16 @@ export class FsDataFeature {
             changed.push(at);
           }
         }
-        this.shownAt.set(shown, positions);
+        // Names come in after the rest (PRD 004, §3.1): their places follow on.
+        const extended = added === 0 ? positions : new Int32Array(entries.length);
+        if (added > 0) {
+          extended.set(positions.subarray(0, from));
+          for (let index = from; index < entries.length; index++) {
+            const entry = entries[index] as FsEntry;
+            extended[index] = entry.hidden ? -1 : shown.push(entry) - 1;
+          }
+        }
+        this.shownAt.set(shown, extended);
         recordDelta(shown, before, changed);
         return shown;
       }
@@ -219,6 +232,10 @@ export class FsDataFeature {
       const before = delta === undefined ? undefined : this.indexes.get(delta.from);
       if (delta !== undefined && before !== undefined) {
         for (const at of delta.changed) {
+          const entry = entries[at] as FsEntry;
+          before.set(entry.path, entry);
+        }
+        for (let at = delta.from.length; at < entries.length; at++) {
           const entry = entries[at] as FsEntry;
           before.set(entry.path, entry);
         }
@@ -412,15 +429,45 @@ export class FsDataFeature {
     const prefix = first.path === '' ? '' : `${first.path}/`;
     // Index-aligned with the backend's names: details say which slot they fill; a vanished entry leaves `null`.
     const slots: (FsEntry | null)[] = [];
+    const named = (name: string, type: FsEntry['type']): FsEntry => ({ name, path: prefix + name, type, size: 0, hidden: name.startsWith('.'), modifiedAt: '', createdAt: '', partial: true });
     let detailsFrom = 0;
-    let shown = Number.NEGATIVE_INFINITY;
-    let namesShown = false;
-    // What changed since the listing last put on screen: while only details came, the next
-    // listing is that one with a few entries replaced, and says so (`recordDelta`).
+    let total: number | null = null;
+    let namesDone = false;
+    // What changed since the listing last put on screen: names added after it, a few entries described
+    // — the next listing is that one so extended, and says so (`recordDelta`), so what is made of it is
+    // extended too rather than made again. An entry gone moves the rest: then it is made afresh.
     let published: readonly FsEntry[] | null = null;
     const described = new Set<number>();
-    let reshaped = false;
     let goneAny = false;
+    // A first reading grows on screen from its first names; a refresh keeps the whole listing it had
+    // up until every new name is in, rather than shrinking it to a thousand and growing it again.
+    const growing = previous === undefined;
+    const publish = (done: boolean): void => {
+      // Nothing to show yet — no name in, or a refresh keeping what it had — says how far it has got.
+      if ((!growing || slots.length === 0) && !namesDone && !done) {
+        const progress: FsListingProgressState = { total, named: slots.length, detailed: detailsFrom, namesDone };
+        this.patchListing(path, { status: 'loading', progress, large: true, ...(previous ? { listing: previous } : {}) });
+        return;
+      }
+      const entries = goneAny ? slots.filter((slot): slot is FsEntry => slot !== null) : (slots.slice() as FsEntry[]);
+      if (published !== null && !goneAny && published.length > 0) {
+        recordDelta(entries, published, [...described].filter((index) => index < (published as readonly FsEntry[]).length));
+      }
+      published = entries;
+      described.clear();
+      const listing: FsDirectoryListing = { path: first.path, parent: first.parent, entries };
+      const progress: FsListingProgressState = { total, named: slots.length, detailed: detailsFrom, namesDone };
+      this.patchListing(path, done ? { status: 'ready', listing, large: true } : { status: 'loading', listing, progress, large: true });
+    };
+
+    // The names read on the way to finding the folder large: on screen at once (PRD 004, §3.1).
+    for (const { name, type } of first.progressive?.names ?? []) {
+      slots.push(named(name, type));
+    }
+    if (slots.length > 0) {
+      publish(false);
+    }
+    let shown = slots.length > 0 ? Date.now() : Number.NEGATIVE_INFINITY;
 
     for (;;) {
       if (reading.aborted) {
@@ -432,8 +479,7 @@ export class FsDataFeature {
         return;
       }
       for (const { name, type } of answer.names) {
-        slots.push({ name, path: prefix + name, type, size: 0, hidden: name.startsWith('.'), modifiedAt: '', createdAt: '', partial: true });
-        reshaped = true;
+        slots.push(named(name, type));
       }
       for (const detail of answer.details) {
         const slot = slots[detail.index];
@@ -445,30 +491,18 @@ export class FsDataFeature {
       }
       for (const index of answer.gone) {
         slots[index] = null;
-        reshaped = true;
         goneAny = true;
       }
       detailsFrom += answer.details.length + answer.gone.length;
+      total = answer.total;
+      const namesJustDone = answer.namesDone && !namesDone;
+      namesDone = answer.namesDone;
 
       // Once a second — and the moment the names are all in, and when everything is.
       const now = Date.now();
-      if (answer.done || (answer.namesDone && !namesShown) || now - shown >= LARGE_LISTING_INTERVAL_MS) {
+      if (answer.done || namesJustDone || now - shown >= LARGE_LISTING_INTERVAL_MS) {
         shown = now;
-        const progress: FsListingProgressState = { total: answer.total, named: slots.length, detailed: detailsFrom };
-        if (!answer.namesDone) {
-          this.patchListing(path, { status: 'loading', progress, large: true, ...(previous ? { listing: previous } : {}) });
-        } else {
-          namesShown = true;
-          const entries = goneAny ? slots.filter((slot): slot is FsEntry => slot !== null) : (slots.slice() as FsEntry[]);
-          if (published !== null && !reshaped) {
-            recordDelta(entries, published, [...described]);
-          }
-          published = entries;
-          described.clear();
-          reshaped = false;
-          const listing: FsDirectoryListing = { path: first.path, parent: first.parent, entries };
-          this.patchListing(path, answer.done ? { status: 'ready', listing, large: true } : { status: 'loading', listing, progress, large: true });
-        }
+        publish(answer.done);
       }
       if (answer.done) {
         return;
@@ -516,15 +550,25 @@ export class FsDataFeature {
    * again rather than reuse the count it kept (PRD 004, §3.1). Asked for while
    * a read is on its way, it follows that one rather than being lost.
    */
-  reloadDetails(path: string, recount = false): void {
+  reloadDetails(path: string, recount = false): Promise<void> {
     if (!this.pendingDetails.has(path)) {
-      void this.fetchDetails(path, recount);
-    } else if (recount) {
-      this.recountAfter.add(path);
+      return this.fetchDetails(path, recount);
     }
+    if (!recount) {
+      return Promise.resolve();
+    }
+    // Resolves when the recount queued after the read on its way is done — `Counting…` lasts as long.
+    let queued = this.recountAfter.get(path);
+    if (queued === undefined) {
+      let done!: () => void;
+      const finished = new Promise<void>((resolve) => (done = resolve));
+      queued = { finished, done };
+      this.recountAfter.set(path, queued);
+    }
+    return queued.finished;
   }
 
-  private readonly recountAfter = new Set<string>();
+  private readonly recountAfter = new Map<string, { readonly finished: Promise<void>; readonly done: () => void }>();
 
   private async fetchDetails(path: string, recount = false): Promise<void> {
     this.pendingDetails.add(path);
@@ -538,8 +582,10 @@ export class FsDataFeature {
       this.patchDetails(path, { status: 'error', error: FsError.from(error) });
     } finally {
       this.pendingDetails.delete(path);
-      if (this.recountAfter.delete(path)) {
-        void this.fetchDetails(path, true);
+      const queued = this.recountAfter.get(path);
+      if (queued !== undefined) {
+        this.recountAfter.delete(path);
+        void this.fetchDetails(path, true).then(queued.done);
       }
     }
   }

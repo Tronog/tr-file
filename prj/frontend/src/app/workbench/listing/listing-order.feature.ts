@@ -3,7 +3,7 @@ import type { FsEntry } from '../../file-system/file-system.model';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import type { PanelSort } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
-import { deltaOf, recordDelta } from './array-delta';
+import { deltaOf, descendsFrom, recordDelta } from './array-delta';
 import { sortEntries, timeOf } from './listing-order';
 import type { ListingOrderAnswer, ListingOrderAsk } from './listing-order.worker';
 
@@ -55,6 +55,9 @@ export class ListingOrderFeature {
   private readonly waiting = new Map<number, { readonly path: string; readonly sort: PanelSort; readonly source: readonly FsEntry[] }>();
   private nextId = 0;
   private worker: ListingOrderWorker | null | undefined;
+  /** Orders asked for and not answered yet, and those wanted again once they are. */
+  private readonly inFlight = new Set<string>();
+  private readonly again = new Map<string, { readonly path: string; readonly sort: PanelSort }>();
   /** The last order laid over entries, kept: `sorted` is read several times a render. */
   private laid: { readonly entries: readonly FsEntry[]; readonly order: Order; readonly result: readonly FsEntry[] } | null = null;
 
@@ -68,6 +71,12 @@ export class ListingOrderFeature {
         const entries = this.parent.fsDataFt.entries(path);
         const key = keyOf(path, sort);
         if (entries.length < WORKER_SORT_THRESHOLD || this.asked.get(key) === entries) {
+          continue;
+        }
+        // One question at a time per order: a million names take the worker longer than the second
+        // until the next update — asked again with the latest when its answer is in, not queued up.
+        if (this.inFlight.has(key)) {
+          this.again.set(key, { path, sort });
           continue;
         }
         if (this.carries(key, sort, entries)) {
@@ -98,22 +107,30 @@ export class ListingOrderFeature {
     if (laid !== null && laid.entries === entries && laid.order === order) {
       return laid.result;
     }
-    // The entries last laid out, a few of them described since: those few put in their places.
+    // The entries last laid out, a few described and some added since: those few put in their
+    // places, the ones added after the order's reach following on, until the next order has them.
+    const covered = order.order.length;
     const delta = deltaOf(entries);
     if (laid !== null && laid.order === order && delta !== undefined && delta.from === laid.entries) {
       const positions = this.positionsIn(order);
       const result = laid.result.slice();
       const changed: number[] = [];
       for (const index of delta.changed) {
-        const at = positions[index] as number;
+        const at = index < covered ? (positions[index] as number) : index;
         result[at] = entries[index] as FsEntry;
         changed.push(at);
+      }
+      for (let index = delta.from.length; index < entries.length; index++) {
+        result.push(entries[index] as FsEntry);
       }
       recordDelta(result, laid.result, changed);
       this.laid = { entries, order, result };
       return result;
     }
     const result = Array.from(order.order, (index) => entries[index] as FsEntry);
+    for (let index = covered; index < entries.length; index++) {
+      result.push(entries[index] as FsEntry);
+    }
     this.laid = { entries, order, result };
     return result;
   }
@@ -127,7 +144,7 @@ export class ListingOrderFeature {
    */
   private carries(key: string, sort: PanelSort, entries: readonly FsEntry[]): boolean {
     const delta = deltaOf(entries);
-    if (sort.key !== 'name' || delta === undefined || this.asked.get(key) !== delta.from) {
+    if (sort.key !== 'name' || delta === undefined || this.asked.get(key) !== delta.from || entries.length !== delta.from.length) {
       return false;
     }
     return delta.changed.every((index) => isFolder(delta.from[index] as FsEntry) === isFolder(entries[index] as FsEntry));
@@ -153,7 +170,14 @@ export class ListingOrderFeature {
     let joined = this.joined.get(entries);
     if (joined === undefined) {
       const delta = deltaOf(entries);
-      joined = (delta === undefined ? undefined : this.joined.get(delta.from)) ?? entries.map((entry) => entry.name).join('\0');
+      const before = delta === undefined ? undefined : this.joined.get(delta.from);
+      if (delta !== undefined && before !== undefined) {
+        // Names added since go on the end; details change none.
+        const added = entries.slice(delta.from.length).map((entry) => entry.name);
+        joined = added.length === 0 ? before : before === '' ? added.join('\0') : `${before}\0${added.join('\0')}`;
+      } else {
+        joined = entries.map((entry) => entry.name).join('\0');
+      }
       this.joined.set(entries, joined);
     }
     return joined;
@@ -175,8 +199,10 @@ export class ListingOrderFeature {
    * The order to lay over `entries`: the one worked out for this sort, else —
    * while that is being worked out, a column header having just been clicked —
    * the folder's last order in any sort, so the screen stays as it was rather
-   * than jumping to no order at all. Only an order of these same entries will
-   * do: one of a different number of them would point at the wrong ones.
+   * than jumping to no order at all. Only an order of these entries, or of an
+   * earlier listing they were made from (the same places, some described,
+   * some added after — `descendsFrom`), will do: any other would point at the
+   * wrong ones.
    */
   private usableOrder(path: string, entries: readonly FsEntry[], sort: PanelSort): Order | undefined {
     const folder = this.orders().get(path);
@@ -184,10 +210,10 @@ export class ListingOrderFeature {
       return undefined;
     }
     const exact = folder.bySort.get(sortKeyOf(sort));
-    if (exact !== undefined && exact.source.length === entries.length) {
+    if (exact !== undefined && descendsFrom(entries, exact.source)) {
       return exact;
     }
-    return folder.latest.source.length === entries.length ? folder.latest : undefined;
+    return descendsFrom(entries, folder.latest.source) ? folder.latest : undefined;
   }
 
   /**
@@ -199,6 +225,11 @@ export class ListingOrderFeature {
     for (const key of [...this.asked.keys()]) {
       if (!keys.has(key)) {
         this.asked.delete(key);
+      }
+    }
+    for (const key of [...this.again.keys()]) {
+      if (!keys.has(key)) {
+        this.again.delete(key);
       }
     }
     const current = this.orders();
@@ -255,6 +286,7 @@ export class ListingOrderFeature {
       }
     }
     this.asked.set(key, entries);
+    this.inFlight.add(key);
     this.waiting.set(id, { path, sort, source: entries });
     const transfer = [folder.buffer, size?.buffer, time?.buffer, labelIds?.buffer].filter((buffer): buffer is ArrayBuffer => buffer !== undefined);
     worker.postMessage({ id, sort, names: this.joinedNames(entries), folder, size, time, labelIds, labels }, transfer);
@@ -266,16 +298,26 @@ export class ListingOrderFeature {
     if (asked === undefined) {
       return;
     }
-    // An answer overtaken by a newer question is still better than none, but never replaces a newer one.
+    const key = keyOf(asked.path, asked.sort);
+    this.inFlight.delete(key);
+    // An answer is kept unless the order on screen is of a later listing than the one it answers.
     const sortKey = sortKeyOf(asked.sort);
     const folder = this.orders().get(asked.path);
-    const latest = this.asked.get(keyOf(asked.path, asked.sort)) === asked.source;
-    if (folder?.bySort.has(sortKey) && !latest) {
-      return;
+    const current = folder?.bySort.get(sortKey);
+    if (current === undefined || descendsFrom(asked.source, current.source)) {
+      const order: Order = { source: asked.source, order: answer.order };
+      const bySort = new Map(folder?.bySort ?? []).set(sortKey, order);
+      this.orders.update((orders) => new Map(orders).set(asked.path, { bySort, latest: order }));
     }
-    const order: Order = { source: asked.source, order: answer.order };
-    const bySort = new Map(folder?.bySort ?? []).set(sortKey, order);
-    this.orders.update((orders) => new Map(orders).set(asked.path, { bySort, latest: order }));
+    // Wanted again while this was being worked out: asked now, with the entries as they are now.
+    const again = this.again.get(key);
+    if (again !== undefined) {
+      this.again.delete(key);
+      const entries = this.parent.fsDataFt.entries(again.path);
+      if (entries.length >= WORKER_SORT_THRESHOLD && this.asked.get(key) !== entries) {
+        this.ask(again.path, again.sort, entries);
+      }
+    }
   }
 
   /** When an entry was changed, parsed once per entry object: a million `Date.parse`s a second add up. */

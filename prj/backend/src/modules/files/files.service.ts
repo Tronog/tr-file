@@ -159,10 +159,12 @@ export class FilesService {
 
     const skip = target.relative === '' ? this.resolver.reservedNames : [];
     const read = await this.readBelowOrFail(target, this.largeListings.threshold, skip);
-    if (read === null) {
-      return new DirectoryListing(target.relative, [], this.largeListings.start(target, skip));
+    if (!read.complete) {
+      // The names read to get here go back at once, and the worker goes on from them (PRD 004, §3.1).
+      const first = read.dirents.map((dirent) => ({ name: dirent.name, type: FileEntry.typeOf(dirent) }));
+      return new DirectoryListing(target.relative, [], { token: this.largeListings.start(target, skip, first), names: first });
     }
-    const dirents = read;
+    const dirents = read.dirents;
     const entries = await mapLimited(dirents, LISTING_CONCURRENCY, (dirent) => {
       const childRelative =
         target.relative === '' ? dirent.name : `${target.relative}/${dirent.name}`;
@@ -245,8 +247,8 @@ export class FilesService {
 
   /** Full detail view of one entry, as served by `GET /fs/details`. */
   /**
-   * `recount` is a manual refresh (PRD 004, §3.1): the only thing that counts
-   * a large folder's entries again — see `countEntries`.
+   * `recount` counts a large folder's entries through — a click on its
+   * `1000+ items`, or a manual refresh (PRD 004, §3.1.3); see `countEntries`.
    */
   async getDetails(requestedPath: string | undefined, options: { readonly recount?: boolean } = {}): Promise<FileDetails> {
     return this.describe(await this.resolver.resolveReal(requestedPath), options.recount === true);
@@ -265,8 +267,10 @@ export class FilesService {
     const targetType = stats.isSymbolicLink() ? await this.linkTargetType(target.absolute) : undefined;
     const folder = stats.isDirectory() || targetType === 'directory';
 
+    const counted = folder ? await this.countEntries(target, recount) : null;
     return FileDetails.fromStats(target.relative, stats, {
-      entryCount: folder ? await this.countEntries(target, recount) : null,
+      entryCount: counted?.count ?? null,
+      entryCountMore: counted?.more ?? false,
       symlinkTarget: stats.isSymbolicLink() ? await this.readSymlinkTarget(target) : null,
       ...(targetType === undefined ? {} : { targetType }),
     });
@@ -684,38 +688,45 @@ export class FilesService {
   /**
    * Child count of a directory; an unreadable directory reports `null`.
    *
-   * A large folder's (PRD 004, §3.1) is counted once and kept: on a network
-   * share a count of millions is thousands of requests to the file server,
-   * and selecting the folder, auto-refresh reloading its details or another
-   * window asking must not start one again. Only `recount` — a manual refresh
-   * — does. A count already running is joined, never repeated beside it.
-   * Smaller folders are counted every time, as ever: that costs nothing.
+   * A large folder (PRD 004, §3.1.3) is not counted through when it is
+   * described: counting stops at the threshold, and says there are more —
+   * on a network share a count of millions is thousands of requests to the
+   * file server, and selecting the folder must not start one. `recount` — a
+   * click on its `1000+ items`, or a manual refresh of a count made before —
+   * counts it through, once: the number is kept and given from then on, until
+   * another `recount`. A count already running is joined, never repeated
+   * beside it. Smaller folders are counted every time, as ever.
    */
-  private countEntries(target: ResolvedPath, recount: boolean): Promise<number | null> {
+  private async countEntries(target: ResolvedPath, recount: boolean): Promise<{ readonly count: number; readonly more: boolean } | null> {
     const key = target.absolute;
     const kept = this.counts.get(key);
     if (!recount && kept !== undefined) {
-      return Promise.resolve(kept);
+      return { count: kept, more: false };
     }
-    const running = this.counting.get(key);
-    if (running !== undefined) {
-      return running;
+    if (!recount) {
+      const limit = this.largeListings.threshold;
+      const count = await this.countAll(target, limit);
+      return count === null ? null : { count, more: count >= limit };
     }
-    const counting = this.countAll(target)
-      .then((count) => {
-        this.counts.delete(key);
-        if (count !== null && count >= this.largeListings.threshold) {
-          this.counts.set(key, count);
-          if (this.counts.size > COUNTS_KEPT) {
-            const [oldest] = this.counts.keys();
-            this.counts.delete(oldest as string);
+    let running = this.counting.get(key);
+    if (running === undefined) {
+      running = this.countAll(target)
+        .then((count) => {
+          this.counts.delete(key);
+          if (count !== null && count >= this.largeListings.threshold) {
+            this.counts.set(key, count);
+            if (this.counts.size > COUNTS_KEPT) {
+              const [oldest] = this.counts.keys();
+              this.counts.delete(oldest as string);
+            }
           }
-        }
-        return count;
-      })
-      .finally(() => this.counting.delete(key));
-    this.counting.set(key, counting);
-    return counting;
+          return count;
+        })
+        .finally(() => this.counting.delete(key));
+      this.counting.set(key, running);
+    }
+    const count = await running;
+    return count === null ? null : { count, more: false };
   }
 
   /** Large folders' entry counts, by absolute path, until a manual refresh; the oldest go first. */
@@ -723,15 +734,20 @@ export class FilesService {
   private readonly counting = new Map<string, Promise<number | null>>();
 
   /**
-   * A directory's children, counted as the names stream past rather than read
-   * into one array, which for a folder of millions (PRD 004, §3.1) is seconds
-   * and hundreds of megabytes of this thread; an unreadable one reports `null`.
+   * A directory's children — up to `limit` — counted as the names stream past
+   * rather than read into one array, which for a folder of millions (PRD 004,
+   * §3.1) is seconds and hundreds of megabytes of this thread; an unreadable
+   * one reports `null`.
    */
-  private async countAll(target: ResolvedPath): Promise<number | null> {
+  private async countAll(target: ResolvedPath, limit = Number.POSITIVE_INFINITY): Promise<number | null> {
     try {
       let count = 0;
-      for await (const _dirent of await opendir(target.absolute, { bufferSize: 1024 })) {
+      for await (const _dirent of await opendir(target.absolute, { bufferSize: Math.min(limit, 1024) })) {
         count++;
+        if (count >= limit) {
+          // Leaving the loop closes the directory: nothing more is asked of the server.
+          return count;
+        }
       }
       return count;
     } catch (error) {
@@ -807,11 +823,15 @@ export class FilesService {
   }
 
   /**
-   * A folder's entries, reserved names left out — or `null` once there are
-   * `limit` of them, which is as far as it reads: a large folder is the
-   * worker's to read, not this thread's.
+   * A folder's entries, reserved names left out — all of them, or the first
+   * `limit` (`complete: false`), which is as far as it reads: the rest of a
+   * large folder is the worker's to read, not this thread's.
    */
-  private async readBelowOrFail(target: ResolvedPath, limit: number, skip: readonly string[]): Promise<Dirent[] | null> {
+  private async readBelowOrFail(
+    target: ResolvedPath,
+    limit: number,
+    skip: readonly string[],
+  ): Promise<{ readonly dirents: Dirent[]; readonly complete: boolean }> {
     const dirents: Dirent[] = [];
     try {
       const handle = await opendir(target.absolute, { bufferSize: 256 });
@@ -822,10 +842,10 @@ export class FilesService {
         dirents.push(dirent);
         if (dirents.length >= limit) {
           // Leaving the loop early closes the handle.
-          return null;
+          return { dirents, complete: false };
         }
       }
-      return dirents;
+      return { dirents, complete: true };
     } catch (error) {
       throw FilesService.toHttpError(error, target);
     }

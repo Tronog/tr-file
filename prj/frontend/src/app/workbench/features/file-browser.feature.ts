@@ -714,10 +714,10 @@ export class FileBrowserFeature implements PanelContentFeature {
             void this.parent.fsDataFt.reloadListing(path);
           }
           // The entry described beside it, if it is in this folder — or is this folder: a manual
-          // refresh is what counts a large folder's entries again (PRD 004, §3.1).
+          // refresh is what counts a large folder's entries again, if they were counted (PRD 004, §3.1.3).
           const selected = this.parent.selectedEntryId();
           if (selected !== '' && (selected === group.path || parentOf(selected) === group.path)) {
-            this.parent.fsDataFt.reloadDetails(selected, true);
+            void this.parent.fsDataFt.reloadDetails(selected, this.parent.detailsFt.recounts(selected));
           }
         }
         break;
@@ -1104,14 +1104,14 @@ export class FileBrowserFeature implements PanelContentFeature {
         },
       };
     }
-    // A large folder still being counted and named (PRD 004, §3.1), with nothing of it to show yet.
-    if (!state?.listing && state?.progress) {
-      const { total: all, named } = state.progress;
+    // A large folder whose names are still being read (PRD 004, §3.1), with nothing of it to show yet.
+    if (!state?.listing && state?.large) {
+      const named = state.progress?.named ?? 0;
       return {
         empty: {
           icon: 'clock',
-          title: all === null ? 'Counting the entries of this folder…' : `Reading ${all.toLocaleString('en-US')} entries…`,
-          hint: all === null ? 'A large folder is read in the background.' : `${named.toLocaleString('en-US')} names so far`,
+          title: 'Reading the entries of this folder…',
+          hint: named === 0 ? 'A large folder is read in the background.' : `${named.toLocaleString('en-US')} names so far`,
         },
       };
     }
@@ -1143,6 +1143,9 @@ export class FileBrowserFeature implements PanelContentFeature {
     if (progress === undefined || progress.named === 0) {
       // Not watched (PRD 004, §3.1.1): say so, or a stale listing would pass for a live one.
       return large ? `${items} · refresh by hand` : items;
+    }
+    if (!progress.namesDone) {
+      return `${items} · reading…`;
     }
     return `${items} · details ${Math.floor((progress.detailed / progress.named) * 100)}%`;
   }
@@ -1262,6 +1265,10 @@ export class FileBrowserFeature implements PanelContentFeature {
         for (const at of delta.changed) {
           items[at] = this.itemBase(entries[at] as FsEntry);
         }
+        for (let at = delta.from.length; at < entries.length; at++) {
+          items.push(this.itemBase(entries[at] as FsEntry));
+          before.index?.set((entries[at] as FsEntry).path, at);
+        }
         made = before.index === undefined ? { items } : { items, index: before.index };
       } else {
         made = { items: entries.map((entry) => this.itemBase(entry)) };
@@ -1289,13 +1296,18 @@ export class FileBrowserFeature implements PanelContentFeature {
   private baseRows(entries: readonly FsEntry[]): BaseRows {
     let made = this.rowLists.get(entries);
     if (made === undefined) {
-      // The rows last made, a few of their entries described since (PRD 004, §3.1): those few made again.
+      // The rows last made, a few of their entries described and some added since (PRD 004, §3.1):
+      // those few made again, the added ones made after them.
       const delta = deltaOf(entries);
       const before = delta === undefined ? undefined : this.rowLists.get(delta.from);
       if (delta !== undefined && before !== undefined) {
         const rows = before.rows.slice();
         for (const at of delta.changed) {
           rows[at] = this.rowBaseOf(entries[at] as FsEntry, false);
+        }
+        for (let at = delta.from.length; at < entries.length; at++) {
+          rows.push(this.rowBaseOf(entries[at] as FsEntry, false));
+          before.index?.set((entries[at] as FsEntry).path, at);
         }
         made = before.index === undefined ? { rows } : { rows, index: before.index };
       } else {

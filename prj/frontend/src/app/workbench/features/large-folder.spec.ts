@@ -58,22 +58,21 @@ describe('A large folder', () => {
 
   const browser = () => workbench.fileBrowserFt.browser(workbench.activeGroupId());
 
-  it('is counted, named, shown without details, then described — the panel following each stage', async () => {
+  it('is named, shown without details, then described — the panel following each stage', async () => {
     workbench.start();
-    http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1' } }));
+    // The names read on the way to finding it large come with the answer, and are on screen at once.
+    http.expectOne(listUrl('')).flush(
+      fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1', names: [{ name: 'b.txt', type: 'file' }] } }),
+    );
     http.match(detailsUrl('')).forEach((request) => request.flush(fsEnvelope(fsDetails(''))));
+    await settled();
+    expect(browser()?.rows.map((row) => row.name)).toEqual(['b.txt']);
+    expect(browser()?.summary).toBe('1 item · reading…');
 
-    await answer(0, 0, progress({}));
-    expect(browser()?.empty?.title).toBe('Counting the entries of this folder…');
-
+    // The rest come as they are read, asked for from after the first; how many is known with the last.
+    await answer(1, 0, progress({ names: [{ name: 'a.txt', type: 'file' }] }));
     clock += 1000;
-    await answer(0, 0, progress({ total: 3, names: [{ name: 'b.txt', type: 'file' }] }));
-    expect(browser()?.empty?.title).toBe('Reading 3 entries…');
-    expect(browser()?.empty?.hint).toBe('1 names so far');
-    expect(browser()?.rows).toEqual([]);
-
-    // Every name in: shown at once, without sizes or dates, in the panel's order.
-    await answer(1, 0, progress({ total: 3, names: [{ name: 'a.txt', type: 'file' }, { name: 'docs', type: 'directory' }], namesDone: true }));
+    await answer(2, 0, progress({ total: 3, names: [{ name: 'docs', type: 'directory' }], namesDone: true }));
     expect(browser()?.rows.map((row) => row.name)).toEqual(['docs', 'a.txt', 'b.txt']);
     expect(browser()?.rows.find((row) => row.name === 'a.txt')?.cells).toMatchObject({ size: '', modified: '', type: 'TXT' });
     expect(browser()?.summary).toBe('3 items · details 0%');
@@ -276,6 +275,41 @@ describe('A large folder', () => {
     http.match(() => true);
   });
 
+  it('says it is reading until the first names come, and shows them as they do', async () => {
+    workbench.start();
+    http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1' } }));
+    http.match(detailsUrl('')).forEach((request) => request.flush(fsEnvelope(fsDetails(''))));
+    await answer(0, 0, progress({}));
+    expect(browser()?.empty?.title).toBe('Reading the entries of this folder…');
+
+    clock += 1000;
+    await answer(0, 0, progress({ names: [{ name: 'b.txt', type: 'file' }] }));
+    expect(browser()?.empty).toBeUndefined();
+    expect(browser()?.rows.map((row) => row.name)).toEqual(['b.txt']);
+    http.match(() => true);
+  });
+
+  it('extends what it made as names are added — the same as made afresh', async () => {
+    workbench.showHidden.set(false);
+    workbench.start();
+    const names = (list: string[]) => list.map((name) => ({ name, type: 'file' as const }));
+    http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1', names: names(['c', '.h1']) } }));
+    http.match(detailsUrl('')).forEach((request) => request.flush(fsEnvelope(fsDetails(''))));
+    await settled();
+    const shownBefore = workbench.fsDataFt.entries('');
+    expect(shownBefore.map((entry) => entry.name)).toEqual(['c']);
+
+    clock += 1000;
+    await answer(2, 0, progress({ names: names(['.h2', 'a', 'b']) }));
+    const all = workbench.fsDataFt.listingState('')?.listing?.entries as readonly FsEntry[];
+    const shown = workbench.fsDataFt.entries('');
+    expect(shown).toEqual(all.filter((entry) => !entry.hidden));
+    expect(deltaOf(shown)?.from).toBe(shownBefore);
+    expect(workbench.fsDataFt.entryAt('b')?.name).toBe('b');
+    expect(browser()?.rows.map((row) => row.name)).toEqual(['a', 'b', 'c']);
+    http.match(() => true);
+  });
+
   it('puts the screen right at most once a second while the details come in', async () => {
     workbench.start();
     http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1' } }));
@@ -340,6 +374,7 @@ describe('ListingOrderFeature', () => {
 
     // The same entries with their details changed: the last order stands until the next answer.
     const described = entries.map((entry) => ({ ...entry }));
+    recordDelta(described, entries, entries.map((_, index) => index));
     expect(order.sorted('x', described, bySize, () => '')[0]).toBe(described[entries.length - 1]);
   });
 
@@ -369,6 +404,37 @@ describe('ListingOrderFeature', () => {
 
     expect(next).toEqual(Array.from(reversed, (index) => described[index]));
     expect(deltaOf(next)).toEqual({ from: first, changed: [entries.length - 1 - 3, entries.length - 1 - 700] });
+  });
+
+  it('lays an order over a longer listing made from the one it was worked out for, the rest after it', () => {
+    const internals = order as unknown as { ask: (path: string, sort: typeof bySize, entries: readonly FsEntry[]) => void };
+    const first = named(WORKER_SORT_THRESHOLD);
+    internals.ask('x', bySize, first);
+    reply({ id: asks[0]?.id as number, order: Uint32Array.from({ length: first.length }, (_, index) => first.length - 1 - index) });
+
+    const longer = [...first, ...named(WORKER_SORT_THRESHOLD + 2).slice(WORKER_SORT_THRESHOLD)];
+    recordDelta(longer, first, []);
+    expect(order.ready('x', longer, bySize)).toBe(true);
+    const sorted = order.sorted('x', longer, bySize, () => '');
+    expect(sorted[0]).toBe(first[first.length - 1]);
+    expect(sorted.slice(-2)).toEqual(longer.slice(-2));
+    // Not one made some other way.
+    expect(order.ready('x', longer.slice(), bySize)).toBe(false);
+  });
+
+  it('keeps a later order over an earlier one answered late, and asks one question at a time', () => {
+    const internals = order as unknown as { ask: (path: string, sort: typeof bySize, entries: readonly FsEntry[]) => void };
+    const first = named(WORKER_SORT_THRESHOLD);
+    const later = [...first, ...named(WORKER_SORT_THRESHOLD + 1).slice(WORKER_SORT_THRESHOLD)];
+    recordDelta(later, first, []);
+    internals.ask('x', bySize, first);
+    internals.ask('x', bySize, later);
+    const identity = (count: number) => Uint32Array.from({ length: count }, (_, index) => index);
+
+    reply({ id: asks[1]?.id as number, order: identity(later.length) });
+    reply({ id: asks[0]?.id as number, order: Uint32Array.from({ length: first.length }, (_, index) => first.length - 1 - index) });
+    // The late answer, for fewer entries, did not replace the later one.
+    expect(order.sorted('x', later, bySize, () => '')[0]).toBe(later[0]);
   });
 
   it('keeps a by-name order through details without asking again, but not a by-size one', () => {

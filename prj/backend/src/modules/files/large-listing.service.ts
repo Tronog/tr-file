@@ -10,14 +10,14 @@ import { LARGE_LISTING_WORKER_SOURCE } from './large-listing.worker.js';
 export const LARGE_LISTING = {
   /** A folder with this many entries or more is read in a worker, by stages; one with fewer at once, as ever. */
   threshold: 1000,
-  /** Names the worker hands over per message. */
-  namesChunk: 50_000,
+  /** Names the worker hands over per message (PRD 004, §3.1: in chunks of 10 000). */
+  namesChunk: 10_000,
   /** Entries `lstat`ed per batch of details… */
   statBatch: 1000,
   /** …this many at a time. */
   concurrency: 64,
   /** Names one progress answer carries at most; the rest come with the next. */
-  namesPerAnswer: 100_000,
+  namesPerAnswer: 10_000,
   /** Details one progress answer carries at most. */
   detailsPerAnswer: 50_000,
   /** A listing nobody has asked about for this long is forgotten, its worker stopped. */
@@ -52,7 +52,7 @@ export interface ListingDetailDto {
  */
 export interface ListingProgressDto {
   readonly path: string;
-  /** How many entries there are; `null` while they are still being counted. */
+  /** How many entries there are; `null` until every name has been read. */
   readonly total: number | null;
   readonly names: readonly ListingNameDto[];
   /** Every name has been handed out — with this answer or before it. */
@@ -76,9 +76,8 @@ interface WorkerDetail {
 }
 
 type WorkerMessage =
-  | { readonly kind: 'count'; readonly total: number }
   | { readonly kind: 'names'; readonly names: readonly string[]; readonly types: readonly FileEntryType[] }
-  | { readonly kind: 'names-done' }
+  | { readonly kind: 'names-done'; readonly total: number }
   | { readonly kind: 'details'; readonly items: readonly WorkerDetail[] }
   | { readonly kind: 'done' }
   | { readonly kind: 'error'; readonly code: string | null; readonly message: string };
@@ -104,7 +103,8 @@ interface Listing {
  * and then answer with one enormous response.
  *
  * `start` hands back a token at once; `progress` answers, from a caller's
- * cursors, the count, the names and the details that have come in since. The
+ * cursors, the names and the details that have come in since — and, once the
+ * last name is in, how many there are. The
  * caller polls — once a second, as the PRD asks — until `done`. What the
  * worker reports is kept here until then, and a while after, so each answer
  * is a slice of it rather than something the worker must be asked for.
@@ -128,8 +128,13 @@ export class LargeListings {
     return this.limits.threshold;
   }
 
-  /** Starts reading `target` — a folder, already resolved and checked — and names the listing. */
-  start(target: ResolvedPath, skip: readonly string[]): string {
+  /**
+   * Starts reading `target` — a folder, already resolved and checked — and
+   * names the listing. `first` are the names already read on the way here,
+   * handed back to the caller at once: the listing starts with them, in that
+   * order, and the worker adds the rest after them.
+   */
+  start(target: ResolvedPath, skip: readonly string[], first: readonly ListingNameDto[] = []): string {
     this.makeRoom();
     const token = randomBytes(16).toString('hex');
     const worker = new Worker(LARGE_LISTING_WORKER_SOURCE, {
@@ -137,6 +142,7 @@ export class LargeListings {
       workerData: {
         dir: target.absolute,
         skip,
+        known: first.map(({ name, type }) => [name, type]),
         namesChunk: this.limits.namesChunk,
         statBatch: this.limits.statBatch,
         concurrency: this.limits.concurrency,
@@ -146,8 +152,8 @@ export class LargeListings {
       path: target.relative,
       worker,
       total: null,
-      names: [],
-      types: [],
+      names: first.map(({ name }) => name),
+      types: first.map(({ type }) => type),
       namesDone: false,
       details: [],
       finished: false,
@@ -225,9 +231,6 @@ export class LargeListings {
 
   private receive(listing: Listing, message: WorkerMessage): void {
     switch (message.kind) {
-      case 'count':
-        listing.total = message.total;
-        break;
       case 'names':
         for (let index = 0; index < message.names.length; index++) {
           listing.names.push(message.names[index] as string);
@@ -235,6 +238,7 @@ export class LargeListings {
         }
         break;
       case 'names-done':
+        listing.total = message.total;
         listing.namesDone = true;
         break;
       case 'details':

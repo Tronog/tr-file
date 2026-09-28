@@ -1,4 +1,4 @@
-import { FileEntry, type FileEntryDto } from './file-entry.model.js';
+import { FileEntry, type FileEntryDto, type FileEntryType } from './file-entry.model.js';
 
 /** One collator for every listing: building one per comparison is slow. */
 const NATURAL_ORDER = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
@@ -10,8 +10,10 @@ export interface DirectoryListingDto {
   /**
    * A large folder (PRD 004, §3.1): `entries` is empty, and the folder is
    * being read by stages — asked after with `GET /api/fs/list-progress`.
+   * `names` are the first of them, read on the way to finding it large; the
+   * progress answers go on from after them.
    */
-  readonly progressive?: { readonly token: string };
+  readonly progressive?: { readonly token: string; readonly names: readonly { readonly name: string; readonly type: FileEntryType }[] };
 }
 
 /** A directory and the entries it directly contains. */
@@ -20,7 +22,7 @@ export class DirectoryListing {
     readonly path: string,
     readonly entries: readonly FileEntry[],
     /** A large folder's reading, by stages; see `DirectoryListingDto.progressive`. */
-    readonly progressiveToken: string | null = null,
+    readonly progressive: NonNullable<DirectoryListingDto['progressive']> | null = null,
   ) {}
 
   /** Root-relative parent path, or `null` when this is the root itself. */
@@ -44,7 +46,7 @@ export class DirectoryListing {
       }
       return NATURAL_ORDER.compare(a.name, b.name);
     });
-    return new DirectoryListing(this.path, entries, this.progressiveToken);
+    return new DirectoryListing(this.path, entries, this.progressive);
   }
 
   toJSON(): DirectoryListingDto {
@@ -52,7 +54,7 @@ export class DirectoryListing {
       path: this.path,
       parent: this.parent,
       entries: this.entries.map((entry) => entry.toJSON()),
-      ...(this.progressiveToken === null ? {} : { progressive: { token: this.progressiveToken } }),
+      ...(this.progressive === null ? {} : { progressive: this.progressive }),
     };
   }
 }

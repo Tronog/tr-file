@@ -440,7 +440,10 @@
               [expanded]="panes.isExpanded('properties')"
               (toggle)="panes.toggle('properties')"
             >
-              <ui-property-list [properties]="trash.showing() ? trash.properties() : details.properties()" />
+              <ui-property-list
+                [properties]="trash.showing() ? trash.properties() : details.properties()"
+                (action)="details.runAction($event)"
+              />
             </ui-pane>
           }
         }

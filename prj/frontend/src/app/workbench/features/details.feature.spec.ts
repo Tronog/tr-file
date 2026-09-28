@@ -136,8 +136,7 @@ describe('DetailsFeature', () => {
       await selectImage('logo.png');
 
       workbench.detailsFt.runAction('refresh');
-      // By hand: a large folder's entries would be counted again (PRD 004, §3.1).
-      http.expectOne(`${detailsUrl('logo.png')}&recount=1`).flush(fsEnvelope(fsDetails('logo.png')));
+      http.expectOne(detailsUrl('logo.png')).flush(fsEnvelope(fsDetails('logo.png')));
       http.expectOne(downloadUrl('logo.png')).flush(new Blob(['NEWER'], { type: 'image/png' }));
       await settled();
 
@@ -180,6 +179,33 @@ describe('DetailsFeature', () => {
         subtitle: 'Folder · 4 items',
         icon: 'folder',
       });
+    });
+  });
+
+  /** PRD 004, §3.1.3 — a large folder says `1000+ items` until that is clicked, which counts them all. */
+  describe('a large folder\'s entries', () => {
+    const entries = () => workbench.detailsFt.properties().find((property) => property.label === 'Entries');
+
+    it('says 1000+, and counts them all when that is pressed — once, then again only by a refresh', async () => {
+      await selectAndFlush('big', fsDirectoryDetails('big', { entryCount: 1000, entryCountMore: true }));
+      expect(entries()).toMatchObject({ value: '1000+ items', action: 'count-entries' });
+      expect(workbench.detailsFt.preview()?.subtitle).toContain('1000+ items');
+      // A refresh does not count what was never counted.
+      expect(workbench.detailsFt.recounts('big')).toBe(false);
+
+      workbench.detailsFt.runAction('count-entries');
+      await settled();
+      expect(entries()).toEqual({ label: 'Entries', value: 'Counting…' });
+      http.expectOne(`${detailsUrl('big')}&recount=1`).flush(fsEnvelope(fsDirectoryDetails('big', { entryCount: 1_234_567 })));
+      await settled();
+      expect(entries()).toEqual({ label: 'Entries', value: '1234567 items' });
+
+      // Counted once: a refresh counts again.
+      expect(workbench.detailsFt.recounts('big')).toBe(true);
+      workbench.detailsFt.runAction('refresh');
+      http.expectOne(`${detailsUrl('big')}&recount=1`).flush(fsEnvelope(fsDirectoryDetails('big', { entryCount: 1_234_568 })));
+      await settled();
+      expect(entries()?.value).toBe('1234568 items');
     });
   });
 
@@ -289,7 +315,7 @@ describe('DetailsFeature', () => {
       await selectAndFlush('README.md');
 
       workbench.detailsFt.runAction('refresh');
-      http.expectOne(`${detailsUrl('README.md')}&recount=1`).flush(fsEnvelope(fsDetails('README.md', { size: 99 })));
+      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md', { size: 99 })));
       await settled();
 
       expect(workbench.detailsFt.preview()?.subtitle).toBe('MD · 99 B');

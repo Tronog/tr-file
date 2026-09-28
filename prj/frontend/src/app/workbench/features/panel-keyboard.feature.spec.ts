@@ -207,10 +207,6 @@ describe('PanelKeyboardFeature', () => {
       http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
       workbench.panelKeyboardFt.run(groupId(), { command: 'refresh', entryId: null });
       http.expectOne(listUrl('')).flush(fsEnvelope(fsListing('', ROOT_ENTRIES)));
-      // The entry described beside the listing is read again with it — counted again, were it a
-      // large folder; after the read still finishing, which it follows rather than races.
-      await settled();
-      http.expectOne(`${detailsUrl('README.md')}&recount=1`).flush(fsEnvelope(fsDetails('README.md')));
       await settled();
 
       expect(token()).toBe(before);

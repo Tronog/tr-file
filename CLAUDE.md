@@ -380,10 +380,11 @@ Specs of the layout's mechanics start from one panel instead (`provideOnePanel()
 backend counts to 1000 as it reads names (`FilesService.listDirectory`); past that it answers at once
 with `progressive: { token }` and hands the folder to a worker thread (`LargeListings`,
 `large-listing.worker.ts` — a source string started with `eval: true`, so tsx, the ES build and the
-desktop's single CommonJS bundle all run it): count, names with the directory's own types, then
+desktop's single CommonJS bundle all run it): the names with the directory's own types, handed
+over in chunks as they are read (no count first — how many is known with the last), then
 `lstat` in batches; links' targets are judged against the root on the host. `GET
 /api/fs/list-progress` (bridge `list-progress`, mapped by `RemoteBackend`) serves it by cursor. The
-frontend follows it in `FsDataFeature.readLarge`: a "Counting… / Reading N entries…" placeholder, then
+frontend follows it in `FsDataFeature.readLarge`: a "Reading the entries… N names so far" placeholder, then
 every entry shown `partial` (name and type; blank size and date), then details filled in — asking
 once a second (at once while chunks are full) and putting the screen right at most once a second. A
 large listing is ordered in a Web Worker (`ListingOrderFeature`, `listing-order.worker.ts`, the same
@@ -401,10 +402,12 @@ folder or closed, and no other panel, tree or image still showing it — stops b
 an `effect` in `FileBrowserFeature` sees it leave the screen and calls `FsDataFeature.abortLarge`,
 which ends the polling, cancels the backend's worker (`DELETE /api/fs/list-progress`, bridge
 `list-cancel`) and puts back the last whole listing, or forgets the folder so it is read afresh.
-A large folder's *entry count* (its details: selecting it in its parent) is counted once by the
-backend and kept (`FilesService.countEntries`, concurrent asks joined) — only a manual refresh
-recounts: `reloadDetails(path, true)` from the details' *Refresh details* and from a panel's Refresh
-of the folder the selection is in (`?recount=1`, bridge `recount`); auto-refresh never does.
+A large folder's *entry count* (its details: selecting it in its parent) stops at 1000 and says so
+(`entryCountMore`, shown `1000+ items`, §3.1.3); pressing that value (a `UiProperty` with an `action`)
+counts it through (`?recount=1`, bridge `recount`), once — the backend keeps the number
+(`FilesService.countEntries`, concurrent asks joined) and gives it from then on. A manual refresh
+(*Refresh details*, a panel's Refresh of the folder the selection is in) counts again only a folder
+counted through before (`DetailsFeature.recounts`); auto-refresh never does.
 
 **No blank frames.** A reload keeps what is on screen: `FsDataFeature`, `FilePreviewFeature` and
 `ImageSourceService` go to `status: 'loading'` *with* the previous listing / details / document /
