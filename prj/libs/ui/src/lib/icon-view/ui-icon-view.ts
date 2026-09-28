@@ -639,6 +639,13 @@ export class UiIconView {
     if (id === null) {
       return;
     }
+    // Focus gone elsewhere meanwhile — the path bar, another panel — is the
+    // user's: a render while a large folder streams in must not take it back.
+    const focused = document.activeElement;
+    if (focused !== null && focused !== document.body && !this.host.contains(focused)) {
+      this.pendingFocusId = null;
+      return;
+    }
     const tile = this.tiles().find((candidate) => candidate.nativeElement.dataset['itemId'] === id);
     if (tile) {
       this.movingFocus = true;

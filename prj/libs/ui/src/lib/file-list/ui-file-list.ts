@@ -191,9 +191,10 @@ export class UiFileList {
     return visible.some((row) => row.id === focusId) ? focusId : (visible[0]?.id ?? null);
   });
 
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+
   constructor() {
-    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-    afterNextRender(() => this.viewport.attach(host));
+    afterNextRender(() => this.viewport.attach(this.host));
     inject(DestroyRef).onDestroy(() => this.viewport.dispose());
 
     // After a sort (PRD 002, §3.1): the rows are in their new order by now,
@@ -513,6 +514,13 @@ export class UiFileList {
   private focusPending(): void {
     const id = this.pendingFocusId;
     if (id === null) {
+      return;
+    }
+    // Focus gone elsewhere meanwhile — the path bar, another panel — is the
+    // user's: a render while a large folder streams in must not take it back.
+    const focused = document.activeElement;
+    if (focused !== null && focused !== document.body && !this.host.contains(focused)) {
+      this.pendingFocusId = null;
       return;
     }
     const element = this.rowElements().find((candidate) => candidate.nativeElement.dataset['rowId'] === id);

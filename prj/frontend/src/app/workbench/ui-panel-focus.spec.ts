@@ -327,6 +327,31 @@ describe('UiPanelGroup body focus', () => {
   });
 
   /**
+   * PRD 004, §4.2.1 — a large folder stays loading for as long as it streams
+   * in, and the panel renders with every update. A request still waiting for
+   * a row must not pull focus back from the path bar the user has gone to.
+   */
+  it('gives up waiting once focus has gone elsewhere, as to the path bar', () => {
+    fixture.componentRef.setInput('group', { ...GROUP, loading: true });
+    show({ rows: [], location: '/docs' });
+    ask(1);
+    expect(document.activeElement).toBe(contentBody());
+
+    (fixture.nativeElement.querySelector('ui-breadcrumbs nav') as HTMLElement).click();
+    fixture.detectChanges();
+    const field = fixture.nativeElement.querySelector('ui-breadcrumbs input') as HTMLInputElement;
+    expect(document.activeElement).toBe(field);
+
+    // Each update is a new group model too, which is what re-runs the request.
+    fixture.componentRef.setInput('group', { ...GROUP, loading: true });
+    show({ rows: [], location: '/docs', summary: '1,000 items · reading…' });
+    fixture.componentRef.setInput('group', { ...GROUP, loading: true });
+    show({ location: '/docs', summary: '2,000 items · reading…' });
+
+    expect(document.activeElement).toBe(field);
+  });
+
+  /**
    * But a request that found a settled body with nothing to focus is spent: it
    * must not come back and steal focus from wherever the user has gone since.
    */

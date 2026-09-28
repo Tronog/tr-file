@@ -327,7 +327,10 @@ and draws `suggestions`, the first chosen already so `Enter` opens it (a combobo
 `Tab` completes, `Escape`; a folder typed with a `/` suggests itself first, and a name typed whole
 ranks first), and
 `FileBrowserFeature.locationInput` reads the folder typed in and ranks its entries
-(`listing/location-suggest.ts`: folders first, prefix before substring, case ignored, `*`/`?`); the toolbar has Back and Forward. What the app cannot preview (PDF,
+(`listing/location-suggest.ts`: folders first, prefix before substring, case ignored, `*`/`?`) — and
+keeps the keyboard while a large folder streams in (§4.2.1): a focus request `UiPanelGroup` holds
+for a loading body, and a row a key moved to in `UiFileList` / `UiIconView`, are dropped once focus
+has gone elsewhere, never taken back on a later render; the toolbar has Back and Forward. What the app cannot preview (PDF,
 Office, archives, too large) opens with `SystemOpenFeature` — the default app on
 the desktop (the main process asks before running a program), a new browser tab
 served `inline` otherwise; *Reveal* exists only on the desktop, for local files. *Copy Path* (`Ctrl`+`Shift`+`C` in a panel — the `copy-path` panel key) copies

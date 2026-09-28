@@ -206,6 +206,9 @@ export class UiPanelGroup {
   /** A request that has not found anything to focus yet. */
   private focusWanted = false;
 
+  /** Where the last attempt at `focusWanted` put focus, as the stand-in for a tab stop to come. */
+  private focusStandIn: Element | null = null;
+
   /** `group().loading`, once it has lasted `UI_LOADING_RAIL_DELAY_MS`; ends with it. */
   protected readonly showLoading = signal(false);
 
@@ -237,14 +240,28 @@ export class UiPanelGroup {
       if (token !== this.seenFocusToken) {
         this.seenFocusToken = token;
         this.focusWanted = token > 0;
+        this.focusStandIn = null;
       }
 
       if (!this.focusWanted) {
         return;
       }
 
+      // A retry finds focus moved off the stand-in — into the path bar, another
+      // panel: the user has gone on, and a large folder stays loading for as
+      // long as it streams in, so every update would pull them back (PRD 004,
+      // §4.2.1). Focus dropped to the page, its element gone, still counts.
+      if (this.focusStandIn !== null && !this.stillOnStandIn()) {
+        this.focusWanted = false;
+        this.focusStandIn = null;
+        return;
+      }
+
       if (this.moveFocusIntoBody() || !loading) {
         this.focusWanted = false;
+        this.focusStandIn = null;
+      } else {
+        this.focusStandIn = document.activeElement;
       }
     });
   }
@@ -290,6 +307,12 @@ export class UiPanelGroup {
     const target = scope.querySelector<HTMLElement>('[tabindex="0"]');
     (target ?? scope).focus();
     return target !== null;
+  }
+
+  /** Whether focus is where a waiting request left it, or nowhere in particular. */
+  private stillOnStandIn(): boolean {
+    const focused = document.activeElement;
+    return focused === null || focused === document.body || focused === this.focusStandIn;
   }
 
   /** Accessible name of the loading bar, e.g. `Loading Documents`. */
