@@ -82,9 +82,9 @@ focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab) are bound on the
 instead, and emit what the tab bar's buttons do (`new-tab` for `Ctrl`+`T`); `/` is a character, so
 the list and the icon view let a panel-bound character past type-to-find while no name is being
 typed (`isPanelCharacter`), and the group ignores it in a text field. `Ctrl`+`Enter` and
-`Ctrl`+double click (§2.5) open the focused entry in a new tab of the *other* panel — the previous
-one, or the next in layout order (`EditorGroupsFeature.otherGroupOf`), splitting one off only when
-there is none — and take the keyboard there (`FileBrowserFeature.openEntryAside`); the key is
+`Ctrl`+double click (§2.5) open the focused entry in a new tab of the *other* panel — with two,
+the other one; with more, the previous one, or the next in layout order once it has gone
+(`EditorGroupsFeature.otherGroupOf`); splitting one off only when there is none — and take the keyboard there (`FileBrowserFeature.openEntryAside`); the key is
 `UiFileBrowser`'s, on its host, and the double click the views' `activateAside`; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring explorer → each
 panel in layout order → bottom panel (while open) → details, and round: `FocusCycleFeature`
 decides the ring, the `Workbench` component finds the `data-focus-region` that has focus and

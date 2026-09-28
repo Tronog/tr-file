@@ -218,19 +218,22 @@ export class EditorGroupsFeature {
   }
 
   /**
-   * Where `Ctrl`+`Enter` sends an entry (PRD 002, §2.5): the panel active
-   * before this one — the other side of a two-panel layout — or, when that
+   * Where `Ctrl`+`Enter` sends an entry (PRD 002, §2.5): with two panels, the
+   * other one; with more, the panel active before this one — or, when that
    * has gone, the next panel in layout order. `undefined` with no other panel.
    */
   otherGroupOf(groupId: string): string | undefined {
     const ids = this.parent.panelLayoutFt.groupIds();
+    const others = ids.filter((id) => id !== groupId);
+    if (others.length <= 1) {
+      return others[0];
+    }
     const previous = this.parent.previousGroupId();
-    if (previous !== null && previous !== groupId && ids.includes(previous)) {
+    if (previous !== null && others.includes(previous)) {
       return previous;
     }
     const at = ids.indexOf(groupId);
-    const next = at === -1 ? undefined : ids[(at + 1) % ids.length];
-    return next === groupId ? undefined : next;
+    return at === -1 ? others[0] : ids[(at + 1) % ids.length];
   }
 
   selectTab(groupId: string, tabId: string): void {

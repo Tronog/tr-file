@@ -77,7 +77,17 @@ describe('New tabs and the other panel', () => {
     expect(tabsOf(right)).toEqual(['folder:', 'file:README.md*']);
   });
 
-  it('goes to the panel active before, not the next in the layout', async () => {
+  it('with two panels, always goes to the other one — even before either was left', async () => {
+    workbench.previousGroupId.set(null);
+    workbench.fileBrowserFt.openEntryAside(right, 'docs');
+    answer();
+    await settled();
+
+    expect(tabsOf(left)).toEqual(['folder:', 'folder:docs*']);
+    expect(tabsOf(right)).toEqual(['folder:*']);
+  });
+
+  it('with more than two, goes to the panel active before, not the next in the layout', async () => {
     workbench.editorGroupsFt.runAction(right, 'split-right');
     answer();
     const third = workbench.panelLayoutFt.groupIds()[2] as string;
