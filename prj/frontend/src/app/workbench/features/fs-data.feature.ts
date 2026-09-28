@@ -24,6 +24,11 @@ export interface FsListingState {
   readonly error?: FsError;
   /** A large folder still being read: count, names, details. Gone once it is all in. */
   readonly progress?: FsListingProgressState;
+  /**
+   * Read as a large folder (PRD 004, §3.1) — so not watched for changes
+   * (§3.1.1): it is read again only when someone asks, with Refresh.
+   */
+  readonly large?: true;
 }
 
 const NO_ENTRIES: readonly FsEntry[] = [];
@@ -104,6 +109,11 @@ export class FsDataFeature {
    * render those states from `listingState`. While a reload is in flight these
    * are still the previous entries, so nothing on screen blanks meanwhile.
    */
+  /** Whether `path` was read as a large folder, which is refreshed by hand only (PRD 004, §3.1.1). */
+  isLarge(path: string): boolean {
+    return this.listings().get(path)?.large === true;
+  }
+
   entries(path: string): readonly FsEntry[] {
     const entries = this.listings().get(path)?.listing?.entries ?? NO_ENTRIES;
     if (this.parent.showHidden()) {
@@ -360,7 +370,7 @@ export class FsDataFeature {
         shown = now;
         const progress: FsListingProgressState = { total: answer.total, named: slots.length, detailed: detailsFrom };
         if (!answer.namesDone) {
-          this.patchListing(path, { status: 'loading', progress, ...(previous ? { listing: previous } : {}) });
+          this.patchListing(path, { status: 'loading', progress, large: true, ...(previous ? { listing: previous } : {}) });
         } else {
           namesShown = true;
           const entries = goneAny ? slots.filter((slot): slot is FsEntry => slot !== null) : (slots.slice() as FsEntry[]);
@@ -371,7 +381,7 @@ export class FsDataFeature {
           described.clear();
           reshaped = false;
           const listing: FsDirectoryListing = { path: first.path, parent: first.parent, entries };
-          this.patchListing(path, answer.done ? { status: 'ready', listing } : { status: 'loading', listing, progress });
+          this.patchListing(path, answer.done ? { status: 'ready', listing, large: true } : { status: 'loading', listing, progress, large: true });
         }
       }
       if (answer.done) {

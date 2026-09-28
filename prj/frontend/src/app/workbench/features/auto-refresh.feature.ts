@@ -62,10 +62,14 @@ export class AutoRefreshFeature {
     }
   }
 
-  /** The folders whose listings are on screen right now. */
+  /**
+   * The folders whose listings are on screen right now — but for large ones
+   * (PRD 004, §3.1.1): a folder of a million entries is read again only when
+   * someone asks, with Refresh, never because the backend saw it change.
+   */
   foldersShown(): readonly string[] {
     const folders = new Set([...this.parent.fileBrowserFt.foldersShown(), ...this.parent.explorerFt.foldersShown()]);
-    return [...folders].slice(0, WATCH_LIMIT);
+    return [...folders].filter((path) => !this.parent.fsDataFt.isLarge(path)).slice(0, WATCH_LIMIT);
   }
 
   /**

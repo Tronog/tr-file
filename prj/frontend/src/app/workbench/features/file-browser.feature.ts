@@ -993,7 +993,7 @@ export class FileBrowserFeature implements PanelContentFeature {
             : [],
       items: view === 'grid' ? this.itemsOf(entries, group, active) : [],
       // Kept through a reload, like the rows: the count changes when the answer does.
-      ...(state?.listing ? { summary: this.summary(entries.length, all.length, filter, state.progress), dropFolder: true } : {}),
+      ...(state?.listing ? { summary: this.summary(entries.length, all.length, filter, state.progress, state.large), dropFolder: true } : {}),
       ...this.placeholder(state, entries.length, all.length, filter),
     };
   }
@@ -1106,14 +1106,15 @@ export class FileBrowserFeature implements PanelContentFeature {
    * `6 items` — or, while a filter hides some, `2 of 6 items`; and while a
    * large folder's details are still coming (PRD 004, §3.1), how far along.
    */
-  private summary(count: number, total: number, filter: string, progress?: FsListingProgressState): string {
+  private summary(count: number, total: number, filter: string, progress?: FsListingProgressState, large?: true): string {
     const noun = total === 1 ? 'item' : 'items';
     const items =
       filter.trim() === '' || count === total
         ? `${count.toLocaleString('en-US')} ${count === 1 ? 'item' : 'items'}`
         : `${count.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} ${noun}`;
     if (progress === undefined || progress.named === 0) {
-      return items;
+      // Not watched (PRD 004, §3.1.1): say so, or a stale listing would pass for a live one.
+      return large ? `${items} · refresh by hand` : items;
     }
     return `${items} · details ${Math.floor((progress.detailed / progress.named) * 100)}%`;
   }

@@ -92,9 +92,35 @@ describe('A large folder', () => {
     clock += 1000;
     await answer(3, 1, progress({ total: 3, namesDone: true, details: [detail(1, 'a.txt', 10)], gone: [2], done: true }));
     expect(browser()?.rows.map((row) => row.name)).toEqual(['a.txt', 'b.txt']);
-    expect(browser()?.summary).toBe('2 items');
+    expect(browser()?.summary).toBe('2 items · refresh by hand');
     expect(workbench.fsDataFt.listingState('')?.status).toBe('ready');
     expect(workbench.editorGroupsFt.group(workbench.activeGroupId())?.loading).toBeUndefined();
+    http.match(() => true);
+  });
+
+  /** §3.1.1 — never polled for changes: read again only by Refresh. */
+  it('is left out of auto-refresh, and read again by Refresh', async () => {
+    workbench.start();
+    http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1' } }));
+    http.match(detailsUrl('')).forEach((request) => request.flush(fsEnvelope(fsDetails(''))));
+    expect(workbench.autoRefreshFt.foldersShown()).toEqual([]);
+    await answer(0, 0, progress({ total: 1, names: [{ name: 'a', type: 'file' }], namesDone: true, done: true }));
+    expect(workbench.fsDataFt.isLarge('')).toBe(true);
+    expect(workbench.autoRefreshFt.foldersShown()).toEqual([]);
+
+    workbench.fileBrowserFt.runToolbarAction(workbench.activeGroupId(), 'refresh');
+    await settled();
+    http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1' } }));
+    await answer(0, 0, progress({ total: 1, names: [{ name: 'b', type: 'file' }], namesDone: true, done: true }));
+    expect(browser()?.rows.map((row) => row.name)).toEqual(['b']);
+
+    // Grown small again: an ordinary listing, watched as ever.
+    workbench.fileBrowserFt.runToolbarAction(workbench.activeGroupId(), 'refresh');
+    await settled();
+    http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [fsEntry('c')] }));
+    await settled();
+    expect(workbench.fsDataFt.isLarge('')).toBe(false);
+    expect(workbench.autoRefreshFt.foldersShown()).toEqual(['']);
     http.match(() => true);
   });
 
