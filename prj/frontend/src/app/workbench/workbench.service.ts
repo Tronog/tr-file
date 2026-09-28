@@ -246,6 +246,7 @@ export class WorkbenchService {
     if (this.restored !== null) {
       this.bottomPanelFt.restore(this.restored.bottomPanel.tab, this.restored.bottomPanel.collapsed);
       this.sidebarPanesFt.restore(this.restored.panes);
+      this.sidebarPanesFt.restoreOrders(this.restored.paneOrder);
     }
     // A fresh start on the desktop begins in the home folder (PRD 003, §6),
     // which only the backend knows: the panels wait for it. A browser's

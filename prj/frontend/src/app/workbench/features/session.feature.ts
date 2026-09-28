@@ -4,6 +4,7 @@ import type { SettingsStore } from '../../settings/settings.service';
 import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
 import type { PanelDiffSpec, PanelGroupState, PanelSort, PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
+import type { SidebarId } from './sidebar-panes.feature';
 
 /** Settings key of the last session's layout; the backend it was on is appended. */
 export const SESSION_KEY = 'tr-file.session.v1';
@@ -25,13 +26,15 @@ export interface SessionSnapshot extends MockWorkbenchLayout {
   readonly showHidden: boolean;
   /** The sidebar panes that were open. */
   readonly panes: readonly string[];
+  /** The order of the sidebars' panes (PRD 002, §5.1), where it is not the default. */
+  readonly paneOrder: Partial<Record<SidebarId, readonly string[]>>;
 }
 
 /**
  * The session, remembered (PRD 003, §6): the panel layout and every panel's
- * tabs, folder, view and sort, the active panel, the sidebars' widths and
- * which of their panes are open, the bottom panel, and whether hidden files
- * show.
+ * tabs, folder, view and sort, the active panel, the sidebars' widths,
+ * which of their panes are open and in what order, the bottom panel, and
+ * whether hidden files show.
  *
  * Kept in the settings per backend — the folders of this computer are not a
  * remote server's — and written a moment after each change. Restored when
@@ -145,6 +148,7 @@ export class SessionFeature {
       bottomPanel: { tab: p.bottomPanelFt.activeTab(), collapsed: p.bottomPanelFt.collapsed() },
       showHidden: p.showHidden(),
       panes: p.sidebarPanesFt.expandedIds(),
+      paneOrder: p.sidebarPanesFt.changedOrders(),
     };
   }
 
@@ -206,8 +210,21 @@ export class SessionFeature {
         collapsed: bottom['collapsed'] !== false,
       },
       showHidden: raw['showHidden'] === true,
-      panes: Array.isArray(raw['panes']) ? raw['panes'].filter((pane): pane is string => typeof pane === 'string') : [],
+      panes: SessionFeature.strings(raw['panes']),
+      paneOrder: SessionFeature.paneOrder(raw['paneOrder']),
     };
+  }
+
+  private static strings(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  }
+
+  /** Only what is a list of names is kept; `SidebarPanesFeature` sorts out which names still exist. */
+  private static paneOrder(value: unknown): Partial<Record<SidebarId, readonly string[]>> {
+    const raw = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+    return Object.fromEntries(
+      (['explorer', 'details'] as const).filter((sidebar) => Array.isArray(raw[sidebar])).map((sidebar) => [sidebar, SessionFeature.strings(raw[sidebar])]),
+    );
   }
 
   private static group(value: unknown): PanelGroupState | null {

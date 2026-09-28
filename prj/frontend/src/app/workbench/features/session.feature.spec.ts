@@ -45,6 +45,8 @@ const SAVED: SessionSnapshot = {
   bottomPanel: { tab: 'progress', collapsed: false },
   showHidden: true,
   panes: ['explorer-tree', 'recent'],
+  // A pane this version no longer has is dropped; one it does not name keeps its default place.
+  paneOrder: { details: ['properties', 'gone', 'git', 'open-with'] },
 };
 
 describe('SessionFeature', () => {
@@ -84,6 +86,8 @@ describe('SessionFeature', () => {
     expect(workbench.bottomPanelFt.activeTab()).toBe('progress');
     expect(workbench.sidebarPanesFt.isExpanded('recent')).toBe(true);
     expect(workbench.sidebarPanesFt.isExpanded('bookmarks')).toBe(false);
+    expect(workbench.sidebarPanesFt.order('details')).toEqual(['properties', 'permissions', 'git', 'open-with']);
+    expect(workbench.sidebarPanesFt.order('explorer')).toEqual(['places', 'bookmarks', 'recent', 'explorer-tree']);
     // New ids go past every one the session used, tabs' included.
     expect(workbench.editorGroupsFt.createId()).toBe('group-10');
 
@@ -122,6 +126,7 @@ describe('SessionFeature', () => {
     workbench.sessionFt.start();
     workbench.fileBrowserFt.setView('group-root', 'grid');
     workbench.leftSidebarWidth.set(300);
+    workbench.sidebarPanesFt.move('explorer', { paneId: 'explorer-tree', targetId: 'places', position: 'before' });
     TestBed.tick();
     vi.advanceTimersByTime(399);
     expect(localStorage.getItem(`${SESSION_KEY}:local`)).toBeNull();
@@ -130,6 +135,7 @@ describe('SessionFeature', () => {
     const saved = SessionFeature.validate(JSON.parse(localStorage.getItem(`${SESSION_KEY}:local`) ?? 'null'));
     expect(saved?.groups[0]?.view).toBe('grid');
     expect(saved?.leftSidebarWidth).toBe(300);
+    expect(saved?.paneOrder).toEqual({ explorer: ['explorer-tree', 'places', 'bookmarks', 'recent'] });
   });
 
   it('forgets the layout and starts over on Reset Layout', () => {

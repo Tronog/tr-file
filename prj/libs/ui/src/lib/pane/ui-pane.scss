@@ -8,12 +8,39 @@
 :host {
   display: flex;
   flex-direction: column;
+  position: relative;
   min-height: calc(var(--vsc-pane-header-height) + 1px);
   overflow: hidden;
 }
 
 :host(.is-grow) {
   flex: 1;
+}
+
+// Moving a pane (PRD 002, §5.1): the one dragged dims, and a 2px accent rule
+// marks where it would go — above or below the pane under the pointer.
+:host(.is-dragging) {
+  opacity: 0.4;
+}
+
+:host(.drop-before)::before,
+:host(.drop-after)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 2px;
+  background: var(--vsc-accent);
+  pointer-events: none;
+}
+
+:host(.drop-before)::before {
+  top: 0;
+}
+
+:host(.drop-after)::after {
+  bottom: 0;
 }
 
 .pane-header {

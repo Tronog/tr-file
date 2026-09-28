@@ -71,6 +71,22 @@ export interface UiTabReorder extends UiTabDragData {
   readonly beforeTabId: string | null;
 }
 
+/**
+ * MIME type carrying a dragged sidebar pane (PRD 002, §5.1); the payload is
+ * the pane's id.
+ */
+export const UI_PANE_MIME = 'application/x-tr-file-pane';
+
+/**
+ * A pane of a sidebar dropped on another of the same sidebar — or moved a slot
+ * up or down with `Ctrl`+`↑`/`↓` on its header — to go before or after it.
+ */
+export interface UiPaneMove {
+  readonly paneId: string;
+  readonly targetId: string;
+  readonly position: 'before' | 'after';
+}
+
 /** A keyboard-driven tab move, one slot at a time. */
 export interface UiTabMove {
   readonly tabId: string;

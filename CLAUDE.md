@@ -223,6 +223,13 @@ which `RemoteBackend` maps to a remote server's health) on start and every 10 mi
 difference from this computer's clock, ticks on the server's minute, and formats in the *server's*
 zone — started by the `Workbench` component, like Git, so specs ask nothing.
 
+The panes of the Explorer and Details sidebars can be rearranged (PRD 002, §5.1): a `UiPane` with a
+`paneId` drags by its header onto another pane of the same sidebar (upper half before it, lower half
+after), or moves a slot with `Ctrl`+`↑`/`↓` on its header, and reports a `UiPaneMove`;
+`SidebarPanesFeature` keeps each sidebar's order (`order`, `move`), `workbench.html` draws the panes
+in it with `@for`/`@switch`, and the session remembers it (`paneOrder`, only where it is not the
+default). In Details the entry's card heads the first pane that is not Git (`detailsCardBefore`).
+
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a
 double chevron pointing the way the panel will move. Choosing a tab, including from the

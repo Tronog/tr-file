@@ -1,10 +1,18 @@
-<div class="pane-header">
+<div
+  class="pane-header"
+  [attr.draggable]="paneId() === null ? null : 'true'"
+  (dragstart)="onDragStart($event)"
+  (dragend)="onDragEnd()"
+>
   <button
+    #toggleButton
     type="button"
     class="pane-toggle"
     [attr.aria-expanded]="expanded()"
     [attr.aria-controls]="expanded() ? bodyId : null"
+    [attr.aria-keyshortcuts]="paneId() === null ? null : 'Control+ArrowUp Control+ArrowDown'"
     (click)="toggle.emit()"
+    (keydown)="onHeaderKeyDown($event)"
   >
     <ui-icon class="twisty" [name]="expanded() ? 'chevron-down' : 'chevron-right'" />
     <span class="pane-title">{{ title() }}</span>
