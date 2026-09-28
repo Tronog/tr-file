@@ -87,6 +87,17 @@ export interface UiPaneMove {
   readonly position: 'before' | 'after';
 }
 
+/**
+ * The sash on a pane's top edge was dragged (PRD 002, §5.2): the height, in
+ * pixels, of every expanded pane of that sidebar — the two either side of the
+ * sash as moved, the rest as they stand. Given back as each pane's `size`,
+ * they are weights: the panes keep these proportions as the sidebar changes
+ * height.
+ */
+export interface UiPaneResize {
+  readonly sizes: Readonly<Record<string, number>>;
+}
+
 /** A keyboard-driven tab move, one slot at a time. */
 export interface UiTabMove {
   readonly tabId: string;

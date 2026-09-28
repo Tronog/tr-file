@@ -28,12 +28,14 @@ export interface SessionSnapshot extends MockWorkbenchLayout {
   readonly panes: readonly string[];
   /** The order of the sidebars' panes (PRD 002, §5.1), where it is not the default. */
   readonly paneOrder: Partial<Record<SidebarId, readonly string[]>>;
+  /** The sidebars' panes' heights, as weights (PRD 002, §5.2); only those that were resized. */
+  readonly paneSizes: Readonly<Record<string, number>>;
 }
 
 /**
  * The session, remembered (PRD 003, §6): the panel layout and every panel's
  * tabs, folder, view and sort, the active panel, the sidebars' widths,
- * which of their panes are open and in what order, the bottom panel, and
+ * which of their panes are open, in what order and how tall, the bottom panel, and
  * whether hidden files show.
  *
  * Kept in the settings per backend — the folders of this computer are not a
@@ -149,6 +151,7 @@ export class SessionFeature {
       showHidden: p.showHidden(),
       panes: p.sidebarPanesFt.expandedIds(),
       paneOrder: p.sidebarPanesFt.changedOrders(),
+      paneSizes: p.sidebarPanesFt.paneSizes(),
     };
   }
 
@@ -212,11 +215,19 @@ export class SessionFeature {
       showHidden: raw['showHidden'] === true,
       panes: SessionFeature.strings(raw['panes']),
       paneOrder: SessionFeature.paneOrder(raw['paneOrder']),
+      paneSizes: SessionFeature.paneSizes(raw['paneSizes']),
     };
   }
 
   private static strings(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  }
+
+  private static paneSizes(value: unknown): Record<string, number> {
+    const raw = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(raw).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] > 0),
+    );
   }
 
   /** Only what is a list of names is kept; `SidebarPanesFeature` sorts out which names still exist. */

@@ -1,9 +1,12 @@
 import { Component, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import { UI_PANE_MIME, UiPane, UiSidebar, type UiPaneMove } from '@tr-file/ui';
+import { UI_PANE_MIME, UiPane, UiSidebar, type UiPaneMove, type UiPaneResize } from '@tr-file/ui';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
 
-/** PRD 002, §5.1 — the panes of a sidebar move by drag and drop, and by `Ctrl`+`↑`/`↓`. */
+/**
+ * PRD 002, §5.1 — the panes of a sidebar move by drag and drop, and by `Ctrl`+`↑`/`↓`;
+ * §5.2 — and resize by the sash on their top edge.
+ */
 
 /** jsdom has no `DataTransfer`; this is the part of one the browser uses. */
 class FakeTransfer {
@@ -26,7 +29,14 @@ class FakeTransfer {
   template: `
     <ui-sidebar title="Left">
       @for (id of order(); track id) {
-        <ui-pane [paneId]="id" [title]="id" (paneMove)="moves.push($event)" />
+        <ui-pane
+          [paneId]="id"
+          [title]="id"
+          [expanded]="!collapsed().includes(id)"
+          [size]="sizes()[id] ?? null"
+          (paneMove)="moves.push($event)"
+          (paneResize)="resizes.push($event)"
+        />
       }
     </ui-sidebar>
     <ui-sidebar title="Right">
@@ -36,7 +46,10 @@ class FakeTransfer {
 })
 class Host {
   readonly order = signal(['a', 'b', 'c']);
+  readonly collapsed = signal<string[]>([]);
+  readonly sizes = signal<Record<string, number>>({});
   readonly moves: UiPaneMove[] = [];
+  readonly resizes: UiPaneResize[] = [];
 }
 
 describe('Moving sidebar panes', () => {
@@ -117,6 +130,90 @@ describe('Moving sidebar panes', () => {
   });
 });
 
+describe('Resizing sidebar panes', () => {
+  let fixture: ComponentFixture<Host>;
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+  });
+
+  const pane = (id: string): HTMLElement => fixture.nativeElement.querySelector(`[data-pane-id="${id}"]`) as HTMLElement;
+  const sash = (id: string): HTMLElement | null => pane(id).querySelector(':scope > .pane-sash');
+
+  /** Panes a, b and c 100, 200 and 300px tall, each with a 22px header. */
+  function measure(): void {
+    const heights: Record<string, number> = { a: 100, b: 200, c: 300 };
+    for (const [id, height] of Object.entries(heights)) {
+      pane(id).getBoundingClientRect = () => ({ height }) as DOMRect;
+      (pane(id).querySelector('.pane-header') as HTMLElement).getBoundingClientRect = () => ({ height: 22 }) as DOMRect;
+    }
+  }
+
+  function pointer(type: string, target: HTMLElement, clientY: number): void {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, { pointerId: 1, clientY });
+    target.dispatchEvent(event);
+    fixture.detectChanges();
+  }
+
+  it('trades height with the expanded pane above, reporting every expanded pane', () => {
+    measure();
+    const handle = sash('c') as HTMLElement;
+    pointer('pointerdown', handle, 500);
+    pointer('pointermove', handle, 450);
+    pointer('pointermove', handle, 470);
+    pointer('pointerup', handle, 470);
+
+    expect(fixture.componentInstance.resizes).toEqual([
+      { sizes: { a: 100, b: 150, c: 350 } },
+      { sizes: { a: 100, b: 170, c: 330 } },
+    ]);
+  });
+
+  it('keeps each pane its header and a row', () => {
+    measure();
+    const handle = sash('b') as HTMLElement;
+    pointer('pointerdown', handle, 100);
+    pointer('pointermove', handle, 0);
+    expect(fixture.componentInstance.resizes.at(-1)).toEqual({ sizes: { a: 45, b: 255, c: 300 } });
+    pointer('pointermove', handle, 1000);
+    expect(fixture.componentInstance.resizes.at(-1)).toEqual({ sizes: { a: 255, b: 45, c: 300 } });
+  });
+
+  it('resizes across a collapsed pane: the expanded ones either side trade, from either edge', () => {
+    fixture.componentInstance.collapsed.set(['b']);
+    fixture.detectChanges();
+    measure();
+
+    // The edge right under A is the collapsed B's; its header rides along.
+    (sash('b') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    (sash('c') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(fixture.componentInstance.resizes).toEqual([{ sizes: { a: 124, c: 276 } }, { sizes: { a: 76, c: 324 } }]);
+  });
+
+  it('does nothing on an edge with no expanded pane on one side', () => {
+    fixture.componentInstance.collapsed.set(['a', 'c']);
+    fixture.detectChanges();
+    measure();
+
+    (sash('b') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    (sash('c') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(fixture.componentInstance.resizes).toEqual([]);
+  });
+
+  it('weighs a sized pane by its size while expanded', () => {
+    fixture.componentInstance.sizes.set({ a: 120, b: 80 });
+    fixture.componentInstance.collapsed.set(['b']);
+    fixture.detectChanges();
+
+    expect(pane('a').style.flex).toBe('120 1 0px');
+    expect(pane('a').classList).toContain('is-sized');
+    expect(pane('b').style.flex).toBe('');
+    expect(pane('c').style.flex).toBe('');
+  });
+});
+
 describe('SidebarPanesFeature order', () => {
   it('places a moved pane before or after its target, in its own sidebar only', () => {
     const panes = new SidebarPanesFeature({ fileSystem: { transport: { systemShell: false } } } as never);
@@ -134,5 +231,20 @@ describe('SidebarPanesFeature order', () => {
     expect(panes.order('details')).toEqual(['open-with', 'properties', 'permissions', 'git']);
     expect(panes.order('explorer')).toEqual(['places', 'bookmarks', 'recent', 'explorer-tree']);
     expect(panes.changedOrders()).toEqual({ details: ['open-with', 'properties', 'permissions', 'git'] });
+  });
+
+  it('keeps pane heights, and gives a pane opened among sized ones an equal share', () => {
+    const panes = new SidebarPanesFeature({ fileSystem: { transport: { systemShell: false } } } as never);
+    panes.resize({ sizes: { bookmarks: 100, 'explorer-tree': 299.6, nope: Number.NaN } });
+    expect(panes.sizeOf('explorer-tree')).toBe(300);
+    expect(panes.paneSizes()).toEqual({ bookmarks: 100, 'explorer-tree': 300 });
+
+    panes.toggle('recent');
+    expect(panes.sizeOf('recent')).toBe(200);
+    // Closing and opening again keeps what it had.
+    panes.resize({ sizes: { recent: 50 } });
+    panes.toggle('recent');
+    panes.toggle('recent');
+    expect(panes.sizeOf('recent')).toBe(50);
   });
 });

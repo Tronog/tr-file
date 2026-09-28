@@ -43,6 +43,18 @@
   bottom: 0;
 }
 
+// The sash on the top edge (PRD 002, §5.2), over the header's border. Hidden
+// until the sidebar shows it — only it can tell whether an expanded pane is
+// above this one.
+.pane-sash {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+
 .pane-header {
   display: flex;
   flex: none;

@@ -1,5 +1,5 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
-import type { UiPaneMove } from '@tr-file/ui';
+import type { UiPaneMove, UiPaneResize } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /** Panes that start expanded; everything else starts collapsed. */
@@ -33,12 +33,17 @@ export const DEFAULT_PANE_ORDER: Readonly<Record<SidebarId, readonly string[]>> 
  * closed state of every pane in both sidebars lives here. So does their order
  * (PRD 002, §5.1): a pane dragged onto another, or moved with `Ctrl`+`↑`/`↓`,
  * is reported by the library and placed here; the templates draw the panes in
- * `order(sidebar)`, and the session remembers it.
+ * `order(sidebar)`, and the session remembers it. So does their height
+ * (PRD 002, §5.2): a pane's sash reports every expanded pane's, kept here by
+ * id and handed back as the pane's `size` — a weight, so the panes keep their
+ * proportions as the window changes height.
  */
 export class SidebarPanesFeature {
   private readonly expanded: WritableSignal<ReadonlySet<string>>;
 
   private readonly orders = signal<Readonly<Record<SidebarId, readonly string[]>>>(DEFAULT_PANE_ORDER);
+
+  private readonly sizes = signal<Readonly<Record<string, number>>>({});
 
   constructor(private readonly parent: WorkbenchService) {
     // Places are the desktop's (PRD 003, §6): a server names its root and no
@@ -71,6 +76,9 @@ export class SidebarPanesFeature {
   }
 
   toggle(id: string): void {
+    if (!this.isExpanded(id)) {
+      this.shareOnOpen(id);
+    }
     this.expanded.update((ids) => {
       const next = new Set(ids);
       if (!next.delete(id)) {
@@ -117,6 +125,46 @@ export class SidebarPanesFeature {
     const at = rest.indexOf(move.targetId) + (move.position === 'after' ? 1 : 0);
     const next = [...rest.slice(0, at), move.paneId, ...rest.slice(at)];
     this.orders.update((orders) => ({ ...orders, [sidebar]: next }));
+  }
+
+  /** A pane's height as a weight among its sidebar's, or `null` while it sizes itself. */
+  sizeOf(id: string): number | null {
+    return this.sizes()[id] ?? null;
+  }
+
+  /** A pane's sash was dragged: the heights of every expanded pane of that sidebar. */
+  resize(resize: UiPaneResize): void {
+    const valid = Object.entries(resize.sizes).filter(([, size]) => Number.isFinite(size) && size > 0);
+    this.sizes.update((sizes) => ({ ...sizes, ...Object.fromEntries(valid.map(([id, size]) => [id, Math.round(size)])) }));
+  }
+
+  /** Every pane's height, for the session. */
+  paneSizes(): Readonly<Record<string, number>> {
+    return this.sizes();
+  }
+
+  /** Puts back remembered heights. */
+  restoreSizes(sizes: Readonly<Record<string, number>>): void {
+    this.sizes.set(sizes);
+  }
+
+  /**
+   * A pane never sized, opened in a sidebar whose open panes are, takes an
+   * equal share of it — the average of theirs. Left to size itself it would
+   * weigh one pixel against their hundreds and all but vanish.
+   */
+  private shareOnOpen(id: string): void {
+    const sidebar = (Object.keys(DEFAULT_PANE_ORDER) as SidebarId[]).find((key) => DEFAULT_PANE_ORDER[key].includes(id));
+    if (sidebar === undefined || this.sizeOf(id) !== null) {
+      return;
+    }
+    const others = this.order(sidebar)
+      .filter((other) => other !== id && this.isExpanded(other))
+      .map((other) => this.sizeOf(other))
+      .filter((size): size is number => size !== null);
+    if (others.length > 0) {
+      this.resize({ sizes: { [id]: others.reduce((sum, size) => sum + size, 0) / others.length } });
+    }
   }
 
   private static merged(saved: readonly string[] | undefined, defaults: readonly string[]): readonly string[] {

@@ -47,6 +47,7 @@ const SAVED: SessionSnapshot = {
   panes: ['explorer-tree', 'recent'],
   // A pane this version no longer has is dropped; one it does not name keeps its default place.
   paneOrder: { details: ['properties', 'gone', 'git', 'open-with'] },
+  paneSizes: { recent: 120, 'explorer-tree': 360 },
 };
 
 describe('SessionFeature', () => {
@@ -88,6 +89,8 @@ describe('SessionFeature', () => {
     expect(workbench.sidebarPanesFt.isExpanded('bookmarks')).toBe(false);
     expect(workbench.sidebarPanesFt.order('details')).toEqual(['properties', 'permissions', 'git', 'open-with']);
     expect(workbench.sidebarPanesFt.order('explorer')).toEqual(['places', 'bookmarks', 'recent', 'explorer-tree']);
+    expect(workbench.sidebarPanesFt.sizeOf('recent')).toBe(120);
+    expect(workbench.sidebarPanesFt.sizeOf('places')).toBeNull();
     // New ids go past every one the session used, tabs' included.
     expect(workbench.editorGroupsFt.createId()).toBe('group-10');
 
@@ -102,6 +105,10 @@ describe('SessionFeature', () => {
     expect(SessionFeature.validate({ ...SAVED, version: 2 })).toBeNull();
     expect(SessionFeature.validate({ ...SAVED, groups: [{ ...SAVED.groups[0], view: 'sideways' }, SAVED.groups[1]] })).toBeNull();
     expect(SessionFeature.validate('{')).toBeNull();
+    // Heights that are not heights are left out, not a reason to start over.
+    expect(SessionFeature.validate({ ...SAVED, paneSizes: { recent: -4, places: 'tall', 'explorer-tree': 360 } })?.paneSizes).toEqual({
+      'explorer-tree': 360,
+    });
 
     localStorage.setItem(`${SESSION_KEY}:local`, JSON.stringify(broken));
     create();
@@ -127,6 +134,7 @@ describe('SessionFeature', () => {
     workbench.fileBrowserFt.setView('group-root', 'grid');
     workbench.leftSidebarWidth.set(300);
     workbench.sidebarPanesFt.move('explorer', { paneId: 'explorer-tree', targetId: 'places', position: 'before' });
+    workbench.sidebarPanesFt.resize({ sizes: { bookmarks: 100.4, 'explorer-tree': 300 } });
     TestBed.tick();
     vi.advanceTimersByTime(399);
     expect(localStorage.getItem(`${SESSION_KEY}:local`)).toBeNull();
@@ -135,6 +143,7 @@ describe('SessionFeature', () => {
     const saved = SessionFeature.validate(JSON.parse(localStorage.getItem(`${SESSION_KEY}:local`) ?? 'null'));
     expect(saved?.groups[0]?.view).toBe('grid');
     expect(saved?.leftSidebarWidth).toBe(300);
+    expect(saved?.paneSizes).toEqual({ bookmarks: 100, 'explorer-tree': 300 });
     expect(saved?.paneOrder).toEqual({ explorer: ['explorer-tree', 'places', 'bookmarks', 'recent'] });
   });
 

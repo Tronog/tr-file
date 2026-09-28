@@ -1,6 +1,18 @@
-import { afterNextRender, Component, ElementRef, inject, Injector, input, output, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, ElementRef, inject, Injector, input, output, signal, viewChild } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
-import { UI_PANE_MIME, type UiIconAction, type UiIconActionAt, type UiPaneMove } from '../models';
+import { UiSash } from '../sash/ui-sash';
+import { UI_PANE_MIME, type UiIconAction, type UiIconActionAt, type UiPaneMove, type UiPaneResize, type UiSashResize } from '../models';
+
+/** A sash drag under way: every expanded pane's height and least height, and the two the sash is between. */
+interface ResizeState {
+  readonly heights: Record<string, number>;
+  readonly mins: Record<string, number>;
+  readonly aboveId: string;
+  readonly belowId: string;
+}
+
+/** The least a resized pane's body keeps below its header: one row. */
+const MIN_BODY_HEIGHT = 22;
 
 /**
  * The pane being dragged, and the sidebar it is in. A drag's payload cannot be
@@ -22,15 +34,24 @@ let dragging: { readonly id: string; readonly container: Element | null } | null
  * before that one, the lower half after — and `Ctrl`+`↑`/`↓` on the header
  * moves it a slot. Either is reported as a `UiPaneMove`; the order is the
  * caller's to keep.
+ *
+ * A pane with an expanded pane above it and one at or below it — itself, or
+ * past collapsed headers — has a sash on its top edge (PRD 002, §5.2; which
+ * panes do is the sidebar's stylesheet), as every boundary does in VS Code:
+ * dragging it trades height between those two, reported as a `UiPaneResize` of every
+ * expanded pane — measured, so the ones that were never sized join in. A
+ * `size` given back makes the pane that share of the sidebar, as a weight.
  */
 @Component({
   selector: 'ui-pane',
   templateUrl: './ui-pane.html',
   styleUrl: './ui-pane.scss',
-  imports: [UiIcon],
+  imports: [UiIcon, UiSash],
   host: {
     class: 'ui-pane',
     '[class.is-grow]': 'grow()',
+    '[class.is-sized]': 'sized()',
+    '[style.flex]': "sized() ? size() + ' 1 0px' : null",
     '[class.is-collapsed]': '!expanded()',
     '[class.is-dragging]': 'dragged()',
     '[class.drop-before]': "dropAt() === 'before'",
@@ -60,6 +81,9 @@ export class UiPane {
   /** Names the pane among its sidebar's, and makes it movable; `null` keeps it where it is. */
   readonly paneId = input<string | null>(null);
 
+  /** Height as a weight among the sidebar's sized panes (`UiPaneResize`); `null` sizes to content, or `grow`. */
+  readonly size = input<number | null>(null);
+
   /** The header was clicked; the caller flips `expanded`. */
   readonly toggle = output<void>();
 
@@ -72,6 +96,9 @@ export class UiPane {
   /** A pane — this one, by key, or another, dropped here — should move. */
   readonly paneMove = output<UiPaneMove>();
 
+  /** The sash on the top edge was dragged. */
+  readonly paneResize = output<UiPaneResize>();
+
   /** Instance counter — a unique body id without pulling in a service. */
   private static nextId = 0;
 
@@ -83,12 +110,70 @@ export class UiPane {
   /** Where a pane dragged over this one would go, or `null`. */
   protected readonly dropAt = signal<'before' | 'after' | null>(null);
 
+  protected readonly sized = computed(() => this.expanded() && this.size() !== null);
+
+  /** A sash drag under way; measured when it starts. */
+  private resizing: ResizeState | null = null;
+
   private readonly toggleButton = viewChild.required<ElementRef<HTMLButtonElement>>('toggleButton');
 
   protected select(id: string, event: MouseEvent): void {
     this.actionSelect.emit(id);
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     this.actionAt.emit({ id, x: rect.left, y: rect.bottom });
+  }
+
+  /* -- resizing ---------------------------------------------------------------- */
+
+  protected onSashResize(event: UiSashResize): void {
+    if (event.phase === 'end') {
+      this.resizing = null;
+      return;
+    }
+    // A key press moves without a `start`.
+    this.resizing ??= this.measure();
+    const state = this.resizing;
+    if (state === null || event.delta === 0) {
+      return;
+    }
+    const { aboveId, belowId, heights, mins } = state;
+    const above = heights[aboveId] as number;
+    const below = heights[belowId] as number;
+    // What one gains the other gives, and neither goes below its header and a row.
+    const delta = Math.max((mins[aboveId] as number) - above, Math.min(below - (mins[belowId] as number), event.delta));
+    heights[aboveId] = above + delta;
+    heights[belowId] = below - delta;
+    this.paneResize.emit({ sizes: { ...heights } });
+  }
+
+  /**
+   * The heights of the expanded panes of this sidebar, as they stand, and the
+   * two this sash is between: the nearest expanded pane above it, and this
+   * pane — or, when it is collapsed, the nearest expanded one below, its
+   * header riding along between them. `null` without one on either side.
+   */
+  private measure(): ResizeState | null {
+    const self = this.host.nativeElement;
+    const panes = Array.from(self.parentElement?.children ?? []).filter(
+      (element): element is HTMLElement => element.classList.contains('ui-pane') && element.hasAttribute('data-pane-id'),
+    );
+    const expanded = (pane: HTMLElement | undefined) => pane !== undefined && !pane.classList.contains('is-collapsed');
+    const at = panes.indexOf(self);
+    const above = panes.slice(0, Math.max(at, 0)).reverse().find(expanded);
+    const below = at < 0 ? undefined : panes.slice(at).find(expanded);
+    if (above === undefined || below === undefined) {
+      return null;
+    }
+    const heights: Record<string, number> = {};
+    const mins: Record<string, number> = {};
+    for (const pane of panes.filter(expanded)) {
+      const id = pane.getAttribute('data-pane-id') as string;
+      const header = pane.querySelector<HTMLElement>(':scope > .pane-header');
+      heights[id] = pane.getBoundingClientRect().height;
+      mins[id] = (header?.getBoundingClientRect().height ?? 0) + 1 + MIN_BODY_HEIGHT;
+    }
+    const idOf = (pane: HTMLElement) => pane.getAttribute('data-pane-id') as string;
+    return { heights, mins, aboveId: idOf(above), belowId: idOf(below) };
   }
 
   /* -- moving ---------------------------------------------------------------- */

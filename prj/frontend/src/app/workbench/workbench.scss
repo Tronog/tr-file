@@ -52,9 +52,10 @@
 /*
  * The Git pane sits above the details (PRD 011, §2.1) and takes the room its
  * changes need — up to a point, past which it scrolls on its own and leaves
- * the rest of the sidebar to the details below.
+ * the rest of the sidebar to the details below. Once resized (PRD 002, §5.2)
+ * it is as tall as it was made, and its body scrolls like any pane's.
  */
-.git-pane {
+.git-pane:not(.is-sized) {
   flex: none;
 
   ui-source-control {

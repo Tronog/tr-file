@@ -118,6 +118,8 @@
           <ui-pane
             [paneId]="paneId"
             (paneMove)="panes.move('explorer', $event)"
+            [size]="panes.sizeOf(paneId)"
+            (paneResize)="panes.resize($event)"
             title="Places"
             [expanded]="panes.isExpanded('places')"
             (toggle)="panes.toggle('places'); places.load()"
@@ -134,6 +136,8 @@
           <ui-pane
             [paneId]="paneId"
             (paneMove)="panes.move('explorer', $event)"
+            [size]="panes.sizeOf(paneId)"
+            (paneResize)="panes.resize($event)"
             title="Bookmarks"
             [expanded]="panes.isExpanded('bookmarks')"
             (toggle)="panes.toggle('bookmarks')"
@@ -154,6 +158,8 @@
           <ui-pane
             [paneId]="paneId"
             (paneMove)="panes.move('explorer', $event)"
+            [size]="panes.sizeOf(paneId)"
+            (paneResize)="panes.resize($event)"
             title="Recent"
             [expanded]="panes.isExpanded('recent')"
             (toggle)="panes.toggle('recent')"
@@ -174,6 +180,8 @@
           <ui-pane
             [paneId]="paneId"
             (paneMove)="panes.move('explorer', $event)"
+            [size]="panes.sizeOf(paneId)"
+            (paneResize)="panes.resize($event)"
             [title]="explorer.title"
             [expanded]="panes.isExpanded('explorer-tree')"
             [actions]="explorer.actions"
@@ -395,6 +403,8 @@
             <ui-pane
               [paneId]="paneId"
               (paneMove)="panes.move('details', $event)"
+              [size]="panes.sizeOf(paneId)"
+              (paneResize)="panes.resize($event)"
               class="git-pane"
               title="Git"
               [expanded]="panes.isExpanded('git')"
@@ -423,6 +433,8 @@
             <ui-pane
               [paneId]="paneId"
               (paneMove)="panes.move('details', $event)"
+              [size]="panes.sizeOf(paneId)"
+              (paneResize)="panes.resize($event)"
               title="Properties"
               [expanded]="panes.isExpanded('properties')"
               (toggle)="panes.toggle('properties')"
@@ -437,6 +449,8 @@
               <ui-pane
                 [paneId]="paneId"
                 (paneMove)="panes.move('details', $event)"
+                [size]="panes.sizeOf(paneId)"
+                (paneResize)="panes.resize($event)"
                 title="Permissions"
                 [expanded]="panes.isExpanded('permissions')"
                 (toggle)="panes.toggle('permissions')"
@@ -451,6 +465,8 @@
             <ui-pane
               [paneId]="paneId"
               (paneMove)="panes.move('details', $event)"
+              [size]="panes.sizeOf(paneId)"
+              (paneResize)="panes.resize($event)"
               title="Actions"
               [expanded]="panes.isExpanded('open-with')"
               [grow]="true"

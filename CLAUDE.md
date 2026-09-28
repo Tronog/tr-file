@@ -229,6 +229,13 @@ after), or moves a slot with `Ctrl`+`↑`/`↓` on its header, and reports a `Ui
 `SidebarPanesFeature` keeps each sidebar's order (`order`, `move`), `workbench.html` draws the panes
 in it with `@for`/`@switch`, and the session remembers it (`paneOrder`, only where it is not the
 default). In Details the entry's card heads the first pane that is not Git (`detailsCardBefore`).
+Their heights too (§5.2): every boundary with an expanded pane above it and one at or below it has
+a `UiSash` (on the top edge of the pane under it, collapsed or not — `UiSidebar`'s stylesheet decides
+which); dragging it trades height between those two, collapsed headers riding along, and the
+pane reports every expanded pane's measured height (`UiPaneResize`). `SidebarPanesFeature` keeps
+them by id (`sizeOf`, `resize`, the session's `paneSizes`) and hands them back as `size`, which the
+pane uses as a `flex` weight — so the panes keep their proportions as the window changes height.
+A pane opened among sized ones takes the average of theirs.
 
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a

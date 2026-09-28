@@ -2,6 +2,10 @@
 
 :host {
   display: flex;
+  // The whole height of its slot: a `grow` pane takes what is left of it, and
+  // resized panes (PRD 002, §5.2) share it out — neither can in a sidebar only
+  // as tall as its content.
+  flex: 1;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
@@ -60,4 +64,18 @@
     cursor: default;
     background: transparent;
   }
+}
+
+/*
+ * A pane's sash (PRD 002, §5.2) is shown on every boundary with something to
+ * resize on both sides: an expanded pane somewhere above, and one at or below —
+ * the pane itself, or one past the collapsed headers under it, which ride
+ * along between the two.
+ */
+:host
+  ::ng-deep
+  .ui-pane:not(.is-collapsed)
+  ~ .ui-pane:is(:not(.is-collapsed), :has(~ .ui-pane:not(.is-collapsed)))
+  > .pane-sash {
+  display: block;
 }
