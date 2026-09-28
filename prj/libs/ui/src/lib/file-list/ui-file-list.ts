@@ -15,7 +15,7 @@ import {
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
 import { UiKeymap } from '../keyboard/keymap';
-import { LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
+import { isPanelCharacter, LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
 import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
 import type { UiFileColumn, UiFileRow, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
@@ -102,6 +102,9 @@ export class UiFileList {
 
   /** Double click: open the entry. */
   readonly activate = output<string>();
+
+  /** `Ctrl`+double click: open the entry in the other panel (PRD 002, §2.5). */
+  readonly activateAside = output<string>();
 
   /** The row a click or a key made current. */
   readonly select = output<string>();
@@ -291,6 +294,15 @@ export class UiFileList {
     }
   }
 
+  /** A double click opens its entry — with `Ctrl` (`Cmd`), in the other panel. */
+  protected onDoubleClick(event: MouseEvent, id: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      this.activateAside.emit(id);
+    } else {
+      this.activate.emit(id);
+    }
+  }
+
   protected onKeydown(event: KeyboardEvent, index: number): void {
     const rows = this.rows();
     const row = rows[index];
@@ -354,7 +366,7 @@ export class UiFileList {
         }
         break;
       default: {
-        if (!isTypeaheadKey(event)) {
+        if (!isTypeaheadKey(event) || isPanelCharacter(this.keymap, event, this.typeahead.typing())) {
           return;
         }
         const found = this.typeahead.match(

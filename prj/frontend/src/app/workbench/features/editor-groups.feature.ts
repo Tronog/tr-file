@@ -178,6 +178,61 @@ export class EditorGroupsFeature {
 
   /* -- tabs -------------------------------------------------------------- */
 
+  /**
+   * Adds a tab to a group and chooses it — loaded, and the group made the
+   * active one — as a click on it would. Returns the new tab's id.
+   */
+  openTab(groupId: string, tab: Omit<PanelTabState, 'id' | 'active' | 'remembered'>): string | undefined {
+    if (!this.stateOf(groupId)) {
+      return undefined;
+    }
+    const id = `tab-${this.createId()}`;
+    this.update(groupId, (group) => ({ ...group, tabs: [...group.tabs, { ...tab, id }] }));
+    this.selectTab(groupId, id);
+    return id;
+  }
+
+  /**
+   * `Ctrl`+`T` (PRD 002, §2.2): a new tab in this group where it is — as a
+   * file manager's new tab opens on the folder you are in. A folder, a zip or
+   * the trash is opened again; from a file or a diff, the folder it is in.
+   * The keyboard goes with it.
+   */
+  newTab(groupId: string): void {
+    const group = this.stateOf(groupId);
+    if (!group) {
+      return;
+    }
+    const active = this.activeTabOf(group);
+    let tab: Omit<PanelTabState, 'id' | 'active' | 'remembered'>;
+    if (active !== undefined && active.kind !== 'file' && active.kind !== 'diff') {
+      const { id: _id, active: _active, remembered: _remembered, ...rest } = active;
+      tab = rest;
+    } else {
+      const path = active === undefined ? group.path : active.path.includes('/') ? active.path.slice(0, active.path.lastIndexOf('/')) : '';
+      tab = { label: path === '' ? this.parent.workspaceName() : (path.split('/').at(-1) ?? path), path, kind: 'folder' };
+    }
+    if (this.openTab(groupId, tab) !== undefined) {
+      this.parent.panelFocusFt.focusBody(groupId);
+    }
+  }
+
+  /**
+   * Where `Ctrl`+`Enter` sends an entry (PRD 002, §2.5): the panel active
+   * before this one — the other side of a two-panel layout — or, when that
+   * has gone, the next panel in layout order. `undefined` with no other panel.
+   */
+  otherGroupOf(groupId: string): string | undefined {
+    const ids = this.parent.panelLayoutFt.groupIds();
+    const previous = this.parent.previousGroupId();
+    if (previous !== null && previous !== groupId && ids.includes(previous)) {
+      return previous;
+    }
+    const at = ids.indexOf(groupId);
+    const next = at === -1 ? undefined : ids[(at + 1) % ids.length];
+    return next === groupId ? undefined : next;
+  }
+
   selectTab(groupId: string, tabId: string): void {
     const before = this.stateOf(groupId);
     this.groups.update((groups) =>
@@ -312,6 +367,9 @@ export class EditorGroupsFeature {
       case 'split-down':
         this.splitActive(groupId, 'bottom');
         break;
+      case 'new-tab':
+        this.newTab(groupId);
+        break;
       case 'maximize':
         this.parent.panelLayoutFt.toggleMaximize(groupId);
         break;
@@ -338,7 +396,7 @@ export class EditorGroupsFeature {
       return;
     }
     // The new panel is where the work continues, so the keyboard goes with it
-    // — otherwise `Ctrl`+`T` leaves focus behind in the panel it split.
+    // — otherwise `/` leaves focus behind in the panel it split.
     this.parent.panelFocusFt.focusBody(newGroupId);
   }
 

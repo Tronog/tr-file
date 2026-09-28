@@ -226,10 +226,11 @@ entry would maximize the window.
 | Drag a tab inside its bar | Reorders it, with a 2px insertion bar showing the landing spot |
 | Drag a tab onto another bar or a group's centre | Moves it into that group |
 | Drag a tab onto a group's edge (outer 25%) | Divides that group; the tab lands in the new half |
-| Split right / Split down, or `Ctrl`+`T` | Copies the active tab into a new group beside this one |
+| Split right / Split down, or `/` | Copies the active tab into a new group beside this one |
+| `Ctrl`+`T` | Emits `new-tab` (`actionSelect`); the app opens a new tab on the same folder (PRD 002, §2.2) |
 | `Ctrl`+`W` | Closes the panel's focused tab; the group goes with its last one |
 | `Ctrl`+`PageUp` / `Ctrl`+`PageDown` | Moves to the previous / next tab, wrapping at either end |
-| `Ctrl`+`Enter` | Emits `open-aside`; the app opens that entry in a new panel on the right |
+| `Ctrl`+`Enter`, or `Ctrl`+double click | Emits `open-aside`; the app opens that entry in a new tab of the other panel (PRD 002, §2.5) |
 | Maximize, or double-click a tab | Renders one group alone; the button becomes Restore |
 | Press a group's blank space — body, tab bar, loading rail, toolbar gaps | Emits `bodyPress`; the app focuses the group and its content |
 | Drag OS files onto a group's body | Emits `fileDrop` with the dropped `File`s; the app uploads them |
@@ -304,18 +305,23 @@ keyboard of its own — and both views let an `Alt` chord bubble untouched so it
 arrives exactly once.
 
 Some chords belong to the panel as a whole rather than to what is selected in
-it: `Ctrl`+`T` splits it, `Ctrl`+`W` closes its focused tab (PRD 001, §6.2.2)
+it: `/` splits it, `Ctrl`+`T` opens a new tab in it (PRD 002, §2.2), `Ctrl`+`W` closes its
+focused tab (PRD 001, §6.2.2)
 and `Ctrl`+`PageUp`/`PageDown` moves between its tabs, wrapping at either end
 (§6.2.4). They are bound on the group's host, so they answer with focus
 anywhere inside — its content, or a tab in the bar — and each
 emits exactly what the equivalent pointer gesture emits: the split and close
 buttons, or a click on the neighbouring tab. The pointer and the keyboard
 cannot drift apart, and switching by keyboard lands focus in the new tab's
-content just as clicking would.
+content just as clicking would. `/` is a plain character, which type-to-find
+would otherwise take: the list and the icon view let a character bound in the
+panel or window pass while no name is being typed (`isPanelCharacter`), and the
+group ignores an unmodified chord typed into a text field.
 
 `Ctrl`+`Enter` is the exception to that symmetry (§6.2.5): opening an entry in
-a panel that does not exist yet has no pointer equivalent, so it leaves as a
-`UiPanelKey` for the application to carry out. It is `UiFileBrowser`'s, bound
+the other panel (PRD 002, §2.5) has no tab-bar equivalent, so it leaves as a
+`UiPanelKey` for the application to carry out — as does its pointer twin,
+`Ctrl`+double click, which the views report as `activateAside`. It is `UiFileBrowser`'s, bound
 on its host so it answers from a row, a tile, the document or the path bar,
 and it supplies the entry from its own model — the cursor if there is one, the
 selection otherwise — which is what lets one handler serve the listing and the

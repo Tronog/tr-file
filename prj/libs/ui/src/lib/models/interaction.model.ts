@@ -137,7 +137,8 @@ export type UiPanelCommand =
  *
  * `back` and `forward` carry an entry like the rest, but never use one: they
  * are about where the *panel* has been, not what is selected in it.
- * `open-aside` opens its entry in a panel that does not exist yet.
+ * `open-aside` (`Ctrl`+`Enter`, `Ctrl`+double click) opens its entry in the
+ * other panel (PRD 002, §2.5).
  * `copy-path` is `Ctrl`+`Shift`+`C` (PRD 004, §1.3.2): its entry, or — with
  * none — whatever the panel shows.
  * `select-pattern` / `unselect-pattern` are `+` / `-` (PRD 004, §2): the

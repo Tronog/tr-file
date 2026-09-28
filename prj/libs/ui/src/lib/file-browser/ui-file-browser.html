@@ -67,6 +67,7 @@
               [sortable]="!!browser().sortable"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="rowActivate.emit($event)"
+              (activateAside)="command.emit({ command: 'open-aside', entryId: $event })"
               (sort)="sortChange.emit($event)"
               (command)="command.emit($event)"
             />
@@ -82,6 +83,7 @@
               [sortable]="!!browser().sortable"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="rowActivate.emit($event)"
+              (activateAside)="command.emit({ command: 'open-aside', entryId: $event })"
               (toggle)="rowToggle.emit($event)"
               (sort)="sortChange.emit($event)"
               (command)="command.emit($event)"
@@ -94,6 +96,7 @@
               [dropTargetId]="dropTargetId()"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="itemActivate.emit($event)"
+              (activateAside)="command.emit({ command: 'open-aside', entryId: $event })"
               (command)="command.emit($event)"
               (shown)="itemsShown.emit($event)"
             />

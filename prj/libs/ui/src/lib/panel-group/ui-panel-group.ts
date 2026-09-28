@@ -63,8 +63,19 @@ function readTabDragData(transfer: DataTransfer | null): UiTabDragData | null {
   }
 }
 
+/** Where a key types text: a text input, a text area, or editable content. */
+function isTextField(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target instanceof HTMLInputElement) {
+    return !['button', 'checkbox', 'radio', 'range', 'color', 'file', 'image', 'reset', 'submit'].includes(target.type);
+  }
+  return target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
+}
+
 /** The chords of the group itself; see `onGroupKeydown`. */
-const GROUP_COMMANDS = ['view.splitRight', 'tab.close', 'tab.next', 'tab.previous'] as const;
+const GROUP_COMMANDS = ['view.splitRight', 'tab.new', 'tab.close', 'tab.next', 'tab.previous'] as const;
 
 /**
  * One editor group: the shell around whatever its active tab shows.
@@ -293,12 +304,12 @@ export class UiPanelGroup {
    * keymap binds them (PRD 010, §2).
    *
    * Bound on the host rather than the body, so they work with focus anywhere
-   * in the group — in its content, or on a tab in the bar. None is a new
-   * capability: `Ctrl`+`T` and `Ctrl`+`W` emit exactly what the tab bar's
-   * split and close buttons emit, and `Ctrl`+`PageUp`/`PageDown` (§6.2.4)
-   * emits what clicking the neighbouring tab emits. That is why the
-   * application needs no new wiring, and why the pointer and the keyboard can
-   * never drift apart.
+   * in the group — in its content, or on a tab in the bar. `/` and `Ctrl`+`W`
+   * emit exactly what the tab bar's split and close buttons emit, `Ctrl`+`T`
+   * asks for a new tab (`new-tab`, PRD 002, §2.2), and `Ctrl`+`PageUp`/
+   * `PageDown` (§6.2.4) emits what clicking the neighbouring tab emits — so
+   * the pointer and the keyboard can never drift apart. A chord without
+   * `Ctrl` or `Alt` — `/` — typed into a text field is text, not a command.
    *
    * Everything else is the content's: it sits inside this host, so its own
    * handlers see a key first — which is how `UiFileBrowser` answers
@@ -306,12 +317,15 @@ export class UiPanelGroup {
    */
   protected onGroupKeydown(event: KeyboardEvent): void {
     // A key the content already took — a row's own binding — is not the group's too.
-    if (event.defaultPrevented) {
+    if (event.defaultPrevented || (!event.ctrlKey && !event.metaKey && !event.altKey && isTextField(event.target))) {
       return;
     }
     switch (this.keymap.commandFor(event, 'panel', GROUP_COMMANDS)) {
       case 'view.splitRight':
         this.actionSelect.emit('split-right');
+        break;
+      case 'tab.new':
+        this.actionSelect.emit('new-tab');
         break;
       case 'tab.close': {
         // The focused tab is the active one; a group with none has nothing to

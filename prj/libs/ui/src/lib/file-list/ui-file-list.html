@@ -66,7 +66,7 @@
         [attr.tabindex]="row.id === tabStopId() ? 0 : -1"
         [attr.aria-keyshortcuts]="keyShortcuts()"
         (click)="onClick($event, index)"
-        (dblclick)="activate.emit(row.id)"
+        (dblclick)="onDoubleClick($event, row.id)"
         (keydown)="onKeydown($event, index)"
         (pointerdown)="pressing = true"
         (pointerup)="pressing = false"

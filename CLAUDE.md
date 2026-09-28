@@ -76,11 +76,16 @@ command of `CommandsFeature` run on the active panel; `FunctionKeysFeature` draw
 middle of `UiStatusBar` (`functionKeys`) from whatever they are bound to. `F5` copies, so refreshing is `Ctrl`+`R` (the desktop's
 accelerator table leaves it unbound). In the list and grid `Insert` marks and moves on and `*`
 selects all or none (`UiListSelection`); `+`/`-` select or unselect by a pattern
-(`FileBrowserFeature.selectByPattern`, `listing/name-pattern.ts`). `Ctrl`+`T` (split),
-`Ctrl`+`W` (close the focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab) are
-bound on the group's host instead, and emit the same outputs the tab bar's buttons do;
-`Ctrl`+`Enter` (open the focused entry in a new panel on the right) is `UiFileBrowser`'s,
-on its host; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring explorer → each
+(`FileBrowserFeature.selectByPattern`, `listing/name-pattern.ts`). `/` (split — PRD 002, §2.2),
+`Ctrl`+`T` (a new tab on the same folder, `EditorGroupsFeature.newTab`), `Ctrl`+`W` (close the
+focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab) are bound on the group's host
+instead, and emit what the tab bar's buttons do (`new-tab` for `Ctrl`+`T`); `/` is a character, so
+the list and the icon view let a panel-bound character past type-to-find while no name is being
+typed (`isPanelCharacter`), and the group ignores it in a text field. `Ctrl`+`Enter` and
+`Ctrl`+double click (§2.5) open the focused entry in a new tab of the *other* panel — the previous
+one, or the next in layout order (`EditorGroupsFeature.otherGroupOf`), splitting one off only when
+there is none — and take the keyboard there (`FileBrowserFeature.openEntryAside`); the key is
+`UiFileBrowser`'s, on its host, and the double click the views' `activateAside`; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring explorer → each
 panel in layout order → bottom panel (while open) → details, and round: `FocusCycleFeature`
 decides the ring, the `Workbench` component finds the `data-focus-region` that has focus and
 focuses into the next (a panel through `PanelFocusFeature`, a sidebar where focus last was in it).

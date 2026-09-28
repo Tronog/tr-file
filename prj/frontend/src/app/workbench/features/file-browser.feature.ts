@@ -517,12 +517,14 @@ export class FileBrowserFeature implements PanelContentFeature {
   }
 
   /**
-   * Opens an entry in a new panel beside this one (PRD 001, §6.2.5).
-   *
-   * Unlike the split button, which copies the active tab, the new panel is
-   * created *for* this entry: a folder gets its listing, a file gets its
-   * viewer. The keyboard goes with it, because opening something aside is a
-   * request to work in it.
+   * `Ctrl`+`Enter` and `Ctrl`+double click (PRD 002, §2.5): opens an entry in
+   * a new tab of the *other* panel — the one active before this, as
+   * `EditorGroupsFeature.otherGroupOf` finds it — the way a two-panel file
+   * manager shows something on the other side. A folder gets its listing, a
+   * file its viewer (a tab already showing that file is chosen instead). With
+   * no other panel, a new one is split off to the right for it. The keyboard
+   * goes with it, because opening something there is a request to look at it
+   * — and `Ctrl`+`W` then closes it.
    */
   openEntryAside(groupId: string, entryId: string): void {
     const entry = this.entryIn(groupId, entryId) ?? this.parent.fsDataFt.entryAt(entryId);
@@ -531,24 +533,29 @@ export class FileBrowserFeature implements PanelContentFeature {
     }
 
     const directory = isFolder(entry);
-    const newGroupId = this.groups.openBeside(groupId, 'right', (id) => ({
-      id: `tab-${id}`,
-      label: entry.name,
-      path: entry.path,
-      kind: directory ? 'folder' : 'file',
-    }));
-    if (newGroupId === undefined) {
-      return;
-    }
-
-    if (directory) {
-      this.parent.fsDataFt.ensureListing(entry.path);
+    const tab = { label: entry.name, path: entry.path, kind: directory ? ('folder' as const) : ('file' as const) };
+    let target = this.groups.otherGroupOf(groupId);
+    if (target === undefined) {
+      target = this.groups.openBeside(groupId, 'right', (id) => ({ id: `tab-${id}`, ...tab }));
+      if (target === undefined) {
+        return;
+      }
+      if (directory) {
+        this.parent.fsDataFt.ensureListing(entry.path);
+      } else {
+        this.parent.filePreviewFt.load(entry.path);
+      }
+    } else if (directory) {
+      this.groups.openTab(target, tab);
     } else {
-      this.parent.select(entry.path);
+      this.openFile(target, entry.path, entry.name);
       this.parent.filePreviewFt.load(entry.path);
     }
+    if (!directory) {
+      this.parent.select(entry.path);
+    }
 
-    this.parent.panelFocusFt.focusBody(newGroupId);
+    this.parent.panelFocusFt.focusBody(target);
   }
 
   /* -- toolbar ----------------------------------------------------------- */

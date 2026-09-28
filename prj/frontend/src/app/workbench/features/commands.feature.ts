@@ -237,7 +237,7 @@ export class CommandsFeature {
       {
         id: 'file.openToSide',
         category: 'File',
-        label: 'Open to the Side',
+        label: 'Open in Other Panel',
         palette: false,
         enabled: one,
         run: (t) => p.fileBrowserFt.openPathAside(t.groupId, t.paths[0] as string),
@@ -403,7 +403,7 @@ export class CommandsFeature {
       {
         id: 'places.openToSide',
         category: 'Places',
-        label: 'Open to the Side',
+        label: 'Open in Other Panel',
         palette: false,
         enabled: (t) => t.folder !== null,
         run: (t) => p.placesFt.openAside(t.folder as string),
@@ -535,7 +535,9 @@ export class CommandsFeature {
       { id: 'git.init', category: 'Git', label: 'Initialize Repository', enabled: () => git.canInit(), run: () => void git.init() },
       { id: 'git.refresh', category: 'Git', label: 'Refresh', enabled: () => git.available() && !git.busy(), run: () => void git.refresh() },
 
-      /* Tabs — from a tab's context menu only */
+      /* Tabs */
+      { id: 'tab.new', category: 'Tab', label: 'New Tab', run: (t) => p.editorGroupsFt.newTab(t.groupId) },
+      /* … the rest from a tab's context menu only */
       { id: 'tab.close', category: 'Tab', label: 'Close', palette: false, enabled: (t) => t.tabId !== undefined, run: (t) => p.editorGroupsFt.closeTab(t.groupId, t.tabId as string) },
       {
         id: 'tab.closeOthers',

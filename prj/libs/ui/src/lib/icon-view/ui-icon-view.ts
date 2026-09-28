@@ -14,7 +14,7 @@ import {
 import { UiIcon } from '../icon/ui-icon';
 import { isTypeaheadKey, pageStep, UiTypeahead } from '../keyboard/list-navigation';
 import { UiKeymap } from '../keyboard/keymap';
-import { LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
+import { isPanelCharacter, LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
 import { clickMode, moveMode, UiListSelection, type UiSelectMode } from '../keyboard/list-selection';
 import type { UiIconViewItem, UiPanelKey, UiSelectionChange } from '../models';
 import { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from '../virtual/ui-virtual-viewport';
@@ -108,7 +108,7 @@ interface MarqueeDrag {
         [attr.tabindex]="item.id === tabStopId() ? 0 : -1"
         [attr.title]="item.label"
         (click)="onClick($event, index)"
-        (dblclick)="activate.emit(item.id)"
+        (dblclick)="onDoubleClick($event, item.id)"
         (keydown)="onKeydown($event, index)"
         (pointerdown)="pressing = true"
         (pointerup)="pressing = false"
@@ -160,7 +160,11 @@ export class UiIconView {
   /** The folder tile a drag is over, lit as the drop target. */
   readonly dropTargetId = input<string | null>(null);
 
+  /** Double click: open the entry. */
   readonly activate = output<string>();
+
+  /** `Ctrl`+double click: open the entry in the other panel (PRD 002, §2.5). */
+  readonly activateAside = output<string>();
 
   /** The tile a click or a key made current. */
   readonly select = output<string>();
@@ -325,6 +329,15 @@ export class UiIconView {
     }
   }
 
+  /** A double click opens its entry — with `Ctrl` (`Cmd`), in the other panel. */
+  protected onDoubleClick(event: MouseEvent, id: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      this.activateAside.emit(id);
+    } else {
+      this.activate.emit(id);
+    }
+  }
+
   protected onKeydown(event: KeyboardEvent, index: number): void {
     const items = this.items();
     const item = items[index];
@@ -356,6 +369,11 @@ export class UiIconView {
       }
       this.focusTile(target, moveMode(event));
       event.preventDefault();
+      return;
+    }
+
+    // A character the panel binds — `/` — goes on to it (PRD 002, §2.2).
+    if (!command && isPanelCharacter(this.keymap, event, this.typeahead.typing())) {
       return;
     }
 

@@ -64,3 +64,17 @@ export function listKeyShortcuts(keymap: UiKeymap): string {
     )
     .join(' ');
 }
+
+/**
+ * Whether a character key is the panel's or the window's rather than
+ * type-to-find's: bound there — `/` splits the panel (PRD 002, §2.2) — while
+ * no name is being typed. Mid-name it is part of the name, as a list
+ * command's character is.
+ */
+export function isPanelCharacter(keymap: UiKeymap, event: KeyboardEvent, typing: boolean): boolean {
+  const chord = chordOf(event);
+  if (chord === null || typing || event.key.length !== 1) {
+    return false;
+  }
+  return keymap.bindings().some((binding) => (binding.when === 'panel' || binding.when === 'window') && binding.key === chord);
+}

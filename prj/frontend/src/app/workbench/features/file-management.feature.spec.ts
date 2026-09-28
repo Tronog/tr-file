@@ -391,7 +391,7 @@ describe('File management (PRD 003, §5)', () => {
       expect(workbench.contextMenuFt.menu()).toMatchObject({ x: 10, y: 20 });
       expect(labels()).toEqual([
         'Open',
-        'Open to the Side',
+        'Open in Other Panel',
         'Open in New Browser Tab',
         'Open Containing Folder',
         'Cut',

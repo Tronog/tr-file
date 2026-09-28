@@ -230,8 +230,11 @@ describe('PanelKeyboardFeature', () => {
       expect(workbench.panelFocusFt.token(second)).toBeGreaterThan(0);
     });
 
-    /** PRD 001, §6.2.5 — the entry gets a panel of its own, on the right. */
-    describe('opening aside', () => {
+    /**
+     * PRD 001, §6.2.5 — with no other panel to open it in (PRD 002, §2.5, see
+     * `other-panel.spec.ts`), the entry gets a panel of its own, on the right.
+     */
+    describe('opening aside, with one panel', () => {
       it('gives a folder a new panel listing it, and the keyboard with it', async () => {
         await start();
         const first = groupId();

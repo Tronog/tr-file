@@ -569,7 +569,7 @@ describe('panel keys', () => {
    * with focus anywhere in the panel — and they emit exactly what the tab
    * bar's own buttons emit, so the two paths cannot drift.
    */
-  describe('Ctrl+T and Ctrl+W', () => {
+  describe('/, Ctrl+T and Ctrl+W (PRD 002, §2.2)', () => {
     let actions: string[];
     let closed: string[];
 
@@ -587,11 +587,43 @@ describe('panel keys', () => {
       return event;
     };
 
-    it('splits the panel on Ctrl+T', () => {
-      const event = chord('t', contentBody());
+    it('splits the panel on /, and opens a new tab on Ctrl+T', () => {
+      const split = chord('/', contentBody(), {});
+      const tab = chord('t', contentBody());
 
+      expect(actions).toEqual(['split-right', 'new-tab']);
+      expect(split.defaultPrevented).toBe(true);
+      expect(tab.defaultPrevented).toBe(true);
+    });
+
+    it('takes / from a row rather than finding a name by it — but not in the middle of one', () => {
+      const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
+      chord('/', row, {});
       expect(actions).toEqual(['split-right']);
-      expect(event.defaultPrevented).toBe(true);
+
+      chord('d', row, {});
+      chord('/', row, {});
+      expect(actions).toEqual(['split-right']);
+    });
+
+    it('opens the entry in the other panel on Ctrl+double click (PRD 002, §2.5)', () => {
+      const opened: string[] = [];
+      fixture.componentInstance.content()?.rowActivate.subscribe((id) => opened.push(id));
+      const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
+      row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, ctrlKey: true }));
+      row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+      expect(commands.filter((key) => key.command === 'open-aside')).toEqual([{ command: 'open-aside', entryId: ROWS[0]?.id }]);
+      expect(opened).toEqual([ROWS[0]?.id]);
+    });
+
+    it('leaves / to a text field', () => {
+      const field = document.createElement('input');
+      contentBody().appendChild(field);
+      const event = chord('/', field, {});
+
+      expect(actions).toEqual([]);
+      expect(event.defaultPrevented).toBe(false);
     });
 
     it('closes the focused tab on Ctrl+W', () => {
@@ -607,7 +639,7 @@ describe('panel keys', () => {
       chord('t', fixture.nativeElement.querySelector('.tab-main'));
       chord('w', fixture.nativeElement.querySelector('.tab-main'));
 
-      expect(actions).toEqual(['split-right']);
+      expect(actions).toEqual(['new-tab']);
       expect(closed).toEqual(['tab-root']);
     });
 
