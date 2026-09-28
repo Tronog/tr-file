@@ -204,6 +204,15 @@ export class LargeListings {
     };
   }
 
+  /**
+   * Stops reading a listing nobody wants any more — its panel went elsewhere
+   * (PRD 004, §3.1.2) — and forgets it. An unknown token is no error: it may
+   * have finished and been forgotten already.
+   */
+  cancel(token: string): void {
+    this.forget(token);
+  }
+
   /** Stops every reader, for a server shutting down. */
   close(): void {
     clearInterval(this.sweeper);

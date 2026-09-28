@@ -1,4 +1,4 @@
-import { computed, signal } from '@angular/core';
+import { computed, effect, signal, untracked } from '@angular/core';
 import type {
   UiBreadcrumb,
   UiEntryDrop,
@@ -137,7 +137,29 @@ export class FileBrowserFeature implements PanelContentFeature {
   /** Requests for each panel's filter box and path bar to take the keyboard, by group id. */
   private readonly focusRequests = signal<Readonly<Record<string, { readonly filter: number; readonly location: number }>>>({});
 
-  constructor(private readonly parent: WorkbenchService) {}
+  constructor(private readonly parent: WorkbenchService) {
+    // A large folder left before it is all read — its tab gone to another folder, or closed —
+    // stops being read (PRD 004, §3.1.2), unless it is still on screen somewhere else.
+    effect(() => {
+      const shown = new Set([...this.ordersWanted().map(({ path }) => path), ...this.parent.explorerFt.foldersShown()]);
+      untracked(() => {
+        for (const path of this.shownBefore) {
+          if (!shown.has(path)) {
+            this.parent.fsDataFt.abortLarge(path);
+          }
+        }
+        for (const path of shown) {
+          if (!this.shownBefore.has(path)) {
+            this.parent.fsDataFt.keepLarge(path);
+          }
+        }
+        this.shownBefore = shown;
+      });
+    });
+  }
+
+  /** The folders on screen when last looked — to tell which of them left it. */
+  private shownBefore: ReadonlySet<string> = new Set();
 
   private get groups(): EditorGroupsFeature {
     return this.parent.editorGroupsFt;

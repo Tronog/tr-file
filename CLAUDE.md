@@ -396,7 +396,11 @@ and cut are laid over a copy of the base rows — so a keypress in a folder of h
 copy of an array. Keep new per-entry work off those paths. A large folder is never polled
 (§3.1.1): `FsListingState.large` (set from the first answer, kept through reloads) leaves it out of
 `AutoRefreshFeature`'s folders and out of its expiring, so it is read again only by Refresh — the
-summary says `· refresh by hand`.
+summary says `· refresh by hand`. A large folder left before it is all in — its tab gone to another
+folder or closed, and no other panel, tree or image still showing it — stops being read (§3.1.2):
+an `effect` in `FileBrowserFeature` sees it leave the screen and calls `FsDataFeature.abortLarge`,
+which ends the polling, cancels the backend's worker (`DELETE /api/fs/list-progress`, bridge
+`list-cancel`) and puts back the last whole listing, or forgets the folder so it is read afresh.
 
 **No blank frames.** A reload keeps what is on screen: `FsDataFeature`, `FilePreviewFeature` and
 `ImageSourceService` go to `status: 'loading'` *with* the previous listing / details / document /

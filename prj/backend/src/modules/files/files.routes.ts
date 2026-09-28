@@ -73,6 +73,19 @@ export class FilesRoutes implements RouteModule {
       }),
     );
 
+    // DELETE /api/fs/list-progress?token= — stop reading a large folder nobody wants (PRD 004, §3.1.2).
+    this.router.delete(
+      '/list-progress',
+      asyncHandler(async (req, res) => {
+        const token = FilesRoutes.readQueryString(req, 'token');
+        if (token === undefined || token === '') {
+          throw HttpError.badRequest('Query parameter "token" is required');
+        }
+        this.filesService.cancelListing(token);
+        res.json({ data: { cancelled: true } });
+      }),
+    );
+
     // GET /api/fs/places — where to start, and the Places pane (PRD 003, §6).
     this.router.get(
       '/places',

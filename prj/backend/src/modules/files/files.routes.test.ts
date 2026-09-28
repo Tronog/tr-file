@@ -108,6 +108,12 @@ describe('GET /api/fs/list-progress', () => {
       assert.equal(await errorCodeOf(await fetch(`${base}/list-progress?token=${token}&namesFrom=x`)), 'BAD_REQUEST');
       assert.equal(await errorCodeOf(await fetch(`${base}/list-progress`)), 'BAD_REQUEST');
       assert.equal((await fetch(`${base}/list-progress?token=nope`)).status, 404);
+
+      // PRD 004, §3.1.2 — cancelled: a write, so it needs the CSRF header like any other.
+      assert.equal((await fetch(`${base}/list-progress?token=${token}`, { method: 'DELETE' })).status, 403);
+      const cancelled = await fetch(`${base}/list-progress?token=${token}`, { method: 'DELETE', headers: { 'X-TR-File-Request': '1' } });
+      assert.equal(cancelled.status, 200);
+      assert.equal((await fetch(`${base}/list-progress?token=${token}`)).status, 404);
     } finally {
       await rm(big, { recursive: true, force: true });
     }

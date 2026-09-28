@@ -137,6 +137,16 @@ describe('LargeListings', () => {
     assert.ok(names.some((name) => name.name === 'big'));
   });
 
+  /** PRD 004, §3.1.2 — a reading nobody wants any more is stopped and forgotten. */
+  it('stops a reading cancelled, and forgets it', async () => {
+    const token = (await service.listDirectory('big')).toJSON().progressive?.token as string;
+    service.cancelListing(token);
+    assert.throws(() => service.listProgress(token), (error: unknown) => error instanceof HttpError && error.status === 404);
+    // Cancelling again, or something unknown, is no error.
+    service.cancelListing(token);
+    service.cancelListing('never-was');
+  });
+
   it('says so when a token is unknown or forgotten', () => {
     assert.throws(
       () => service.listProgress('no-such-token'),

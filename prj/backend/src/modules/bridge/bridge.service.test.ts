@@ -99,6 +99,10 @@ describe('list', () => {
     assert.equal(names, 1000);
     assert.equal(details, 1000);
 
+    // PRD 004, §3.1.2 — cancelled through the bridge, the reading is forgotten.
+    dataOf(await bridge.dispatch({ command: 'list-cancel', token }));
+    assert.equal(errorOf(await bridge.dispatch({ command: 'list-progress', token })).status, 404);
+
     const error = errorOf(await bridge.dispatch({ command: 'list-progress', token, namesFrom: -1 } as never));
     assert.equal(error.code, 'BAD_REQUEST');
   });

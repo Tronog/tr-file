@@ -126,6 +126,123 @@ describe('A large folder', () => {
     http.match(() => true);
   });
 
+  /**
+   * §3.1.2 — a large folder left before it is all in stops being read. A
+   * subfolder, `big`: the root is always on screen, in the Explorer's tree.
+   */
+  describe('left while it is being read', () => {
+    const progressive = () => fsEnvelope({ path: 'big', parent: '', entries: [], progressive: { token: 't1' } });
+    const cancels = () => http.match((request) => request.method === 'DELETE' && request.url.startsWith('/api/fs/list-progress'));
+    const polls = () => http.match((request) => request.method === 'GET' && request.url.startsWith('/api/fs/list-progress'));
+    const group = () => workbench.activeGroupId();
+
+    /** Opens `folder` in the panel, answering a small listing for anything but `big`. */
+    async function open(folder: string): Promise<void> {
+      workbench.fileBrowserFt.navigateTo(group(), folder, folder);
+      TestBed.tick();
+      await settled();
+      if (folder !== 'big') {
+        http.match(listUrl(folder)).forEach((request) => request.flush(fsEnvelope({ path: folder, parent: folder === '' ? null : '', entries: [] })));
+        await settled();
+      }
+    }
+
+    beforeEach(async () => {
+      workbench.start();
+      http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [] }));
+      http.match(() => true).forEach((request) => request.flush(fsEnvelope(fsDetails(''))));
+      await settled();
+      TestBed.tick();
+    });
+
+    async function openBigAndAnswerOnce(): Promise<void> {
+      await open('big');
+      http.expectOne(listUrl('big')).flush(progressive());
+      await answer(0, 0, progress({ path: 'big', total: 5, names: [{ name: 'a', type: 'file' }] }));
+      TestBed.tick();
+    }
+
+    it('asks no more, tells the backend, and keeps nothing half read', async () => {
+      await openBigAndAnswerOnce();
+      await open('elsewhere');
+
+      const cancel = cancels();
+      expect(cancel).toHaveLength(1);
+      expect(cancel[0]?.request.urlWithParams).toContain('token=t1');
+      cancel[0]?.flush(fsEnvelope({ cancelled: true }));
+      // The question already on its way fails — the backend forgot the token — and that is no error.
+      polls().forEach((request) => request.flush({ error: { code: 'NOT_FOUND', message: 'gone' } }, { status: 404, statusText: 'Not Found' }));
+      clock += 5000;
+      await settled();
+      expect(polls()).toEqual([]);
+      expect(workbench.fsDataFt.listingState('big')).toBeUndefined();
+      expect(workbench.fsDataFt.isReadingLarge('big')).toBe(false);
+
+      // Opened again: read afresh.
+      await open('big');
+      expect(http.match(listUrl('big'))).toHaveLength(1);
+      http.match(() => true);
+    });
+
+    it('goes on while another panel still shows it', async () => {
+      await openBigAndAnswerOnce();
+      workbench.editorGroupsFt.runAction(group(), 'split-right');
+      TestBed.tick();
+      await open('elsewhere');
+
+      expect(cancels()).toEqual([]);
+      expect(workbench.fsDataFt.isReadingLarge('big')).toBe(true);
+      http.match(() => true);
+    });
+
+    it('gives up a refresh left half way for the listing it had', async () => {
+      await open('big');
+      http.expectOne(listUrl('big')).flush(progressive());
+      await answer(0, 0, progress({ path: 'big', total: 1, names: [{ name: 'old', type: 'file' }], namesDone: true, done: true }));
+
+      workbench.fileBrowserFt.runToolbarAction(group(), 'refresh');
+      await settled();
+      http.expectOne(listUrl('big')).flush(progressive());
+      await answer(0, 0, progress({ path: 'big', total: 1 }));
+      TestBed.tick();
+
+      await open('elsewhere');
+      cancels();
+      await settled();
+      expect(workbench.fsDataFt.listingState('big')).toMatchObject({ status: 'ready', large: true });
+      expect(workbench.fsDataFt.entries('big').map((entry) => entry.name)).toEqual(['old']);
+      http.match(() => true);
+    });
+
+    it('gives up a folder left before its first answer, once that says it is large', async () => {
+      await open('big');
+      const first = http.expectOne(listUrl('big'));
+      await open('elsewhere');
+      first.flush(progressive());
+      await settled();
+      await settled();
+
+      expect(cancels()).toHaveLength(1);
+      expect(polls()).toEqual([]);
+      http.match(() => true);
+    });
+
+    it('keeps reading a folder left and come back to before its first answer', async () => {
+      await open('big');
+      const first = http.expectOne(listUrl('big'));
+      await open('elsewhere');
+      workbench.panelHistoryFt.back(group());
+      TestBed.tick();
+      await settled();
+      first.flush(progressive());
+      await settled();
+
+      expect(cancels()).toEqual([]);
+      expect(workbench.fsDataFt.isReadingLarge('big')).toBe(true);
+      http.match(() => true);
+    });
+  });
+
   it('makes each update from the last where only details came — the same result as made afresh', async () => {
     workbench.showHidden.set(false);
     workbench.start();

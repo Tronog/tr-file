@@ -158,6 +158,10 @@ export class FsBridgeService implements FsTransport {
     return this.invoke<FsDirectoryListing>({ command: 'list', path });
   }
 
+  async listCancel(token: string): Promise<void> {
+    await this.invoke<unknown>({ command: 'list-cancel', token });
+  }
+
   async listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress> {
     return this.invoke<FsListingProgress>({ command: 'list-progress', token, namesFrom, detailsFrom });
   }

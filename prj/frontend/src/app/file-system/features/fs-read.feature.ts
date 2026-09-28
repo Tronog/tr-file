@@ -20,6 +20,11 @@ export class FsReadFeature {
     return this.parent.transport.list(path);
   }
 
+  /** Stops the backend reading a large folder (PRD 004, §3.1.2). */
+  async listCancel(token: string): Promise<void> {
+    return this.parent.transport.listCancel(token);
+  }
+
   /** A large folder's reading (PRD 004, §3.1), from the caller's cursors. */
   async listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress> {
     return this.parent.transport.listProgress(token, namesFrom, detailsFrom);

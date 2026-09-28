@@ -33,6 +33,16 @@ export interface FsListingState {
 
 const NO_ENTRIES: readonly FsEntry[] = [];
 
+/** A large folder being read: its backend token, and whether it was given up (PRD 004, §3.1.2). */
+interface LargeRead {
+  readonly token: string;
+  aborted: boolean;
+  /** Ends the pause between questions early. */
+  wake: (() => void) | null;
+  /** The listing shown before this reading began, put back if it is given up. */
+  readonly previous: FsDirectoryListing | undefined;
+}
+
 /** A large folder's reading is asked after, and put on screen, at most this often (PRD 004, §3.1). */
 export const LARGE_LISTING_INTERVAL_MS = 1000;
 
@@ -330,7 +340,75 @@ export class FsDataFeature {
    * everything is in, which is what keeps the path `pending` meanwhile.
    */
   private async readLarge(path: string, first: FsDirectoryListing, token: string, previous: FsDirectoryListing | undefined): Promise<void> {
+    const reading: LargeRead = { token, aborted: false, wake: null, previous };
+    this.largeReads.set(path, reading);
+    if (this.abandoned.delete(path)) {
+      this.abortLarge(path);
+    }
+    try {
+      await this.followLarge(path, first, reading, previous);
+    } catch (error) {
+      // Once given up, the backend has forgotten the token: a question still on its way fails, harmlessly.
+      if (!reading.aborted) {
+        throw error;
+      }
+    } finally {
+      this.largeReads.delete(path);
+    }
+  }
+
+  /**
+   * Stops reading a large folder nobody is looking at any more — the panel
+   * that showed it went elsewhere (PRD 004, §3.1.2): no more questions to the
+   * backend, whose worker is stopped too, and no read queued after it.
+   */
+  abortLarge(path: string): void {
+    const reading = this.largeReads.get(path);
+    if (reading === undefined) {
+      // Left while its first answer is still on the way: given up the moment it turns out large.
+      if (this.pendingListings.has(path)) {
+        this.abandoned.add(path);
+      }
+      return;
+    }
+    if (reading.aborted) {
+      return;
+    }
+    reading.aborted = true;
+    reading.wake?.();
+    this.staleListings.delete(path);
+    // At once, not when the question on its way comes back: the last whole listing if there was
+    // one, else nothing — so the folder is read afresh when it is next opened.
+    if (reading.previous !== undefined) {
+      this.patchListing(path, { status: 'ready', listing: reading.previous, large: true });
+    } else {
+      this.listings.update((cache) => {
+        const next = new Map(cache);
+        next.delete(path);
+        return next;
+      });
+    }
+    void this.parent.fileSystem.readFt.listCancel(reading.token).catch(() => undefined);
+  }
+
+  /** A folder shown again: whatever its reading was given up for, it is wanted after all. */
+  keepLarge(path: string): void {
+    this.abandoned.delete(path);
+  }
+
+  /** Folders left before their first answer came — given up if it says they are large. */
+  private readonly abandoned = new Set<string>();
+
+  /** Whether a large folder is being read right now. */
+  isReadingLarge(path: string): boolean {
+    return this.largeReads.has(path);
+  }
+
+  private readonly largeReads = new Map<string, LargeRead>();
+
+  private async followLarge(path: string, first: FsDirectoryListing, reading: LargeRead, previous: FsDirectoryListing | undefined): Promise<void> {
     const read = this.parent.fileSystem.readFt;
+    const token = reading.token;
     const prefix = first.path === '' ? '' : `${first.path}/`;
     // Index-aligned with the backend's names: details say which slot they fill; a vanished entry leaves `null`.
     const slots: (FsEntry | null)[] = [];
@@ -345,8 +423,14 @@ export class FsDataFeature {
     let goneAny = false;
 
     for (;;) {
+      if (reading.aborted) {
+        return;
+      }
       const asked = Date.now();
       const answer = await read.listProgress(token, slots.length, detailsFrom);
+      if (reading.aborted) {
+        return;
+      }
       for (const { name, type } of answer.names) {
         slots.push({ name, path: prefix + name, type, size: 0, hidden: name.startsWith('.'), modifiedAt: '', createdAt: '', partial: true });
         reshaped = true;
@@ -390,7 +474,17 @@ export class FsDataFeature {
         return;
       }
       const full = answer.names.length >= FULL_ANSWER || answer.details.length >= FULL_ANSWER;
-      await this.wait(full ? 0 : Math.max(0, LARGE_LISTING_INTERVAL_MS - (Date.now() - asked)));
+      // A pause an abort cuts short: nobody waits a second for a folder they have left.
+      await Promise.race([
+        this.wait(full ? 0 : Math.max(0, LARGE_LISTING_INTERVAL_MS - (Date.now() - asked))),
+        new Promise<void>((resolve) => {
+          reading.wake = resolve;
+        }),
+      ]);
+      reading.wake = null;
+      if (reading.aborted) {
+        return;
+      }
     }
   }
 

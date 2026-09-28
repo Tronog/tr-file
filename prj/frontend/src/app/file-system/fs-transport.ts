@@ -54,6 +54,9 @@ export interface FsTransport {
   /** A large folder's reading (PRD 004, §3.1): what came in after the cursors. */
   listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress>;
 
+  /** Stops the backend reading a large folder nobody wants any more (PRD 004, §3.1.2). */
+  listCancel(token: string): Promise<void>;
+
   /** Describes one file or directory in full. */
   details(path: string): Promise<FsDetails>;
 

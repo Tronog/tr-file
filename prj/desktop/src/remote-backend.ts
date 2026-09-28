@@ -238,6 +238,8 @@ export class RemoteBackend {
     switch (request.command) {
       case 'list':
         return this.json('GET', '/fs/list', { query: { path: request.path } });
+      case 'list-cancel':
+        return this.json('DELETE', '/fs/list-progress', { query: { token: request.token } });
       case 'list-progress':
         return this.json('GET', '/fs/list-progress', {
           query: { token: request.token, namesFrom: String(request.namesFrom ?? 0), detailsFrom: String(request.detailsFrom ?? 0) },
@@ -583,7 +585,7 @@ export class RemoteBackend {
   /* -- HTTP ------------------------------------------------------------------ */
 
   private async json<T>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     path: string,
     options: { query?: Record<string, string>; body?: unknown; accept?: readonly number[] } = {},
   ): Promise<T> {
@@ -597,7 +599,7 @@ export class RemoteBackend {
    * turned into the server's own failure.
    */
   private async request(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     path: string,
     options: {
       query?: Record<string, string | readonly string[]>;

@@ -749,6 +749,11 @@ export class FilesService {
     }
   }
 
+  /** Stops reading a large folder the caller no longer wants (PRD 004, §3.1.2). */
+  cancelListing(token: string): void {
+    this.largeListings.cancel(token);
+  }
+
   /** Where a large folder's reading has got to (PRD 004, §3.1), from the caller's cursors. */
   listProgress(token: string, namesFrom?: number, detailsFrom?: number): ListingProgressDto {
     return this.largeListings.progress(token, namesFrom, detailsFrom);

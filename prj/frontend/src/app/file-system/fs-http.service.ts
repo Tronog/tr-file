@@ -68,6 +68,14 @@ export class FsHttpService implements FsTransport {
     return this.get<FsDirectoryListing>('list', path);
   }
 
+  async listCancel(token: string): Promise<void> {
+    try {
+      await firstValueFrom(this.http.delete(`${this.baseUrl}/list-progress?${new HttpParams().set('token', token).toString()}`));
+    } catch (error) {
+      throw FsError.from(error);
+    }
+  }
+
   async listProgress(token: string, namesFrom: number, detailsFrom: number): Promise<FsListingProgress> {
     const params = new HttpParams().set('token', token).set('namesFrom', namesFrom).set('detailsFrom', detailsFrom);
     try {

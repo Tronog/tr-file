@@ -32,6 +32,7 @@ import type {
 export type FsBridgeCommand =
   | 'list'
   | 'list-progress'
+  | 'list-cancel'
   | 'details'
   | 'read'
   | 'upload-begin'
@@ -94,6 +95,12 @@ export interface FsListProgressRequest {
   readonly token: string;
   readonly namesFrom?: number;
   readonly detailsFrom?: number;
+}
+
+/** Stop reading a large folder nobody wants (PRD 004, §3.1.2) — `DELETE /api/fs/list-progress`. */
+export interface FsListCancelRequest {
+  readonly command: 'list-cancel';
+  readonly token: string;
 }
 
 /** Full metadata for one entry. */
@@ -319,6 +326,7 @@ export type FsBridgeRequest =
   | FsLogoutRequest
   | FsListRequest
   | FsListProgressRequest
+  | FsListCancelRequest
   | FsDetailsRequest
   | FsReadRequest
   | FsUploadBeginRequest

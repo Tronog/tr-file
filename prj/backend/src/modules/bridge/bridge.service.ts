@@ -280,6 +280,9 @@ export class FileSystemBridge {
         return (await this.files.listDirectory(request.path)).toJSON();
       case 'list-progress':
         return this.files.listProgress(request.token, request.namesFrom, request.detailsFrom);
+      case 'list-cancel':
+        this.files.cancelListing(request.token);
+        return { cancelled: true };
       case 'details':
         return (await this.files.getDetails(request.path)).toJSON();
       case 'read':
@@ -585,6 +588,8 @@ export class FileSystemBridge {
       case 'list':
       case 'details':
         return { command, path: FileSystemBridge.readString(value, 'path') };
+      case 'list-cancel':
+        return { command, token: FileSystemBridge.readString(value, 'token') };
       case 'list-progress': {
         const cursors = {
           namesFrom: FileSystemBridge.readOptionalCount(value, 'namesFrom'),
