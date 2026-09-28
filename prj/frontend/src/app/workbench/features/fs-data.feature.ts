@@ -298,6 +298,8 @@ export class FsDataFeature {
       if (listing.progressive === undefined) {
         this.patchListing(path, { status: 'ready', listing });
       } else {
+        // Large from the first answer on: not watched even before the count comes (§3.1.1).
+        this.patchListing(path, { status: 'loading', large: true, ...(previous ? { listing: previous } : {}) });
         await this.readLarge(path, listing, listing.progressive.token, previous);
       }
     } catch (error) {

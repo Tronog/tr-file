@@ -332,7 +332,8 @@ under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what
 changed — which the backend's `WatchService` judges by what a listing shows: an entry coming, going
 or renamed, or (in a folder under `WATCH_SNAPSHOT_MAX` entries, snapshotted as the watcher starts)
-a child's type, size or modified time. Windows reports access-time updates as changes too, and a
+a child's type, size or modified time (a large folder is not asked about at all — PRD 004,
+§3.1.1). Windows reports access-time updates as changes too, and a
 Samba share whose files are dated ahead of its server's clock updates them on every read, so a
 folder reading itself would otherwise be re-read for ever; folders leaving the screen are `expire`d in `FsDataFeature`, read again
 when next shown.
@@ -391,7 +392,10 @@ keeps the last order up meanwhile. Each update is made from the last where only 
 (`listing/array-delta.ts`: the hidden filter, the path index, the order laid over, the rows), rows
 are built for the showing view only, their cells formatted when first read, and selection, focus
 and cut are laid over a copy of the base rows — so a keypress in a folder of half a million costs a
-copy of an array. Keep new per-entry work off those paths.
+copy of an array. Keep new per-entry work off those paths. A large folder is never polled
+(§3.1.1): `FsListingState.large` (set from the first answer, kept through reloads) leaves it out of
+`AutoRefreshFeature`'s folders and out of its expiring, so it is read again only by Refresh — the
+summary says `· refresh by hand`.
 
 **No blank frames.** A reload keeps what is on screen: `FsDataFeature`, `FilePreviewFeature` and
 `ImageSourceService` go to `status: 'loading'` *with* the previous listing / details / document /

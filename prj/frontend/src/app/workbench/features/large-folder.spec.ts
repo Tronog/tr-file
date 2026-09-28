@@ -103,6 +103,8 @@ describe('A large folder', () => {
     workbench.start();
     http.expectOne(listUrl('')).flush(fsEnvelope({ path: '', parent: null, entries: [], progressive: { token: 't1' } }));
     http.match(detailsUrl('')).forEach((request) => request.flush(fsEnvelope(fsDetails(''))));
+    await settled();
+    // Large from the token on, before anything is counted.
     expect(workbench.autoRefreshFt.foldersShown()).toEqual([]);
     await answer(0, 0, progress({ total: 1, names: [{ name: 'a', type: 'file' }], namesDone: true, done: true }));
     expect(workbench.fsDataFt.isLarge('')).toBe(true);

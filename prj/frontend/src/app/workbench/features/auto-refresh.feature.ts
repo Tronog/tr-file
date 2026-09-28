@@ -121,7 +121,8 @@ export class AutoRefreshFeature {
   private forgetUnwatched(folders: readonly string[]): void {
     const now = new Set(folders);
     for (const path of this.watched) {
-      if (!now.has(path)) {
+      // A large folder is read again by hand only (PRD 004, §3.1.1), not when it is next shown.
+      if (!now.has(path) && !this.parent.fsDataFt.isLarge(path)) {
         this.parent.fsDataFt.expire(path);
       }
     }
