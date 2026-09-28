@@ -44,6 +44,11 @@
   font-size: var(--vsc-font-size-sm);
 }
 
+/* Source and destination of a file action, set a little apart from the actions above (PRD 002, §2.7.1). */
+.transfer-paths {
+  padding-top: 8px;
+}
+
 /*
  * The Git pane sits above the details (PRD 011, §2.1) and takes the room its
  * changes need — up to a point, past which it scrolls on its own and leaves

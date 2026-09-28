@@ -102,4 +102,28 @@ describe('The previous panel', () => {
     // After C, round the layout: B.
     expect(await offered()).toBe('/b');
   });
+
+  /** §2.7.1 — the details sidebar shows the two, under its actions. */
+  const shown = (): Record<string, string> =>
+    Object.fromEntries(workbench.detailsFt.transferPaths().map((property) => [property.label, property.value]));
+
+  it('shows the source and destination in the details sidebar, as the prompt offers them', async () => {
+    const [a, b, c] = panels;
+    focus(c);
+    focus(a);
+    expect(shown()).toEqual({ Source: '/a', Destination: '/c' });
+
+    focus(b);
+    expect(shown()).toEqual({ Source: '/b', Destination: '/a' });
+    expect(await offered()).toBe(shown()['Destination']);
+  });
+
+  it('shows no source while the active panel shows no folder', () => {
+    const [a, b] = panels;
+    focus(a);
+    focus(b);
+    workbench.editorGroupsFt.update(b, (group) => ({ ...group, tabs: group.tabs.map((tab) => ({ ...tab, kind: 'file' as const })) }));
+
+    expect(shown()).toEqual({ Source: '—', Destination: '/a' });
+  });
 });

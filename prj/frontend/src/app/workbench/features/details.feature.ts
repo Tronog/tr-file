@@ -128,6 +128,23 @@ export class DetailsFeature {
   });
 
   /**
+   * Where a file action goes from and to (PRD 002, §2.7.1): the active panel's
+   * folder and the one *Copy To…* / *Move To…* would offer — the panel active
+   * before it, by the rule `OperationsFeature.defaultDestination` keeps.
+   * Shown under the actions, whatever is selected.
+   */
+  readonly transferPaths = computed<readonly UiProperty[]>(() => {
+    const groupId = this.parent.activeGroupId();
+    const groups = this.parent.editorGroupsFt;
+    const group = groups.stateOf(groupId);
+    const source = group !== undefined && groups.activeTabOf(group)?.kind === 'folder' ? group.path : null;
+    return [
+      { label: 'Source', value: source === null ? '—' : `/${source}`, mono: true },
+      { label: 'Destination', value: `/${this.parent.operationsFt.defaultDestination(groupId)}`, mono: true },
+    ];
+  });
+
+  /**
    * Fetches what the sidebar shows about a path; called on every selection.
    *
    * An image is also read as a picture, so the card can show the file itself

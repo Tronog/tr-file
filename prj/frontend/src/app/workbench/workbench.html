@@ -433,6 +433,8 @@
         (toggle)="panes.toggle('open-with')"
       >
         <ui-action-list [items]="details.actions()" (select)="details.runAction($event)" />
+        <!-- where a file action goes from and to (PRD 002, §2.7.1) -->
+        <ui-property-list class="transfer-paths" [properties]="details.transferPaths()" />
       </ui-pane>
     }
     }

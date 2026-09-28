@@ -234,6 +234,8 @@ The workbench remembers the active panel and the one active before it (PRD 002, 
 through its `activate()`. A file action's source is the active panel and its destination the previous
 one: *Copy To…* / *Move To…* (and `F5` / `F6`) offer that panel's folder, falling back to the next
 folder panel in layout order when it has gone or shows no folder.
+The details sidebar's Actions pane ends with both (§2.7.1, `DetailsFeature.transferPaths`, from
+`OperationsFeature.defaultDestination`), so what `F5` / `F6` will offer is visible beforehand.
 
 File operations (PRD 005 §1) — copy, move, move to trash, empty trash — are backend jobs,
 started and followed by `OperationsFeature`: it asks first (destination, what to do with

@@ -655,9 +655,10 @@ export class OperationsFeature {
    * panel the user is in, the destination the one they came from, however
    * many panels are on screen. When that panel has gone, or shows no folder,
    * the next panel that shows one — two panels side by side are a source and
-   * a target — or, with one panel, the folder it is in.
+   * a target — or, with one panel, the folder it is in. The details sidebar
+   * shows it too (§2.7.1), so the prompt never offers a surprise.
    */
-  private defaultDestination(groupId: string): string {
+  defaultDestination(groupId: string): string {
     const groups = this.parent.editorGroupsFt;
     const previousId = this.parent.previousGroupId();
     const previous = previousId === null || previousId === groupId ? undefined : groups.stateOf(previousId);
