@@ -376,6 +376,12 @@ asks `/api/fs/host-paths` and writes with the Clipboard API, or `execCommand('co
 is not a secure context; a failure is said, never swallowed. Pressed twice within a second on the
 same entries (`PanelKeyboardFeature.copyPath`) it copies them the UNIX way instead — `C:\Users` as
 `/C/Users`, every `\` a `/` (`unixPath`; `copyPaths(paths, 'unix')`, bridge `unix: true`).
+Every path shown in the details sidebar — *Location*, *Links to*, the trash's *Original location*,
+the Actions pane's *Source* / *Destination* — copies itself when pressed (PRD 001, §9.3.1), the UNIX
+way with `Shift`: `SystemOpenFeature.copyable` makes the `UiProperty` a `copy` button (`UiPropertyList`
+reports `{ id, shift }`), `copyPathValue` copies an entry of the root as *Copy Path* does and a path
+naming none (a link's target, the system trash's) as text — `FsTransport.copyText`, bridge
+`clipboard-write-text` — and the value says `Copied` for a moment (`badge`).
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what
