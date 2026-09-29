@@ -36,7 +36,7 @@ import type {
 import type { AuthStatus } from '../auth/auth.model';
 import { FS_ABORTED, FsError } from './fs-error';
 import type { FsDetailsOptions, FsTransport, FsUploadOptions } from './fs-transport';
-import { shownPath } from './fs-path';
+import { shownPath, unixPath, type FsPathStyle } from './fs-path';
 
 const IDLE_PROGRESS: FsUploadProgress = { loaded: 0, total: null, percent: null };
 
@@ -423,8 +423,9 @@ export class FsHttpService implements FsTransport {
    * exist, and the old `execCommand('copy')` of a selected text field still
    * works there, inside the click that asked for it.
    */
-  async copyPaths(paths: readonly string[]): Promise<string> {
-    const text = (await this.hostPaths(paths)).join('\n');
+  async copyPaths(paths: readonly string[], style: FsPathStyle = 'native'): Promise<string> {
+    const hostPaths = await this.hostPaths(paths);
+    const text = (style === 'unix' ? hostPaths.map(unixPath) : hostPaths).join('\n');
     const clipboard = globalThis.navigator?.clipboard;
     if (clipboard !== undefined) {
       try {

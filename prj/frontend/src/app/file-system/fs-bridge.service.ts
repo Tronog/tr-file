@@ -25,6 +25,7 @@ import type {
 } from './file-system.model';
 import { FS_ABORTED, FsError } from './fs-error';
 import type { FsDetailsOptions, FsTransport, FsUploadOptions } from './fs-transport';
+import type { FsPathStyle } from './fs-path';
 
 /**
  * What a bridge command answers with. Mirrors the backend's
@@ -401,8 +402,9 @@ export class FsBridgeService implements FsTransport {
   }
 
   /** The main process writes it: the page itself may not write to the system clipboard. */
-  async copyPaths(paths: readonly string[]): Promise<string> {
-    return (await this.invoke<{ text: string }>({ command: 'clipboard-write-paths', paths: [...paths] })).text;
+  async copyPaths(paths: readonly string[], style: FsPathStyle = 'native'): Promise<string> {
+    const request = { command: 'clipboard-write-paths', paths: [...paths], ...(style === 'unix' ? { unix: true } : {}) };
+    return (await this.invoke<{ text: string }>(request)).text;
   }
 
   /** The main process starts it — for entries on this computer; it knows which window is where. */

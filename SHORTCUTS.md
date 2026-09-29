@@ -77,6 +77,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `Ctrl`+`C` / `Ctrl`+`X` / `Ctrl`+`V` | Copy / cut / paste entries | In a panel |
 | `Ctrl`+`Z` | Undo the last file change | In a panel |
 | `Ctrl`+`Shift`+`C` | Copy the full path | In a panel |
+| `Ctrl`+`Shift`+`C` twice within a second | Copy the full path the UNIX way (`C:\Users` → `/C/Users`) | In a panel |
 | `Enter` | Open — a folder in the panel, a file in a tab | On a row |
 | `Backspace` | Up one folder | On a row |
 | `Delete` | Move to trash (asks first) | On a row |

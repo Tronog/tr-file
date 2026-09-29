@@ -338,7 +338,9 @@ the *full* path (PRD 004, §1.3.2) — `SystemOpenFeature.copyPaths` → `FsTran
 desktop the main process writes the real host paths (`clipboard-write-paths` — the window's own
 clipboard permission is denied; a remote server is asked with `host-paths`), in a browser the page
 asks `/api/fs/host-paths` and writes with the Clipboard API, or `execCommand('copy')` where the page
-is not a secure context; a failure is said, never swallowed.
+is not a secure context; a failure is said, never swallowed. Pressed twice within a second on the
+same entries (`PanelKeyboardFeature.copyPath`) it copies them the UNIX way instead — `C:\Users` as
+`/C/Users`, every `\` a `/` (`unixPath`; `copyPaths(paths, 'unix')`, bridge `unix: true`).
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what

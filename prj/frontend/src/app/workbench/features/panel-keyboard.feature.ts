@@ -2,6 +2,9 @@ import type { UiPanelKey } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 import type { CommandTarget } from './commands.feature';
 
+/** How soon a second `Ctrl`+`Shift`+`C` must follow the first to copy UNIX paths (PRD 004, §1.3.2). */
+const DOUBLE_PRESS_MS = 1000;
+
 /**
  * What a panel's keyboard does (PRD 001, Section 6.2).
  *
@@ -29,6 +32,9 @@ import type { CommandTarget } from './commands.feature';
  * mean the same wherever focus is, and `FunctionKeysFeature` binds them.
  */
 export class PanelKeyboardFeature {
+  /** The last `copy-path` press that copied the host's way: when, and what. */
+  private lastCopyPath: { readonly at: number; readonly paths: string } | null = null;
+
   constructor(private readonly parent: WorkbenchService) {}
 
   /**
@@ -114,7 +120,7 @@ export class PanelKeyboardFeature {
 
       // PRD 004, §1.3.2: `Ctrl`+`Shift`+`C`, the command *Copy Path* runs.
       case 'copy-path':
-        this.parent.commandsFt.run('file.copyPath', this.copyPathTarget(groupId, key.entryId));
+        this.copyPath(groupId, key.entryId);
         break;
 
       case 'delete':
@@ -145,6 +151,26 @@ export class PanelKeyboardFeature {
         void files.selectByPattern(groupId, key.command === 'select-pattern');
         break;
     }
+  }
+
+  /**
+   * `Ctrl`+`Shift`+`C` runs *Copy Path*; pressed again on the same entries
+   * within a second, it copies them the UNIX way instead — `C:\Users\me` as
+   * `/C/Users/me` (PRD 004, §1.3.2) — over what the first press copied. A third
+   * press starts over.
+   */
+  private copyPath(groupId: string, entryId: string | null): void {
+    const target = this.copyPathTarget(groupId, entryId);
+    const paths = target.paths.length > 0 ? target.paths : target.folder === null ? [] : [target.folder];
+    const now = Date.now();
+    const last = this.lastCopyPath;
+    if (last !== null && now - last.at <= DOUBLE_PRESS_MS && last.paths === paths.join('\n')) {
+      this.lastCopyPath = null;
+      void this.parent.systemOpenFt.copyPaths(paths, 'unix');
+      return;
+    }
+    this.lastCopyPath = { at: now, paths: paths.join('\n') };
+    this.parent.commandsFt.run('file.copyPath', target);
   }
 
   /**

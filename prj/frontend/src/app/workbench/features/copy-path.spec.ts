@@ -56,6 +56,16 @@ describe('Copy Path', () => {
     expect(writeText).toHaveBeenCalledWith('/srv/files/docs/a.md\n/srv/files/docs/b c.txt');
   });
 
+  /** PRD 004, §1.3.2 — `Ctrl`+`Shift`+`C` twice: a Windows server's paths the UNIX way. */
+  it('copies UNIX paths when asked to', async () => {
+    const writeText = vi.fn(async () => undefined);
+    useClipboard({ writeText });
+    const copying = workbench.systemOpenFt.copyPaths(['docs/a.md', 'docs'], 'unix');
+    await answerHostPaths(['docs/a.md', 'docs'], ['C:\\files\\docs\\a.md', 'C:\\files\\docs']);
+    await copying;
+    expect(writeText).toHaveBeenCalledWith('/C/files/docs/a.md\n/C/files/docs');
+  });
+
   it('copies the folder itself when nothing is selected — the root too', async () => {
     const writeText = vi.fn(async () => undefined);
     useClipboard({ writeText });

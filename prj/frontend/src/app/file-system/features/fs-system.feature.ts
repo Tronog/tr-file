@@ -1,5 +1,6 @@
 import type { FsClipboardFiles } from '../file-system.model';
 import type { FileSystemService } from '../file-system.service';
+import type { FsPathStyle } from '../fs-path';
 
 /**
  * Handing entries to the user's own computer (PRD 003, §5): opening one with
@@ -55,8 +56,8 @@ export class FsSystemFeature {
   }
 
   /** *Copy Path*; answers with the text put on the clipboard. */
-  copyPaths(paths: readonly string[]): Promise<string> {
-    return this.parent.transport.copyPaths(paths);
+  copyPaths(paths: readonly string[], style: FsPathStyle = 'native'): Promise<string> {
+    return this.parent.transport.copyPaths(paths, style);
   }
 
   startDrag(paths: readonly string[]): boolean {

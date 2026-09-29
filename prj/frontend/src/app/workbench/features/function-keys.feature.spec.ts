@@ -225,6 +225,43 @@ describe('Function keys (PRD 004, §2)', () => {
       expect(copy).toHaveBeenCalledWith(['']);
     });
 
+    /** PRD 004, §1.3.2: twice within a second, the UNIX way — `C:\Users` as `/C/Users`. */
+    describe('pressed twice', () => {
+      beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }));
+      afterEach(() => vi.useRealTimers());
+
+      it('copies UNIX paths the second time within a second', () => {
+        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+
+        workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
+        vi.advanceTimersByTime(600);
+        workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
+
+        expect(copy.mock.calls).toEqual([[['b.txt']], [['b.txt'], 'unix']]);
+      });
+
+      it('starts over after the second press', () => {
+        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+
+        for (let press = 0; press < 3; press += 1) {
+          workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
+        }
+
+        expect(copy.mock.calls).toEqual([[['b.txt']], [['b.txt'], 'unix'], [['b.txt']]]);
+      });
+
+      it('copies the host way again after more than a second, or for other entries', () => {
+        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+
+        workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
+        vi.advanceTimersByTime(1001);
+        workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
+        workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'c.pdf' });
+
+        expect(copy.mock.calls).toEqual([[['b.txt']], [['b.txt']], [['c.pdf']]]);
+      });
+    });
+
     it('shows the key beside Copy Path', () => {
       expect(workbench.commandsFt.menuItem('file.copyPath').keybinding).toBe('Ctrl+Shift+C');
     });

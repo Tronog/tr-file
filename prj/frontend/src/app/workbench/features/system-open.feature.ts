@@ -1,7 +1,7 @@
 import { computed } from '@angular/core';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
-import { shownPath } from '../../file-system/fs-path';
+import { shownPath, type FsPathStyle } from '../../file-system/fs-path';
 
 /** Which system the window runs on, as far as naming things after it goes. */
 type Platform = 'windows' | 'mac' | 'other';
@@ -47,15 +47,16 @@ export class SystemOpenFeature {
 
   /**
    * *Copy Path* (PRD 003, §5): the entries' paths, one per line, on the
-   * clipboard — real host paths on the desktop. A clipboard that refuses is
-   * said, never swallowed.
+   * clipboard — real host paths on the desktop, or with `unix` those paths
+   * the UNIX way (`/C/Users/me`, PRD 004, §1.3.2). A clipboard that refuses
+   * is said, never swallowed.
    */
-  async copyPaths(paths: readonly string[]): Promise<void> {
+  async copyPaths(paths: readonly string[], style: FsPathStyle = 'native'): Promise<void> {
     if (paths.length === 0) {
       return;
     }
     try {
-      await this.parent.fileSystem.systemFt.copyPaths(paths);
+      await this.parent.fileSystem.systemFt.copyPaths(paths, style);
     } catch (error) {
       await this.parent.modal.message({
         severity: 'error',

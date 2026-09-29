@@ -11,7 +11,7 @@ import type { FsBridgeResponse } from '@tr-file/backend/bridge';
 import { AppConfig } from '@tr-file/backend/config';
 import { Logger } from '@tr-file/backend/core';
 
-import { BridgeSessions, type WindowRef } from './bridge-sessions.js';
+import { BridgeSessions, unixPath, type WindowRef } from './bridge-sessions.js';
 import type { DesktopShell } from './desktop-shell.js';
 
 /**
@@ -80,6 +80,16 @@ after(async () => {
   await new Promise((resolve) => server.close(resolve));
   await rm(localRoot, { recursive: true, force: true });
   await rm(remoteRoot, { recursive: true, force: true });
+});
+
+/** PRD 004, §1.3.2 — a Windows path the UNIX way. */
+describe('unixPath', () => {
+  it('turns the drive into a folder of the root, and every backslash into a slash', () => {
+    assert.equal(unixPath('C:\\'), '/C/');
+    assert.equal(unixPath('T:\\Work\\a b.txt'), '/T/Work/a b.txt');
+    assert.equal(unixPath('\\\\server\\share\\x'), '//server/share/x');
+    assert.equal(unixPath('/home/me'), '/home/me');
+  });
 });
 
 describe('BridgeSessions', () => {
@@ -378,6 +388,15 @@ describe('BridgeSessions and the system clipboard (PRD 003, §6)', () => {
     dataOf(await withClipboard.dispatch(sender, { command: 'clipboard-write-paths', paths: ['there.txt'] }));
     // The full path on the server's own disk (PRD 004, §1.3.2).
     assert.equal(clipboard.text, join(remoteRoot, 'there.txt'));
+  });
+
+  /** PRD 004, §1.3.2 — `Ctrl`+`Shift`+`C` twice in the window. */
+  it('copies paths the UNIX way when asked to', async () => {
+    const sender = window();
+    const copied = dataOf(await withClipboard.dispatch(sender, { command: 'clipboard-write-paths', paths: ['here.txt', ''], unix: true }));
+    const expected = [unixPath(join(localRoot, 'here.txt')), unixPath(localRoot)].join('\n');
+    assert.deepEqual(copied, { text: expected });
+    assert.equal(clipboard.text, expected);
   });
 
   it('says so when there is no clipboard to copy to', async () => {

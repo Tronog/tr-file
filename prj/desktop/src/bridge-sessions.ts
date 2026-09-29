@@ -39,6 +39,17 @@ export interface BridgeSessionsOptions {
 const failure = (code: string, status: number, message: string): FsBridgeResponse => ({ error: { code, message, status } });
 
 /**
+ * A host path the UNIX way (PRD 004, §1.3.2): the drive as a folder of the
+ * root, `C:\Users\me` → `/C/Users/me` and `C:\` → `/C/`, every `\` a `/`.
+ * A path that already is one is left as it is.
+ */
+export function unixPath(path: string): string {
+  const slashed = path.replace(/\\/g, '/');
+  const drive = /^([A-Za-z]):(\/.*)?$/.exec(slashed);
+  return drive === null ? slashed : `/${drive[1] as string}${drive[2] ?? ''}`;
+}
+
+/**
  * Each window's way to the file system: who is signed in (PRD 003, §2), and
  * which backend its commands go to (PRD 006, §1).
  *
@@ -220,10 +231,12 @@ export class BridgeSessions {
    * system clipboard, from the main process, since the window may not write
    * to it itself. On this computer each is its real host path (`C:\Users\me`
    * on Windows, whatever root the window is pinned to); on a remote server,
-   * the path the server names it by. Answers with the text copied.
+   * the path the server names it by. With `unix`, each the UNIX way —
+   * `C:\Users\me` is `/C/Users/me` (PRD 004, §1.3.2), one per line with `\n`.
+   * Answers with the text copied.
    */
   private async copyPaths(sender: WindowRef, request: Record<string, unknown>): Promise<FsBridgeResponse> {
-    const { paths } = request;
+    const { paths, unix } = request;
     if (!Array.isArray(paths) || !paths.every((path): path is string => typeof path === 'string') || paths.length === 0 || paths.length > 10_000) {
       return failure('BAD_REQUEST', 400, 'Bridge request field "paths" must be a non-empty array of strings');
     }
@@ -245,7 +258,7 @@ export class BridgeSessions {
       const answer = await remote.dispatch({ command: 'host-paths', paths });
       lines = 'data' in answer ? (answer.data as { paths: readonly string[] }).paths : paths.map(BridgeSessions.shownPath);
     }
-    const text = lines.join(this.platform === 'win32' ? '\r\n' : '\n');
+    const text = unix === true ? lines.map(unixPath).join('\n') : lines.join(this.platform === 'win32' ? '\r\n' : '\n');
     await this.clipboard.writeText(text);
     return { data: { text } };
   }
