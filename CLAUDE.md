@@ -71,7 +71,7 @@ workbench — `Enter`, `Space`, `Backspace`, `Ctrl`+`R` (refresh), `+`/`-`, and 
 `UiPanelKey`; `PanelKeyboardFeature` is the one place those bindings are decided.
 **Midnight Commander (PRD 004, §2).** The function keys are the *window's*, not a panel's:
 `F1`–`F10` are window bindings of `KeybindingsFeature` (help, rename, view, edit/open, copy and
-move — to the other panel's folder —, mkdir, trash, main menu, and quit on the desktop), each a
+move — to the other panel's folder —, mkdir, delete for good (PRD 004, §2.1; the trash is `Delete`), main menu, and quit on the desktop), each a
 command of `CommandsFeature` run on the active panel; `FunctionKeysFeature` draws the strip in the
 middle of `UiStatusBar` (`functionKeys`) from whatever they are bound to. `F5` copies, so refreshing is `Ctrl`+`R` (the desktop's
 accelerator table leaves it unbound). In the list and grid `Insert` marks and moves on and `*`
@@ -583,7 +583,7 @@ new file is first copied into the local temp folder (a program on the share will
 there — the portable `.exe` as the app from then on, the setup silently over the installation — and the
 new version is started directly (`startDetached`, with `--tr-file-upgraded`, so it waits for the old one's single-instance lock) before this one quits; the portable launcher has no `unpackDirName`, so old and new never share an unpack folder. Every step goes to `update.log` in the user-data folder.
 `pnpm --filter @tr-file/desktop publish:share` puts a release there.
-*File › Check for Updates…* (§8.6.1, `file.checkForUpdates`, desktop only) looks now — the channel's
+*File › Check for Updates…* (§8.6.1, `file.checkForUpdates`, `Ctrl`+`U`, desktop only) looks now — the channel's
 `check` — and always answers: up to date, a newer version to upgrade to (*Upgrade* / *Later*), the
 folder unreadable, or a copy that does not update itself (`supported: false`).
 

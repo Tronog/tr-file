@@ -80,7 +80,8 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
 
     expect(keys().keysFor('view.commandPalette')).toEqual(['Ctrl+Shift+P', 'Ctrl+P']);
     expect(keys().keysFor('help.show')).toEqual(['F1']);
-    expect(keys().keysFor('file.trash')).toEqual(['Delete', 'F8']);
+    expect(keys().keysFor('file.trash')).toEqual(['Delete']);
+    expect(keys().keysFor('file.delete')).toEqual(['Shift+Delete', 'F8']);
     expect(keymap().keysFor('file.open', 'list')).toEqual(['Enter']);
   });
 

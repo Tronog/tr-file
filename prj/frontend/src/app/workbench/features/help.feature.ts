@@ -30,6 +30,7 @@ const SUBJECTS: readonly { readonly id: string; readonly title: string; readonly
       'view.togglePanel',
       'view.toggleExplorer',
       'view.toggleDetails',
+      'file.checkForUpdates',
       'workbench.focusNextPart',
       'workbench.focusPreviousPart',
     ],

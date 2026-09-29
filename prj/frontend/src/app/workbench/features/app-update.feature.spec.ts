@@ -140,6 +140,22 @@ describe('File › Check for Updates… (PRD 001, §8.6.1)', () => {
     expect(message).toHaveBeenCalledWith(expect.objectContaining({ message: 'tr-file is up to date.' }));
   });
 
+  it('is Ctrl+U, and the menu says so', async () => {
+    const api = new FakeUpdateApi();
+    const workbench = bootstrap(api);
+    await settled();
+    vi.spyOn(workbench.modal, 'message').mockResolvedValue();
+
+    const event = new KeyboardEvent('keydown', { key: 'u', ctrlKey: true, cancelable: true });
+    workbench.keybindingsFt.handleShortcut(event);
+    await settled();
+    expect(event.defaultPrevented).toBe(true);
+    expect(api.sent).toEqual(['status', 'check']);
+
+    const file = workbench.chromeFt.menuItems().find((menu) => menu.id === 'file');
+    expect(file?.items?.find((item) => item.id === 'file.checkForUpdates')?.keybinding).toBe('Ctrl+U');
+  });
+
   it('offers a newer version found now, and upgrades to it when told to', async () => {
     const api = new FakeUpdateApi();
     api.onShare = 'tr-file-0.1.1-x86_64.AppImage';

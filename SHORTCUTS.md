@@ -35,6 +35,7 @@ the configurable keys as they are bound now, the user's changes included.
 | `` Ctrl+Shift+` `` | Show or hide the bottom panel (the key left of `1`, on any layout) | Anywhere |
 | `Ctrl`+`E` | Show or hide the Explorer | Anywhere |
 | `Ctrl`+`D` | Show or hide Details | Anywhere |
+| `Ctrl`+`U` | Check for updates (desktop) | Anywhere |
 | `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` | Focus next / previous part: Explorer → each panel → bottom panel (while open) → Details, and round | Anywhere |
 
 ### Function keys (Midnight Commander)
@@ -52,7 +53,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `F5` | Copy to… | Anywhere |
 | `F6` | Move to… | Anywhere |
 | `F7` | New folder… | Anywhere |
-| `F8` | Move to trash | Anywhere |
+| `F8` | Delete permanently (asks first) — `Delete` moves to trash | Anywhere |
 | `F9` | Main menu | Anywhere |
 | `F10` | Quit (desktop) | Anywhere |
 

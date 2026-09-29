@@ -101,11 +101,12 @@ describe('Function keys (PRD 004, §2)', () => {
       ]);
     });
 
-    it('F3 views, F4 opens with the system, F7 makes a folder, F8 trashes', () => {
+    it('F3 views, F4 opens with the system, F7 makes a folder, F8 deletes for good', () => {
       const open = vi.spyOn(workbench.fileBrowserFt, 'openPath').mockImplementation(() => undefined);
       const external = vi.spyOn(workbench.systemOpenFt, 'open').mockResolvedValue();
       const folder = vi.spyOn(workbench.fileEditFt, 'createFolder').mockResolvedValue();
       const trash = vi.spyOn(workbench.operationsFt, 'trash').mockResolvedValue();
+      const remove = vi.spyOn(workbench.operationsFt, 'deletePermanently').mockResolvedValue();
       select(['c.pdf']);
 
       for (const key of ['F3', 'F4', 'F7', 'F8']) {
@@ -115,7 +116,9 @@ describe('Function keys (PRD 004, §2)', () => {
       expect(open).toHaveBeenCalledWith(group, 'c.pdf');
       expect(external).toHaveBeenCalledWith('c.pdf');
       expect(folder).toHaveBeenCalledWith('', group);
-      expect(trash).toHaveBeenCalledWith(['c.pdf']);
+      // PRD 004, §2.1: deleted — asked first by `deletePermanently` — not moved to the trash.
+      expect(remove).toHaveBeenCalledWith(['c.pdf']);
+      expect(trash).not.toHaveBeenCalled();
     });
 
     it('F9 opens the first main menu', () => {

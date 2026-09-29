@@ -20,6 +20,8 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   // PRD 001, §9.2.1.
   { command: 'view.toggleExplorer', key: 'Ctrl+E', when: 'window' },
   { command: 'view.toggleDetails', key: 'Ctrl+D', when: 'window' },
+  // PRD 001, §8.6.1 — the desktop's; in a browser the command is disabled and the key does nothing.
+  { command: 'file.checkForUpdates', key: 'Ctrl+U', when: 'window' },
   { command: 'workbench.focusNextPart', key: 'Ctrl+Tab', when: 'window' },
   { command: 'workbench.focusPreviousPart', key: 'Ctrl+Shift+Tab', when: 'window' },
   { command: 'workbench.nextPanel', key: 'Tab', when: 'panel' },
@@ -33,7 +35,8 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'file.copyTo', key: 'F5', when: 'window' },
   { command: 'file.moveTo', key: 'F6', when: 'window' },
   { command: 'file.newFolder', key: 'F7', when: 'window' },
-  { command: 'file.trash', key: 'F8', when: 'window' },
+  // Midnight Commander's Delete: for good, after asking — the trash is `Delete` (PRD 004, §2.1).
+  { command: 'file.delete', key: 'F8', when: 'window' },
   { command: 'view.mainMenu', key: 'F9', when: 'window' },
   { command: 'file.quit', key: 'F10', when: 'window' },
 ];

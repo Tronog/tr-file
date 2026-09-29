@@ -12,7 +12,8 @@ const SHORT_LABELS: Readonly<Record<string, (parent: WorkbenchService) => string
   'file.copyTo': () => 'Copy',
   'file.moveTo': () => 'Move',
   'file.newFolder': () => 'MkDir',
-  'file.trash': () => 'Delete',
+  'file.trash': () => 'Trash',
+  'file.delete': () => 'Delete',
   'view.mainMenu': () => 'Menu',
   'file.quit': () => 'Quit',
 };
@@ -38,7 +39,7 @@ const FUNCTION_KEYS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F1
  * | `F5` | copy, to the other panel's folder | Copy |
  * | `F6` | move, to the other panel's folder | RenMov |
  * | `F7` | new folder | Mkdir |
- * | `F8` | move to the trash, after asking | Delete |
+ * | `F8` | delete for good, after asking (PRD 004, §2.1) | Delete |
  * | `F9` | the main menu | PullDn |
  * | `F10` | quit, after asking — desktop only | Quit |
  *
