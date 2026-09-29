@@ -50,6 +50,8 @@
     [commandLabel]="chrome.commandLabel"
     [commandKeys]="chrome.commandKeys"
     [actions]="chrome.titleBarActions()"
+    [upgrade]="workbench.appUpdateFt.upgrade()"
+    (upgradeSelect)="workbench.appUpdateFt.run()"
     [windowControls]="windowControls.controls()"
     [draggable]="windowControls.draggable()"
     [leadingInset]="windowControls.leadingInset()"

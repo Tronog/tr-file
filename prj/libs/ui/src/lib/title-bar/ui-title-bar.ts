@@ -2,7 +2,7 @@ import { Component, ElementRef, computed, input, output, viewChildren } from '@a
 import { UiContextMenu } from '../context-menu/ui-context-menu';
 import { UiIcon } from '../icon/ui-icon';
 import type { UiIconAction, UiIconName } from '../models/icon.model';
-import type { UiMenuBarItem, UiMenuBarSelection, UiWindowControl } from '../models/chrome.model';
+import type { UiMenuBarItem, UiMenuBarSelection, UiTitleBarUpgrade, UiWindowControl } from '../models/chrome.model';
 
 /**
  * The window title bar: menu bar on the left, command centre in the middle and
@@ -45,6 +45,12 @@ export class UiTitleBar {
   readonly actions = input<readonly UiIconAction[]>([]);
 
   /**
+   * A newer version of the application is there (PRD 001, §8.6): a green
+   * button right of the title, or nothing when `null`.
+   */
+  readonly upgrade = input<UiTitleBarUpgrade | null>(null);
+
+  /**
    * The window buttons, or empty where the window still has its own — a
    * browser tab, or a platform that draws them itself.
    */
@@ -76,6 +82,9 @@ export class UiTitleBar {
   readonly commandSelect = output<void>();
 
   readonly actionSelect = output<string>();
+
+  /** The *Upgrade* button was pressed. */
+  readonly upgradeSelect = output<void>();
 
   readonly windowControlSelect = output<string>();
 

@@ -85,6 +85,7 @@ export class MockDataWorkbenchService {
         { id: 'file.uploadFolder', label: 'Upload Folder…' },
         { id: 'file.download', label: 'Download' },
         { id: 'file.emptyTrash', label: 'Empty Trash…', separatorBefore: true },
+        { id: 'file.checkForUpdates', label: 'Check for Updates…', separatorBefore: true },
       ],
     },
     {

@@ -1,5 +1,6 @@
 import { computed, inject, Service, signal } from '@angular/core';
 import { DesktopWindowService } from '../desktop/desktop-window.service';
+import { DesktopUpdateService } from '../desktop/desktop-update.service';
 import { FileSystemService } from '../file-system/file-system.service';
 import { ImageSourceService } from '../file-system/image-source.service';
 import { BottomPanelFeature } from './features/bottom-panel.feature';
@@ -22,6 +23,7 @@ import { SidebarPanesFeature } from './features/sidebar-panes.feature';
 import { ListingOrderFeature } from './listing/listing-order.feature';
 import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
+import { AppUpdateFeature } from './features/app-update.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { OperationsFeature } from './features/operations.feature';
 import { FocusCycleFeature } from './features/focus-cycle.feature';
@@ -74,6 +76,9 @@ export class WorkbenchService {
    * where the tab supplies its own decorations.
    */
   readonly desktopWindow = inject(DesktopWindowService);
+
+  /** The desktop's self-update: whether the share holds a newer version (PRD 001, §8.6). */
+  readonly desktopUpdate = inject(DesktopUpdateService);
 
   /**
    * Pictures the browser can draw, cached by path — read by the panel's viewer
@@ -199,6 +204,8 @@ export class WorkbenchService {
   readonly resizeFt = new WorkbenchResizeFeature(this);
   /** The frameless window's own buttons and drag region. */
   readonly windowControlsFt = new WindowControlsFeature(this);
+  /** The title bar's green *Upgrade* button (PRD 001, §8.6). */
+  readonly appUpdateFt = new AppUpdateFeature(this);
   /** Remote servers kept on this machine, for *Connect to Remote Server* (PRD 009, §1). */
   readonly savedServersFt = new SavedServersFeature(undefined, this.settings);
   /** The command palette: `Ctrl`+`Shift`+`P` (PRD 009, §1). */

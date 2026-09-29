@@ -1,0 +1,500 @@
+import { spawn } from 'node:child_process';
+import { chmod, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
+
+/**
+ * Where the distributables are published (PRD 001, §8.6): a folder on the
+ * office share, one per platform. `TR_FILE_UPDATE_DIR` names another, and
+ * `off` turns updating off.
+ */
+export const DEFAULT_UPDATE_DIRS: Readonly<Partial<Record<NodeJS.Platform, string>>> = {
+  win32: 'S:\\Library\\Software\\Applications\\Tronog\\TR-File',
+  linux: '/S/Library/Software/Applications/Tronog/TR-File',
+};
+
+/**
+ * What a copy of the app is, which decides which file on the share updates it
+ * and how:
+ *
+ * - `appimage` — a Linux AppImage; `path` is the `.AppImage` file itself.
+ * - `portable` — the Windows single `.exe` (§8.3); `path` is that `.exe`.
+ * - `installed` — installed by the Windows setup (§8.4); updated by running a
+ *   newer setup, which replaces the installation in place.
+ */
+export type InstallationKind = 'appimage' | 'portable' | 'installed';
+
+export interface Installation {
+  readonly kind: InstallationKind;
+  /** The file that *is* the app, for `appimage` and `portable`. */
+  readonly path?: string;
+  /** `app.getVersion()`: the one hint there is before anything was recorded. */
+  readonly version: string;
+}
+
+/**
+ * What says a file is a new version (§8.6): its name, size and modified time
+ * — not a version inside it, which would mean opening a 100 MB file on a share
+ * every few minutes.
+ */
+export interface UpdateFileKey {
+  readonly name: string;
+  readonly size: number;
+  readonly mtimeMs: number;
+}
+
+/** A newer distributable than the running one, found on the share. */
+export interface UpdateCandidate extends UpdateFileKey {
+  readonly path: string;
+}
+
+/** How the new version starts once this process has gone. */
+export interface Relaunch {
+  readonly command: string;
+  readonly args: readonly string[];
+}
+
+export interface SelfUpdateOptions {
+  /** The folder the distributables are published in. */
+  readonly source: string;
+  readonly installation: Installation;
+  /** `update-state.json` in the user-data folder: the key of what is installed. */
+  readonly stateFile: string;
+  /** A temporary folder for the installed kind's setup. */
+  readonly tempDir: string;
+  /** A file changed more recently than this is taken to be still being copied. */
+  readonly settleMs?: number;
+  readonly now?: () => number;
+}
+
+/** Filesystem times on a share are coarse (FAT: 2 s); a key within this is the same key. */
+const MTIME_TOLERANCE_MS = 2_000;
+
+/** A file on the share must have stood still this long to be offered. */
+const DEFAULT_SETTLE_MS = 30_000;
+
+/** Beside the file being replaced, so the final rename stays on one file system. */
+const PART_SUFFIX = '.update-part';
+const OLD_SUFFIX = '.update-old';
+
+/**
+ * Which kind of copy is running, from what the packaged launchers leave in the
+ * environment — or `null` where there is nothing to update: a development run,
+ * macOS, an unpacked build.
+ */
+export function detectInstallation(
+  platform: NodeJS.Platform,
+  env: NodeJS.ProcessEnv,
+  packaged: boolean,
+  version: string,
+): Installation | null {
+  if (!packaged) {
+    return null;
+  }
+  if (platform === 'linux' && env['APPIMAGE']) {
+    return { kind: 'appimage', path: env['APPIMAGE'], version };
+  }
+  if (platform === 'win32') {
+    // electron-builder's portable launcher names the `.exe` it was started from.
+    const portable = env['PORTABLE_EXECUTABLE_FILE'];
+    return portable ? { kind: 'portable', path: portable, version } : { kind: 'installed', version };
+  }
+  return null;
+}
+
+/** The folder to look in, or `null` when updating is off. */
+export function updateSource(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string | null {
+  const configured = env['TR_FILE_UPDATE_DIR']?.trim();
+  if (configured === 'off') {
+    return null;
+  }
+  return configured || DEFAULT_UPDATE_DIRS[platform] || null;
+}
+
+/** Whether `name` is a distributable for this kind of copy. */
+export function isDistributableFor(kind: InstallationKind, name: string): boolean {
+  if (name.startsWith('.') || name.endsWith(PART_SUFFIX)) {
+    return false;
+  }
+  switch (kind) {
+    case 'appimage':
+      return /\.appimage$/i.test(name);
+    // The portable `.exe` and the setup sit side by side; each updates its own kind.
+    case 'portable':
+      return /\.exe$/i.test(name) && !/setup/i.test(name);
+    case 'installed':
+      return /\.exe$/i.test(name) && /setup/i.test(name);
+  }
+}
+
+export function sameKey(a: UpdateFileKey, b: UpdateFileKey): boolean {
+  return a.name === b.name && a.size === b.size && Math.abs(a.mtimeMs - b.mtimeMs) <= MTIME_TOLERANCE_MS;
+}
+
+/**
+ * Self-updating from a folder (PRD 001, §8.6).
+ *
+ * The published distributables are plain files on a share, so there is no
+ * feed, no signature and no version inside to read: a file is a new version
+ * when its key — name, size, modified time — is not the key of the file this
+ * copy was installed from. That key is kept in `update-state.json`, written as
+ * an upgrade is applied. Before there is one (a copy installed by hand) the
+ * running file stands in: the same name and size is the same file, whatever
+ * the copy did to its time — or a name that carries this version.
+ *
+ * Applying it: an AppImage or portable `.exe` is copied beside the running
+ * file and renamed over it (a running file may be renamed, on Linux and on
+ * Windows alike), so its path — what every shortcut points at — stays; the
+ * installed kind runs the newer setup silently, which replaces the
+ * installation. Either way the new version starts once this process has gone.
+ *
+ * Nothing here imports `electron`.
+ */
+export class SelfUpdate {
+  private readonly settleMs: number;
+  private readonly now: () => number;
+
+  constructor(private readonly options: SelfUpdateOptions) {
+    this.settleMs = options.settleMs ?? DEFAULT_SETTLE_MS;
+    this.now = options.now ?? Date.now;
+  }
+
+  get installation(): Installation {
+    return this.options.installation;
+  }
+
+  /**
+   * The newest distributable on the share when it is not what is running;
+   * `null` when it is, or when there is none. Throws when the share cannot
+   * be read.
+   */
+  async check(): Promise<UpdateCandidate | null> {
+    const latest = await this.latest();
+    if (latest === null || (await this.isCurrent(latest))) {
+      return null;
+    }
+    return latest;
+  }
+
+  /**
+   * Puts `candidate` in place and says how to start it. Throws, leaving the
+   * running copy as it was, when it cannot — a folder the app may not write
+   * in, a file on the share that changed meanwhile.
+   */
+  async apply(candidate: UpdateCandidate): Promise<Relaunch> {
+    const installation = this.options.installation;
+    await this.assertUnchanged(candidate);
+
+    if (installation.kind === 'installed') {
+      await mkdir(this.options.tempDir, { recursive: true });
+      const setup = join(this.options.tempDir, candidate.name);
+      await this.copyChecked(candidate, setup);
+      await this.record(candidate);
+      // What electron-updater passes too: silent, as an update, and start the app when done.
+      return { command: setup, args: ['--updated', '/S', '--force-run'] };
+    }
+
+    const target = installation.path;
+    if (target === undefined) {
+      throw new Error('The running copy does not say where it is.');
+    }
+    const part = join(dirname(target), `.${basename(target)}${PART_SUFFIX}`);
+    try {
+      await this.copyChecked(candidate, part);
+      await chmod(part, 0o755);
+      await this.replace(target, part);
+    } catch (error: unknown) {
+      await rm(part, { force: true });
+      throw error;
+    }
+    await this.record(candidate);
+    return { command: target, args: [] };
+  }
+
+  /** What an earlier upgrade left behind: the old `.exe`, a copy it never finished. */
+  async cleanUp(): Promise<void> {
+    const target = this.options.installation.path;
+    if (target !== undefined) {
+      await rm(`${target}${OLD_SUFFIX}`, { force: true }).catch(() => undefined);
+      await rm(join(dirname(target), `.${basename(target)}${PART_SUFFIX}`), { force: true }).catch(() => undefined);
+    }
+    await rm(this.options.tempDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+
+  /* -- internals ---------------------------------------------------------- */
+
+  /** The most recently modified distributable that has stood still; `null` if none. */
+  private async latest(): Promise<UpdateCandidate | null> {
+    let names: string[];
+    try {
+      names = await readdir(this.options.source);
+    } catch {
+      // The share is not mounted, or not reachable from here: said by a check
+      // asked for (§8.6.1); a periodic one only logs it.
+      throw new Error(`The update folder ${this.options.source} could not be read.`);
+    }
+
+    let latest: UpdateCandidate | null = null;
+    for (const name of names) {
+      if (!isDistributableFor(this.options.installation.kind, name)) {
+        continue;
+      }
+      const path = join(this.options.source, name);
+      const info = await stat(path).catch(() => null);
+      if (info === null || !info.isFile() || this.now() - info.mtimeMs < this.settleMs) {
+        continue;
+      }
+      if (latest === null || info.mtimeMs > latest.mtimeMs) {
+        latest = { name, size: info.size, mtimeMs: info.mtimeMs, path };
+      }
+    }
+    return latest;
+  }
+
+  private async isCurrent(candidate: UpdateCandidate): Promise<boolean> {
+    const recorded = await this.recorded();
+    if (recorded !== null) {
+      return sameKey(recorded, candidate);
+    }
+
+    // Nothing recorded yet: the running file, or the version, is the only hint.
+    const { path, version } = this.options.installation;
+    const self = path === undefined ? null : await stat(path).catch(() => null);
+    const sameFile = path !== undefined && self !== null && basename(path) === candidate.name && self.size === candidate.size;
+    const sameVersion = candidate.name.includes(`-${version}-`) || candidate.name.includes(`-${version}.`);
+    if (sameFile || sameVersion) {
+      // From now on the share's own key is the one compared.
+      await this.record(candidate).catch(() => undefined);
+      return true;
+    }
+    return false;
+  }
+
+  private async recorded(): Promise<UpdateFileKey | null> {
+    try {
+      const value = JSON.parse(await readFile(this.options.stateFile, 'utf8')) as { installed?: Partial<UpdateFileKey> };
+      const installed = value.installed;
+      if (
+        installed !== undefined &&
+        typeof installed.name === 'string' &&
+        typeof installed.size === 'number' &&
+        typeof installed.mtimeMs === 'number'
+      ) {
+        return { name: installed.name, size: installed.size, mtimeMs: installed.mtimeMs };
+      }
+    } catch {
+      // Missing or broken: nothing recorded.
+    }
+    return null;
+  }
+
+  private async record(key: UpdateFileKey): Promise<void> {
+    const file = this.options.stateFile;
+    await mkdir(dirname(file), { recursive: true });
+    const installed: UpdateFileKey = { name: key.name, size: key.size, mtimeMs: key.mtimeMs };
+    const temporary = `${file}.tmp`;
+    await writeFile(temporary, `${JSON.stringify({ installed }, null, 2)}\n`);
+    await rename(temporary, file);
+  }
+
+  /** The share's file is still the one that was offered. */
+  private async assertUnchanged(candidate: UpdateCandidate): Promise<void> {
+    const info = await stat(candidate.path).catch(() => null);
+    if (info === null) {
+      throw new Error(`${candidate.name} is no longer in ${this.options.source}.`);
+    }
+    if (!sameKey({ name: candidate.name, size: info.size, mtimeMs: info.mtimeMs }, candidate)) {
+      throw new Error(`${candidate.name} changed since it was offered; it may still be being copied.`);
+    }
+  }
+
+  /** Copies, then checks that all of it arrived and that the source held still. */
+  private async copyChecked(candidate: UpdateCandidate, to: string): Promise<void> {
+    await copyFile(candidate.path, to);
+    const copied = await stat(to);
+    if (copied.size !== candidate.size) {
+      throw new Error(`${candidate.name} was not copied whole.`);
+    }
+    await this.assertUnchanged(candidate);
+  }
+
+  /**
+   * Renames `part` over `target`. On Windows a running `.exe` cannot be
+   * replaced, but it can be moved aside — so it is, and removed on the next
+   * start; on Linux the rename replaces it outright, the running AppImage
+   * keeping the old file open until it exits.
+   */
+  private async replace(target: string, part: string): Promise<void> {
+    if (process.platform !== 'win32') {
+      await rename(part, target);
+      return;
+    }
+    const old = `${target}${OLD_SUFFIX}`;
+    await rm(old, { force: true });
+    await rename(target, old);
+    try {
+      await rename(part, target);
+    } catch (error: unknown) {
+      await rename(old, target).catch(() => undefined);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Starts `relaunch` once the processes in `waitFor` have exited, from a
+ * detached shell that outlives this one.
+ *
+ * Waiting matters twice over: the new copy would otherwise find this one still
+ * holding the single-instance lock and quit, and the portable launcher removes
+ * the folder it unpacked into only after the app has exited — the folder the
+ * new launcher unpacks into.
+ */
+export function relaunchAfterExit(relaunch: Relaunch, waitFor: readonly number[], platform: NodeJS.Platform = process.platform): void {
+  if (platform === 'win32') {
+    const quote = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+    const ids = waitFor.join(',');
+    const args = relaunch.args.length > 0 ? ` -ArgumentList ${relaunch.args.map(quote).join(',')}` : '';
+    const script =
+      `Wait-Process -Id ${ids} -Timeout 60 -ErrorAction SilentlyContinue; ` +
+      `Start-Process -FilePath ${quote(relaunch.command)}${args}`;
+    spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    }).unref();
+    return;
+  }
+
+  // Up to a minute, a fifth of a second at a time; then the new copy, detached from us.
+  const wait = waitFor.map((id) => `n=0; while kill -0 ${id} 2>/dev/null && [ $n -lt 300 ]; do sleep 0.2; n=$((n+1)); done`).join('; ');
+  const env = { ...process.env };
+  // The running AppImage's runtime variables would point the new one at our mount.
+  for (const name of ['APPIMAGE', 'APPDIR', 'ARGV0', 'OWD']) {
+    delete env[name];
+  }
+  spawn('/bin/sh', ['-c', `${wait}; exec "$0" "$@"`, relaunch.command, ...relaunch.args], {
+    detached: true,
+    stdio: 'ignore',
+    env,
+  }).unref();
+}
+
+/** What the title bar is told (§8.6): a newer version, and whether it is being put in place. */
+export interface UpdateStatus {
+  /** The file on the share that would be installed, by name; `null` when up to date. */
+  readonly available: string | null;
+  readonly upgrading: boolean;
+}
+
+/** How often the share is looked at again. */
+export const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
+
+export interface UpdateMonitorHooks {
+  /** The status changed; every window is told. */
+  readonly changed: (status: UpdateStatus) => void;
+  /** The update is in place: start it after this process, then quit. */
+  readonly restart: (relaunch: Relaunch) => void;
+  readonly log: (message: string, fields?: Record<string, unknown>) => void;
+}
+
+/**
+ * Keeps looking for a newer version — at start and every quarter of an hour —
+ * and applies it when asked. One check or upgrade at a time.
+ */
+export class UpdateMonitor {
+  private candidate: UpdateCandidate | null = null;
+  private upgrading = false;
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private checking: Promise<string | null> | null = null;
+  /** Why the last check failed, so a share that stays away is logged once. */
+  private lastError: string | null = null;
+
+  constructor(
+    private readonly updater: SelfUpdate,
+    private readonly hooks: UpdateMonitorHooks,
+    private readonly intervalMs = UPDATE_CHECK_INTERVAL_MS,
+  ) {}
+
+  get status(): UpdateStatus {
+    return { available: this.candidate?.name ?? null, upgrading: this.upgrading };
+  }
+
+  /** Clears what an earlier upgrade left, then checks now and on the interval. */
+  async start(): Promise<void> {
+    await this.updater.cleanUp();
+    this.timer = setInterval(() => void this.check(), this.intervalMs);
+    this.timer.unref?.();
+    await this.check();
+  }
+
+  stop(): void {
+    if (this.timer !== null) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  /**
+   * Looks at the share once; joins a check already running. Resolves with why
+   * the share could not be read, or `null` — the status says what was found.
+   */
+  check(): Promise<string | null> {
+    this.checking ??= this.checkOnce().finally(() => (this.checking = null));
+    return this.checking;
+  }
+
+  /**
+   * Puts the offered version in place and restarts into it. Resolves with why
+   * it could not, or `null` once the restart is under way.
+   */
+  async upgrade(): Promise<string | null> {
+    if (this.upgrading) {
+      return null;
+    }
+    await this.check();
+    const candidate = this.candidate;
+    if (candidate === null) {
+      return 'There is no newer version to upgrade to.';
+    }
+
+    this.upgrading = true;
+    this.hooks.changed(this.status);
+    try {
+      const relaunch = await this.updater.apply(candidate);
+      this.hooks.log('upgrading', { from: this.updater.installation.version, to: candidate.name });
+      this.hooks.restart(relaunch);
+      return null;
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.hooks.log('upgrade failed', { to: candidate.name, reason });
+      this.upgrading = false;
+      this.hooks.changed(this.status);
+      return reason;
+    }
+  }
+
+  private async checkOnce(): Promise<string | null> {
+    if (this.upgrading) {
+      return null;
+    }
+    const before = this.candidate?.name ?? null;
+    try {
+      this.candidate = await this.updater.check();
+      this.lastError = null;
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      if (reason !== this.lastError) {
+        this.hooks.log('update check failed', { reason });
+      }
+      this.lastError = reason;
+      return reason;
+    }
+    if ((this.candidate?.name ?? null) !== before) {
+      if (this.candidate !== null) {
+        this.hooks.log('update available', { name: this.candidate.name });
+      }
+      this.hooks.changed(this.status);
+    }
+    return null;
+  }
+}

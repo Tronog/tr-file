@@ -324,6 +324,7 @@ the state are restored.
 | `src/system-clipboard.ts`, `src/electron-clipboard.ts` | Files on the system clipboard, both ways |
 | `src/drag-out.channel.ts` | Entries dragged out of a panel into other apps |
 | `src/window-controls.channel.ts` | The four verbs a page may use on its own window |
+| `src/self-update.ts`, `src/update.channel.ts` | Upgrading from the share: what is newer, putting it in place, the *Upgrade* button's channel |
 | `src/app-menu.ts` | The accelerator table; deliberately without `Ctrl`+`W` |
 | `src/preload.cts` | The two small objects the renderer is given |
 | `scripts/bundle.mjs` | The build: one file for the main process, one for the preload |
@@ -445,6 +446,58 @@ uninstaller out of the stub with electron-builder's own reader instead (see its
 README). So `pnpm package:win` needs nothing installed: no Wine, no `sudo`, no
 Docker. (electron-builder's own downloadable Linux Wine, `toolsets.wine`, is no
 help here: its archive ships without Wine's Windows DLLs and cannot start.)
+
+### Self-updating (PRD 001, §8.6)
+
+The distributables are published to a folder on the office share, and every
+packaged copy watches it — at start and every 15 minutes:
+
+| Platform | Folder | Files |
+| --- | --- | --- |
+| Windows | `S:\Library\Software\Applications\Tronog\TR-File` | `*.exe` — the portable one for a portable copy, `*Setup*` for an installed one |
+| Linux | `/S/Library/Software/Applications/Tronog/TR-File` | `*.AppImage` |
+
+`TR_FILE_UPDATE_DIR` names another folder, and `off` turns it off; a
+development run (not packaged, or no `APPIMAGE` / Windows) never updates.
+
+There is no feed and no version to read: a file is a new version when its
+**name, size and modified time** are not those of the file this copy was
+installed from, which `update-state.json` in the user-data folder records. Of
+several, the most recently modified wins; one modified in the last 30 s is
+taken to be still copying and waits. Before anything is recorded (a copy
+installed by hand), the running AppImage / `.exe` stands in — the same name and
+size is the same file — or a name carrying `app.getVersion()`; either records
+the share's key from then on.
+
+While one is there the page's title bar shows a green **Upgrade** right of the
+title (`UpdateChannel` → `window.trFileUpdate` → `AppUpdateFeature`). Pressed
+and confirmed, `SelfUpdate.apply`:
+
+- **AppImage / portable `.exe`** — copies the new file beside the running one
+  (a dot-name) and renames it over it, so the path every shortcut points at
+  stays. On Windows the running `.exe` is moved aside first (a running `.exe`
+  can be renamed, not replaced) and removed on the next start.
+- **Installed** — copies the setup to a temporary folder and runs it with
+  `--updated /S --force-run`: silent, over the installation (§8.4), and it starts
+  the app when done.
+
+The file on the share is checked again before and after the copy, so one
+changed meanwhile is refused and the running copy left alone; a failure is
+said in the window. The new copy is started by a detached shell once this
+process — and, for the AppImage runtime and the portable launcher, its parent,
+which cleans up after it — has exited, so it never meets the old one's
+single-instance lock.
+
+*File › Check for Updates…* (§8.6.1) asks the same channel to look now
+(`check`) rather than at the next quarter hour, and the window always answers:
+up to date, a newer version — offered for upgrade on the spot, or left on the
+title bar for later —, the folder could not be read (a periodic check only logs
+that, once), or this copy does not update itself (a development run, or
+`TR_FILE_UPDATE_DIR=off`).
+
+`pnpm publish:share [folder]` copies this version's AppImage and `.exe`s from
+`release/` to the share, each under a dot-name renamed into place, so no copy
+ever sees half a file.
 
 ### Why the main process is bundled
 

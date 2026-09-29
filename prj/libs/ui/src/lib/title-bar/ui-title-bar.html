@@ -48,6 +48,21 @@
 }
 
 <div class="titlebar-right">
+  @if (upgrade(); as upgrade) {
+    <!-- Right of the title, not among the chrome buttons (PRD 001, §8.6). -->
+    <button
+      type="button"
+      class="upgrade-btn"
+      [disabled]="upgrade.busy ?? false"
+      [attr.aria-busy]="upgrade.busy ? true : null"
+      [attr.title]="upgrade.title"
+      (click)="upgradeSelect.emit()"
+    >
+      <ui-icon name="arrow-up" />
+      <span>{{ upgrade.label }}</span>
+    </button>
+  }
+
   @for (action of actions(); track action.id) {
     <button
       type="button"

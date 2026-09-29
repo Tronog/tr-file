@@ -216,6 +216,11 @@ turns red. A double-click is reported through `dragAreaDoubleClick`, but only
 when it landed on the bar itself: without that guard, double-clicking a menu
 entry would maximize the window.
 
+`upgrade` (PRD 001, §8.6) is the green *Upgrade* button right of the title —
+at the start of the right-hand column, so it sits against the command centre
+however many chrome buttons follow. The app sets it while a newer version is
+there (`busy` while it is being put in place) and hears `upgradeSelect`.
+
 ## Panel interactions
 
 | Gesture | Result |

@@ -13,6 +13,7 @@ import { BridgeSessions } from './bridge-sessions.js';
 import type { DesktopShell } from './desktop-shell.js';
 import { MainWindow } from './main-window.js';
 import { SaveFileChannel } from './save-file.channel.js';
+import { detectInstallation, relaunchAfterExit, SelfUpdate, UpdateMonitor, updateSource } from './self-update.js';
 import { SettingsChannel } from './settings.channel.js';
 import { SettingsStore } from './settings-store.js';
 import { windowBackground } from './window-background.js';
@@ -20,6 +21,7 @@ import { WindowStateFile } from './window-state.js';
 import { SystemClipboard } from './system-clipboard.js';
 import { ShellTrash } from './shell-trash.js';
 import { SystemPlaces } from './system-places.js';
+import { UpdateChannel } from './update.channel.js';
 import { WindowControlsChannel } from './window-controls.channel.js';
 import { VisibilityShortcut } from './window-visibility.js';
 
@@ -66,6 +68,9 @@ class DesktopApplication {
   /** The settings file, read once here too: the window's first colour comes from it (PRD 010, §4). */
   private settingsStore: SettingsStore | null = null;
   private dragChannel: DragOutChannel | null = null;
+  /** Upgrading from the share's newer distributable (PRD 001, §8.6); `null` where there is none to follow. */
+  private updates: UpdateMonitor | null = null;
+  private updateChannel: UpdateChannel | null = null;
   private sessions: BridgeSessions | null = null;
 
   /**
@@ -170,7 +175,17 @@ class DesktopApplication {
       this.windowChannel = new WindowControlsChannel(page.origin, this.stack.log);
       this.windowChannel.register();
 
+      // The title bar's *Upgrade* button asks for the status on its first frame (§8.6).
+      this.updates = this.createUpdateMonitor();
+      this.updateChannel = new UpdateChannel(page.origin, this.stack.log, this.updates);
+      this.updateChannel.register();
+
       await this.openWindow();
+
+      // Looked at after the window is up: a share that is slow to answer must not hold it back.
+      void this.updates?.start().catch((error: unknown) =>
+        this.stack.log.warn('update monitor failed to start', { reason: error instanceof Error ? error.message : String(error) }),
+      );
 
       // `Ctrl`+`` ` `` shows and hides the window from anywhere (PRD 001, §8.5).
       this.visibilityShortcut = new VisibilityShortcut(
@@ -182,6 +197,37 @@ class DesktopApplication {
     } catch (error: unknown) {
       this.fail(error);
     }
+  }
+
+  /**
+   * Self-updating (PRD 001, §8.6), for a packaged AppImage, portable `.exe` or
+   * installed copy whose folder on the share is set — `null` otherwise.
+   */
+  private createUpdateMonitor(): UpdateMonitor | null {
+    const installation = detectInstallation(process.platform, process.env, app.isPackaged, app.getVersion());
+    const source = updateSource(process.platform, process.env);
+    if (installation === null || source === null) {
+      this.stack.log.debug('self-update off', { packaged: app.isPackaged, source });
+      return null;
+    }
+    this.stack.log.info('self-update follows', { source, kind: installation.kind });
+    const updater = new SelfUpdate({
+      source,
+      installation,
+      stateFile: join(app.getPath('userData'), 'update-state.json'),
+      tempDir: join(app.getPath('temp'), 'tr-file-update'),
+    });
+    return new UpdateMonitor(updater, {
+      changed: (status) => UpdateChannel.publish(status),
+      log: (message, fields) => this.stack.log.info(message, fields),
+      restart: (relaunch) => {
+        // The portable launcher and the AppImage runtime outlive the app by a moment
+        // and clean up after it; the new copy starts once they have gone too.
+        const waitFor = installation.kind === 'installed' ? [process.pid] : [process.pid, process.ppid];
+        relaunchAfterExit(relaunch, waitFor);
+        app.quit();
+      },
+    });
   }
 
   private async openWindow(): Promise<void> {
@@ -250,6 +296,8 @@ class DesktopApplication {
   private shutDown(event: Electron.Event): void {
     event.preventDefault();
     this.visibilityShortcut?.dispose();
+    this.updates?.stop();
+    this.updateChannel?.dispose();
     this.channel?.dispose();
     this.windowChannel?.dispose();
     this.saveChannel?.dispose();

@@ -34,6 +34,20 @@ export interface UiWindowControl {
   readonly danger?: boolean;
 }
 
+/**
+ * The green *Upgrade* button right of the window's title (PRD 001, §8.6): the
+ * application says a newer version is there, the bar draws it and reports the
+ * press.
+ */
+export interface UiTitleBarUpgrade {
+  /** The button's text, e.g. `Upgrade`. */
+  readonly label: string;
+  /** Its tooltip: what it upgrades to. */
+  readonly title: string;
+  /** The upgrade is under way; the button waits. */
+  readonly busy?: boolean;
+}
+
 /** An icon button in the activity bar. */
 export interface UiActivityItem {
   readonly id: string;

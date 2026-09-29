@@ -113,3 +113,21 @@ contextBridge.exposeInMainWorld('trFileWindow', {
     return () => void ipcRenderer.removeListener(WINDOW_STATE_EVENT, handler);
   },
 });
+
+/*
+ * Self-updating (PRD 001, §8.6): whether the share holds a newer version, and
+ * the title bar's *Upgrade* button. The main process decides what is newer and
+ * does the upgrading; the page may only ask.
+ */
+const UPDATE_CHANNEL = 'tr-file:update';
+const UPDATE_STATUS_EVENT = 'tr-file:update:status';
+
+contextBridge.exposeInMainWorld('trFileUpdate', {
+  version: VERSION,
+  invoke: (command: unknown): Promise<unknown> => ipcRenderer.invoke(UPDATE_CHANNEL, { command }),
+  onStatus: (listener: (status: unknown) => void): (() => void) => {
+    const handler = (_event: unknown, status: unknown): void => listener(status);
+    ipcRenderer.on(UPDATE_STATUS_EVENT, handler);
+    return () => void ipcRenderer.removeListener(UPDATE_STATUS_EVENT, handler);
+  },
+});

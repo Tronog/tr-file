@@ -99,6 +99,8 @@ export class Workbench {
     this.workbench.gitFt.start();
     // The server's clock in the status bar (PRD 001, §13.1): asked from here too, not from the service.
     this.workbench.serverClockFt.start();
+    // The title bar's *Upgrade* button (PRD 001, §8.6) follows the desktop shell from here too.
+    this.workbench.appUpdateFt.start();
 
     // A feature asked for files — or a folder (PRD 003, §6); only the component may open the picker.
     effect(() => {

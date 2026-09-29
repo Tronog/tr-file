@@ -48,6 +48,11 @@
   --vsc-function-key-bg: #2aa1b3;
   --vsc-function-key-hover-bg: #3fbdd0;
   --vsc-function-key-fg: #000000;
+  /* The title bar's *Upgrade* button (PRD 001, §8.6): green, with white text
+     at 4.6:1, darker under the pointer. The same in both themes. */
+  --vsc-upgrade-bg: #1f883d;
+  --vsc-upgrade-hover-bg: #1a7f37;
+  --vsc-upgrade-fg: #ffffff;
   --vsc-focus-border: #0078d4;
   /* VS Code's `textLink.foreground`. The accent (#0078d4) is a control colour:
      at ~3.6:1 on the editor background it fails AA as body text. */
@@ -172,6 +177,9 @@
   --vsc-function-key-bg: #2aa1b3;
   --vsc-function-key-hover-bg: #3fbdd0;
   --vsc-function-key-fg: #000000;
+  --vsc-upgrade-bg: #1f883d;
+  --vsc-upgrade-hover-bg: #1a7f37;
+  --vsc-upgrade-fg: #ffffff;
   --vsc-focus-border: #005fb8;
   --vsc-link: #005fb8;
 

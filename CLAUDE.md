@@ -553,6 +553,18 @@ window being looked at and brings back a hidden, minimised or background one; on
 `GlobalShortcutsPortal` feature lets a Wayland session grant it. A chord already taken is logged,
 not fatal.
 
+Section 8.6: the desktop updates itself from a folder on the share (`S:\Library\Software\Applications\Tronog\TR-File`,
+`/S/Library/Software/Applications/Tronog/TR-File`; `TR_FILE_UPDATE_DIR`, `off`). `SelfUpdate`
+(`desktop/src/self-update.ts`) judges a file new by name, size and modified time against the key
+recorded in `update-state.json`; `UpdateMonitor` looks at start and every 15 minutes; `UpdateChannel` and
+the preload's `trFileUpdate` reach `AppUpdateFeature`, whose green *Upgrade* sits right of the title
+(`UiTitleBar.upgrade`). Upgrading renames an AppImage / portable `.exe` over the running one (same path),
+or runs a newer setup silently, and restarts once this process has gone (`relaunchAfterExit`).
+`pnpm --filter @tr-file/desktop publish:share` puts a release there.
+*File › Check for Updates…* (§8.6.1, `file.checkForUpdates`, desktop only) looks now — the channel's
+`check` — and always answers: up to date, a newer version to upgrade to (*Upgrade* / *Later*), the
+folder unreadable, or a copy that does not update itself (`supported: false`).
+
 Section 8.2 took the window's frame away: `UiTitleBar` is the title bar, with the drag
 region and the window buttons in it. `WindowControlsChannel` plus the preload give the
 page four verbs over its own window, `DesktopWindowService` is the frontend seam, and

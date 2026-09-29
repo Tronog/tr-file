@@ -314,6 +314,14 @@ export class CommandsFeature {
         run: (t) => p.systemOpenFt.copyPaths(some(t) ? t.paths : [t.folder as string]),
       },
       { id: 'file.emptyTrash', category: 'File', label: 'Empty Trash…', run: () => p.operationsFt.emptyTrash() },
+      // The share looked at now for a newer version (PRD 001, §8.6.1); only the desktop app updates itself.
+      {
+        id: 'file.checkForUpdates',
+        category: 'File',
+        label: 'Check for Updates…',
+        enabled: () => p.appUpdateFt.canCheck(),
+        run: () => p.appUpdateFt.check(),
+      },
       // Midnight Commander's `F10` (PRD 004, §2): only a window of the desktop app can be quit.
       { id: 'file.quit', category: 'File', label: 'Quit', enabled: () => p.desktopWindow.isAvailable, run: () => this.quit() },
 
