@@ -331,7 +331,7 @@
       [bodyFocus]="panel.bodyFocus()"
       [tabs]="panel.tabs()"
       [actions]="panel.actions()"
-      (select)="panel.select($event)"
+      (tabSelect)="panel.select($event)"
       (actionSelect)="panel.runAction($event)"
     >
       @if (panel.transfersVisible()) {

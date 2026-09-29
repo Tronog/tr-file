@@ -6,7 +6,7 @@ import { UiBottomPanel, type UiPanelTab } from '@tr-file/ui';
 @Component({
   imports: [UiBottomPanel],
   template: `
-    <ui-bottom-panel [tabs]="tabs" [collapsed]="collapsed()" [bodyFocus]="focus()">
+    <ui-bottom-panel [tabs]="tabs" [collapsed]="collapsed()" [bodyFocus]="focus()" (tabSelect)="chosen.push($event)">
       @if (withBox()) {
         <textarea></textarea>
       } @else {
@@ -20,6 +20,7 @@ class Host {
   readonly collapsed = signal(true);
   readonly focus = signal(0);
   readonly withBox = signal(true);
+  readonly chosen: unknown[] = [];
 }
 
 describe('UiBottomPanel bodyFocus', () => {
@@ -31,6 +32,20 @@ describe('UiBottomPanel bodyFocus', () => {
   };
 
   afterEach(() => document.body.replaceChildren());
+
+  it('reports a clicked tab, and not text selected in the content', () => {
+    const fixture = create();
+    fixture.componentInstance.collapsed.set(false);
+    fixture.detectChanges();
+
+    const box = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    box.value = 'some notes';
+    box.setSelectionRange(0, 4);
+    box.dispatchEvent(new Event('select', { bubbles: true }));
+    (fixture.nativeElement.querySelector('.panel-tab') as HTMLButtonElement).click();
+
+    expect(fixture.componentInstance.chosen).toEqual(['notes']);
+  });
 
   it('focuses the first focusable element of the content once the body is there', async () => {
     const fixture = create();

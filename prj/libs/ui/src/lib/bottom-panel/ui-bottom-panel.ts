@@ -44,7 +44,12 @@ export class UiBottomPanel {
    */
   readonly bodyFocus = input(0);
 
-  readonly select = output<string>();
+  /**
+   * A tab was clicked: its id. Not `select` — a listener by that name on this
+   * element would also hear the DOM's `select` event, which a `<textarea>` in
+   * the projected content fires, and bubbles, whenever text in it is selected.
+   */
+  readonly tabSelect = output<string>();
   readonly actionSelect = output<string>();
 
   /** The one tab that is keyboard reachable (roving tabindex). */

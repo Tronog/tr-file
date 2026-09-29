@@ -8,7 +8,7 @@
         [class.is-active]="tab.active"
         [attr.aria-selected]="tab.active ? 'true' : 'false'"
         [attr.tabindex]="tab.id === focusId() ? 0 : -1"
-        (click)="select.emit(tab.id)"
+        (click)="tabSelect.emit(tab.id)"
       >
         {{ tab.label }}
         @if (tab.count !== undefined) {
