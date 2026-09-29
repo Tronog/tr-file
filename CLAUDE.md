@@ -572,11 +572,13 @@ not fatal.
 
 Section 8.6: the desktop updates itself from a folder on the share (`S:\Library\Software\Applications\Tronog\TR-File`,
 `/S/Library/Software/Applications/Tronog/TR-File`; `TR_FILE_UPDATE_DIR`, `off`). `SelfUpdate`
-(`desktop/src/self-update.ts`) judges a file new by name, size and modified time against the key
+(`desktop/src/self-update.ts`) judges a file new by size and modified time (never its name, which may stay the same) against the key
 recorded in `update-state.json`; `UpdateMonitor` looks at start and every 15 minutes; `UpdateChannel` and
 the preload's `trFileUpdate` reach `AppUpdateFeature`, whose blue *Upgrade* sits right of the command palette box
-(`UiTitleBar.upgrade`). Upgrading renames an AppImage / portable `.exe` over the running one (same path),
-or runs a newer setup silently, and restarts once this process has gone (`relaunchAfterExit`).
+(`UiTitleBar.upgrade`). Upgrading renames an AppImage over the running one (same path); on Windows the
+new file is first copied into the local temp folder (a program on the share will not run) and run from
+there — the portable `.exe` as the app from then on, the setup silently over the installation — and the
+app restarts once this process has gone (`relaunchAfterExit`).
 `pnpm --filter @tr-file/desktop publish:share` puts a release there.
 *File › Check for Updates…* (§8.6.1, `file.checkForUpdates`, desktop only) looks now — the channel's
 `check` — and always answers: up to date, a newer version to upgrade to (*Upgrade* / *Later*), the

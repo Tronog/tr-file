@@ -461,25 +461,31 @@ packaged copy watches it — at start and every 15 minutes:
 development run (not packaged, or no `APPIMAGE` / Windows) never updates.
 
 There is no feed and no version to read: a file is a new version when its
-**name, size and modified time** are not those of the file this copy was
-installed from, which `update-state.json` in the user-data folder records. Of
-several, the most recently modified wins; one modified in the last 30 s is
-taken to be still copying and waits. Before anything is recorded (a copy
-installed by hand), the running AppImage / `.exe` stands in — the same name and
-size is the same file — or a name carrying `app.getVersion()`; either records
-the share's key from then on.
+**size and modified time** are not those of the file this copy was installed
+from — the **name** plays no part, and may stay the same from one version to
+the next. `update-state.json` in the user-data folder records that key, and
+the file it was installed as. Of several, the most recently modified wins; one
+modified in the last 30 s is taken to be still copying and waits. Where the
+running file is not the one recorded (a copy installed by hand, or an older one
+started from its old shortcut), it stands in itself — the same size is the same
+file, whatever a copy did to its time — or, for the installed kind, a name
+carrying `app.getVersion()`; either records the share's key from then on.
 
 While one is there the page's title bar shows a blue **Upgrade** right of the
 command palette box (`UpdateChannel` → `window.trFileUpdate` → `AppUpdateFeature`). Pressed
 and confirmed, `SelfUpdate.apply`:
 
-- **AppImage / portable `.exe`** — copies the new file beside the running one
-  (a dot-name) and renames it over it, so the path every shortcut points at
-  stays. On Windows the running `.exe` is moved aside first (a running `.exe`
-  can be renamed, not replaced) and removed on the next start.
-- **Installed** — copies the setup to a temporary folder and runs it with
-  `--updated /S --force-run`: silent, over the installation (§8.4), and it starts
-  the app when done.
+- **AppImage** — copies the new file beside the running one (a dot-name) and
+  renames it over it, so the path every shortcut points at stays.
+- **Windows** — a program on a network share will not run, so the new file is
+  always copied into the **local temporary folder** first
+  (`%TEMP%\tr-file-update\…`) and run from there:
+  - **portable `.exe`** — into a folder of its own per version, and that copy
+    is the app from then on; the old `.exe` is left alone (started again, it
+    is offered the upgrade once more). Folders of versions no longer running
+    are removed on the next start.
+  - **installed** — the setup, run with `--updated /S --force-run`: silent,
+    over the installation (§8.4), and it starts the app when done.
 
 The file on the share is checked again before and after the copy, so one
 changed meanwhile is refused and the running copy left alone; a failure is

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { chmod, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 /**
  * Where the distributables are published (PRD 001, §8.6): a folder on the
@@ -32,14 +32,21 @@ export interface Installation {
 }
 
 /**
- * What says a file is a new version (§8.6): its name, size and modified time
- * — not a version inside it, which would mean opening a 100 MB file on a share
- * every few minutes.
+ * What says a file is a new version (§8.6): its size and modified time — not
+ * its name, which may stay the same from one version to the next, and not a
+ * version inside it, which would mean opening a 100 MB file on a share every
+ * few minutes. The name is kept only to say what is offered.
  */
 export interface UpdateFileKey {
   readonly name: string;
   readonly size: number;
   readonly mtimeMs: number;
+}
+
+/** What `update-state.json` keeps: the key installed, and the file it was installed as. */
+interface InstalledRecord extends UpdateFileKey {
+  /** The AppImage or `.exe` that is that version; absent for the installed kind. */
+  readonly executable?: string;
 }
 
 /** A newer distributable than the running one, found on the share. */
@@ -59,8 +66,13 @@ export interface SelfUpdateOptions {
   readonly installation: Installation;
   /** `update-state.json` in the user-data folder: the key of what is installed. */
   readonly stateFile: string;
-  /** A temporary folder for the installed kind's setup. */
+  /**
+   * A folder of the *local* temporary folder, where a Windows distributable
+   * is copied to be run — a program on the share will not run (§8.6).
+   */
   readonly tempDir: string;
+  /** `process.platform`, for comparing paths; a test may say another. */
+  readonly platform?: NodeJS.Platform;
   /** A file changed more recently than this is taken to be still being copied. */
   readonly settleMs?: number;
   readonly now?: () => number;
@@ -72,9 +84,11 @@ const MTIME_TOLERANCE_MS = 2_000;
 /** A file on the share must have stood still this long to be offered. */
 const DEFAULT_SETTLE_MS = 30_000;
 
-/** Beside the file being replaced, so the final rename stays on one file system. */
+/** Beside the AppImage being replaced, so the final rename stays on one file system. */
 const PART_SUFFIX = '.update-part';
-const OLD_SUFFIX = '.update-old';
+
+/** Where in the temporary folder a newer setup is put, to be run. */
+const SETUP_DIR = 'setup';
 
 /**
  * Which kind of copy is running, from what the packaged launchers leave in the
@@ -126,8 +140,15 @@ export function isDistributableFor(kind: InstallationKind, name: string): boolea
   }
 }
 
+/** The same version: the same size and modified time, whatever the files are called (§8.6). */
 export function sameKey(a: UpdateFileKey, b: UpdateFileKey): boolean {
-  return a.name === b.name && a.size === b.size && Math.abs(a.mtimeMs - b.mtimeMs) <= MTIME_TOLERANCE_MS;
+  return a.size === b.size && Math.abs(a.mtimeMs - b.mtimeMs) <= MTIME_TOLERANCE_MS;
+}
+
+/** Whether two paths name one file — without regard to case on Windows. */
+function samePath(a: string, b: string, platform: NodeJS.Platform): boolean {
+  const [x, y] = [resolve(a), resolve(b)];
+  return platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y;
 }
 
 /**
@@ -135,27 +156,37 @@ export function sameKey(a: UpdateFileKey, b: UpdateFileKey): boolean {
  *
  * The published distributables are plain files on a share, so there is no
  * feed, no signature and no version inside to read: a file is a new version
- * when its key — name, size, modified time — is not the key of the file this
- * copy was installed from. That key is kept in `update-state.json`, written as
- * an upgrade is applied. Before there is one (a copy installed by hand) the
- * running file stands in: the same name and size is the same file, whatever
- * the copy did to its time — or a name that carries this version.
+ * when its key — size and modified time; the name may stay the same — is not
+ * the key of the file this copy was installed from. That key is kept in
+ * `update-state.json`, written as an upgrade is applied, with the file it was
+ * installed as. Where the running file is another (a copy installed by hand,
+ * or an older one started from its old shortcut), the running file stands
+ * in: the same size is the same file, whatever a copy did to its time — or,
+ * for the installed kind, which has no file of its own, a name carrying this
+ * version.
  *
- * Applying it: an AppImage or portable `.exe` is copied beside the running
- * file and renamed over it (a running file may be renamed, on Linux and on
- * Windows alike), so its path — what every shortcut points at — stays; the
- * installed kind runs the newer setup silently, which replaces the
- * installation. Either way the new version starts once this process has gone.
+ * Applying it:
+ * - **AppImage** — copied beside the running one and renamed over it (a
+ *   running file may be renamed), so its path — what every shortcut points
+ *   at — stays.
+ * - **Windows** — a program on a network share will not run, so the new file
+ *   is copied into the local temporary folder first (§8.6) and run from
+ *   there: the portable `.exe` is the app from then on (its old copy is left
+ *   alone), the setup installs over the installation silently.
+ *
+ * Either way the new version starts once this process has gone.
  *
  * Nothing here imports `electron`.
  */
 export class SelfUpdate {
   private readonly settleMs: number;
   private readonly now: () => number;
+  private readonly platform: NodeJS.Platform;
 
   constructor(private readonly options: SelfUpdateOptions) {
     this.settleMs = options.settleMs ?? DEFAULT_SETTLE_MS;
     this.now = options.now ?? Date.now;
+    this.platform = options.platform ?? process.platform;
   }
 
   get installation(): Installation {
@@ -185,12 +216,17 @@ export class SelfUpdate {
     await this.assertUnchanged(candidate);
 
     if (installation.kind === 'installed') {
-      await mkdir(this.options.tempDir, { recursive: true });
-      const setup = join(this.options.tempDir, candidate.name);
-      await this.copyChecked(candidate, setup);
+      const setup = await this.stage(candidate, SETUP_DIR);
       await this.record(candidate);
       // What electron-updater passes too: silent, as an update, and start the app when done.
       return { command: setup, args: ['--updated', '/S', '--force-run'] };
+    }
+
+    if (installation.kind === 'portable') {
+      // A folder of its own per version: the one running now is locked until it exits.
+      const executable = await this.stage(candidate, `${candidate.size}-${Math.round(candidate.mtimeMs)}`);
+      await this.record(candidate, executable);
+      return { command: executable, args: [] };
     }
 
     const target = installation.path;
@@ -201,23 +237,32 @@ export class SelfUpdate {
     try {
       await this.copyChecked(candidate, part);
       await chmod(part, 0o755);
-      await this.replace(target, part);
+      await rename(part, target);
     } catch (error: unknown) {
       await rm(part, { force: true });
       throw error;
     }
-    await this.record(candidate);
+    await this.record(candidate, target);
     return { command: target, args: [] };
   }
 
-  /** What an earlier upgrade left behind: the old `.exe`, a copy it never finished. */
+  /**
+   * What earlier upgrades left behind: an AppImage copy never finished, and
+   * everything in the temporary folder but the folder the app runs from.
+   */
   async cleanUp(): Promise<void> {
-    const target = this.options.installation.path;
-    if (target !== undefined) {
-      await rm(`${target}${OLD_SUFFIX}`, { force: true }).catch(() => undefined);
-      await rm(join(dirname(target), `.${basename(target)}${PART_SUFFIX}`), { force: true }).catch(() => undefined);
+    const running = this.options.installation.path;
+    if (running !== undefined) {
+      await rm(join(dirname(running), `.${basename(running)}${PART_SUFFIX}`), { force: true }).catch(() => undefined);
     }
-    await rm(this.options.tempDir, { recursive: true, force: true }).catch(() => undefined);
+    const names = await readdir(this.options.tempDir).catch(() => [] as string[]);
+    for (const name of names) {
+      const folder = join(this.options.tempDir, name);
+      if (running !== undefined && samePath(dirname(running), folder, this.platform)) {
+        continue;
+      }
+      await rm(folder, { recursive: true, force: true }).catch(() => undefined);
+    }
   }
 
   /* -- internals ---------------------------------------------------------- */
@@ -251,27 +296,46 @@ export class SelfUpdate {
   }
 
   private async isCurrent(candidate: UpdateCandidate): Promise<boolean> {
-    const recorded = await this.recorded();
-    if (recorded !== null) {
-      return sameKey(recorded, candidate);
-    }
-
-    // Nothing recorded yet: the running file, or the version, is the only hint.
     const { path, version } = this.options.installation;
-    const self = path === undefined ? null : await stat(path).catch(() => null);
-    const sameFile = path !== undefined && self !== null && basename(path) === candidate.name && self.size === candidate.size;
-    const sameVersion = candidate.name.includes(`-${version}-`) || candidate.name.includes(`-${version}.`);
-    if (sameFile || sameVersion) {
-      // From now on the share's own key is the one compared.
-      await this.record(candidate).catch(() => undefined);
+    const recorded = await this.recorded();
+    if (recorded !== null && !sameKey(recorded, candidate)) {
+      return false;
+    }
+    // Recorded as what this very file is: nothing to ask of it.
+    if (recorded !== null && (path === undefined || recorded.executable === undefined || samePath(recorded.executable, path, this.platform))) {
       return true;
     }
-    return false;
+
+    // Nothing recorded, or recorded for another file: the running file — or,
+    // with none of its own, this version in the name — is the only hint.
+    const self = path === undefined ? null : await stat(path).catch(() => null);
+    const same =
+      self !== null ? self.size === candidate.size : candidate.name.includes(`-${version}-`) || candidate.name.includes(`-${version}.`);
+    if (same) {
+      // From now on the share's own key is the one compared.
+      await this.record(candidate, path).catch(() => undefined);
+    }
+    return same;
   }
 
-  private async recorded(): Promise<UpdateFileKey | null> {
+  /** Copies `candidate` into its own folder of the local temporary folder; the copy's path. */
+  private async stage(candidate: UpdateCandidate, folder: string): Promise<string> {
+    const directory = join(this.options.tempDir, folder);
+    await rm(directory, { recursive: true, force: true });
+    await mkdir(directory, { recursive: true });
+    const staged = join(directory, candidate.name);
     try {
-      const value = JSON.parse(await readFile(this.options.stateFile, 'utf8')) as { installed?: Partial<UpdateFileKey> };
+      await this.copyChecked(candidate, staged);
+    } catch (error: unknown) {
+      await rm(directory, { recursive: true, force: true });
+      throw error;
+    }
+    return staged;
+  }
+
+  private async recorded(): Promise<InstalledRecord | null> {
+    try {
+      const value = JSON.parse(await readFile(this.options.stateFile, 'utf8')) as { installed?: Partial<InstalledRecord> };
       const installed = value.installed;
       if (
         installed !== undefined &&
@@ -279,7 +343,8 @@ export class SelfUpdate {
         typeof installed.size === 'number' &&
         typeof installed.mtimeMs === 'number'
       ) {
-        return { name: installed.name, size: installed.size, mtimeMs: installed.mtimeMs };
+        const { name, size, mtimeMs, executable } = installed;
+        return { name, size, mtimeMs, ...(typeof executable === 'string' ? { executable } : {}) };
       }
     } catch {
       // Missing or broken: nothing recorded.
@@ -287,10 +352,10 @@ export class SelfUpdate {
     return null;
   }
 
-  private async record(key: UpdateFileKey): Promise<void> {
+  private async record(key: UpdateFileKey, executable?: string): Promise<void> {
     const file = this.options.stateFile;
     await mkdir(dirname(file), { recursive: true });
-    const installed: UpdateFileKey = { name: key.name, size: key.size, mtimeMs: key.mtimeMs };
+    const installed: InstalledRecord = { name: key.name, size: key.size, mtimeMs: key.mtimeMs, ...(executable ? { executable } : {}) };
     const temporary = `${file}.tmp`;
     await writeFile(temporary, `${JSON.stringify({ installed }, null, 2)}\n`);
     await rename(temporary, file);
@@ -315,28 +380,6 @@ export class SelfUpdate {
       throw new Error(`${candidate.name} was not copied whole.`);
     }
     await this.assertUnchanged(candidate);
-  }
-
-  /**
-   * Renames `part` over `target`. On Windows a running `.exe` cannot be
-   * replaced, but it can be moved aside — so it is, and removed on the next
-   * start; on Linux the rename replaces it outright, the running AppImage
-   * keeping the old file open until it exits.
-   */
-  private async replace(target: string, part: string): Promise<void> {
-    if (process.platform !== 'win32') {
-      await rename(part, target);
-      return;
-    }
-    const old = `${target}${OLD_SUFFIX}`;
-    await rm(old, { force: true });
-    await rename(target, old);
-    try {
-      await rename(part, target);
-    } catch (error: unknown) {
-      await rename(old, target).catch(() => undefined);
-      throw error;
-    }
   }
 }
 

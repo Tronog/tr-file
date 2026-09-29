@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import {
@@ -132,6 +132,51 @@ describe('SelfUpdate', () => {
     assert.equal((await updater(dirs, install).check())?.name, 'tr-file.AppImage');
   });
 
+  it('knows a new version by size and time alone — the name may stay the same', async () => {
+    const dirs = await fixture('same-name');
+    const self = join(dirs.home, 'tr-file.exe');
+    await publish(self, 'v1', 0);
+    const install: Installation = { kind: 'portable', path: self, version: '1.0.0' };
+    const published = join(dirs.share, 'tr-file.exe');
+    await publish(published, 'v1', 300_000);
+    assert.equal(await updater(dirs, install).check(), null);
+
+    // Republished under the very same name, one byte longer…
+    await publish(published, 'v1b', 200_000);
+    assert.equal((await updater(dirs, install).check())?.name, 'tr-file.exe');
+    // …or the same size, but newer.
+    await publish(published, 'v1', 100_000);
+    assert.equal((await updater(dirs, install).check())?.name, 'tr-file.exe');
+  });
+
+  it('runs a newer portable .exe from the local temporary folder, leaving the old one alone', async () => {
+    const dirs = await fixture('portable');
+    const self = join(dirs.home, 'tr-file.exe');
+    await publish(self, 'old', 0);
+    await publish(join(dirs.share, 'tr-file.exe'), 'new version', 100_000);
+
+    const update = updater(dirs, { kind: 'portable', path: self, version: '1.0.0' });
+    const candidate = await update.check();
+    assert.ok(candidate);
+    const relaunch = await update.apply(candidate);
+
+    assert.equal(dirname(dirname(relaunch.command)), join(dirs.data, 'tmp'));
+    assert.equal(basename(relaunch.command), 'tr-file.exe');
+    assert.equal(await readFile(relaunch.command, 'utf8'), 'new version');
+    assert.equal(await readFile(self, 'utf8'), 'old');
+
+    // Started from there, it is up to date — and keeps its own folder when cleaning up.
+    const upgraded = updater(dirs, { kind: 'portable', path: relaunch.command, version: '1.0.1' });
+    await mkdir(join(dirs.data, 'tmp', 'stale'));
+    await upgraded.cleanUp();
+    await access(relaunch.command);
+    await assert.rejects(access(join(dirs.data, 'tmp', 'stale')));
+    assert.equal(await upgraded.check(), null);
+
+    // The old one, started from its old shortcut, is still offered the new version.
+    assert.equal((await updater(dirs, { kind: 'portable', path: self, version: '1.0.0' }).check())?.name, 'tr-file.exe');
+  });
+
   it('puts an AppImage in place of the running one, keeping its path, and records it', async () => {
     const dirs = await fixture('apply');
     const self = join(dirs.home, 'tr-file.AppImage');
@@ -156,7 +201,7 @@ describe('SelfUpdate', () => {
     await publish(self, 'old', 0);
     const install: Installation = { kind: 'appimage', path: self, version: '1.0.0' };
     const published = join(dirs.share, 'tr-file-1.0.1-x86_64.AppImage');
-    await publish(published, 'new', 100_000);
+    await publish(published, 'new build', 100_000);
 
     const update = updater(dirs, install);
     const candidate = await update.check();
@@ -178,7 +223,8 @@ describe('SelfUpdate', () => {
     const candidate = await update.check();
     assert.equal(candidate?.name, 'tr-file-Setup-1.0.1-x64.exe');
     const relaunch = await update.apply(candidate!);
-    assert.equal(relaunch.command, join(dirs.data, 'tmp', 'tr-file-Setup-1.0.1-x64.exe'));
+    // Run from the local temporary folder: a program on the share will not run.
+    assert.equal(relaunch.command, join(dirs.data, 'tmp', 'setup', 'tr-file-Setup-1.0.1-x64.exe'));
     assert.deepEqual(relaunch.args, ['--updated', '/S', '--force-run']);
     assert.equal(await readFile(relaunch.command, 'utf8'), 'setup 2');
   });
@@ -189,7 +235,7 @@ describe('UpdateMonitor', () => {
     const dirs = await fixture('monitor');
     const self = join(dirs.home, 'tr-file.AppImage');
     await publish(self, 'old', 0);
-    await publish(join(dirs.share, 'tr-file-1.0.1-x86_64.AppImage'), 'new', 100_000);
+    await publish(join(dirs.share, 'tr-file-1.0.1-x86_64.AppImage'), 'new build', 100_000);
 
     const statuses: UpdateStatus[] = [];
     const restarts: Relaunch[] = [];
