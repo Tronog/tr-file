@@ -393,6 +393,32 @@ describe('ChromeFeature', () => {
     });
   });
 
+  /** PRD 001, §8.2.2 — a sun / moon at the left of the title bar's buttons, swapping light and dark. */
+  it('toggles light and dark from the leftmost title bar button', () => {
+    try {
+      const theme = () => workbench.preferencesFt.effectiveTheme();
+      const button = () => workbench.chromeFt.titleBarActions()[0];
+      expect(theme()).toBe('dark');
+      expect(button()).toMatchObject({ id: 'toggle-theme', icon: 'sun', label: 'Switch to Light Theme' });
+
+      workbench.chromeFt.runTitleBarAction('toggle-theme');
+      expect(theme()).toBe('light');
+      expect(workbench.preferencesFt.choice('workbench.colorTheme')).toBe('light');
+      expect(button()).toMatchObject({ icon: 'moon', label: 'Switch to Dark Theme' });
+      TestBed.tick();
+      expect(document.documentElement.dataset['theme']).toBe('light');
+
+      // Following the system, a press picks the other of what is shown outright.
+      workbench.preferencesFt.choose('workbench.colorTheme', 'system');
+      const shown = theme();
+      workbench.commandsFt.run('view.toggleTheme');
+      expect(workbench.preferencesFt.choice('workbench.colorTheme')).toBe(shown === 'dark' ? 'light' : 'dark');
+    } finally {
+      workbench.preferencesFt.choose('workbench.colorTheme', 'dark');
+      TestBed.tick();
+    }
+  });
+
   it('passes the static chrome through from the seed data', () => {
     expect(workbench.chromeFt.titleBarActions().map((action) => action.id)).toEqual(workbench.mockWorkbench.titleBarActions.map((action) => action.id));
     expect(workbench.chromeFt.commandLabel).toBe(workbench.mockWorkbench.commandLabel);

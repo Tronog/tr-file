@@ -16,6 +16,7 @@ export type SidebarName = 'explorer' | 'details';
 
 /** What each title-bar button runs: commands of the table, so the palette and the View menu run the same. */
 const TITLE_BAR_COMMANDS: Readonly<Record<string, string>> = {
+  'toggle-theme': 'view.toggleTheme',
   'toggle-left': 'view.toggleExplorer',
   'toggle-panel': 'view.togglePanel',
   'toggle-right': 'view.toggleDetails',
@@ -61,6 +62,11 @@ export class ChromeFeature {
           return { ...action, icon: icon(preferences.detailsSide()), active: this.isShown('details') };
         case 'toggle-panel':
           return { ...action, active: !this.parent.bottomPanelFt.collapsed() };
+        // Leftmost of the group (PRD 001, §8.2.2): the sun in the dark, the moon in the light — what a press turns to.
+        case 'toggle-theme':
+          return preferences.effectiveTheme() === 'dark'
+            ? { ...action, label: 'Switch to Light Theme', icon: 'sun' }
+            : { ...action, label: 'Switch to Dark Theme', icon: 'moon' };
         default:
           return action;
       }

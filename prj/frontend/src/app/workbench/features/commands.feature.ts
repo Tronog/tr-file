@@ -500,6 +500,13 @@ export class CommandsFeature {
         checked: () => p.preferencesFt.value('window.restoreLayout'),
         run: () => p.preferencesFt.set('window.restoreLayout', !p.preferencesFt.value('window.restoreLayout')),
       },
+      // The title bar's sun / moon (PRD 001, §8.2.2).
+      {
+        id: 'view.toggleTheme',
+        category: 'Preferences',
+        label: () => (p.preferencesFt.effectiveTheme() === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'),
+        run: () => p.preferencesFt.toggleTheme(),
+      },
       { id: 'view.resetLayout', category: 'View', label: 'Reset Layout', run: () => void p.sessionFt.confirmResetLayout() },
 
       /* The settings window (PRD 010) */

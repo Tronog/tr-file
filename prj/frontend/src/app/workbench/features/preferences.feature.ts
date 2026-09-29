@@ -236,6 +236,17 @@ export class PreferencesFeature {
     }
   }
 
+  /** The theme in force — the one chosen, or the system's while following it. */
+  readonly effectiveTheme = computed(() => this.theme.theme());
+
+  /**
+   * The title bar's sun / moon (PRD 001, §8.2.2): the other of light and dark,
+   * chosen outright — so a window that followed the system stops following it.
+   */
+  toggleTheme(): void {
+    this.choose('workbench.colorTheme', this.theme.theme() === 'dark' ? 'light' : 'dark');
+  }
+
   set(id: string, value: boolean): void {
     const preference = PreferencesFeature.find(id);
     if (preference?.kind.type !== 'boolean') {

@@ -275,6 +275,7 @@ describe('CommandPaletteFeature', () => {
       'View: Toggle Explorer',
       'View: Toggle Details',
       'Preferences: Restore Layout on Start',
+      'Preferences: Switch to Light Theme',
       'View: Reset Layout',
       'Preferences: Open Settings',
       'Preferences: Open Keyboard Shortcuts',
