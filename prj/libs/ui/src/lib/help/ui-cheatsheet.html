@@ -1,0 +1,40 @@
+@for (section of sections(); track section.id) {
+  <section class="card" [attr.data-hue]="section.hue" [attr.aria-labelledby]="'cheat-' + section.id">
+    <h3 class="card-title" [id]="'cheat-' + section.id">
+      <span class="swatch" aria-hidden="true"></span>
+      {{ section.title }}
+    </h3>
+    @if (section.note) {
+      <p class="note">{{ section.note }}</p>
+    }
+    <dl class="rows">
+      @for (row of section.rows; track row.id) {
+        <div class="row">
+          <dt class="keys">
+            @for (chord of row.keys; track $index; let last = $last) {
+              <span class="chord">
+                @for (key of chord; track $index; let lastKey = $last) {
+                  <kbd>{{ key }}</kbd>
+                  @if (!lastKey) {
+                    <span class="plus" aria-hidden="true">+</span>
+                  }
+                }
+              </span>
+              @if (!last) {
+                <span class="or">or</span>
+              }
+            }
+          </dt>
+          <dd class="label">
+            {{ row.label }}
+            @if (row.where) {
+              <span class="where">{{ row.where }}</span>
+            }
+          </dd>
+        </div>
+      }
+    </dl>
+  </section>
+} @empty {
+  <p class="empty">{{ empty() }}</p>
+}

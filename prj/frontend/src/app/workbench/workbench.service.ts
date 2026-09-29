@@ -24,6 +24,7 @@ import { ListingOrderFeature } from './listing/listing-order.feature';
 import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
 import { AppUpdateFeature } from './features/app-update.feature';
+import { HelpFeature } from './features/help.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { OperationsFeature } from './features/operations.feature';
 import { FocusCycleFeature } from './features/focus-cycle.feature';
@@ -240,6 +241,8 @@ export class WorkbenchService {
   readonly keybindingsFt = new KeybindingsFeature(this);
   /** The settings window itself (PRD 010). */
   readonly settingsEditorFt = new SettingsEditorFeature(this);
+  /** The Help window: `F1`, the cheatsheet of every key (PRD 001, §16). */
+  readonly helpFt = new HelpFeature(this);
   /** The backend machine's date and time, at the right of the status bar (PRD 001, §13.1). */
   readonly serverClockFt = new ServerClockFeature(this);
 

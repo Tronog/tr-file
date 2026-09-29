@@ -1,0 +1,36 @@
+<header class="head">
+  <h2 class="title" id="ui-help-title">Help</h2>
+  <div class="tabs" role="tablist" aria-labelledby="ui-help-title">
+    @for (tab of tabs(); track tab.id; let index = $index) {
+      <button
+        #tab
+        type="button"
+        class="tab"
+        role="tab"
+        [id]="tabId(tab.id)"
+        [class.is-active]="tab.id === activeTab()"
+        [attr.aria-selected]="tab.id === activeTab()"
+        [attr.tabindex]="tab.id === activeTab() ? 0 : -1"
+        aria-controls="ui-help-panel"
+        (click)="tabSelect.emit(tab.id)"
+        (keydown)="onTabKeydown($event, index)"
+      >
+        {{ tab.label }}
+      </button>
+    }
+  </div>
+  <ui-search-field
+    class="search"
+    [placeholder]="searchPlaceholder()"
+    [label]="searchPlaceholder()"
+    [value]="query()"
+    (valueChange)="queryChange.emit($event)"
+  />
+  <button type="button" class="close" title="Close (Escape)" aria-label="Close help" (click)="close.emit()">
+    <ui-icon name="x" />
+  </button>
+</header>
+
+<div class="panel" id="ui-help-panel" role="tabpanel" [attr.aria-labelledby]="tabId(activeTab())">
+  <ng-content />
+</div>

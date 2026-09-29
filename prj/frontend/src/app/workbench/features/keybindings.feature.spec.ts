@@ -78,7 +78,8 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
   it("starts with the library's keys and the window's, and hands them to the keymap", async () => {
     await setUp();
 
-    expect(keys().keysFor('view.commandPalette')).toEqual(['Ctrl+Shift+P', 'F1', 'Ctrl+P']);
+    expect(keys().keysFor('view.commandPalette')).toEqual(['Ctrl+Shift+P', 'Ctrl+P']);
+    expect(keys().keysFor('help.show')).toEqual(['F1']);
     expect(keys().keysFor('file.trash')).toEqual(['Delete', 'F8']);
     expect(keymap().keysFor('file.open', 'list')).toEqual(['Enter']);
   });

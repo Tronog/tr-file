@@ -49,8 +49,8 @@ describe('ChromeFeature', () => {
     const menus = () => workbench.chromeFt.menuItems();
     const go = () => menus().find((menu) => menu.id === 'go');
 
-    it('has File, Edit, Selection, View and Go, all closed', () => {
-      expect(menus().map((menu) => menu.label)).toEqual(['File', 'Edit', 'Selection', 'View', 'Go']);
+    it('has File, Edit, Selection, View, Go and Help, all closed', () => {
+      expect(menus().map((menu) => menu.label)).toEqual(['File', 'Edit', 'Selection', 'View', 'Go', 'Help']);
       expect(menus().every((menu) => !menu.open)).toBe(true);
     });
 

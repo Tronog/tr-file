@@ -241,7 +241,7 @@ describe('CommandPaletteFeature', () => {
     await settled();
   };
 
-  it('opens on Ctrl+Shift+P, F1 and Ctrl+P, listing every command', () => {
+  it('opens on Ctrl+Shift+P and Ctrl+P, listing every command', () => {
     expect(shortcut('P', { ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(true);
     expect(palette().isOpen()).toBe(true);
     // Only what applies to the active panel — nothing is selected, so nothing to rename or trash.
@@ -278,16 +278,14 @@ describe('CommandPaletteFeature', () => {
       'View: Reset Layout',
       'Preferences: Open Settings',
       'Preferences: Open Keyboard Shortcuts',
+      'Help: Show Help',
+      'Help: Keyboard Shortcuts Cheatsheet',
       'Go: Go to Location…',
       'Tab: New Tab',
       'View: Toggle Maximized Panel',
       'Remote: Connect to Remote Server…',
     ]);
     expect(palette().activeId()).toBe('go.jumpToFolder');
-
-    palette().close();
-    shortcut('F1');
-    expect(palette().isOpen()).toBe(true);
 
     palette().close();
     shortcut('p', { ctrlKey: true });
@@ -297,7 +295,7 @@ describe('CommandPaletteFeature', () => {
   it('stays shut while a modal window is open', () => {
     void workbench.modal.message({ message: 'Busy' });
 
-    expect(shortcut('F1').defaultPrevented).toBe(false);
+    expect(shortcut('P', { ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(false);
     expect(palette().isOpen()).toBe(false);
   });
 

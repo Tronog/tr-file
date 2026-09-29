@@ -511,7 +511,11 @@ export class CommandsFeature {
         run: () => p.settingsEditorFt.open('keyboard-shortcuts'),
       },
 
-      /* The window, for the function keys (PRD 004, §2): `F1` and `F9` */
+      /* Help (PRD 001, §16): `F1` */
+      { id: 'help.show', category: 'Help', label: 'Show Help', run: () => p.helpFt.open() },
+      { id: 'help.cheatsheet', category: 'Help', label: 'Keyboard Shortcuts Cheatsheet', run: () => p.helpFt.open('cheatsheet') },
+
+      /* The window, for the function keys (PRD 004, §2): `F9` */
       { id: 'view.commandPalette', category: 'View', label: 'Show All Commands', palette: false, run: () => p.commandPaletteFt.show() },
       { id: 'view.mainMenu', category: 'View', label: 'Open the Main Menu', palette: false, run: () => p.chromeFt.openMainMenu() },
 

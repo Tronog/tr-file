@@ -47,7 +47,7 @@ describe('Function keys (PRD 004, §2)', () => {
   describe('the strip', () => {
     it('shows F1 to F9 in a browser, as Midnight Commander labels them', () => {
       expect(workbench.functionKeysFt.strip().map((key) => `${key.key} ${key.label}`)).toEqual([
-        '1 Commands',
+        '1 Help',
         '2 Rename',
         '3 View',
         '4 Open',

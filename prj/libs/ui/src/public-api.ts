@@ -52,6 +52,9 @@ export {
 } from './lib/keyboard/keymap';
 export type { UiKeybinding, UiKeyContext } from './lib/keyboard/keymap';
 export { UiSash } from './lib/sash/ui-sash';
+/* help (PRD 001, §16) */
+export { UiHelp } from './lib/help/ui-help';
+export { UiCheatsheet } from './lib/help/ui-cheatsheet';
 export { UiProgress } from './lib/progress/ui-progress';
 export { UiEmptyState } from './lib/empty-state/ui-empty-state';
 export { UiBreadcrumbs } from './lib/breadcrumbs/ui-breadcrumbs';

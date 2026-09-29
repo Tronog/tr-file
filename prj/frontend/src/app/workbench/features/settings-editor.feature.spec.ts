@@ -154,7 +154,8 @@ describe('Settings', () => {
     const row = (command: string, key: string | null) => rows().find((candidate) => candidate.command === command && candidate.key === key);
 
     it('lists every binding and every unbound command, searchable', () => {
-      expect(row('view.commandPalette', 'F1')).toMatchObject({ category: 'View', label: 'Show All Commands', when: 'Anywhere', source: 'Default' });
+      expect(row('view.commandPalette', 'Ctrl+P')).toMatchObject({ category: 'View', label: 'Show All Commands', when: 'Anywhere', source: 'Default' });
+      expect(row('help.show', 'F1')).toMatchObject({ category: 'Help', label: 'Show Help', when: 'Anywhere', source: 'Default' });
       expect(row('file.open', 'Enter')?.when).toBe('On a row');
       expect(row('file.emptyTrash', null)).toBeDefined();
 

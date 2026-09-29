@@ -10,6 +10,9 @@ and dialogs — are **fixed** (PRD 010, §2).
 
 On macOS `Ctrl` means `Cmd` throughout.
 
+In the app, `F1` (or *Help › Keyboard Shortcuts Cheatsheet*) shows all of this as a cheatsheet —
+the configurable keys as they are bound now, the user's changes included.
+
 **Where** is the key's context, as the Keyboard Shortcuts page shows it:
 
 | Where | Meaning |
@@ -25,7 +28,7 @@ On macOS `Ctrl` means `Cmd` throughout.
 
 | Key | Command | Where |
 | --- | --- | --- |
-| `Ctrl`+`Shift`+`P`, `F1`, `Ctrl`+`P` | Command palette | Anywhere |
+| `Ctrl`+`Shift`+`P`, `Ctrl`+`P` | Command palette | Anywhere |
 | `Ctrl`+`Shift`+`F` | Search files by name | Anywhere |
 | `Ctrl`+`H` | Show or hide hidden files | Anywhere |
 | `Ctrl`+`,` | Settings | Anywhere |
@@ -42,7 +45,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 
 | Key | Command | Where |
 | --- | --- | --- |
-| `F1` | Command palette | Anywhere |
+| `F1` | Help — the cheatsheet of every key (PRD 001, §16) | Anywhere |
 | `F2` | Rename… | Anywhere |
 | `F3` | View — open read-only in a tab | Anywhere |
 | `F4` | Open with the system's app | Anywhere |

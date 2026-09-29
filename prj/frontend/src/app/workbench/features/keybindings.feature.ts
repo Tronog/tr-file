@@ -12,7 +12,6 @@ export const KEYBINDINGS_KEY = 'tr-file.keybindings.v1';
  */
 export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'view.commandPalette', key: 'Ctrl+Shift+P', when: 'window' },
-  { command: 'view.commandPalette', key: 'F1', when: 'window' },
   { command: 'view.commandPalette', key: 'Ctrl+P', when: 'window' },
   { command: 'edit.search', key: 'Ctrl+Shift+F', when: 'window' },
   { command: 'view.hidden', key: 'Ctrl+H', when: 'window' },
@@ -26,6 +25,8 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'workbench.nextPanel', key: 'Tab', when: 'panel' },
   { command: 'workbench.previousPanel', key: 'Shift+Tab', when: 'panel' },
   // Midnight Commander's function keys (PRD 004, §2).
+  // Help, as Midnight Commander's `F1` is (PRD 001, §16).
+  { command: 'help.show', key: 'F1', when: 'window' },
   { command: 'file.rename', key: 'F2', when: 'window' },
   { command: 'file.open', key: 'F3', when: 'window' },
   { command: 'file.openExternal', key: 'F4', when: 'window' },

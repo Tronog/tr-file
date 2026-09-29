@@ -149,6 +149,15 @@ export class MockDataWorkbenchService {
         { id: 'go.remote', label: 'Remote Computer…', checked: false },
       ],
     },
+    {
+      // PRD 001, §16.
+      id: 'help',
+      label: 'Help',
+      items: [
+        { id: 'help.show', label: 'Show Help' },
+        { id: 'help.cheatsheet', label: 'Keyboard Shortcuts Cheatsheet' },
+      ],
+    },
   ];
 
   /** The title bar's command centre opens the command palette (PRD 009, §1). */

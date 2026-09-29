@@ -5,6 +5,7 @@ import type { WorkbenchService } from '../workbench.service';
 /** The strip's word for a command — Midnight Commander's, where it fits what the command does here. */
 const SHORT_LABELS: Readonly<Record<string, (parent: WorkbenchService) => string>> = {
   'view.commandPalette': () => 'Commands',
+  'help.show': () => 'Help',
   'file.rename': () => 'Rename',
   'file.open': () => 'View',
   'file.openExternal': (p) => (p.fileSystem.systemFt.opensInApps ? 'Edit' : 'Open'),
@@ -30,7 +31,7 @@ const FUNCTION_KEYS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F1
  *
  * | Key | Here | Midnight Commander |
  * | --- | --- | --- |
- * | `F1` | the command palette | Help |
+ * | `F1` | help — the cheatsheet (PRD 001, §16) | Help |
  * | `F2` | rename (VS Code's `F2`) | the user menu |
  * | `F3` | view — open read-only | View |
  * | `F4` | edit — the default app (a browser tab in a browser) | Edit |

@@ -64,6 +64,7 @@ Code's to do so.
 | Area | Components |
 | --- | --- |
 | Shell | `UiWorkbench` (`leftAt` / `rightAt` put each sidebar at either edge, both at one if need be — PRD 010, §3), `UiTitleBar`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
+| Help (PRD 001, §16) | `UiHelp` (a window frame: `tabs` as a WAI-ARIA tab list, a search box, close; the page projected), `UiCheatsheet` (`UiCheatsheetSection` cards in CSS columns, each a `hue` — `--vsc-hue-*` — keys as keycaps, rows on a subgrid) |
 | Sidebars | `UiSidebar`, `UiPane` (with a `paneId`, movable among its sidebar's panes by dragging its header or `Ctrl`+`↑`/`↓` — reported as a `UiPaneMove`, PRD 002, §5.1; and resizable by the sash on its top edge, shown by `UiSidebar` on every boundary with an expanded pane above and one at or below, collapsed headers riding along — reported as a `UiPaneResize` of every expanded pane's height, given back as `size` weights, §5.2), `UiTree` |
 | Details | `UiPreviewCard`, `UiPropertyList` (a value with an `action` is a button reported by `action` — `1000+ items`, PRD 004, §3.1.3), `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |

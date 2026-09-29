@@ -1,0 +1,133 @@
+:host {
+  display: block;
+  padding: 16px;
+  columns: 360px auto;
+  column-gap: 16px;
+  color: var(--vsc-fg);
+  font-size: var(--vsc-font-size-sm);
+}
+
+/* Each subject its own colour; the band and the keycaps take it. */
+.card {
+  --hue: var(--vsc-hue-blue);
+
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 16px;
+  break-inside: avoid;
+  border: 1px solid var(--vsc-border);
+  border-top: 4px solid var(--hue);
+  border-radius: var(--vsc-radius-lg);
+  background: color-mix(in srgb, var(--hue) 5%, var(--vsc-editor-bg));
+  overflow: hidden;
+
+  &[data-hue='green'] { --hue: var(--vsc-hue-green); }
+  &[data-hue='orange'] { --hue: var(--vsc-hue-orange); }
+  &[data-hue='purple'] { --hue: var(--vsc-hue-purple); }
+  &[data-hue='teal'] { --hue: var(--vsc-hue-teal); }
+  &[data-hue='yellow'] { --hue: var(--vsc-hue-yellow); }
+  &[data-hue='pink'] { --hue: var(--vsc-hue-pink); }
+  &[data-hue='red'] { --hue: var(--vsc-hue-red); }
+}
+
+.card-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--hue) 16%, var(--vsc-editor-bg));
+  color: var(--vsc-fg-bright);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--hue);
+}
+
+.note {
+  margin: 6px 12px 0;
+  color: var(--vsc-fg-muted);
+}
+
+/* One key column per card, as wide as its widest keys (up to half): the rows
+   share it through a subgrid, so every label of a card lines up. */
+.rows {
+  display: grid;
+  grid-template-columns: fit-content(50%) minmax(0, 1fr);
+  margin: 0;
+  padding: 4px 0;
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 16px;
+  align-items: baseline;
+  padding: 4px 12px;
+
+  &:nth-child(even) {
+    background: color-mix(in srgb, var(--hue) 4%, transparent);
+  }
+}
+
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin: 0;
+}
+
+.chord {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+kbd {
+  min-width: 20px;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--hue) 60%, var(--vsc-border));
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--hue) 20%, var(--vsc-editor-bg));
+  color: var(--vsc-fg-bright);
+  font-family: var(--vsc-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  text-align: center;
+}
+
+.plus,
+.or {
+  color: var(--vsc-fg-muted);
+  font-size: 11px;
+}
+
+.or {
+  margin: 0 2px;
+}
+
+.label {
+  margin: 0;
+  color: var(--vsc-fg);
+}
+
+.where {
+  margin-left: 6px;
+  color: var(--vsc-fg-muted);
+  font-size: 11px;
+}
+
+.empty {
+  margin: 24px 0;
+  color: var(--vsc-fg-muted);
+  text-align: center;
+}

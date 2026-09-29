@@ -70,7 +70,7 @@ type-to-find, selection following focus) and report the keys that mean something
 workbench — `Enter`, `Space`, `Backspace`, `Ctrl`+`R` (refresh), `+`/`-`, and `Alt`+`←`/`→` — as a
 `UiPanelKey`; `PanelKeyboardFeature` is the one place those bindings are decided.
 **Midnight Commander (PRD 004, §2).** The function keys are the *window's*, not a panel's:
-`F1`–`F10` are window bindings of `KeybindingsFeature` (palette, rename, view, edit/open, copy and
+`F1`–`F10` are window bindings of `KeybindingsFeature` (help, rename, view, edit/open, copy and
 move — to the other panel's folder —, mkdir, trash, main menu, and quit on the desktop), each a
 command of `CommandsFeature` run on the active panel; `FunctionKeysFeature` draws the strip in the
 middle of `UiStatusBar` (`functionKeys`) from whatever they are bound to. `F5` copies, so refreshing is `Ctrl`+`R` (the desktop's
@@ -157,14 +157,14 @@ active panel, and comes back for anything shown in it), *Toggle Panel* (§12.3),
 layout grid (PRD 001, §15.1.1), *Reset Layout*; `view.resetLayout` asks first wherever it is run from
 (`SessionFeature.confirmResetLayout`), since the window then reloads fresh.
 
-The main menu (PRD 008, §1) is File, Edit, Selection, View and Go, from
+The main menu (PRD 008, §1) is File, Edit, Selection, View, Go and Help (PRD 001, §16), from
 `MockDataWorkbenchService.menuItems`; `UiTitleBar` draws the menus, `ChromeFeature` holds
 which is open (`setMenuOpen`) and runs entries (`runMenuItem`, through `CommandsFeature`).
 Go ends with *Local Computer* — checked while `WorkbenchService.backend` is `local`, the default and, until
 PRD 006, the only one — and *Remote Computer…*, which opens the command palette at *Connect
 to Remote Server* (`CommandPaletteFeature.run`).
 
-The command palette (PRD 009, §1) is `CommandPaletteFeature`: `Ctrl`+`Shift`+`P`, `F1`,
+The command palette (PRD 009, §1) is `CommandPaletteFeature`: `Ctrl`+`Shift`+`P`,
 `Ctrl`+`P` or the title bar's command centre open it in the library's `UiQuickInput`;
 commands are filtered by `command-palette/fuzzy-match.ts`, and a command that needs a value
 turns the box into an input box (`InputStep`: `validate` as you type, `accept` does the work
@@ -209,6 +209,15 @@ starts (before the sign-in screen), on each change, and with the OS while follow
 paint before Angular does, and both read the same preference: an inline script in `index.html` (a
 browser's `localStorage`) and, on the desktop, the window's `backgroundColor`
 (`desktop/src/window-background.ts`, from the main process's settings file).
+
+**Help (PRD 001, §16).** `F1` (`help.show`, Midnight Commander's key for it; also the Help menu) opens
+the Help window: `HelpFeature` opens `HelpModal` — the library's `UiHelp` (tabs, a search box, close)
+in a `size: 'large'` modal — whose one tab so far is the *Cheatsheet* (§16.1, `help.cheatsheet`):
+`UiCheatsheet` cards, one colour each (`--vsc-hue-*`), keys as keycaps. The configurable cards are built
+from `KeybindingsFeature.bindings()` as it is now, grouped by `SUBJECTS` (a bound command none names goes
+under *Other*; the function keys have their own card and are not repeated), then the fixed keys
+(`FIXED`) — keep both in step with `SHORTCUTS.md`. A new page of help is a tab in `HelpFeature.tabs` and
+a `@case` in `HelpModal`.
 
 **Every key is configurable (PRD 010, §2).** The library's components never test a key for a
 command themselves: they ask the library's root `UiKeymap` (`prj/libs/ui/src/lib/keyboard/keymap.ts`)

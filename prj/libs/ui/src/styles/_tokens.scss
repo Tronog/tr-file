@@ -48,6 +48,16 @@
   --vsc-function-key-bg: #2aa1b3;
   --vsc-function-key-hover-bg: #3fbdd0;
   --vsc-function-key-fg: #000000;
+  /* The cheatsheet's section colours (PRD 001, §16.1): a card's band and the
+     tint of its keys — never text, so they need only be told apart. */
+  --vsc-hue-blue: #3794ff;
+  --vsc-hue-green: #3fb950;
+  --vsc-hue-orange: #f0883e;
+  --vsc-hue-purple: #b180d7;
+  --vsc-hue-teal: #2aa1b3;
+  --vsc-hue-yellow: #d7ba35;
+  --vsc-hue-pink: #e36fb0;
+  --vsc-hue-red: #f14c4c;
   --vsc-focus-border: #0078d4;
   /* VS Code's `textLink.foreground`. The accent (#0078d4) is a control colour:
      at ~3.6:1 on the editor background it fails AA as body text. */
@@ -172,6 +182,14 @@
   --vsc-function-key-bg: #2aa1b3;
   --vsc-function-key-hover-bg: #3fbdd0;
   --vsc-function-key-fg: #000000;
+  --vsc-hue-blue: #005fb8;
+  --vsc-hue-green: #1a7f37;
+  --vsc-hue-orange: #bc4c00;
+  --vsc-hue-purple: #8250df;
+  --vsc-hue-teal: #0e7c8c;
+  --vsc-hue-yellow: #9a6700;
+  --vsc-hue-pink: #bf3989;
+  --vsc-hue-red: #cf222e;
   --vsc-focus-border: #005fb8;
   --vsc-link: #005fb8;
 
