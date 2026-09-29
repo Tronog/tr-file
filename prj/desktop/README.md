@@ -489,18 +489,18 @@ and confirmed, `SelfUpdate.apply`:
 
 The file on the share is checked again before and after the copy, so one
 changed meanwhile is refused and the running copy left alone; a failure is
-said in the window. The new copy is started by a detached helper once this
-process — and, for the AppImage runtime and the portable launcher, its parent —
-has exited: the portable launcher deletes `%TEMP%\tr-file`, the folder it
-unpacked the app into, only as it exits, and the new launcher unpacks into the
-same folder; nor may the new copy meet the old one's single-instance lock. On
-Windows the helper is a batch file (`relaunch-<pid>.cmd` in
-`%TEMP%\tr-file-update`, run by `cmd.exe` from there — PowerShell may be
-blocked on a managed machine), on Linux `/bin/sh`. The app quits only once the
-helper is running; if it cannot start, the window says so and stays.
+said in the window. The new copy is then started directly — the local
+AppImage or `.exe`, or the setup — as a process of its own, with
+`--tr-file-upgraded`, and the app quits once it is running (if it cannot start,
+the window says so and stays). Nothing waits in between: a copy started with
+that flag asks for the single-instance lock again for up to 20 s while the old
+one exits, and the portable launcher unpacks into a folder of its own each run
+(no `unpackDirName` — with a fixed folder, the new launcher would unpack into
+the one the old launcher deletes as it exits). A batch helper that waited
+instead opened a console window for every `tasklist`/`find` it ran.
 
-Every step — what was copied from where to where, what is run, and the
-helper's own waiting and starting — is appended to **`update.log`** in the
+Every step — what was copied from where to where, and what was started with
+what — is appended to **`update.log`** in the
 user-data folder (`%APPDATA%\tr-file\update.log`, `~/.config/tr-file/update.log`):
 the first thing to read when an upgrade does not come back.
 

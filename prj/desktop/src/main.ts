@@ -13,7 +13,7 @@ import { BridgeSessions } from './bridge-sessions.js';
 import type { DesktopShell } from './desktop-shell.js';
 import { MainWindow } from './main-window.js';
 import { SaveFileChannel } from './save-file.channel.js';
-import { appendUpdateLog, detectInstallation, relaunchAfterExit, SelfUpdate, UpdateMonitor, updateSource } from './self-update.js';
+import { appendUpdateLog, detectInstallation, SelfUpdate, startDetached, UpdateMonitor, updateSource } from './self-update.js';
 import { SettingsChannel } from './settings.channel.js';
 import { SettingsStore } from './settings-store.js';
 import { windowBackground } from './window-background.js';
@@ -34,6 +34,12 @@ import { VisibilityShortcut } from './window-visibility.js';
  * things happen in, which is the only thing about a main process that is hard
  * to reconstruct later.
  */
+/** What an upgrade starts the new version with, so it waits for the old one's lock (PRD 001, §8.6). */
+const UPGRADED_FLAG = '--tr-file-upgraded';
+/** Twenty seconds, a quarter of one at a time. */
+const LOCK_RETRIES = 80;
+const LOCK_RETRY_MS = 250;
+
 class DesktopApplication {
   private readonly config = DesktopConfig.resolve({
     env: process.env,
@@ -103,17 +109,37 @@ class DesktopApplication {
    * copies would mean two servers over the same files.
    */
   run(): void {
-    if (!app.requestSingleInstanceLock()) {
-      app.quit();
-      return;
-    }
-
     // A Wayland session gives out global shortcuts only through its portal
-    // (PRD 001, §8.5); X11 and the other platforms need nothing.
+    // (PRD 001, §8.5); X11 and the other platforms need nothing. Before
+    // `ready`, which may come while the lock below is waited for.
     if (process.platform === 'linux') {
       app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal');
     }
 
+    if (app.requestSingleInstanceLock()) {
+      this.begin();
+      return;
+    }
+    // Started by an upgrade (PRD 001, §8.6): the old version is on its way
+    // out and still holds the lock for a moment — ask again for a while.
+    if (!process.argv.includes(UPGRADED_FLAG)) {
+      app.quit();
+      return;
+    }
+    let tries = 0;
+    const retry = setInterval(() => {
+      if (app.requestSingleInstanceLock()) {
+        clearInterval(retry);
+        this.begin();
+      } else if (++tries >= LOCK_RETRIES) {
+        clearInterval(retry);
+        app.quit();
+      }
+    }, LOCK_RETRY_MS);
+  }
+
+  /** Everything after the lock: the lifecycle's handlers, and the start once ready. */
+  private begin(): void {
     app.on('second-instance', () => this.window?.focus());
     app.on('window-all-closed', () => {
       // macOS keeps the app running with no windows; everywhere else, closing
@@ -224,11 +250,11 @@ class DesktopApplication {
         changed: (status) => UpdateChannel.publish(status),
         log,
         restart: async (relaunch) => {
-          // The portable launcher and the AppImage runtime outlive the app by a moment
-          // and clean up after it; the new copy starts once they have gone too.
-          const waitFor = installation.kind === 'installed' ? [process.pid] : [process.pid, process.ppid];
-          await relaunchAfterExit(relaunch, waitFor, { tempDir, logFile });
-          log('helper started; quitting', { waitFor });
+          // Started now, from the local copy; it waits for this one's lock itself.
+          // The setup is not the app: it closes whatever is still running and starts the app when done.
+          const args = installation.kind === 'installed' ? relaunch.args : [...relaunch.args, UPGRADED_FLAG];
+          await startDetached({ command: relaunch.command, args });
+          log('new version started; quitting', { run: relaunch.command, args });
           app.quit();
         },
       },

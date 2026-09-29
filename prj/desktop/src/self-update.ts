@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, statSync, truncateSync } from 'node:fs';
 import { chmod, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve, win32 } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 /**
  * Where the distributables are published (PRD 001, §8.6): a folder on the
@@ -389,104 +389,33 @@ export class SelfUpdate {
   }
 }
 
-/** How a relaunch is started, and where it says what it did. */
-export interface RelaunchOptions {
-  /** The update's temporary folder: the helper script is written, and run, there. */
-  readonly tempDir: string;
-  /** `update.log`: every step of the helper, appended. */
-  readonly logFile: string;
-  readonly platform?: NodeJS.Platform;
-}
-
-/** A path inside a batch file's double quotes: `%` doubled, so it is not expanded. */
-function batchQuoted(value: string): string {
-  return `"${value.replace(/%/g, '%%').replace(/"/g, '')}"`;
-}
-
 /**
- * The Windows helper (§8.6): waits — up to a minute each — for the processes
- * in `waitFor` to exit, then starts `relaunch` from its own folder, saying
- * each step in the log. A batch file for `cmd.exe`, which every Windows runs,
- * rather than PowerShell, which a managed one may not; `ping` is its clock,
- * since `timeout` refuses to run without a console.
- */
-export function windowsRelaunchScript(relaunch: Relaunch, waitFor: readonly number[], logFile: string): string {
-  const log = batchQuoted(logFile);
-  const lines = ['@echo off', 'setlocal', `echo %date% %time% helper: started >> ${log}`];
-  waitFor.forEach((id, index) => {
-    lines.push(
-      'set n=0',
-      `:wait${index}`,
-      `tasklist /FI "PID eq ${id}" /NH 2>nul | find " ${id} " >nul || goto gone${index}`,
-      'set /a n+=1',
-      `if %n% geq 120 (echo %date% %time% helper: process ${id} still running, starting anyway >> ${log} & goto gone${index})`,
-      'ping -n 2 -w 500 127.0.0.1 >nul',
-      `goto wait${index}`,
-      `:gone${index}`,
-      `echo %date% %time% helper: process ${id} has exited >> ${log}`,
-    );
-  });
-  const command = batchQuoted(relaunch.command);
-  // Bare where they can be: an NSIS setup knows `/S` only unquoted.
-  const args = relaunch.args.map((arg) => (/^[\w/.:=-]+$/.test(arg) ? arg : batchQuoted(arg))).join(' ');
-  lines.push(
-    `if not exist ${command} (echo %date% %time% helper: ${command} is missing >> ${log} & exit /b 1)`,
-    `echo %date% %time% helper: starting ${command} ${args} >> ${log}`,
-    `start "" /D ${batchQuoted(win32.dirname(relaunch.command))} ${command}${args ? ` ${args}` : ''}`,
-    `echo %date% %time% helper: start returned %errorlevel% >> ${log}`,
-    'endlocal',
-  );
-  return `${lines.join('\r\n')}\r\n`;
-}
-
-/**
- * Starts `relaunch` once the processes in `waitFor` have exited, from a
- * detached helper that outlives this one — started in the update's own
- * temporary folder, never in the folder the app runs from, which the portable
- * launcher deletes as it exits.
+ * Starts the new version — the local copy of an AppImage or portable `.exe`,
+ * or a setup — as a process of its own that outlives this one, and resolves
+ * once it is running; rejects when it cannot start, so the app stays open
+ * rather than quitting into nothing.
  *
- * Waiting matters twice over: the new copy would otherwise find this one still
- * holding the single-instance lock and quit, and the portable launcher removes
- * the folder it unpacked into only after the app has exited — the folder the
- * new launcher unpacks into. Throws when the helper cannot be started, so the
- * app stays open rather than quitting into nothing.
+ * Started directly, with nothing in between: both are windowed programs, so
+ * nothing flashes up, and nothing needs waiting for — the new app waits for
+ * this one's single-instance lock itself (`--tr-file-upgraded`), and the
+ * portable launcher unpacks into a folder of its own each run.
  */
-export async function relaunchAfterExit(relaunch: Relaunch, waitFor: readonly number[], options: RelaunchOptions): Promise<void> {
-  const platform = options.platform ?? process.platform;
-  await mkdir(options.tempDir, { recursive: true });
+export async function startDetached(relaunch: Relaunch): Promise<void> {
   const env = { ...process.env };
   // The running launcher's variables would point the new one at our copy.
   for (const name of ['APPIMAGE', 'APPDIR', 'ARGV0', 'OWD', 'PORTABLE_EXECUTABLE_DIR', 'PORTABLE_EXECUTABLE_FILE', 'PORTABLE_EXECUTABLE_APP_FILENAME']) {
     delete env[name];
   }
-
-  let child: ReturnType<typeof spawn>;
-  if (platform === 'win32') {
-    const script = join(options.tempDir, `relaunch-${process.pid}.cmd`);
-    await writeFile(script, windowsRelaunchScript(relaunch, waitFor, options.logFile));
-    child = spawn(process.env['ComSpec'] || 'cmd.exe', ['/d', '/c', script], {
-      cwd: options.tempDir,
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-      env,
-    });
-  } else {
-    // Up to a minute each, a fifth of a second at a time; then the new copy, detached from us.
-    const log = `"$LOG"`;
-    const wait = waitFor.map((id) => `n=0; while kill -0 ${id} 2>/dev/null && [ $n -lt 300 ]; do sleep 0.2; n=$((n+1)); done; echo "$(date) helper: process ${id} has exited" >> ${log}`).join('; ');
-    child = spawn('/bin/sh', ['-c', `${wait}; echo "$(date) helper: starting $0" >> ${log}; exec "$0" "$@"`, relaunch.command, ...relaunch.args], {
-      cwd: options.tempDir,
-      detached: true,
-      stdio: 'ignore',
-      env: { ...env, LOG: options.logFile },
-    });
-  }
-
-  // Started, or not: the answer comes as an event, not from `spawn`.
+  const child = spawn(relaunch.command, [...relaunch.args], {
+    // Its own folder: never the one the running app was unpacked into, which goes as it exits.
+    cwd: dirname(relaunch.command),
+    detached: true,
+    stdio: 'ignore',
+    env,
+  });
   await new Promise<void>((resolve, reject) => {
     child.once('spawn', () => resolve());
-    child.once('error', (error) => reject(new Error(`The upgrade could not be started: ${error.message}`)));
+    child.once('error', (error) => reject(new Error(`The new version could not be started: ${error.message}`)));
   });
   child.unref();
 }

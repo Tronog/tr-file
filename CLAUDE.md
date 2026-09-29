@@ -578,7 +578,7 @@ the preload's `trFileUpdate` reach `AppUpdateFeature`, whose blue *Upgrade* sits
 (`UiTitleBar.upgrade`). Upgrading renames an AppImage over the running one (same path); on Windows the
 new file is first copied into the local temp folder (a program on the share will not run) and run from
 there — the portable `.exe` as the app from then on, the setup silently over the installation — and the
-app restarts once this process has gone (`relaunchAfterExit`).
+new version is started directly (`startDetached`, with `--tr-file-upgraded`, so it waits for the old one's single-instance lock) before this one quits; the portable launcher has no `unpackDirName`, so old and new never share an unpack folder. Every step goes to `update.log` in the user-data folder.
 `pnpm --filter @tr-file/desktop publish:share` puts a release there.
 *File › Check for Updates…* (§8.6.1, `file.checkForUpdates`, desktop only) looks now — the channel's
 `check` — and always answers: up to date, a newer version to upgrade to (*Upgrade* / *Later*), the

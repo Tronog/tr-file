@@ -58,11 +58,11 @@ win:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 portable:
-  # One running copy at a time is already the rule (main.ts takes a
-  # single-instance lock), so the launcher should reuse the same unpack
-  # directory rather than growing a new one per run.
+  # No `unpackDirName`: the launcher unpacks into a folder of its own each run
+  # (it unpacks afresh every time anyway) and removes it as it exits. With a
+  # fixed folder, the launcher of an upgrade (PRD 001, §8.6) would unpack into
+  # the very folder the old launcher is deleting.
   requestExecutionLevel: user
-  unpackDirName: tr-file
 
 # The setup's uninstaller is normally written by running a stub under Wine.
 # The package scripts point ELECTRON_BUILDER_WINE_TOOLSET_DIR at
