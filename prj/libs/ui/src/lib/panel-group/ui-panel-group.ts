@@ -227,6 +227,19 @@ export class UiPanelGroup {
     });
     inject(DestroyRef).onDestroy(() => clearTimeout(timer));
 
+    // A drop the content takes itself — the file browser's, which stops it
+    // there so this group does not act on it twice — never reaches
+    // `onBodyDrop`, and no `dragleave` follows a drop: without hearing it on
+    // the way down, the file overlay `dragover` lit would stay up over the
+    // panel (a desktop drag of entries within one panel is a drag of files).
+    const clear = (): void => this.clearDragState();
+    this.host.addEventListener('drop', clear, true);
+    this.host.addEventListener('dragend', clear, true);
+    inject(DestroyRef).onDestroy(() => {
+      this.host.removeEventListener('drop', clear, true);
+      this.host.removeEventListener('dragend', clear, true);
+    });
+
     // After render, not during it: the body has to exist before focus can go
     // into it, and on a tab switch the *new* tab's body is what must exist.
     // A request outlives an unsatisfied attempt while the listing is still
