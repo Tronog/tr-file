@@ -407,6 +407,12 @@ export class FsBridgeService implements FsTransport {
     return (await this.invoke<{ text: string }>(request)).text;
   }
 
+  /** The main process writes it, as it does the paths. */
+  async copyText(text: string, style: FsPathStyle = 'native'): Promise<string> {
+    const request = { command: 'clipboard-write-text', text, ...(style === 'unix' ? { unix: true } : {}) };
+    return (await this.invoke<{ text: string }>(request)).text;
+  }
+
   /** The main process starts it — for entries on this computer; it knows which window is where. */
   startDrag(paths: readonly string[]): boolean {
     const start = this.api?.startDrag;

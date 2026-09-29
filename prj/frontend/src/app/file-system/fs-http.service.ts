@@ -425,7 +425,15 @@ export class FsHttpService implements FsTransport {
    */
   async copyPaths(paths: readonly string[], style: FsPathStyle = 'native'): Promise<string> {
     const hostPaths = await this.hostPaths(paths);
-    const text = (style === 'unix' ? hostPaths.map(unixPath) : hostPaths).join('\n');
+    return this.writeText((style === 'unix' ? hostPaths.map(unixPath) : hostPaths).join('\n'));
+  }
+
+  async copyText(text: string, style: FsPathStyle = 'native'): Promise<string> {
+    return this.writeText(style === 'unix' ? unixPath(text) : text);
+  }
+
+  /** The Clipboard API, else a selected text field copied the old way; says so when neither may. */
+  private async writeText(text: string): Promise<string> {
     const clipboard = globalThis.navigator?.clipboard;
     if (clipboard !== undefined) {
       try {

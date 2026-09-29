@@ -169,6 +169,13 @@ export interface FsTransport {
    */
   copyPaths(paths: readonly string[], style?: FsPathStyle): Promise<string>;
 
+  /**
+   * A path that names no entry of the root — where a link points, where the
+   * system trash says an item was (PRD 001, §9.3.1) — copied as it is, or the
+   * UNIX way; answers with the text. Rejects with `NOT_SUPPORTED` like `copyPaths`.
+   */
+  copyText(text: string, style?: FsPathStyle): Promise<string>;
+
   /** Starts the system's drag of these entries, for other apps to take; `false` where there is none. */
   startDrag(paths: readonly string[]): boolean;
 

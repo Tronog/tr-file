@@ -208,7 +208,7 @@ describe('Function keys (PRD 004, §2)', () => {
   /** PRD 004, §1.3.2: `Ctrl`+`Shift`+`C` in a panel runs *Copy Path*. */
   describe('Ctrl+Shift+C', () => {
     it('copies the selection when the entry is part of it, else the entry', () => {
-      const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+      const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue(true);
       select(['a.txt', 'b.txt']);
 
       workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
@@ -218,7 +218,7 @@ describe('Function keys (PRD 004, §2)', () => {
     });
 
     it('copies the folder the panel lists when no entry has focus', () => {
-      const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+      const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue(true);
 
       workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: null });
 
@@ -231,7 +231,7 @@ describe('Function keys (PRD 004, §2)', () => {
       afterEach(() => vi.useRealTimers());
 
       it('copies UNIX paths the second time within a second', () => {
-        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue(true);
 
         workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
         vi.advanceTimersByTime(600);
@@ -241,7 +241,7 @@ describe('Function keys (PRD 004, §2)', () => {
       });
 
       it('starts over after the second press', () => {
-        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue(true);
 
         for (let press = 0; press < 3; press += 1) {
           workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
@@ -251,7 +251,7 @@ describe('Function keys (PRD 004, §2)', () => {
       });
 
       it('copies the host way again after more than a second, or for other entries', () => {
-        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue();
+        const copy = vi.spyOn(workbench.systemOpenFt, 'copyPaths').mockResolvedValue(true);
 
         workbench.panelKeyboardFt.run(group, { command: 'copy-path', entryId: 'b.txt' });
         vi.advanceTimersByTime(1001);

@@ -15,6 +15,19 @@ export interface UiProperty {
   readonly action?: string;
   /** What the button does, for its tooltip and accessible name. */
   readonly actionLabel?: string;
+  /**
+   * The value is a path a press copies (PRD 001, §9.3.1): drawn as the value
+   * it is, not as a link — underlined under the pointer, with a copy cursor.
+   */
+  readonly copy?: boolean;
+  /** A word after the value, for a moment — `Copied`. */
+  readonly badge?: string;
+}
+
+/** A value with an `action` pressed — and whether `Shift` was held (PRD 001, §9.3.1). */
+export interface UiPropertyActivation {
+  readonly id: string;
+  readonly shift: boolean;
 }
 
 /** read/write/execute for one principal. */

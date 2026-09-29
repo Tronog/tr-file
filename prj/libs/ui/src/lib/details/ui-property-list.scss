@@ -63,3 +63,25 @@ dd {
     @include focus-ring;
   }
 }
+
+/* A path a press copies (PRD 001, §9.3.1): the value as it is, a copy cursor, underlined under the pointer. */
+.prop-action.is-copy {
+  color: inherit;
+  cursor: copy;
+
+  &:hover {
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+  }
+}
+
+.badge {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--vsc-badge-bg);
+  color: var(--vsc-accent-fg);
+  font-family: var(--vsc-font);
+  font-size: 10px;
+  white-space: nowrap;
+}

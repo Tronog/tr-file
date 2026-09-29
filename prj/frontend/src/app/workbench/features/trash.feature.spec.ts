@@ -121,7 +121,11 @@ describe('TrashFeature', () => {
     trash().setSelection(group, { selected: ['notes.txt.k1'], focused: 'notes.txt.k1' });
 
     expect(trash().preview().title).toBe('notes.txt');
-    expect(trash().properties()[0]).toEqual({ label: 'Original location', value: '/docs/notes.txt', mono: true });
+    expect(trash().properties()[0]).toMatchObject({ label: 'Original location', value: '/docs/notes.txt', mono: true, copy: true });
+    // A server trash's location is in the root: copied as its full path (PRD 001, §9.3.1).
+    const copy = vi.spyOn(workbench.fileSystem.systemFt, 'copyPaths').mockResolvedValue('');
+    trash().runProperty({ id: 'copy-trash-location', shift: true });
+    expect(copy).toHaveBeenCalledWith(['docs/notes.txt'], 'unix');
     expect(trash().actions().map((action) => action.id)).toEqual(['restore', 'empty', 'refresh']);
   });
 

@@ -448,7 +448,7 @@
             >
               <ui-property-list
                 [properties]="trash.showing() ? trash.properties() : details.properties()"
-                (action)="details.runAction($event)"
+                (action)="trash.showing() ? trash.runProperty($event) : details.runProperty($event)"
               />
             </ui-pane>
           }
@@ -487,7 +487,7 @@
               } @else {
                 <ui-action-list [items]="details.actions()" (select)="details.runAction($event)" />
                 <!-- where a file action goes from and to (PRD 002, §2.7.1) -->
-                <ui-property-list class="transfer-paths" [properties]="details.transferPaths()" />
+                <ui-property-list class="transfer-paths" [properties]="details.transferPaths()" (action)="details.runProperty($event)" />
               }
             </ui-pane>
           }

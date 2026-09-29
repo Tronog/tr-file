@@ -399,6 +399,15 @@ describe('BridgeSessions and the system clipboard (PRD 003, §6)', () => {
     assert.equal(clipboard.text, expected);
   });
 
+  /** PRD 001, §9.3.1 — a path no entry of the root has (a link's target), copied as it is. */
+  it('copies a path as text, or the UNIX way', async () => {
+    assert.deepEqual(dataOf(await withClipboard.dispatch(window(), { command: 'clipboard-write-text', text: 'C:\\Users\\me' })), { text: 'C:\\Users\\me' });
+    assert.equal(clipboard.text, 'C:\\Users\\me');
+    assert.deepEqual(dataOf(await withClipboard.dispatch(window(), { command: 'clipboard-write-text', text: 'C:\\Users\\me', unix: true })), { text: '/C/Users/me' });
+    assert.equal(errorOf(await withClipboard.dispatch(window(), { command: 'clipboard-write-text', text: '' })).status, 400);
+    assert.equal(errorOf(await sessions.dispatch(window(), { command: 'clipboard-write-text', text: 'x' })).code, 'NOT_SUPPORTED');
+  });
+
   it('says so when there is no clipboard to copy to', async () => {
     assert.equal(errorOf(await sessions.dispatch(window(), { command: 'clipboard-write-paths', paths: ['here.txt'] })).code, 'NOT_SUPPORTED');
   });

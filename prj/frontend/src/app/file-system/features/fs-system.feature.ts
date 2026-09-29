@@ -60,6 +60,11 @@ export class FsSystemFeature {
     return this.parent.transport.copyPaths(paths, style);
   }
 
+  /** A path as text, not an entry of the root (PRD 001, §9.3.1); answers with what was copied. */
+  copyText(text: string, style: FsPathStyle = 'native'): Promise<string> {
+    return this.parent.transport.copyText(text, style);
+  }
+
   startDrag(paths: readonly string[]): boolean {
     return this.parent.transport.startDrag(paths);
   }

@@ -1,7 +1,14 @@
-import { computed } from '@angular/core';
+import { computed, signal } from '@angular/core';
+import type { UiProperty } from '@tr-file/ui';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
 import { shownPath, type FsPathStyle } from '../../file-system/fs-path';
+
+/** How long a copied path's value says `Copied` (PRD 001, §9.3.1). */
+export const COPIED_BADGE_MS = 1500;
+
+/** A path shown as a value somewhere, to copy when pressed: an entry of the root, or text naming none. */
+export type CopyablePath = { readonly path: string } | { readonly text: string };
 
 /** Which system the window runs on, as far as naming things after it goes. */
 type Platform = 'windows' | 'mac' | 'other';
@@ -51,19 +58,63 @@ export class SystemOpenFeature {
    * the UNIX way (`/C/Users/me`, PRD 004, §1.3.2). A clipboard that refuses
    * is said, never swallowed.
    */
-  async copyPaths(paths: readonly string[], style: FsPathStyle = 'native'): Promise<void> {
+  async copyPaths(paths: readonly string[], style: FsPathStyle = 'native'): Promise<boolean> {
     if (paths.length === 0) {
-      return;
+      return false;
     }
     try {
       await this.parent.fileSystem.systemFt.copyPaths(paths, style);
+      return true;
     } catch (error) {
       await this.parent.modal.message({
         severity: 'error',
         message: paths.length === 1 ? 'Could not copy the path.' : 'Could not copy the paths.',
         detail: FsError.from(error).message,
       });
+      return false;
     }
+  }
+
+  /** The value copied last, by the key its list gave it — `Copied` beside it for a moment. */
+  private readonly copiedKey = signal<string | null>(null);
+  private copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * A path pressed in the details sidebar (PRD 001, §9.3.1): copied — an
+   * entry of the root as its full host path, as *Copy Path* does, text naming
+   * none (a link's target) as it is; the UNIX way with `Shift`. `key` names
+   * the value, so it can say `Copied` (`copyable`).
+   */
+  async copyPathValue(key: string, value: CopyablePath, shift: boolean): Promise<void> {
+    const style: FsPathStyle = shift ? 'unix' : 'native';
+    let copied: boolean;
+    if ('path' in value) {
+      copied = await this.copyPaths([value.path], style);
+    } else {
+      try {
+        await this.parent.fileSystem.systemFt.copyText(value.text, style);
+        copied = true;
+      } catch (error) {
+        await this.parent.modal.message({ severity: 'error', message: 'Could not copy the path.', detail: FsError.from(error).message });
+        copied = false;
+      }
+    }
+    if (copied) {
+      clearTimeout(this.copiedTimer);
+      this.copiedKey.set(key);
+      this.copiedTimer = setTimeout(() => this.copiedKey.set(null), COPIED_BADGE_MS);
+    }
+  }
+
+  /** `property` as a path to copy, under `key`: a button that says what a press does, and `Copied` after one. */
+  copyable(property: UiProperty, key: string): UiProperty {
+    return {
+      ...property,
+      action: key,
+      copy: true,
+      actionLabel: 'Copy the path — Shift+click copies it the UNIX way',
+      ...(this.copiedKey() === key ? { badge: 'Copied' } : {}),
+    };
   }
 
   /** Opens `path` outside the app; a refusal is said, a declined program is not. */

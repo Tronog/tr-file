@@ -157,6 +157,8 @@ export class BridgeSessions {
         return this.writeClipboard(sender, request as Record<string, unknown>);
       case 'clipboard-write-paths':
         return this.copyPaths(sender, request as Record<string, unknown>);
+      case 'clipboard-write-text':
+        return this.copyText(request as Record<string, unknown>);
       case 'local-paths': {
         const absolute = (request as { absolute?: unknown }).absolute;
         if (!Array.isArray(absolute) || !absolute.every((path): path is string => typeof path === 'string') || absolute.length > 10_000) {
@@ -261,6 +263,24 @@ export class BridgeSessions {
     const text = unix === true ? lines.map(unixPath).join('\n') : lines.join(this.platform === 'win32' ? '\r\n' : '\n');
     await this.clipboard.writeText(text);
     return { data: { text } };
+  }
+
+  /**
+   * `clipboard-write-text`: a path that names no entry of the root — where a
+   * link points, where the system trash says an item was (PRD 001, §9.3.1) —
+   * copied as it is; with `unix`, the UNIX way. Answers with the text copied.
+   */
+  private async copyText(request: Record<string, unknown>): Promise<FsBridgeResponse> {
+    const { text, unix } = request;
+    if (typeof text !== 'string' || text === '' || text.length > 32_768) {
+      return failure('BAD_REQUEST', 400, 'Bridge request field "text" must be a non-empty string');
+    }
+    if (this.clipboard === null) {
+      return failure('NOT_SUPPORTED', 400, 'There is no system clipboard to copy to.');
+    }
+    const copied = unix === true ? unixPath(text) : text;
+    await this.clipboard.writeText(copied);
+    return { data: { text: copied } };
   }
 
   /** Where an entry that is not there would be on this computer. */

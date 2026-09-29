@@ -11,7 +11,7 @@ describe('UiPropertyList', () => {
     ]);
     fixture.detectChanges();
     const pressed: string[] = [];
-    fixture.componentInstance.action.subscribe((id) => pressed.push(id));
+    fixture.componentInstance.action.subscribe(({ id, shift }) => pressed.push(shift ? `shift ${id}` : id));
 
     const buttons = fixture.nativeElement.querySelectorAll('dd button');
     expect(buttons).toHaveLength(1);
@@ -20,6 +20,20 @@ describe('UiPropertyList', () => {
     expect(button.getAttribute('title')).toBe('Count all entries');
     button.click();
     expect(pressed).toEqual(['count-entries']);
+    button.dispatchEvent(new MouseEvent('click', { shiftKey: true }));
+    expect(pressed).toEqual(['count-entries', 'shift count-entries']);
     expect(fixture.nativeElement.querySelector('dd')?.textContent?.trim()).toBe('4 KB');
+  });
+
+  /** PRD 001, §9.3.1 — a path to copy keeps the value's look, and says `Copied` after. */
+  it('draws a path to copy as the value it is, with its badge', () => {
+    const fixture = TestBed.createComponent(UiPropertyList);
+    fixture.componentRef.setInput('properties', [
+      { label: 'Location', value: '/docs', mono: true, action: 'copy-location', copy: true, actionLabel: 'Copy the path', badge: 'Copied' },
+    ]);
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('button.prop-action.is-copy')?.textContent?.trim()).toBe('/docs');
+    expect(host.querySelector('.badge')?.textContent).toBe('Copied');
   });
 });

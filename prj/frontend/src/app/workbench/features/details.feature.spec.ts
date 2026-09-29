@@ -209,6 +209,65 @@ describe('DetailsFeature', () => {
     });
   });
 
+  /** PRD 001, §9.3.1 — a path in Details copies itself when pressed; the UNIX way with `Shift`. */
+  describe('copying paths', () => {
+    const property = (label: string) =>
+      [...workbench.detailsFt.properties(), ...workbench.detailsFt.transferPaths()].find((candidate) => candidate.label === label);
+
+    it('makes every path a value to copy, and nothing else', async () => {
+      await selectAndFlush('link', fsDetails('link', { type: 'symlink', symlinkTarget: 'C:\\Users\\me' }));
+      for (const label of ['Location', 'Links to', 'Source', 'Destination']) {
+        expect(property(label)).toMatchObject({ copy: true, action: expect.stringMatching(/^copy-/) });
+      }
+      expect(property('Size')?.action).toBeUndefined();
+      expect(property('Media type')?.action).toBeUndefined();
+    });
+
+    it('copies an entry’s folder as Copy Path does, and says so for a moment', async () => {
+      vi.useFakeTimers();
+      try {
+        const copy = vi.spyOn(workbench.fileSystem.systemFt, 'copyPaths').mockResolvedValue('/root/docs/prd');
+        workbench.select('docs/prd/001.md');
+        http.expectOne(detailsUrl('docs/prd/001.md')).flush(fsEnvelope(fsDetails('docs/prd/001.md')));
+        await vi.advanceTimersByTimeAsync(0);
+
+        workbench.detailsFt.runProperty({ id: 'copy-location', shift: false });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(copy).toHaveBeenLastCalledWith(['docs/prd'], 'native');
+        expect(property('Location')?.badge).toBe('Copied');
+
+        workbench.detailsFt.runProperty({ id: 'copy-location', shift: true });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(copy).toHaveBeenLastCalledWith(['docs/prd'], 'unix');
+
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(property('Location')?.badge).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('copies a link’s target as it is, or the UNIX way', async () => {
+      const copy = vi.spyOn(workbench.fileSystem.systemFt, 'copyText').mockResolvedValue('');
+      await selectAndFlush('link', fsDetails('link', { type: 'symlink', symlinkTarget: 'C:\\Users\\me' }));
+
+      workbench.detailsFt.runProperty({ id: 'copy-link-target', shift: true });
+      await settled();
+      expect(copy).toHaveBeenCalledWith('C:\\Users\\me', 'unix');
+    });
+
+    it('says why a path could not be copied', async () => {
+      vi.spyOn(workbench.fileSystem.systemFt, 'copyPaths').mockRejectedValue(new Error('no clipboard'));
+      const message = vi.spyOn(workbench.modal, 'message').mockResolvedValue();
+      await selectAndFlush('docs/a.md', fsDetails('docs/a.md'));
+
+      workbench.detailsFt.runProperty({ id: 'copy-location', shift: false });
+      await settled();
+      expect(message).toHaveBeenCalledWith(expect.objectContaining({ message: 'Could not copy the path.' }));
+      expect(property('Location')?.badge).toBeUndefined();
+    });
+  });
+
   describe('properties', () => {
     it('formats what the backend reports', async () => {
       await selectAndFlush(

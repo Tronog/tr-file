@@ -8,6 +8,7 @@ import type {
   UiIconAction,
   UiPreview,
   UiProperty,
+  UiPropertyActivation,
   UiSelectionChange,
 } from '@tr-file/ui';
 import type { FsTrashItem, FsTrashListing } from '../../file-system/file-system.model';
@@ -204,7 +205,9 @@ export class TrashFeature implements PanelContentFeature {
     const item = this.picked();
     if (item !== undefined) {
       return [
-        { label: 'Original location', value: item.location === null ? 'unknown' : this.locationLabel(item.location), mono: true },
+        item.location === null
+          ? { label: 'Original location', value: 'unknown', mono: true }
+          : this.parent.systemOpenFt.copyable({ label: 'Original location', value: this.locationLabel(item.location), mono: true }, 'copy-trash-location'),
         { label: 'Deleted', value: item.deletedAt === null ? 'unknown' : files.fullTimestamp(item.deletedAt) },
         ...(item.type === 'file' ? [{ label: 'Size', value: `${item.size.toLocaleString('en-US')} bytes (${files.formatBytes(item.size)})` }] : []),
       ];
@@ -234,6 +237,20 @@ export class TrashFeature implements PanelContentFeature {
 
   runAction(id: string): void {
     this.runToolbarAction(this.parent.activeGroupId(), id);
+  }
+
+  /**
+   * A value of the Properties list pressed: the picked item's original
+   * location, copied (PRD 001, §9.3.1) — the server's is in the root, so its
+   * full path is copied as *Copy Path* does; the system's is a host path already.
+   */
+  runProperty(activation: UiPropertyActivation): void {
+    const location = this.picked()?.location;
+    if (activation.id !== 'copy-trash-location' || location == null) {
+      return;
+    }
+    const value = this.state()?.listing?.trash === 'server' ? { path: location } : { text: location };
+    void this.parent.systemOpenFt.copyPathValue(activation.id, value, activation.shift);
   }
 
   /* -- internals ---------------------------------------------------------------- */

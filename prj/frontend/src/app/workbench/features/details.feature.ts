@@ -1,5 +1,6 @@
 import { computed, linkedSignal, signal } from '@angular/core';
-import type { UiActionListItem, UiPermissions, UiPreview, UiProperty } from '@tr-file/ui';
+import type { UiActionListItem, UiPermissions, UiPreview, UiProperty, UiPropertyActivation } from '@tr-file/ui';
+import type { CopyablePath } from './system-open.feature';
 import type { FsDetails } from '../../file-system/file-system.model';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import type { WorkbenchService } from '../workbench.service';
@@ -74,7 +75,10 @@ export class DetailsFeature {
     }
     const files = this.parent.fileViewModel;
     const properties: UiProperty[] = [
-      { label: 'Location', value: this.locationOf(details), mono: true },
+      // The root is in no folder: its `/` is not a path to copy.
+      details.parent === null
+        ? { label: 'Location', value: this.locationOf(details), mono: true }
+        : this.pathValue({ label: 'Location', value: this.locationOf(details), mono: true }, 'copy-location'),
       { label: 'Size', value: `${details.size.toLocaleString('en-US')} bytes (${files.formatBytes(details.size)})` },
       { label: 'On disk', value: files.formatBytes(details.sizeOnDisk) },
       { label: 'Created', value: files.fullTimestamp(details.createdAt) },
@@ -91,7 +95,7 @@ export class DetailsFeature {
       properties.push({ label: 'Media type', value: details.mimeType, mono: true });
     }
     if (details.symlinkTarget) {
-      properties.push({ label: 'Links to', value: details.symlinkTarget, mono: true });
+      properties.push(this.pathValue({ label: 'Links to', value: details.symlinkTarget, mono: true }, 'copy-link-target'));
     }
 
     return properties;
@@ -142,11 +146,47 @@ export class DetailsFeature {
     const groups = this.parent.editorGroupsFt;
     const group = groups.stateOf(groupId);
     const source = group !== undefined && groups.activeTabOf(group)?.kind === 'folder' ? group.path : null;
+    const sourceValue: UiProperty = { label: 'Source', value: source === null ? '—' : shownPath(source), mono: true };
     return [
-      { label: 'Source', value: source === null ? '—' : shownPath(source), mono: true },
-      { label: 'Destination', value: shownPath(this.parent.operationsFt.defaultDestination(groupId)), mono: true },
+      source === null ? sourceValue : this.pathValue(sourceValue, 'copy-source'),
+      this.pathValue({ label: 'Destination', value: shownPath(this.parent.operationsFt.defaultDestination(groupId)), mono: true }, 'copy-destination'),
     ];
   });
+
+  /** A value that is a path: copied when pressed, the UNIX way with `Shift` (PRD 001, §9.3.1). */
+  private pathValue(property: UiProperty, key: string): UiProperty {
+    return this.parent.systemOpenFt.copyable(property, key);
+  }
+
+  /** What each path value copies, read when it is pressed — the entry selected *now*. */
+  private copyableOf(key: string): CopyablePath | null {
+    const details = this.current();
+    switch (key) {
+      case 'copy-location':
+        return details?.parent == null ? null : { path: details.parent };
+      case 'copy-link-target':
+        return details?.symlinkTarget ? { text: details.symlinkTarget } : null;
+      case 'copy-source': {
+        const groups = this.parent.editorGroupsFt;
+        const group = groups.stateOf(this.parent.activeGroupId());
+        return group !== undefined && groups.activeTabOf(group)?.kind === 'folder' ? { path: group.path } : null;
+      }
+      case 'copy-destination':
+        return { path: this.parent.operationsFt.defaultDestination(this.parent.activeGroupId()) };
+      default:
+        return null;
+    }
+  }
+
+  /** A value of the Properties list or the transfer paths pressed: a path copied, or the entries counted. */
+  runProperty(activation: UiPropertyActivation): void {
+    const value = this.copyableOf(activation.id);
+    if (value !== null) {
+      void this.parent.systemOpenFt.copyPathValue(activation.id, value, activation.shift);
+    } else {
+      this.runAction(activation.id);
+    }
+  }
 
   /**
    * Fetches what the sidebar shows about a path; called on every selection.

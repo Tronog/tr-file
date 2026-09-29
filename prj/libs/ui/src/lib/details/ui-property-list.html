@@ -12,14 +12,18 @@
           <button
             type="button"
             class="prop-action"
+            [class.is-copy]="property.copy"
             [attr.title]="property.actionLabel ?? null"
             [attr.aria-label]="property.actionLabel ? property.value + ' — ' + property.actionLabel : null"
-            (click)="action.emit(id)"
+            (click)="action.emit({ id, shift: $event.shiftKey })"
           >
             {{ property.value }}
           </button>
         } @else {
           {{ property.value }}
+        }
+        @if (property.badge) {
+          <span class="badge" role="status">{{ property.badge }}</span>
         }
       </dd>
     </div>
