@@ -469,8 +469,8 @@ installed by hand), the running AppImage / `.exe` stands in — the same name an
 size is the same file — or a name carrying `app.getVersion()`; either records
 the share's key from then on.
 
-While one is there the page's title bar shows a green **Upgrade** right of the
-title (`UpdateChannel` → `window.trFileUpdate` → `AppUpdateFeature`). Pressed
+While one is there the page's title bar shows a blue **Upgrade** right of the
+command palette box (`UpdateChannel` → `window.trFileUpdate` → `AppUpdateFeature`). Pressed
 and confirmed, `SelfUpdate.apply`:
 
 - **AppImage / portable `.exe`** — copies the new file beside the running one

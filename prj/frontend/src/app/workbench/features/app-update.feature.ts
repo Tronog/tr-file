@@ -3,7 +3,7 @@ import type { UiTitleBarUpgrade } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /**
- * The green *Upgrade* button right of the window's title (PRD 001, §8.6).
+ * The blue *Upgrade* button right of the command palette box (PRD 001, §8.6).
  *
  * The desktop shell watches the share the distributables are published on and
  * says when a newer one is there (`DesktopUpdateService`); this feature turns

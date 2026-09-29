@@ -45,8 +45,8 @@ export class UiTitleBar {
   readonly actions = input<readonly UiIconAction[]>([]);
 
   /**
-   * A newer version of the application is there (PRD 001, §8.6): a green
-   * button right of the title, or nothing when `null`.
+   * A newer version of the application is there (PRD 001, §8.6): a blue
+   * button right of the command palette box, or nothing when `null`.
    */
   readonly upgrade = input<UiTitleBarUpgrade | null>(null);
 

@@ -204,7 +204,7 @@ export class WorkbenchService {
   readonly resizeFt = new WorkbenchResizeFeature(this);
   /** The frameless window's own buttons and drag region. */
   readonly windowControlsFt = new WindowControlsFeature(this);
-  /** The title bar's green *Upgrade* button (PRD 001, §8.6). */
+  /** The title bar's blue *Upgrade* button (PRD 001, §8.6). */
   readonly appUpdateFt = new AppUpdateFeature(this);
   /** Remote servers kept on this machine, for *Connect to Remote Server* (PRD 009, §1). */
   readonly savedServersFt = new SavedServersFeature(undefined, this.settings);

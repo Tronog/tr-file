@@ -133,14 +133,15 @@ kbd {
   display: inline-flex;
   gap: 4px;
   align-items: center;
-  /* Hard against the title; the chrome buttons keep the far end. */
+  /* Hard against the command palette box; the chrome buttons keep the far end. Blue — the
+     accent, VS Code's primary button — in both themes (PRD 001, §8.6). */
   margin-right: auto;
   height: 22px;
   padding: 0 10px 0 7px;
   border: 0;
   border-radius: var(--vsc-radius-lg);
-  background: var(--vsc-upgrade-bg);
-  color: var(--vsc-upgrade-fg);
+  background: var(--vsc-accent);
+  color: var(--vsc-accent-fg);
   font: inherit;
   font-size: var(--vsc-font-size-sm);
   font-weight: 600;
@@ -148,7 +149,7 @@ kbd {
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: var(--vsc-upgrade-hover-bg);
+    background: var(--vsc-accent-hover);
   }
 
   &:disabled {

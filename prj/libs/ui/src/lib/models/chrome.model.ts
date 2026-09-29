@@ -35,7 +35,7 @@ export interface UiWindowControl {
 }
 
 /**
- * The green *Upgrade* button right of the window's title (PRD 001, §8.6): the
+ * The blue *Upgrade* button right of the command palette box (PRD 001, §8.6): the
  * application says a newer version is there, the bar draws it and reports the
  * press.
  */

@@ -6,7 +6,7 @@ import { settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
 
 /**
- * PRD 001, §8.6 — the green *Upgrade* button right of the title: shown while
+ * PRD 001, §8.6 — the blue *Upgrade* button right of the command palette box: shown while
  * the desktop shell has found a newer version, asked first, then upgraded.
  */
 
@@ -182,7 +182,7 @@ describe('File › Check for Updates… (PRD 001, §8.6.1)', () => {
 });
 
 describe('UiTitleBar upgrade button', () => {
-  it('draws the button right of the title and reports the press', () => {
+  it('draws the button right of the command palette box and reports the press', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const fixture = TestBed.createComponent(UiTitleBar);
     fixture.componentRef.setInput('menuItems', []);
@@ -195,6 +195,8 @@ describe('UiTitleBar upgrade button', () => {
     fixture.detectChanges();
     const button = host.querySelector<HTMLButtonElement>('.titlebar-right > .upgrade-btn');
     expect(button?.textContent?.trim()).toBe('Upgrade');
+    // Next to the command palette box: the first thing after it, before any chrome button.
+    expect(host.querySelector('.command-center')?.nextElementSibling?.firstElementChild).toBe(button);
     expect(button?.disabled).toBe(false);
 
     let pressed = 0;
