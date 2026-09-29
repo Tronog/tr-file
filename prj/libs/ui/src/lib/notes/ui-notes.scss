@@ -1,0 +1,41 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding-top: 4px;
+}
+
+.notes-box {
+  box-sizing: border-box;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--vsc-input-border);
+  border-radius: 2px;
+  background: var(--vsc-input-bg);
+  color: var(--vsc-fg);
+  font-family: var(--vsc-font-mono);
+  font-size: var(--vsc-font-size);
+  line-height: 1.5;
+  resize: none;
+
+  &:focus {
+    outline: 1px solid var(--vsc-focus-border);
+    outline-offset: -1px;
+    border-color: var(--vsc-focus-border);
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--vsc-severity-error);
+  }
+}
+
+.notes-error {
+  margin: 0;
+  color: var(--vsc-severity-error);
+  font-size: var(--vsc-font-size);
+}

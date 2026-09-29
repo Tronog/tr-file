@@ -367,6 +367,17 @@
           </ul>
         }
       }
+
+      @if (panel.notesVisible()) {
+        <ui-notes
+          placeholder="Write notes here — they are kept on this computer."
+          [text]="workbench.notesFt.text()"
+          [error]="workbench.notesFt.error()"
+          [focusRequest]="workbench.notesFt.focusRequest()"
+          (textChange)="workbench.notesFt.edit($event)"
+          (commit)="workbench.notesFt.flush()"
+        />
+      }
     </ui-bottom-panel>
   </div>
 

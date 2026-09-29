@@ -270,6 +270,7 @@ describe('CommandPaletteFeature', () => {
       'View: Show Hidden Files',
       'View: Refresh',
       'View: Show Bookmarks',
+      'View: Show Notes',
       'Preferences: Restore Layout on Start',
       'View: Reset Layout',
       'Preferences: Open Settings',

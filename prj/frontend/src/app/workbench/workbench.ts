@@ -19,6 +19,7 @@ import {
   UiButton,
   UiStatusBar,
   UiTitleBar,
+  UiNotes,
   UiTransferList,
   UiTree,
   UiWorkbench,
@@ -61,6 +62,7 @@ const FOCUSABLE =
     UiSidebar,
     UiStatusBar,
     UiTitleBar,
+    UiNotes,
     UiTransferList,
     UiTree,
     UiWorkbench,
@@ -73,7 +75,7 @@ const FOCUSABLE =
     '(document:keydown)': 'onDocumentKeydown($event)',
     '(focusin)': 'onFocusIn($event)',
     // What is waiting to be remembered is written before the window goes (PRD 003, §6).
-    '(window:pagehide)': 'workbench.sessionFt.flush()',
+    '(window:pagehide)': 'workbench.sessionFt.flush(); workbench.notesFt.flush()',
   },
 })
 export class Workbench {

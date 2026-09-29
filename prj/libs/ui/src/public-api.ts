@@ -89,3 +89,4 @@ export { UiProgressDialog } from './lib/modal/ui-progress-dialog';
 /* bottom panel ------------------------------------------------------------ */
 export { UiBottomPanel } from './lib/bottom-panel/ui-bottom-panel';
 export { UiTransferList } from './lib/transfers/ui-transfer-list';
+export { UiNotes } from './lib/notes/ui-notes';

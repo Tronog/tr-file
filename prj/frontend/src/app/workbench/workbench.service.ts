@@ -3,6 +3,7 @@ import { DesktopWindowService } from '../desktop/desktop-window.service';
 import { FileSystemService } from '../file-system/file-system.service';
 import { ImageSourceService } from '../file-system/image-source.service';
 import { BottomPanelFeature } from './features/bottom-panel.feature';
+import { NotesFeature } from './features/notes.feature';
 import { ChromeFeature } from './features/chrome.feature';
 import { DetailsFeature } from './features/details.feature';
 import { EditorGroupsFeature } from './features/editor-groups.feature';
@@ -192,6 +193,8 @@ export class WorkbenchService {
   /** Links the two: constructed after the explorer and the groups it drives. */
   readonly explorerNavFt = new ExplorerNavigationFeature(this);
   readonly bottomPanelFt = new BottomPanelFeature(this);
+  /** The bottom panel's Notes, kept in the app's settings (PRD 001, §12.2). */
+  readonly notesFt = new NotesFeature(this.settings);
   readonly sidebarPanesFt = new SidebarPanesFeature(this);
   readonly resizeFt = new WorkbenchResizeFeature(this);
   /** The frameless window's own buttons and drag region. */
@@ -246,7 +249,7 @@ export class WorkbenchService {
   start(): void {
     this.windowControlsFt.start();
     if (this.restored !== null) {
-      this.bottomPanelFt.restore(this.restored.bottomPanel.tab, this.restored.bottomPanel.collapsed);
+      this.bottomPanelFt.restore(this.restored.bottomPanel.collapsed);
       this.sidebarPanesFt.restore(this.restored.panes);
       this.sidebarPanesFt.restoreOrders(this.restored.paneOrder);
       this.sidebarPanesFt.restoreSizes(this.restored.paneSizes);

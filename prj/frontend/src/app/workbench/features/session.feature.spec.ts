@@ -42,7 +42,7 @@ const SAVED: SessionSnapshot = {
   leftSidebarWidth: 333,
   rightSidebarWidth: 250,
   bottomPanelHeight: 180,
-  bottomPanel: { tab: 'progress', collapsed: false },
+  bottomPanel: { tab: 'progress', collapsed: false } as SessionSnapshot['bottomPanel'],
   showHidden: true,
   panes: ['explorer-tree', 'recent'],
   // A pane this version no longer has is dropped; one it does not name keeps its default place.
@@ -89,7 +89,8 @@ describe('SessionFeature', () => {
 
     workbench.start();
     expect(workbench.bottomPanelFt.collapsed()).toBe(false);
-    expect(workbench.bottomPanelFt.activeTab()).toBe('progress');
+    // The tab is not restored: every start is on Notes (PRD 001, §12.2).
+    expect(workbench.bottomPanelFt.activeTab()).toBe('notes');
     expect(workbench.sidebarPanesFt.isExpanded('recent')).toBe(true);
     expect(workbench.sidebarPanesFt.isExpanded('bookmarks')).toBe(false);
     expect(workbench.sidebarPanesFt.order('details')).toEqual(['properties', 'permissions', 'git', 'open-with']);

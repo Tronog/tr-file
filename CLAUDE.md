@@ -261,6 +261,12 @@ something happened, and the button VS Code would close it with is the collapse t
 double chevron pointing the way the panel will move. Choosing a tab, including from the
 activity bar, opens it again; `BottomPanelFeature` owns all of that and `UiBottomPanel` only
 takes a `collapsed` input.
+Its last tab, and the one every start opens on, is *Notes* (§12.2, *View: Show Notes*, `view.notes`;
+the session keeps only whether the panel was collapsed, not its tab): one plain text in the library's
+`UiNotes`, kept by `NotesFeature` under `tr-file.notes.v1` — global, not per backend, so on the
+desktop it is the `userData` settings file whichever server the window is on — written 500 ms after
+typing stops, on leaving the box and on `pagehide`; past 250 KB it says so rather than letting the
+settings file refuse it silently.
 
 The workbench remembers the active panel and the one active before it (PRD 002, §2.7):
 `WorkbenchService.previousGroupId`, kept by `EditorGroupsFeature` — every change of active panel goes

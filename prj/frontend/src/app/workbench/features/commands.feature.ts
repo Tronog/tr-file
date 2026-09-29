@@ -462,6 +462,8 @@ export class CommandsFeature {
         run: () => p.placesFt.clearRecent(),
       },
       { id: 'places.show', category: 'View', label: 'Show Bookmarks', run: () => p.chromeFt.showBookmarks() },
+      /* The bottom panel's Notes (PRD 001, §12.2) */
+      { id: 'view.notes', category: 'View', label: 'Show Notes', run: () => p.bottomPanelFt.showNotes() },
 
       /* Session (PRD 003, §6) */
       {

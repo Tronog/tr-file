@@ -22,7 +22,8 @@ const SORT_KEYS: ReadonlySet<string> = new Set<PanelSort['key']>(['name', 'size'
 /** Everything a session remembers (PRD 003, §6). */
 export interface SessionSnapshot extends MockWorkbenchLayout {
   readonly version: 1;
-  readonly bottomPanel: { readonly tab: string; readonly collapsed: boolean };
+  /** Open or collapsed; not the tab, which is Notes on every start (PRD 001, §12.2). */
+  readonly bottomPanel: { readonly collapsed: boolean };
   readonly showHidden: boolean;
   /** The sidebar panes that were open. */
   readonly panes: readonly string[];
@@ -165,7 +166,7 @@ export class SessionFeature {
       leftSidebarWidth: p.leftSidebarWidth(),
       rightSidebarWidth: p.rightSidebarWidth(),
       bottomPanelHeight: p.bottomPanelHeight(),
-      bottomPanel: { tab: p.bottomPanelFt.activeTab(), collapsed: p.bottomPanelFt.collapsed() },
+      bottomPanel: { collapsed: p.bottomPanelFt.collapsed() },
       showHidden: p.showHidden(),
       panes: p.sidebarPanesFt.expandedIds(),
       paneOrder: p.sidebarPanesFt.changedOrders(),
@@ -226,10 +227,8 @@ export class SessionFeature {
       leftSidebarWidth: width('leftSidebarWidth', 280),
       rightSidebarWidth: width('rightSidebarWidth', 320),
       bottomPanelHeight: width('bottomPanelHeight', 200),
-      bottomPanel: {
-        tab: typeof bottom['tab'] === 'string' ? bottom['tab'] : 'transfers',
-        collapsed: bottom['collapsed'] !== false,
-      },
+      // A `tab` saved before §12.2 is ignored.
+      bottomPanel: { collapsed: bottom['collapsed'] !== false },
       showHidden: raw['showHidden'] === true,
       panes: SessionFeature.strings(raw['panes']),
       paneOrder: SessionFeature.paneOrder(raw['paneOrder']),

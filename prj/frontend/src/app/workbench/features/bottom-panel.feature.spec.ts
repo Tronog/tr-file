@@ -31,17 +31,20 @@ describe('BottomPanelFeature', () => {
     await settled();
   };
 
-  it('opens on Transfers with no counts and an empty list', () => {
+  it('opens on Notes, with no counts and an empty list (PRD 001, §12.2)', () => {
     expect(workbench.bottomPanelFt.tabs().map((candidate) => candidate.id)).toEqual([
       'transfers',
       'progress',
       'problems',
+      'notes',
     ]);
-    expect(tab('transfers')).toEqual({ id: 'transfers', label: 'Transfers', active: true });
+    expect(tab('notes')).toEqual({ id: 'notes', label: 'Notes', active: true });
+    expect(tab('transfers')).toEqual({ id: 'transfers', label: 'Transfers' });
     expect(tab('progress')).toEqual({ id: 'progress', label: 'Progress' });
     expect(tab('problems')).toEqual({ id: 'problems', label: 'Problems' });
+    expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
+    expect(workbench.bottomPanelFt.transfersVisible()).toBe(false);
     expect(workbench.bottomPanelFt.transfersEmpty()).toBe(true);
-    expect(workbench.bottomPanelFt.transfersVisible()).toBe(true);
     expect(workbench.bottomPanelFt.problemsVisible()).toBe(false);
     expect(workbench.bottomPanelFt.problems()).toEqual([]);
   });
@@ -83,6 +86,7 @@ describe('BottomPanelFeature', () => {
       requests[0].flush(fsEnvelope(fsDetails('docs/done.txt')));
       await settled();
 
+      workbench.bottomPanelFt.select('transfers');
       workbench.bottomPanelFt.runAction('clear');
 
       expect(tab('transfers')?.count).toBe(1);
@@ -92,6 +96,7 @@ describe('BottomPanelFeature', () => {
     });
 
     it('ignores an action with nothing behind it', () => {
+      workbench.bottomPanelFt.select('transfers');
       expect(() => workbench.bottomPanelFt.runAction('close')).not.toThrow();
       expect(workbench.bottomPanelFt.actions().map((action) => action.id)).toEqual([
         'clear',
@@ -127,5 +132,30 @@ describe('BottomPanelFeature', () => {
       expect(workbench.bottomPanelFt.collapsed()).toBe(false);
       expect(workbench.bottomPanelFt.problemsVisible()).toBe(true);
     });
+  });
+
+  it('has a Notes tab with nothing to clear (PRD 001, §12.2)', () => {
+    const panel = workbench.bottomPanelFt;
+    panel.select('transfers');
+    panel.select('notes');
+    expect(panel.notesVisible()).toBe(true);
+    expect(panel.actions().map((action) => action.id)).toEqual(['toggle']);
+  });
+
+  it('restores open or collapsed, never the tab', () => {
+    const panel = workbench.bottomPanelFt;
+    panel.restore(false);
+    expect(panel.collapsed()).toBe(false);
+    expect(panel.activeTab()).toBe('notes');
+  });
+
+  it('opens Notes with the cursor in the box from its command', () => {
+    workbench.bottomPanelFt.select('transfers');
+    workbench.bottomPanelFt.restore(true);
+    const before = workbench.notesFt.focusRequest();
+    workbench.commandsFt.run('view.notes');
+    expect(workbench.bottomPanelFt.collapsed()).toBe(false);
+    expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
+    expect(workbench.notesFt.focusRequest()).toBe(before + 1);
   });
 });

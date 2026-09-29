@@ -365,7 +365,7 @@ describe('ChromeFeature', () => {
     });
 
     it('problems and transfers switch the bottom panel tab', () => {
-      expect(workbench.bottomPanelFt.transfersVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
 
       workbench.chromeFt.runStatusAction('problems');
 
@@ -381,7 +381,7 @@ describe('ChromeFeature', () => {
       workbench.chromeFt.runStatusAction('sort');
 
       expect(workbench.showHidden()).toBe(false);
-      expect(workbench.bottomPanelFt.transfersVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
     });
   });
 
