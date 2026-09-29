@@ -198,6 +198,100 @@ describe('PanelHistoryFeature', () => {
     expect(pathOf()).toBe('docs');
   });
 
+  /** PRD 002, §2.1 — Back and Forward put back what was selected, and the cursor. */
+  describe('remembering the selection', () => {
+    const DOCS = [fsDirectory('docs/prd'), fsEntry('docs/a.md'), fsEntry('docs/b.md'), fsEntry('docs/c.md')];
+    const group = () => workbench.editorGroupsFt.stateOf(groupId());
+
+    /** Selects in the active panel, answering the details the sidebar asks for. */
+    const select = (selected: readonly string[], focused: string): void => {
+      workbench.fileBrowserFt.setSelection(groupId(), { selected, focused });
+      for (const request of http.match(() => true)) {
+        request.flush(fsEnvelope(fsDirectoryDetails(request.request.params.get('path') ?? '')));
+      }
+    };
+
+    /** Walks, answering each listing with what that folder holds. */
+    const walkTo = async (direction: 'back' | 'forward'): Promise<void> => {
+      const id = groupId();
+      if (direction === 'back') {
+        history().back(id);
+      } else {
+        history().forward(id);
+      }
+      for (const request of http.match(() => true)) {
+        const path = request.request.params.get('path') ?? '';
+        if (request.request.url.endsWith('/list')) {
+          request.flush(fsEnvelope(fsListing(path, path === 'docs' ? DOCS : path === '' ? ROOT_ENTRIES : [])));
+        } else {
+          request.flush(fsEnvelope(fsDirectoryDetails(path)));
+        }
+      }
+      await settled();
+    };
+
+    it('puts back the selection and the cursor of each folder, going back and forward', async () => {
+      await start();
+      await goTo('docs', DOCS);
+      select(['docs/a.md', 'docs/c.md'], 'docs/c.md');
+
+      await goTo('docs/prd', [fsEntry('docs/prd/001.md'), fsEntry('docs/prd/002.md')]);
+      expect(group()?.selection).toEqual([]);
+      select(['docs/prd/002.md'], 'docs/prd/002.md');
+
+      await walkTo('back');
+      expect(pathOf()).toBe('docs');
+      expect(group()?.selection).toEqual(['docs/a.md', 'docs/c.md']);
+      expect(group()?.focusedEntryId).toBe('docs/c.md');
+      // The details sidebar follows the cursor back too.
+      expect(workbench.selectedEntryId()).toBe('docs/c.md');
+
+      await walkTo('forward');
+      expect(pathOf()).toBe('docs/prd');
+      expect(group()?.selection).toEqual(['docs/prd/002.md']);
+      expect(group()?.focusedEntryId).toBe('docs/prd/002.md');
+    });
+
+    it('keeps a selection changed after coming back', async () => {
+      await start();
+      await goTo('docs', DOCS);
+      select(['docs/a.md'], 'docs/a.md');
+      await goTo('docs/prd', []);
+      await walkTo('back');
+      select(['docs/b.md'], 'docs/b.md');
+      await walkTo('forward');
+      await walkTo('back');
+
+      expect(group()?.selection).toEqual(['docs/b.md']);
+      expect(group()?.focusedEntryId).toBe('docs/b.md');
+    });
+
+    it('restores nothing into an empty folder, and leaves one without trouble', async () => {
+      await start();
+      await goTo('docs', DOCS);
+      select(['docs/b.md'], 'docs/b.md');
+      await goTo('docs/empty', []);
+      await walkTo('back');
+      await walkTo('forward');
+
+      expect(pathOf()).toBe('docs/empty');
+      expect(group()?.selection).toEqual([]);
+
+      await walkTo('back');
+      expect(group()?.selection).toEqual(['docs/b.md']);
+    });
+
+    it('does not carry a selection into a folder visited anew', async () => {
+      await start();
+      await goTo('docs', DOCS);
+      select(['docs/a.md'], 'docs/a.md');
+      await goTo('');
+      await goTo('docs', DOCS);
+
+      expect(group()?.selection).toEqual([]);
+    });
+  });
+
   describe('with two panels', () => {
     /**
      * The point of keeping a trail per panel: two panels are two places

@@ -13,7 +13,7 @@ services:
       NODE_ENV: development
       HOST: 0.0.0.0
       PORT: 4310
-      FILES_ROOT: /data
+      FILES_ROOT: /
       # Unset, a development server runs without a login (and says so in its
       # log); set both to try the sign-in screen (PRD 003, §2).
       AUTH_USERNAME: ${AUTH_USERNAME:-}
@@ -25,6 +25,8 @@ services:
       - backend_root_modules:/app/node_modules
       - backend_modules:/app/backend/node_modules
       - files_data:/data
+      - /S:/S
+      - /T:/T
     working_dir: /app/backend
     restart: unless-stopped
 

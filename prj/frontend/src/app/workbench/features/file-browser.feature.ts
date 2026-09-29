@@ -852,6 +852,7 @@ export class FileBrowserFeature implements PanelContentFeature {
       this.navigateTo(groupId, path, label);
       return;
     }
+    // The active tab is a file: there is no folder selection to keep on the trail.
 
     // A folder tab for this very path is reused rather than duplicated; only
     // then is a new one opened beside the preview.
@@ -877,6 +878,8 @@ export class FileBrowserFeature implements PanelContentFeature {
   navigateTo(groupId: string, path: string, label: string): void {
     if (this.groups.stateOf(groupId)?.path !== path) {
       this.setFilter(groupId, '');
+      // What is selected here, kept on the trail for Back / Forward to put back (PRD 002, §2.1).
+      this.parent.panelHistoryFt.leave(groupId);
     }
     this.groups.update(groupId, (group) => {
       const active = group.tabs.find((tab) => tab.active) ?? group.tabs[0];

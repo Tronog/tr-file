@@ -96,7 +96,10 @@ panel (or one maximized) `Tab` keeps its usual meaning.
 A browser keeps those chords for its own tabs, so they reach the page on the desktop only; the desktop shell installs its own accelerator
 table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
-since two panels are two places someone is working. Any key that changes the folder also
+since two panels are two places someone is working. Each stop keeps what was selected there and the
+cursor (PRD 002, §2.1): `FileBrowserFeature.navigateTo` calls `leave` just before the folder's
+selection is cleared, and Back / Forward put both back (`setSelection`, so the details follow); an empty
+folder restores nothing and its body keeps the keyboard. Any key that changes the folder also
 re-asks for body focus, or the rows it was standing on are gone and the keyboard is left
 outside the panel — and that includes opening a folder by double click. An empty folder
 has nothing focusable in it, so the content's `uiPanelBody` carries `tabindex="-1"` and
