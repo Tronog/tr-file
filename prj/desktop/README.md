@@ -489,10 +489,20 @@ and confirmed, `SelfUpdate.apply`:
 
 The file on the share is checked again before and after the copy, so one
 changed meanwhile is refused and the running copy left alone; a failure is
-said in the window. The new copy is started by a detached shell once this
-process — and, for the AppImage runtime and the portable launcher, its parent,
-which cleans up after it — has exited, so it never meets the old one's
-single-instance lock.
+said in the window. The new copy is started by a detached helper once this
+process — and, for the AppImage runtime and the portable launcher, its parent —
+has exited: the portable launcher deletes `%TEMP%\tr-file`, the folder it
+unpacked the app into, only as it exits, and the new launcher unpacks into the
+same folder; nor may the new copy meet the old one's single-instance lock. On
+Windows the helper is a batch file (`relaunch-<pid>.cmd` in
+`%TEMP%\tr-file-update`, run by `cmd.exe` from there — PowerShell may be
+blocked on a managed machine), on Linux `/bin/sh`. The app quits only once the
+helper is running; if it cannot start, the window says so and stays.
+
+Every step — what was copied from where to where, what is run, and the
+helper's own waiting and starting — is appended to **`update.log`** in the
+user-data folder (`%APPDATA%\tr-file\update.log`, `~/.config/tr-file/update.log`):
+the first thing to read when an upgrade does not come back.
 
 *File › Check for Updates…* (§8.6.1) asks the same channel to look now
 (`check`) rather than at the next quarter hour, and the window always answers:

@@ -13,7 +13,7 @@ import { BridgeSessions } from './bridge-sessions.js';
 import type { DesktopShell } from './desktop-shell.js';
 import { MainWindow } from './main-window.js';
 import { SaveFileChannel } from './save-file.channel.js';
-import { detectInstallation, relaunchAfterExit, SelfUpdate, UpdateMonitor, updateSource } from './self-update.js';
+import { appendUpdateLog, detectInstallation, relaunchAfterExit, SelfUpdate, UpdateMonitor, updateSource } from './self-update.js';
 import { SettingsChannel } from './settings.channel.js';
 import { SettingsStore } from './settings-store.js';
 import { windowBackground } from './window-background.js';
@@ -211,23 +211,28 @@ class DesktopApplication {
       return null;
     }
     this.stack.log.info('self-update follows', { source, kind: installation.kind });
-    const updater = new SelfUpdate({
-      source,
-      installation,
-      stateFile: join(app.getPath('userData'), 'update-state.json'),
-      tempDir: join(app.getPath('temp'), 'tr-file-update'),
-    });
-    return new UpdateMonitor(updater, {
-      changed: (status) => UpdateChannel.publish(status),
-      log: (message, fields) => this.stack.log.info(message, fields),
-      restart: (relaunch) => {
-        // The portable launcher and the AppImage runtime outlive the app by a moment
-        // and clean up after it; the new copy starts once they have gone too.
-        const waitFor = installation.kind === 'installed' ? [process.pid] : [process.pid, process.ppid];
-        relaunchAfterExit(relaunch, waitFor);
-        app.quit();
+    // Every step of an upgrade, and of the helper that starts the new copy, in one file to read afterwards.
+    const logFile = join(app.getPath('userData'), 'update.log');
+    const log = (message: string, fields?: Record<string, unknown>): void => {
+      this.stack.log.info(message, fields);
+      appendUpdateLog(logFile, message, fields);
+    };
+    const tempDir = join(app.getPath('temp'), 'tr-file-update');
+    return new UpdateMonitor(
+      new SelfUpdate({ source, installation, stateFile: join(app.getPath('userData'), 'update-state.json'), tempDir }),
+      {
+        changed: (status) => UpdateChannel.publish(status),
+        log,
+        restart: async (relaunch) => {
+          // The portable launcher and the AppImage runtime outlive the app by a moment
+          // and clean up after it; the new copy starts once they have gone too.
+          const waitFor = installation.kind === 'installed' ? [process.pid] : [process.pid, process.ppid];
+          await relaunchAfterExit(relaunch, waitFor, { tempDir, logFile });
+          log('helper started; quitting', { waitFor });
+          app.quit();
+        },
       },
-    });
+    );
   }
 
   private async openWindow(): Promise<void> {

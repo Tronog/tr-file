@@ -5,7 +5,10 @@ import { basename, dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import {
+  appendUpdateLog,
   detectInstallation,
+  relaunchAfterExit,
+  windowsRelaunchScript,
   isDistributableFor,
   SelfUpdate,
   UpdateMonitor,
@@ -241,7 +244,7 @@ describe('UpdateMonitor', () => {
     const restarts: Relaunch[] = [];
     const monitor = new UpdateMonitor(updater(dirs, { kind: 'appimage', path: self, version: '1.0.0' }), {
       changed: (status) => statuses.push(status),
-      restart: (relaunch) => restarts.push(relaunch),
+      restart: async (relaunch) => void restarts.push(relaunch),
       log: () => undefined,
     });
     await monitor.start();
@@ -257,7 +260,7 @@ describe('UpdateMonitor', () => {
     const dirs = await fixture('nothing');
     const monitor = new UpdateMonitor(updater(dirs, { kind: 'installed', version: '1.0.0' }), {
       changed: () => undefined,
-      restart: () => assert.fail('nothing to restart into'),
+      restart: async () => assert.fail('nothing to restart into'),
       log: () => undefined,
     });
     assert.match((await monitor.upgrade()) ?? '', /no newer version/);
@@ -268,7 +271,7 @@ describe('UpdateMonitor', () => {
     const logged: string[] = [];
     const monitor = new UpdateMonitor(updater({ share: join(dirs.share, 'gone'), data: dirs.data }, { kind: 'installed', version: '1.0.0' }), {
       changed: () => undefined,
-      restart: () => undefined,
+      restart: async () => undefined,
       log: (message) => logged.push(message),
     });
     assert.match((await monitor.check()) ?? '', /could not be read/);
@@ -278,5 +281,71 @@ describe('UpdateMonitor', () => {
     await mkdir(join(dirs.share, 'gone'));
     assert.equal(await monitor.check(), null);
     assert.deepEqual(monitor.status, { available: null, upgrading: false });
+  });
+});
+
+describe('starting the new version', () => {
+  /** The helper Windows runs: waits for the app and its launcher, then starts the local copy, saying so. */
+  it('writes a Windows helper that waits, then starts the copy from its own folder', () => {
+    const script = windowsRelaunchScript(
+      { command: 'C:\\Users\\me\\AppData\\Local\\Temp\\tr-file-update\\9-1\\tr-file.exe', args: [] },
+      [100, 200],
+      'C:\\Users\\me\\AppData\\Roaming\\tr-file\\update.log',
+    );
+    assert.match(script, /tasklist \/FI "PID eq 100"/);
+    assert.match(script, /tasklist \/FI "PID eq 200"/);
+    assert.ok(script.indexOf('PID eq 200') < script.indexOf('start ""'));
+    assert.match(script, /start "" \/D "C:\\Users\\me\\AppData\\Local\\Temp\\tr-file-update\\9-1" "C:\\Users\\me\\AppData\\Local\\Temp\\tr-file-update\\9-1\\tr-file.exe"\r\n/);
+    assert.match(script, />> "C:\\Users\\me\\AppData\\Roaming\\tr-file\\update.log"/);
+    assert.ok(script.endsWith('\r\n'));
+
+    const setup = windowsRelaunchScript({ command: 'C:\\T\\setup\\tr-file-Setup-1.exe', args: ['--updated', '/S', '--force-run'] }, [1], 'C:\\log');
+    assert.match(setup, /"C:\\T\\setup\\tr-file-Setup-1.exe" --updated \/S --force-run\r\n/);
+    // A `%` in a path is kept, not expanded.
+    assert.match(windowsRelaunchScript({ command: 'C:\\100%\\a.exe', args: [] }, [], 'C:\\log'), /"C:\\100%%\\a.exe"/);
+  });
+
+  it('starts the new copy once the processes it waits for have gone, and logs it', { skip: process.platform === 'win32' }, async () => {
+    const dirs = await fixture('relaunch');
+    const done = join(dirs.data, 'started');
+    const program = join(dirs.home, 'new-version.sh');
+    await writeFile(program, `#!/bin/sh\necho "$@" > "${done}"\n`, { mode: 0o755 });
+    const logFile = join(dirs.data, 'update.log');
+
+    // Something to wait for: a process that lives a moment.
+    const { spawn } = await import('node:child_process');
+    const waiting = spawn('sleep', ['0.5']);
+    await relaunchAfterExit({ command: program, args: ['--updated'] }, [waiting.pid as number], { tempDir: join(dirs.data, 'tmp'), logFile });
+    await assert.rejects(access(done));
+
+    for (let i = 0; i < 50 && !(await access(done).then(() => true, () => false)); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal((await readFile(done, 'utf8')).trim(), '--updated');
+    assert.match(await readFile(logFile, 'utf8'), new RegExp(`process ${waiting.pid} has exited[\\s\\S]*starting`));
+  });
+
+  it('says so, rather than quitting into nothing, when the helper cannot start', async () => {
+    const dirs = await fixture('no-helper');
+    await publish(join(dirs.share, 'tr-file-1.0.1-x86_64.AppImage'), 'new build', 100_000);
+    const self = join(dirs.home, 'tr-file.AppImage');
+    await publish(self, 'old', 0);
+    const monitor = new UpdateMonitor(updater(dirs, { kind: 'appimage', path: self, version: '1.0.0' }), {
+      changed: () => undefined,
+      restart: async () => {
+        throw new Error('The upgrade could not be started: spawn ENOENT');
+      },
+      log: () => undefined,
+    });
+    assert.match((await monitor.upgrade()) ?? '', /could not be started/);
+    assert.deepEqual(monitor.status, { available: 'tr-file-1.0.1-x86_64.AppImage', upgrading: false });
+  });
+
+  it('keeps a log to read afterwards', async () => {
+    const dirs = await fixture('log');
+    const file = join(dirs.data, 'update.log');
+    appendUpdateLog(file, 'upgrading', { to: 'tr-file.exe' });
+    assert.match(await readFile(file, 'utf8'), /^\S+Z upgrading \{"to":"tr-file.exe"\}\n$/);
+    appendUpdateLog(join(dirs.data, 'missing', 'x.log'), 'nowhere');
   });
 });

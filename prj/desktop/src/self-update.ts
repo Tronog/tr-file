@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
+import { appendFileSync, statSync, truncateSync } from 'node:fs';
 import { chmod, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, win32 } from 'node:path';
 
 /**
  * Where the distributables are published (PRD 001, §8.6): a folder on the
@@ -326,6 +327,11 @@ export class SelfUpdate {
     const staged = join(directory, candidate.name);
     try {
       await this.copyChecked(candidate, staged);
+      if (this.platform === 'win32') {
+        // Copied with the file, a "downloaded from the internet" mark would
+        // have Windows stop the program to ask — behind a window no one sees.
+        await rm(`${staged}:Zone.Identifier`, { force: true }).catch(() => undefined);
+      }
     } catch (error: unknown) {
       await rm(directory, { recursive: true, force: true });
       throw error;
@@ -383,43 +389,106 @@ export class SelfUpdate {
   }
 }
 
+/** How a relaunch is started, and where it says what it did. */
+export interface RelaunchOptions {
+  /** The update's temporary folder: the helper script is written, and run, there. */
+  readonly tempDir: string;
+  /** `update.log`: every step of the helper, appended. */
+  readonly logFile: string;
+  readonly platform?: NodeJS.Platform;
+}
+
+/** A path inside a batch file's double quotes: `%` doubled, so it is not expanded. */
+function batchQuoted(value: string): string {
+  return `"${value.replace(/%/g, '%%').replace(/"/g, '')}"`;
+}
+
+/**
+ * The Windows helper (§8.6): waits — up to a minute each — for the processes
+ * in `waitFor` to exit, then starts `relaunch` from its own folder, saying
+ * each step in the log. A batch file for `cmd.exe`, which every Windows runs,
+ * rather than PowerShell, which a managed one may not; `ping` is its clock,
+ * since `timeout` refuses to run without a console.
+ */
+export function windowsRelaunchScript(relaunch: Relaunch, waitFor: readonly number[], logFile: string): string {
+  const log = batchQuoted(logFile);
+  const lines = ['@echo off', 'setlocal', `echo %date% %time% helper: started >> ${log}`];
+  waitFor.forEach((id, index) => {
+    lines.push(
+      'set n=0',
+      `:wait${index}`,
+      `tasklist /FI "PID eq ${id}" /NH 2>nul | find " ${id} " >nul || goto gone${index}`,
+      'set /a n+=1',
+      `if %n% geq 120 (echo %date% %time% helper: process ${id} still running, starting anyway >> ${log} & goto gone${index})`,
+      'ping -n 2 -w 500 127.0.0.1 >nul',
+      `goto wait${index}`,
+      `:gone${index}`,
+      `echo %date% %time% helper: process ${id} has exited >> ${log}`,
+    );
+  });
+  const command = batchQuoted(relaunch.command);
+  // Bare where they can be: an NSIS setup knows `/S` only unquoted.
+  const args = relaunch.args.map((arg) => (/^[\w/.:=-]+$/.test(arg) ? arg : batchQuoted(arg))).join(' ');
+  lines.push(
+    `if not exist ${command} (echo %date% %time% helper: ${command} is missing >> ${log} & exit /b 1)`,
+    `echo %date% %time% helper: starting ${command} ${args} >> ${log}`,
+    `start "" /D ${batchQuoted(win32.dirname(relaunch.command))} ${command}${args ? ` ${args}` : ''}`,
+    `echo %date% %time% helper: start returned %errorlevel% >> ${log}`,
+    'endlocal',
+  );
+  return `${lines.join('\r\n')}\r\n`;
+}
+
 /**
  * Starts `relaunch` once the processes in `waitFor` have exited, from a
- * detached shell that outlives this one.
+ * detached helper that outlives this one — started in the update's own
+ * temporary folder, never in the folder the app runs from, which the portable
+ * launcher deletes as it exits.
  *
  * Waiting matters twice over: the new copy would otherwise find this one still
  * holding the single-instance lock and quit, and the portable launcher removes
  * the folder it unpacked into only after the app has exited — the folder the
- * new launcher unpacks into.
+ * new launcher unpacks into. Throws when the helper cannot be started, so the
+ * app stays open rather than quitting into nothing.
  */
-export function relaunchAfterExit(relaunch: Relaunch, waitFor: readonly number[], platform: NodeJS.Platform = process.platform): void {
+export async function relaunchAfterExit(relaunch: Relaunch, waitFor: readonly number[], options: RelaunchOptions): Promise<void> {
+  const platform = options.platform ?? process.platform;
+  await mkdir(options.tempDir, { recursive: true });
+  const env = { ...process.env };
+  // The running launcher's variables would point the new one at our copy.
+  for (const name of ['APPIMAGE', 'APPDIR', 'ARGV0', 'OWD', 'PORTABLE_EXECUTABLE_DIR', 'PORTABLE_EXECUTABLE_FILE', 'PORTABLE_EXECUTABLE_APP_FILENAME']) {
+    delete env[name];
+  }
+
+  let child: ReturnType<typeof spawn>;
   if (platform === 'win32') {
-    const quote = (value: string): string => `'${value.replace(/'/g, "''")}'`;
-    const ids = waitFor.join(',');
-    const args = relaunch.args.length > 0 ? ` -ArgumentList ${relaunch.args.map(quote).join(',')}` : '';
-    const script =
-      `Wait-Process -Id ${ids} -Timeout 60 -ErrorAction SilentlyContinue; ` +
-      `Start-Process -FilePath ${quote(relaunch.command)}${args}`;
-    spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
+    const script = join(options.tempDir, `relaunch-${process.pid}.cmd`);
+    await writeFile(script, windowsRelaunchScript(relaunch, waitFor, options.logFile));
+    child = spawn(process.env['ComSpec'] || 'cmd.exe', ['/d', '/c', script], {
+      cwd: options.tempDir,
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
-    }).unref();
-    return;
+      env,
+    });
+  } else {
+    // Up to a minute each, a fifth of a second at a time; then the new copy, detached from us.
+    const log = `"$LOG"`;
+    const wait = waitFor.map((id) => `n=0; while kill -0 ${id} 2>/dev/null && [ $n -lt 300 ]; do sleep 0.2; n=$((n+1)); done; echo "$(date) helper: process ${id} has exited" >> ${log}`).join('; ');
+    child = spawn('/bin/sh', ['-c', `${wait}; echo "$(date) helper: starting $0" >> ${log}; exec "$0" "$@"`, relaunch.command, ...relaunch.args], {
+      cwd: options.tempDir,
+      detached: true,
+      stdio: 'ignore',
+      env: { ...env, LOG: options.logFile },
+    });
   }
 
-  // Up to a minute, a fifth of a second at a time; then the new copy, detached from us.
-  const wait = waitFor.map((id) => `n=0; while kill -0 ${id} 2>/dev/null && [ $n -lt 300 ]; do sleep 0.2; n=$((n+1)); done`).join('; ');
-  const env = { ...process.env };
-  // The running AppImage's runtime variables would point the new one at our mount.
-  for (const name of ['APPIMAGE', 'APPDIR', 'ARGV0', 'OWD']) {
-    delete env[name];
-  }
-  spawn('/bin/sh', ['-c', `${wait}; exec "$0" "$@"`, relaunch.command, ...relaunch.args], {
-    detached: true,
-    stdio: 'ignore',
-    env,
-  }).unref();
+  // Started, or not: the answer comes as an event, not from `spawn`.
+  await new Promise<void>((resolve, reject) => {
+    child.once('spawn', () => resolve());
+    child.once('error', (error) => reject(new Error(`The upgrade could not be started: ${error.message}`)));
+  });
+  child.unref();
 }
 
 /** What the title bar is told (§8.6): a newer version, and whether it is being put in place. */
@@ -435,8 +504,11 @@ export const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
 export interface UpdateMonitorHooks {
   /** The status changed; every window is told. */
   readonly changed: (status: UpdateStatus) => void;
-  /** The update is in place: start it after this process, then quit. */
-  readonly restart: (relaunch: Relaunch) => void;
+  /**
+   * The update is in place: start it after this process, then quit. Rejects
+   * when it cannot be started — the app then stays open and says why.
+   */
+  readonly restart: (relaunch: Relaunch) => Promise<void>;
   readonly log: (message: string, fields?: Record<string, unknown>) => void;
 }
 
@@ -504,8 +576,8 @@ export class UpdateMonitor {
     this.hooks.changed(this.status);
     try {
       const relaunch = await this.updater.apply(candidate);
-      this.hooks.log('upgrading', { from: this.updater.installation.version, to: candidate.name });
-      this.hooks.restart(relaunch);
+      this.hooks.log('upgrading', { from: this.updater.installation.version, to: candidate.name, source: candidate.path, run: relaunch.command, args: relaunch.args });
+      await this.hooks.restart(relaunch);
       return null;
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -539,5 +611,20 @@ export class UpdateMonitor {
       this.hooks.changed(this.status);
     }
     return null;
+  }
+}
+
+/** `update.log` is kept small: past this it starts again. */
+const UPDATE_LOG_LIMIT = 256 * 1024;
+
+/** One line of `update.log`: when, what, and the fields as JSON. Never throws. */
+export function appendUpdateLog(file: string, message: string, fields?: Record<string, unknown>): void {
+  try {
+    if ((statSync(file, { throwIfNoEntry: false })?.size ?? 0) > UPDATE_LOG_LIMIT) {
+      truncateSync(file, 0);
+    }
+    appendFileSync(file, `${new Date().toISOString()} ${message}${fields ? ` ${JSON.stringify(fields)}` : ''}\n`);
+  } catch {
+    // Nowhere to write it: the console has it too.
   }
 }
