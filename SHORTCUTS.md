@@ -30,6 +30,8 @@ On macOS `Ctrl` means `Cmd` throughout.
 | `Ctrl`+`H` | Show or hide hidden files | Anywhere |
 | `Ctrl`+`,` | Settings | Anywhere |
 | `` Ctrl+Shift+` `` | Show or hide the bottom panel (the key left of `1`, on any layout) | Anywhere |
+| `Ctrl`+`E` | Show or hide the Explorer | Anywhere |
+| `Ctrl`+`D` | Show or hide Details | Anywhere |
 | `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` | Focus next / previous part: Explorer → each panel → bottom panel (while open) → Details, and round | Anywhere |
 
 ### Function keys (Midnight Commander)

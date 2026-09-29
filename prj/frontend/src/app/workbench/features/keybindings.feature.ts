@@ -18,6 +18,9 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'view.hidden', key: 'Ctrl+H', when: 'window' },
   { command: 'workbench.openSettings', key: 'Ctrl+,', when: 'window' },
   { command: 'view.togglePanel', key: 'Ctrl+Shift+`', when: 'window' },
+  // PRD 001, §9.2.1.
+  { command: 'view.toggleExplorer', key: 'Ctrl+E', when: 'window' },
+  { command: 'view.toggleDetails', key: 'Ctrl+D', when: 'window' },
   { command: 'workbench.focusNextPart', key: 'Ctrl+Tab', when: 'window' },
   { command: 'workbench.focusPreviousPart', key: 'Ctrl+Shift+Tab', when: 'window' },
   { command: 'workbench.nextPanel', key: 'Tab', when: 'panel' },

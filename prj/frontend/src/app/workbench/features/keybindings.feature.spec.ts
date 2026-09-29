@@ -97,17 +97,17 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
     const rename = vi.spyOn(workbench.fileEditFt, 'rename').mockResolvedValue();
     workbench.fileBrowserFt.selectEntry(group, 'a.txt');
 
-    keys().change({ command: 'file.rename', key: 'F2', when: 'window' }, 'Ctrl+E');
+    keys().change({ command: 'file.rename', key: 'F2', when: 'window' }, 'Ctrl+Shift+E');
     const old = key('F2');
     keys().handleShortcut(old);
-    keys().handleShortcut(key('e', { ctrlKey: true }));
+    keys().handleShortcut(key('E', { ctrlKey: true, shiftKey: true }));
 
     expect(old.defaultPrevented).toBe(false);
     expect(rename).toHaveBeenCalledTimes(1);
-    expect(workbench.commandsFt.menuItem('file.rename').keybinding).toBe('Ctrl+E');
+    expect(workbench.commandsFt.menuItem('file.rename').keybinding).toBe('Ctrl+Shift+E');
     expect(store.get(KEYBINDINGS_KEY)).toEqual({
       removed: [{ command: 'file.rename', key: 'F2', when: 'window' }],
-      added: [{ command: 'file.rename', key: 'Ctrl+E', when: 'window' }],
+      added: [{ command: 'file.rename', key: 'Ctrl+Shift+E', when: 'window' }],
     });
   });
 
@@ -206,6 +206,28 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
     expect(letter.defaultPrevented).toBe(false);
     expect(chord.defaultPrevented).toBe(true);
     field.remove();
+  });
+
+  it('toggles the Explorer on Ctrl+E and Details on Ctrl+D (PRD 001, §9.2.1)', async () => {
+    await setUp();
+    const chrome = workbench.chromeFt;
+    expect(keys().label('view.toggleExplorer')).toBe('Ctrl+E');
+    expect(keys().label('view.toggleDetails')).toBe('Ctrl+D');
+
+    const explorer = key('e', { ctrlKey: true });
+    keys().handleShortcut(explorer);
+    expect(explorer.defaultPrevented).toBe(true);
+    expect(chrome.isShown('explorer')).toBe(false);
+    expect(chrome.isShown('details')).toBe(true);
+
+    const details = key('d', { ctrlKey: true });
+    keys().handleShortcut(details);
+    expect(details.defaultPrevented).toBe(true);
+    expect(chrome.isShown('details')).toBe(false);
+
+    keys().handleShortcut(key('e', { ctrlKey: true }));
+    keys().handleShortcut(key('d', { ctrlKey: true }));
+    expect(chrome.hiddenSidebars()).toEqual([]);
   });
 
   it('toggles the bottom panel on Ctrl+Shift+` — from a text field too (PRD 001, §12.3)', async () => {

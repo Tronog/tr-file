@@ -149,7 +149,8 @@ bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`
 items are commands of the table, laid out in `MockDataWorkbenchService.settingsMenuItems`:
 hidden files, restore the layout on start, reset it, clear recent folders (PRD 003, §6).
 The title bar's buttons (`ChromeFeature.titleBarActions`, `runTitleBarAction`) are commands of the
-table: *Toggle Explorer* / *Toggle Details* (`view.toggleExplorer` / `view.toggleDetails`, drawn on the
+table: *Toggle Explorer* / *Toggle Details* (`view.toggleExplorer` / `view.toggleDetails`, `Ctrl`+`E` /
+`Ctrl`+`D` — PRD 001, §9.2.1 —, drawn on the
 side each sidebar is on, pressed while shown — `ChromeFeature.isShown`, the session's
 `hiddenSidebars`; hidden, a sidebar leaves the `Ctrl`+`Tab` ring, gives the keyboard back to the
 active panel, and comes back for anything shown in it), *Toggle Panel* (§12.3), and last, the
