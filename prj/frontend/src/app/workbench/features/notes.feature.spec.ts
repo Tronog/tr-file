@@ -66,12 +66,4 @@ describe('NotesFeature', () => {
     expect(notes.error()).toBeNull();
     expect(store.get(NOTES_KEY)).toBe('short again');
   });
-
-  it('raises the focus request each time it is asked', () => {
-    const notes = new NotesFeature(store);
-    expect(notes.focusRequest()).toBe(0);
-    notes.focus();
-    notes.focus();
-    expect(notes.focusRequest()).toBe(2);
-  });
 });

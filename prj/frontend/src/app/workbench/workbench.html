@@ -328,6 +328,7 @@
       label="Workbench panel"
       [style.height.px]="panel.collapsed() ? null : workbench.bottomPanelHeight()"
       [collapsed]="panel.collapsed()"
+      [bodyFocus]="panel.bodyFocus()"
       [tabs]="panel.tabs()"
       [actions]="panel.actions()"
       (select)="panel.select($event)"
@@ -373,7 +374,6 @@
           placeholder="Write notes here — they are kept on this computer."
           [text]="workbench.notesFt.text()"
           [error]="workbench.notesFt.error()"
-          [focusRequest]="workbench.notesFt.focusRequest()"
           (textChange)="workbench.notesFt.edit($event)"
           (commit)="workbench.notesFt.flush()"
         />

@@ -34,7 +34,7 @@
 </div>
 
 @if (!collapsed()) {
-  <div class="panel-body">
+  <div #body class="panel-body" tabindex="-1">
     <ng-content />
   </div>
 }

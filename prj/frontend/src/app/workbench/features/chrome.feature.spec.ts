@@ -349,6 +349,14 @@ describe('ChromeFeature', () => {
     });
   });
 
+  it('toggles the bottom panel from the title bar (PRD 001, §12.3)', () => {
+    expect(workbench.bottomPanelFt.collapsed()).toBe(true);
+    workbench.chromeFt.runTitleBarAction('toggle-panel');
+    expect(workbench.bottomPanelFt.collapsed()).toBe(false);
+    workbench.chromeFt.runTitleBarAction('toggle-panel');
+    expect(workbench.bottomPanelFt.collapsed()).toBe(true);
+  });
+
   describe('runStatusAction()', () => {
     it('hidden toggles the hidden files, which re-counts the listing', async () => {
       await startRoot();

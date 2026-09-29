@@ -290,10 +290,15 @@ export class ChromeFeature {
   });
 
   /** Status-bar items that do something when clicked. */
-  /** A title-bar button (PRD 001, §15.1): the last one resets the layout, once the user has said so. */
+  /**
+   * A title-bar button (PRD 001, §15.1): the last one resets the layout, once
+   * the user has said so; the bottom panel's toggles it (§12.3).
+   */
   runTitleBarAction(id: string): void {
     if (id === 'customize') {
       this.parent.commandsFt.run('view.resetLayout');
+    } else if (id === 'toggle-panel') {
+      this.parent.commandsFt.run('view.togglePanel');
     }
   }
 

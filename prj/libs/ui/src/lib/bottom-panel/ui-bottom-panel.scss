@@ -96,4 +96,10 @@
 
   flex: 1;
   padding: 4px 12px 10px;
+
+  /* focused itself only when its content has nothing to focus (§12.3) */
+  &:focus-visible {
+    outline: 1px solid var(--vsc-focus-border);
+    outline-offset: -1px;
+  }
 }

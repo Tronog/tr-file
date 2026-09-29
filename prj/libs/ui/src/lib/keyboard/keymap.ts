@@ -51,8 +51,17 @@ const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta', 'AltGraph', 'C
  * workbench. A letter is written in capitals whatever `Shift` did to it. A
  * symbol — `*`, `+`, `-` — is written as the character it typed, without the
  * `Shift` it may have taken to type it, so `*` means `*` on every layout.
+ *
+ * But for the key left of `1` in a chord with `Ctrl` or `Alt`: it is `` ` ``
+ * by where it is, not by what it types — `~` with `Shift` on a US layout, a
+ * dead key on many others — so `Ctrl`+`Shift`+`` ` `` (PRD 001, §12.3) is the
+ * same chord on every keyboard, `Shift` and all, as the desktop's `Ctrl`+`` ` ``
+ * is (PRD 001, §8.5).
  */
 export function chordOf(event: KeyboardEvent): string | null {
+  if (event.code === 'Backquote' && (event.ctrlKey || event.metaKey || event.altKey)) {
+    return [...(event.ctrlKey || event.metaKey ? ['Ctrl'] : []), ...(event.shiftKey ? ['Shift'] : []), ...(event.altKey ? ['Alt'] : []), '`'].join('+');
+  }
   const raw = event.key;
   if (raw === undefined || raw === '' || MODIFIER_KEYS.has(raw) || raw === 'Unidentified' || raw === 'Dead') {
     return null;

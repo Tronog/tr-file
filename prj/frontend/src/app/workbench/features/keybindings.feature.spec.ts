@@ -28,6 +28,16 @@ describe('chordOf', () => {
     expect(chordOf(key(',', { ctrlKey: true }))).toBe('Ctrl+,');
   });
 
+  it('writes the key left of 1 as ` in a chord, whatever the layout typed (PRD 001, §12.3)', () => {
+    // US: Shift turns it into `~`; many European layouts make it a dead key.
+    expect(chordOf(key('~', { code: 'Backquote', ctrlKey: true, shiftKey: true }))).toBe('Ctrl+Shift+`');
+    expect(chordOf(key('Dead', { code: 'Backquote', ctrlKey: true, shiftKey: true }))).toBe('Ctrl+Shift+`');
+    expect(chordOf(key('`', { code: 'Backquote', ctrlKey: true }))).toBe('Ctrl+`');
+    // Without Ctrl or Alt it is whatever it typed.
+    expect(chordOf(key('~', { code: 'Backquote', shiftKey: true }))).toBe('~');
+    expect(chordOf(key('Dead', { code: 'Backquote' }))).toBeNull();
+  });
+
   it('is nothing for a modifier on its own', () => {
     expect(chordOf(key('Shift', { shiftKey: true }))).toBeNull();
     expect(chordOf(key('Control', { ctrlKey: true }))).toBeNull();
@@ -195,6 +205,26 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
 
     expect(letter.defaultPrevented).toBe(false);
     expect(chord.defaultPrevented).toBe(true);
+    field.remove();
+  });
+
+  it('toggles the bottom panel on Ctrl+Shift+` — from a text field too (PRD 001, §12.3)', async () => {
+    await setUp();
+    const panel = workbench.bottomPanelFt;
+    expect(panel.collapsed()).toBe(true);
+    expect(keys().label('view.togglePanel')).toBe('Ctrl+Shift+`');
+
+    const open = key('~', { code: 'Backquote', ctrlKey: true, shiftKey: true });
+    keys().handleShortcut(open);
+    expect(open.defaultPrevented).toBe(true);
+    expect(panel.collapsed()).toBe(false);
+
+    const field = document.createElement('textarea');
+    document.body.appendChild(field);
+    const close = key('~', { code: 'Backquote', ctrlKey: true, shiftKey: true });
+    field.dispatchEvent(close);
+    keys().handleShortcut(close);
+    expect(panel.collapsed()).toBe(true);
     field.remove();
   });
 });

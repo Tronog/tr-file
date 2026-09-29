@@ -267,6 +267,12 @@ the session keeps only whether the panel was collapsed, not its tab): one plain 
 desktop it is the `userData` settings file whichever server the window is on — written 500 ms after
 typing stops, on leaving the box and on `pagehide`; past 250 KB it says so rather than letting the
 settings file refuse it silently.
+`Ctrl`+`Shift`+`` ` `` (§12.3, `view.togglePanel`, *View: Toggle Panel*, also the title bar's
+*Toggle bottom panel* button) collapses and opens it; `chordOf` reads the key left of `1` by
+`event.code` in a `Ctrl`/`Alt` chord, so it is `` ` `` on every layout, `Shift` kept. A toggle (that key, the
+chevron, the title bar's button) moves the keyboard too: opening, `UiBottomPanel.bodyFocus` focuses the
+tab content's first focusable element (else the body); closing, `PanelFocusFeature.focusBody` on the
+active panel. A tab chosen for the user — a job opening Progress — takes no focus.
 
 The workbench remembers the active panel and the one active before it (PRD 002, §2.7):
 `WorkbenchService.previousGroupId`, kept by `EditorGroupsFeature` — every change of active panel goes

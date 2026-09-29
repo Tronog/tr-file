@@ -1,6 +1,10 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, ElementRef, afterRenderEffect, computed, input, output, viewChild } from '@angular/core';
 import { UiIconButton } from '../controls/ui-icon-button';
 import type { UiIconAction, UiPanelTab } from '../models';
+
+/** What in the body can take the keyboard. */
+const FOCUSABLE =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * The workbench's bottom panel (Problems / Output / Terminal / Transfers).
@@ -33,6 +37,13 @@ export class UiBottomPanel {
    */
   readonly collapsed = input<boolean>(false);
 
+  /**
+   * Raise to put the keyboard in the active tab's content once the body has
+   * rendered (PRD 001, §12.3): its first focusable element, or the body
+   * itself when the content has none — an empty list, a note in a `<p>`.
+   */
+  readonly bodyFocus = input(0);
+
   readonly select = output<string>();
   readonly actionSelect = output<string>();
 
@@ -41,4 +52,23 @@ export class UiBottomPanel {
     const tabs = this.tabs();
     return (tabs.find((tab) => tab.active) ?? tabs[0])?.id ?? null;
   });
+
+  private readonly body = viewChild<ElementRef<HTMLElement>>('body');
+
+  private seenFocus = 0;
+
+  constructor() {
+    afterRenderEffect(() => {
+      const token = this.bodyFocus();
+      const body = this.body()?.nativeElement;
+      // Asked while collapsed, the request waits for the body.
+      if (token === this.seenFocus || body === undefined) {
+        return;
+      }
+      this.seenFocus = token;
+      if (token > 0) {
+        (body.querySelector<HTMLElement>(FOCUSABLE) ?? body).focus();
+      }
+    });
+  }
 }

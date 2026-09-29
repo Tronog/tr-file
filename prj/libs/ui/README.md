@@ -68,7 +68,7 @@ Code's to do so.
 | Details | `UiPreviewCard`, `UiPropertyList` (a value with an `action` is a button reported by `action` — `1000+ items`, PRD 004, §3.1.3), `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
 | Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
 | Panel content | `UiFileBrowser` (with `UiBreadcrumbs` — an address bar that suggests places, `suggestions` / `pathInput`, PRD 004, §4.2 — `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
-| Bottom panel | `UiBottomPanel`, `UiTransferList` (Transfers and Progress; `cancellable` rows report `cancel`), `UiNotes` (the Notes tab's text box: `textChange`, `commit` on blur, `error`, `focusRequest`) |
+| Bottom panel | `UiBottomPanel`, `UiTransferList` (Transfers and Progress; `cancellable` rows report `cancel`), `UiNotes` (the Notes tab's text box: `textChange`, `commit` on blur, `error`); `bodyFocus` puts the keyboard in the active tab's content |
 | Controls | `UiIconButton`, `UiButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
 | Modal windows | `UiModal` (`size: 'large'` for a window to work in), `UiDialog`, `UiProgressDialog` |
 | Settings | `UiSettingsEditor` (the settings window: sections, settings, search — PRD 010), `UiKeybindingsTable` (Keyboard Shortcuts, with its key recorder) |

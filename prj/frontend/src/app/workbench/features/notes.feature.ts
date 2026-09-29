@@ -27,7 +27,6 @@ export const NOTES_MAX_BYTES = 250 * 1024;
 export class NotesFeature {
   private readonly current = signal('');
   private readonly problem = signal<string | null>(null);
-  private readonly focusToken = signal(0);
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   /** What the box shows. */
@@ -35,9 +34,6 @@ export class NotesFeature {
 
   /** Why the text is not being kept, or `null`. */
   readonly error = this.problem.asReadonly();
-
-  /** Raised by `focus()`; the box takes the cursor on each new value. */
-  readonly focusRequest = this.focusToken.asReadonly();
 
   constructor(private readonly store: SettingsStore = new SettingsService()) {
     const stored = store.get<unknown>(NOTES_KEY);
@@ -63,11 +59,6 @@ export class NotesFeature {
       this.timer = null;
       this.write();
     }
-  }
-
-  /** Asks the box for the cursor. */
-  focus(): void {
-    this.focusToken.update((token) => token + 1);
   }
 
   private write(): void {

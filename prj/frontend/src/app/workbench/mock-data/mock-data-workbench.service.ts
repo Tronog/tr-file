@@ -126,6 +126,7 @@ export class MockDataWorkbenchService {
         { id: 'view.hidden', label: 'Show Hidden Files', separatorBefore: true },
         { id: 'view.refresh', label: 'Refresh' },
         { id: 'places.show', label: 'Show Bookmarks', separatorBefore: true },
+        { id: 'view.togglePanel', label: 'Toggle Panel' },
         { id: 'view.notes', label: 'Show Notes' },
         { id: 'view.resetLayout', label: 'Reset Layout' },
       ],

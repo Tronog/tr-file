@@ -25,6 +25,11 @@ export class BottomPanelFeature {
    */
   readonly collapsed: WritableSignal<boolean>;
 
+  private readonly focusToken = signal(0);
+
+  /** Raised to put the keyboard in the active tab's content; `UiBottomPanel` answers it. */
+  readonly bodyFocus = this.focusToken.asReadonly();
+
   constructor(private readonly parent: WorkbenchService) {
     this.activeTabId = signal('notes');
     this.collapsed = signal(true);
@@ -131,12 +136,27 @@ export class BottomPanelFeature {
   /** Opens the Notes tab with the cursor in it (PRD 001, §12.2). */
   showNotes(): void {
     this.select('notes');
-    this.parent.notesFt.focus();
+    this.focusToken.update((token) => token + 1);
   }
 
-  /** The collapse toggle: the tab bar stays, the body goes. */
+  /**
+   * The collapse toggle — the chevron, the title bar's button and
+   * `Ctrl`+`Shift`+`` ` `` (PRD 001, §12.3): the tab bar stays, the body goes.
+   * The keyboard goes with it: into the tab's content as the body opens, back
+   * into the active panel's content as it closes — else it would be left on
+   * a textarea that is gone, or wherever the chevron was.
+   *
+   * A tab chosen by something else — a job starting opens Progress — does not
+   * take the keyboard: only this, which is the user asking for the panel.
+   */
   toggleCollapsed(): void {
-    this.collapsed.update((collapsed) => !collapsed);
+    if (this.collapsed()) {
+      this.collapsed.set(false);
+      this.focusToken.update((token) => token + 1);
+    } else {
+      this.collapsed.set(true);
+      this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
+    }
   }
 
   runAction(actionId: string): void {

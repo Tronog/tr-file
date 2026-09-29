@@ -36,15 +36,4 @@ describe('UiNotes', () => {
     expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Too long');
     expect(box.getAttribute('aria-invalid')).toBe('true');
   });
-
-  it('takes the cursor on each new focus request', async () => {
-    const { fixture, box } = create();
-    document.body.appendChild(fixture.nativeElement);
-    expect(document.activeElement).not.toBe(box);
-
-    fixture.componentRef.setInput('focusRequest', 1);
-    await fixture.whenStable();
-    expect(document.activeElement).toBe(box);
-    fixture.nativeElement.remove();
-  });
 });

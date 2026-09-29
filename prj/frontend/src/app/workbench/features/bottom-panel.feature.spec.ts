@@ -149,13 +149,38 @@ describe('BottomPanelFeature', () => {
     expect(panel.activeTab()).toBe('notes');
   });
 
-  it('opens Notes with the cursor in the box from its command', () => {
+  it('opens Notes with the keyboard in it from its command', () => {
     workbench.bottomPanelFt.select('transfers');
     workbench.bottomPanelFt.restore(true);
-    const before = workbench.notesFt.focusRequest();
+    const before = workbench.bottomPanelFt.bodyFocus();
     workbench.commandsFt.run('view.notes');
     expect(workbench.bottomPanelFt.collapsed()).toBe(false);
     expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
-    expect(workbench.notesFt.focusRequest()).toBe(before + 1);
+    expect(workbench.bottomPanelFt.bodyFocus()).toBe(before + 1);
+  });
+
+  describe('toggling (PRD 001, §12.3)', () => {
+    it('asks for the tab content to take the keyboard as it opens', () => {
+      const focusBody = vi.spyOn(workbench.panelFocusFt, 'focusBody');
+      workbench.commandsFt.run('view.togglePanel');
+      expect(workbench.bottomPanelFt.collapsed()).toBe(false);
+      expect(workbench.bottomPanelFt.bodyFocus()).toBe(1);
+      expect(focusBody).not.toHaveBeenCalled();
+    });
+
+    it('hands the keyboard to the active panel content as it closes', () => {
+      workbench.bottomPanelFt.toggleCollapsed();
+      const focusBody = vi.spyOn(workbench.panelFocusFt, 'focusBody');
+      workbench.commandsFt.run('view.togglePanel');
+      expect(workbench.bottomPanelFt.collapsed()).toBe(true);
+      expect(focusBody).toHaveBeenCalledWith(workbench.activeGroupId());
+      expect(workbench.bottomPanelFt.bodyFocus()).toBe(1);
+    });
+
+    it('leaves the keyboard alone when a tab is chosen for the user', () => {
+      workbench.bottomPanelFt.select('progress');
+      expect(workbench.bottomPanelFt.collapsed()).toBe(false);
+      expect(workbench.bottomPanelFt.bodyFocus()).toBe(0);
+    });
   });
 });
