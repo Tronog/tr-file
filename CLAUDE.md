@@ -255,6 +255,13 @@ pane reports every expanded pane's measured height (`UiPaneResize`). `SidebarPan
 them by id (`sizeOf`, `resize`, the session's `paneSizes`) and hands them back as `size`, which the
 pane uses as a `flex` weight — so the panes keep their proportions as the window changes height.
 A pane opened among sized ones takes the average of theirs.
+Each sidebar's `…` (PRD 001, §9.2) opens a menu of its panes, checked while shown: `UiSidebar`
+reports `actionAt` with the button's place, `ContextMenuFeature.openSidebarMenu` lists the
+`view.pane.<id>` commands (not in the palette), and `SidebarPanesFeature` keeps what is hidden
+(`shown`, `toggleShown`, the session's `hiddenPanes`) — never the last pane a sidebar shows.
+*Permissions* starts hidden (`DEFAULT_HIDDEN_PANES`), and so does it for a session saved before panes
+could be hidden. The
+templates draw `panes.shown(…)`; with every pane about the entry hidden the Details card goes last.
 
 The bottom panel starts collapsed (§12.1): it keeps its tab bar, whose counts say when
 something happened, and the button VS Code would close it with is the collapse toggle — a

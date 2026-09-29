@@ -4,7 +4,7 @@ import type { SettingsStore } from '../../settings/settings.service';
 import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
 import type { PanelDiffSpec, PanelGroupState, PanelSort, PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
-import type { SidebarId } from './sidebar-panes.feature';
+import { DEFAULT_HIDDEN_PANES, type SidebarId } from './sidebar-panes.feature';
 
 /** Settings key of the last session's layout; the backend it was on is appended. */
 export const SESSION_KEY = 'tr-file.session.v1';
@@ -31,12 +31,14 @@ export interface SessionSnapshot extends MockWorkbenchLayout {
   readonly paneOrder: Partial<Record<SidebarId, readonly string[]>>;
   /** The sidebars' panes' heights, as weights (PRD 002, §5.2); only those that were resized. */
   readonly paneSizes: Readonly<Record<string, number>>;
+  /** The sidebars' panes hidden from their `…` menus (PRD 001, §9.2). */
+  readonly hiddenPanes: readonly string[];
 }
 
 /**
  * The session, remembered (PRD 003, §6): the panel layout and every panel's
  * tabs, folder, view and sort, the active panel, the sidebars' widths,
- * which of their panes are open, in what order and how tall, the bottom panel, and
+ * which of their panes are open or hidden, in what order and how tall, the bottom panel, and
  * whether hidden files show.
  *
  * Kept in the settings per backend — the folders of this computer are not a
@@ -171,6 +173,7 @@ export class SessionFeature {
       panes: p.sidebarPanesFt.expandedIds(),
       paneOrder: p.sidebarPanesFt.changedOrders(),
       paneSizes: p.sidebarPanesFt.paneSizes(),
+      hiddenPanes: p.sidebarPanesFt.hiddenIds(),
     };
   }
 
@@ -233,6 +236,8 @@ export class SessionFeature {
       panes: SessionFeature.strings(raw['panes']),
       paneOrder: SessionFeature.paneOrder(raw['paneOrder']),
       paneSizes: SessionFeature.paneSizes(raw['paneSizes']),
+      // A session from before §9.2 hid nothing on purpose: it gets the default.
+      hiddenPanes: Array.isArray(raw['hiddenPanes']) ? SessionFeature.strings(raw['hiddenPanes']) : DEFAULT_HIDDEN_PANES,
     };
   }
 

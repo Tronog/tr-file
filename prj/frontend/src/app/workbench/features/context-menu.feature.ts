@@ -3,6 +3,7 @@ import type { UiContextMenuRequest, UiMenuItem } from '@tr-file/ui';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import type { CommandTarget } from './commands.feature';
 import type { PlaceSection } from './places.feature';
+import { DEFAULT_PANE_ORDER, type SidebarId } from './sidebar-panes.feature';
 import type { WorkbenchService } from '../workbench.service';
 
 /** A context menu on screen: where, what it offers, and what its commands act on. */
@@ -153,6 +154,16 @@ export class ContextMenuFeature {
   /** The Git pane's `…` button, opening below it (PRD 011, §1). */
   openGitMenu(x: number, y: number): void {
     this.show({ target: null, x, y }, 'Git actions', GIT, this.parent.commandsFt.activeTarget());
+  }
+
+  /**
+   * A sidebar's `…` (PRD 001, §9.2): its panes, in the order they stand, each
+   * checked while shown — choosing one hides or shows it.
+   */
+  openSidebarMenu(sidebar: SidebarId, x: number, y: number): void {
+    const panes = this.parent.sidebarPanesFt.order(sidebar);
+    const layout = panes.filter((id) => DEFAULT_PANE_ORDER[sidebar].includes(id)).map((id) => `view.pane.${id}`);
+    this.show({ target: null, x, y }, sidebar === 'explorer' ? 'Explorer views' : 'Details views', layout, this.parent.commandsFt.activeTarget());
   }
 
   /** A row was chosen: the menu closes, and its command runs against what was right-clicked. */

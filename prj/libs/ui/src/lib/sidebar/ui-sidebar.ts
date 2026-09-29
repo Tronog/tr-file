@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
-import type { UiIconAction } from '../models';
+import type { UiIconAction, UiIconActionAt } from '../models';
 
 /**
  * A workbench side bar (Explorer on the left, Details on the right).
@@ -34,4 +34,13 @@ export class UiSidebar {
 
   /** Emits the `id` of the clicked title-row action. */
   readonly actionSelect = output<string>();
+
+  /** The same click, with where the button is — for the `…` that opens a menu under it (PRD 001, §9.2). */
+  readonly actionAt = output<UiIconActionAt>();
+
+  protected select(id: string, event: MouseEvent): void {
+    this.actionSelect.emit(id);
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.actionAt.emit({ id, x: rect.left, y: rect.bottom });
+  }
 }

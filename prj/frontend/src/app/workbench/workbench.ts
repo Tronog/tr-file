@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, effect, inject, viewChild } from '@angular/core';
 import {
   UiActionList,
@@ -43,6 +44,7 @@ const FOCUSABLE =
 @Component({
   selector: 'app-workbench',
   imports: [
+    NgTemplateOutlet,
     UiActionList,
     UiActivityBar,
     UiBottomPanel,

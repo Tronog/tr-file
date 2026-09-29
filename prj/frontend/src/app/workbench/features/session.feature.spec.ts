@@ -48,6 +48,7 @@ const SAVED: SessionSnapshot = {
   // A pane this version no longer has is dropped; one it does not name keeps its default place.
   paneOrder: { details: ['properties', 'gone', 'git', 'open-with'] },
   paneSizes: { recent: 120, 'explorer-tree': 360 },
+  hiddenPanes: ['permissions'],
 };
 
 describe('SessionFeature', () => {
@@ -97,12 +98,19 @@ describe('SessionFeature', () => {
     expect(workbench.sidebarPanesFt.order('explorer')).toEqual(['places', 'bookmarks', 'recent', 'explorer-tree']);
     expect(workbench.sidebarPanesFt.sizeOf('recent')).toBe(120);
     expect(workbench.sidebarPanesFt.sizeOf('places')).toBeNull();
+    expect(workbench.sidebarPanesFt.shown('details')).toEqual(['properties', 'git', 'open-with']);
     // New ids go past every one the session used, tabs' included.
     expect(workbench.editorGroupsFt.createId()).toBe('group-10');
 
     http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [])));
     http.expectOne(listUrl('notes')).flush(fsEnvelope(fsListing('notes', [])));
     http.match(() => true);
+  });
+
+  it('hides the default panes for a session saved before panes could be hidden (PRD 001, §9.2)', () => {
+    const { hiddenPanes: _, ...old } = SAVED;
+    expect(SessionFeature.validate(old)?.hiddenPanes).toEqual(['permissions']);
+    expect(SessionFeature.validate({ ...SAVED, hiddenPanes: [] })?.hiddenPanes).toEqual([]);
   });
 
   it('ignores a session that does not hold together', () => {

@@ -2,6 +2,7 @@ import type { UiMenuItem, UiPanelView } from '@tr-file/ui';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
 import type { PanelSortKey } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
+import { DEFAULT_PANE_ORDER, PANE_LABELS } from './sidebar-panes.feature';
 
 /**
  * What a command acts on. From a menu or the palette it is the active panel —
@@ -466,6 +467,19 @@ export class CommandsFeature {
       { id: 'view.notes', category: 'View', label: 'Show Notes', run: () => p.bottomPanelFt.showNotes() },
       /* PRD 001, §12.3 */
       { id: 'view.togglePanel', category: 'View', label: 'Toggle Panel', run: () => p.bottomPanelFt.toggleCollapsed() },
+      /* The sidebars' `…` menus (PRD 001, §9.2): one row per pane, checked while it is shown. */
+      ...[...DEFAULT_PANE_ORDER.explorer, ...DEFAULT_PANE_ORDER.details].map(
+        (paneId): CommandSpec => ({
+          id: `view.pane.${paneId}`,
+          category: 'View',
+          label: () => (paneId === 'explorer-tree' ? p.explorerFt.title : (PANE_LABELS[paneId] ?? paneId)),
+          palette: false,
+          checked: () => p.sidebarPanesFt.isShown(paneId),
+          // The last pane shown stays: the row that would hide it is off.
+          enabled: () => !p.sidebarPanesFt.isShown(paneId) || p.sidebarPanesFt.canHide(paneId),
+          run: () => p.sidebarPanesFt.toggleShown(paneId),
+        }),
+      ),
 
       /* Session (PRD 003, §6) */
       {

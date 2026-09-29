@@ -253,6 +253,7 @@ export class WorkbenchService {
       this.sidebarPanesFt.restore(this.restored.panes);
       this.sidebarPanesFt.restoreOrders(this.restored.paneOrder);
       this.sidebarPanesFt.restoreSizes(this.restored.paneSizes);
+      this.sidebarPanesFt.restoreHidden(this.restored.hiddenPanes);
     }
     // A fresh start on the desktop begins in the home folder (PRD 003, §6),
     // which only the backend knows: the panels wait for it. A browser's
