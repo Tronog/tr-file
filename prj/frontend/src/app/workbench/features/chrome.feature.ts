@@ -11,6 +11,17 @@ import type {
 import type { WorkbenchService } from '../workbench.service';
 import { isFolder } from '../../file-system/fs-entry-kind';
 
+/** The two sidebars the title bar shows and hides. */
+export type SidebarName = 'explorer' | 'details';
+
+/** What each title-bar button runs: commands of the table, so the palette and the View menu run the same. */
+const TITLE_BAR_COMMANDS: Readonly<Record<string, string>> = {
+  'toggle-left': 'view.toggleExplorer',
+  'toggle-panel': 'view.togglePanel',
+  'toggle-right': 'view.toggleDetails',
+  customize: 'view.resetLayout',
+};
+
 /**
  * The window chrome: title bar, activity bar and status bar.
  *
@@ -21,15 +32,72 @@ import { isFolder } from '../../file-system/fs-entry-kind';
 export class ChromeFeature {
   readonly commandLabel: string;
   readonly commandKeys: readonly string[];
-  readonly titleBarActions: readonly UiIconAction[];
   readonly sidebarMoreActions: readonly UiIconAction[];
+
+  /** Whether the Explorer and Details sidebars are shown — the title bar's two sidebar buttons. */
+  private readonly shown = signal<Readonly<Record<SidebarName, boolean>>>({ explorer: true, details: true });
 
   constructor(private readonly parent: WorkbenchService) {
     const mock = parent.mockWorkbench;
     this.commandLabel = mock.commandLabel;
     this.commandKeys = mock.commandKeys;
-    this.titleBarActions = mock.titleBarActions;
     this.sidebarMoreActions = mock.sidebarMoreActions;
+  }
+
+  /**
+   * The title bar's layout buttons (PRD 001, §15.1): the Explorer, the bottom
+   * panel and Details — each pressed while what it toggles is showing, and a
+   * sidebar's drawn on the side the settings put it (PRD 010, §3) — then
+   * *Reset Layout*.
+   */
+  readonly titleBarActions = computed<readonly UiIconAction[]>(() => {
+    const preferences = this.parent.preferencesFt;
+    const icon = (side: 'left' | 'right'): UiIconAction['icon'] => (side === 'left' ? 'sidebar-left' : 'sidebar-right');
+    return this.parent.mockWorkbench.titleBarActions.map((action): UiIconAction => {
+      switch (action.id) {
+        case 'toggle-left':
+          return { ...action, icon: icon(preferences.explorerSide()), active: this.isShown('explorer') };
+        case 'toggle-right':
+          return { ...action, icon: icon(preferences.detailsSide()), active: this.isShown('details') };
+        case 'toggle-panel':
+          return { ...action, active: !this.parent.bottomPanelFt.collapsed() };
+        default:
+          return action;
+      }
+    });
+  });
+
+  isShown(sidebar: SidebarName): boolean {
+    return this.shown()[sidebar];
+  }
+
+  /**
+   * Hides or shows a sidebar. Hidden with the keyboard in it, the keyboard
+   * goes to the active panel's content, as it does when the bottom panel is
+   * put away (PRD 001, §12.3) — else it would be left on nothing.
+   */
+  toggleSidebar(sidebar: SidebarName): void {
+    const hiding = this.isShown(sidebar);
+    const hadFocus = hiding && ChromeFeature.focusIsIn(sidebar);
+    this.shown.update((shown) => ({ ...shown, [sidebar]: !hiding }));
+    if (hadFocus) {
+      this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
+    }
+  }
+
+  /** Puts the sidebars back as a restored session had them. */
+  restoreSidebars(hidden: readonly SidebarName[]): void {
+    this.shown.set({ explorer: !hidden.includes('explorer'), details: !hidden.includes('details') });
+  }
+
+  /** The hidden sidebars, for the session. */
+  hiddenSidebars(): readonly SidebarName[] {
+    return (['explorer', 'details'] as const).filter((sidebar) => !this.isShown(sidebar));
+  }
+
+  private static focusIsIn(region: SidebarName): boolean {
+    const focused = globalThis.document?.activeElement;
+    return focused instanceof Element && focused.closest(`[data-focus-region="${region}"]`) !== null;
   }
 
   /** The main menu that is open, if any (PRD 008, §1). */
@@ -40,8 +108,12 @@ export class ChromeFeature {
 
   readonly sidebarView = this.sidebar.asReadonly();
 
+  /** Shows a view of the left sidebar — and the sidebar, if it was hidden. */
   showSidebar(view: 'explorer' | 'search'): void {
     this.sidebar.set(view);
+    if (!this.isShown('explorer')) {
+      this.shown.update((shown) => ({ ...shown, explorer: true }));
+    }
   }
 
   /** The activity bar's Bookmarks (PRD 003, §6): the explorer, with its Bookmarks pane open. */
@@ -291,14 +363,14 @@ export class ChromeFeature {
 
   /** Status-bar items that do something when clicked. */
   /**
-   * A title-bar button (PRD 001, §15.1): the last one resets the layout, once
-   * the user has said so; the bottom panel's toggles it (§12.3).
+   * A title-bar button (PRD 001, §15.1): the sidebars and the bottom panel
+   * (§12.3) are shown and hidden; the last one resets the layout, once the
+   * user has said so.
    */
   runTitleBarAction(id: string): void {
-    if (id === 'customize') {
-      this.parent.commandsFt.run('view.resetLayout');
-    } else if (id === 'toggle-panel') {
-      this.parent.commandsFt.run('view.togglePanel');
+    const command = TITLE_BAR_COMMANDS[id];
+    if (command !== undefined) {
+      this.parent.commandsFt.run(command);
     }
   }
 

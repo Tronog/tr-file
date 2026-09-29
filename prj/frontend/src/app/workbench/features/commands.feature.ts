@@ -467,6 +467,8 @@ export class CommandsFeature {
       { id: 'view.notes', category: 'View', label: 'Show Notes', run: () => p.bottomPanelFt.showNotes() },
       /* PRD 001, §12.3 */
       { id: 'view.togglePanel', category: 'View', label: 'Toggle Panel', run: () => p.bottomPanelFt.toggleCollapsed() },
+      { id: 'view.toggleExplorer', category: 'View', label: 'Toggle Explorer', run: () => p.chromeFt.toggleSidebar('explorer') },
+      { id: 'view.toggleDetails', category: 'View', label: 'Toggle Details', run: () => p.chromeFt.toggleSidebar('details') },
       /* The sidebars' `…` menus (PRD 001, §9.2): one row per pane, checked while it is shown. */
       ...[...DEFAULT_PANE_ORDER.explorer, ...DEFAULT_PANE_ORDER.details].map(
         (paneId): CommandSpec => ({

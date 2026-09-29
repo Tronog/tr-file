@@ -4,6 +4,7 @@ import type { SettingsStore } from '../../settings/settings.service';
 import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
 import type { PanelDiffSpec, PanelGroupState, PanelSort, PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
+import type { SidebarName } from './chrome.feature';
 import { DEFAULT_HIDDEN_PANES, type SidebarId } from './sidebar-panes.feature';
 
 /** Settings key of the last session's layout; the backend it was on is appended. */
@@ -33,6 +34,8 @@ export interface SessionSnapshot extends MockWorkbenchLayout {
   readonly paneSizes: Readonly<Record<string, number>>;
   /** The sidebars' panes hidden from their `…` menus (PRD 001, §9.2). */
   readonly hiddenPanes: readonly string[];
+  /** The sidebars the title bar hid. */
+  readonly hiddenSidebars: readonly SidebarName[];
 }
 
 /**
@@ -174,6 +177,7 @@ export class SessionFeature {
       paneOrder: p.sidebarPanesFt.changedOrders(),
       paneSizes: p.sidebarPanesFt.paneSizes(),
       hiddenPanes: p.sidebarPanesFt.hiddenIds(),
+      hiddenSidebars: p.chromeFt.hiddenSidebars(),
     };
   }
 
@@ -237,6 +241,9 @@ export class SessionFeature {
       paneOrder: SessionFeature.paneOrder(raw['paneOrder']),
       paneSizes: SessionFeature.paneSizes(raw['paneSizes']),
       // A session from before §9.2 hid nothing on purpose: it gets the default.
+      hiddenSidebars: SessionFeature.strings(raw['hiddenSidebars']).filter(
+        (name): name is SidebarName => name === 'explorer' || name === 'details',
+      ),
       hiddenPanes: Array.isArray(raw['hiddenPanes']) ? SessionFeature.strings(raw['hiddenPanes']) : DEFAULT_HIDDEN_PANES,
     };
   }

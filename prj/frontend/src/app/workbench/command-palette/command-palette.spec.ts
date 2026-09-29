@@ -272,6 +272,8 @@ describe('CommandPaletteFeature', () => {
       'View: Show Bookmarks',
       'View: Show Notes',
       'View: Toggle Panel',
+      'View: Toggle Explorer',
+      'View: Toggle Details',
       'Preferences: Restore Layout on Start',
       'View: Reset Layout',
       'Preferences: Open Settings',

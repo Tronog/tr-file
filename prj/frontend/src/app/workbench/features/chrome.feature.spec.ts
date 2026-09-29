@@ -394,7 +394,7 @@ describe('ChromeFeature', () => {
   });
 
   it('passes the static chrome through from the seed data', () => {
-    expect(workbench.chromeFt.titleBarActions).toBe(workbench.mockWorkbench.titleBarActions);
+    expect(workbench.chromeFt.titleBarActions().map((action) => action.id)).toEqual(workbench.mockWorkbench.titleBarActions.map((action) => action.id));
     expect(workbench.chromeFt.commandLabel).toBe(workbench.mockWorkbench.commandLabel);
     expect(workbench.chromeFt.activityItems().map((item) => item.id)).toEqual([
       'explorer',

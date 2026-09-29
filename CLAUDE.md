@@ -148,8 +148,12 @@ bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`
 `openMenu`, `closeSettingsMenu`) shows `UiContextMenu` fixed beside it, opening upward. Its
 items are commands of the table, laid out in `MockDataWorkbenchService.settingsMenuItems`:
 hidden files, restore the layout on start, reset it, clear recent folders (PRD 003, §6).
-The title bar's last button, the layout grid (PRD 001, §15.1.1), is *Reset Layout* too
-(`ChromeFeature.runTitleBarAction`); `view.resetLayout` asks first wherever it is run from
+The title bar's buttons (`ChromeFeature.titleBarActions`, `runTitleBarAction`) are commands of the
+table: *Toggle Explorer* / *Toggle Details* (`view.toggleExplorer` / `view.toggleDetails`, drawn on the
+side each sidebar is on, pressed while shown — `ChromeFeature.isShown`, the session's
+`hiddenSidebars`; hidden, a sidebar leaves the `Ctrl`+`Tab` ring, gives the keyboard back to the
+active panel, and comes back for anything shown in it), *Toggle Panel* (§12.3), and last, the
+layout grid (PRD 001, §15.1.1), *Reset Layout*; `view.resetLayout` asks first wherever it is run from
 (`SessionFeature.confirmResetLayout`), since the window then reloads fresh.
 
 The main menu (PRD 008, §1) is File, Edit, Selection, View and Go, from

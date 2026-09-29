@@ -126,6 +126,8 @@ export class MockDataWorkbenchService {
         { id: 'view.hidden', label: 'Show Hidden Files', separatorBefore: true },
         { id: 'view.refresh', label: 'Refresh' },
         { id: 'places.show', label: 'Show Bookmarks', separatorBefore: true },
+        { id: 'view.toggleExplorer', label: 'Toggle Explorer' },
+        { id: 'view.toggleDetails', label: 'Toggle Details' },
         { id: 'view.togglePanel', label: 'Toggle Panel' },
         { id: 'view.notes', label: 'Show Notes' },
         { id: 'view.resetLayout', label: 'Reset Layout' },
@@ -153,9 +155,9 @@ export class MockDataWorkbenchService {
   readonly commandKeys: readonly string[] = ['Ctrl', 'Shift', 'P'];
 
   readonly titleBarActions: readonly UiIconAction[] = [
-    { id: 'toggle-left', label: 'Toggle left sidebar', icon: 'sidebar-left', active: true },
-    { id: 'toggle-panel', label: 'Toggle bottom panel', icon: 'panel-bottom', active: true },
-    { id: 'toggle-right', label: 'Toggle right sidebar', icon: 'sidebar-right', active: true },
+    { id: 'toggle-left', label: 'Toggle Explorer', icon: 'sidebar-left', active: true },
+    { id: 'toggle-panel', label: 'Toggle Panel', icon: 'panel-bottom', active: true },
+    { id: 'toggle-right', label: 'Toggle Details', icon: 'sidebar-right', active: true },
     { id: 'customize', label: 'Reset Layout', icon: 'layout-grid' },
   ];
 

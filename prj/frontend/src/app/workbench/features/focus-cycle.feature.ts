@@ -37,8 +37,9 @@ export class FocusCycleFeature {
     // Left to right as the window shows them, wherever the settings put the
     // sidebars (PRD 010, §3): on one side together, the Explorer is outermost.
     const preferences = this.parent.preferencesFt;
-    const explorer = preferences.explorerSide();
-    const details = preferences.detailsSide();
+    // A hidden sidebar is not in it.
+    const explorer = this.parent.chromeFt.isShown('explorer') ? preferences.explorerSide() : null;
+    const details = this.parent.chromeFt.isShown('details') ? preferences.detailsSide() : null;
     return [
       ...(explorer === 'left' ? (['explorer'] as const) : []),
       ...(details === 'left' ? (['details'] as const) : []),

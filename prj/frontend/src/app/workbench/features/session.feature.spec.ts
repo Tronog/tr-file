@@ -49,6 +49,7 @@ const SAVED: SessionSnapshot = {
   paneOrder: { details: ['properties', 'gone', 'git', 'open-with'] },
   paneSizes: { recent: 120, 'explorer-tree': 360 },
   hiddenPanes: ['permissions'],
+  hiddenSidebars: ['details'],
 };
 
 describe('SessionFeature', () => {
@@ -99,6 +100,8 @@ describe('SessionFeature', () => {
     expect(workbench.sidebarPanesFt.sizeOf('recent')).toBe(120);
     expect(workbench.sidebarPanesFt.sizeOf('places')).toBeNull();
     expect(workbench.sidebarPanesFt.shown('details')).toEqual(['properties', 'git', 'open-with']);
+    expect(workbench.chromeFt.isShown('explorer')).toBe(true);
+    expect(workbench.chromeFt.isShown('details')).toBe(false);
     // New ids go past every one the session used, tabs' included.
     expect(workbench.editorGroupsFt.createId()).toBe('group-10');
 
@@ -200,7 +203,7 @@ describe('SessionFeature', () => {
 
     it('is what the title bar\'s layout button does', async () => {
       const { reload, confirm } = setUp(true);
-      expect(workbench.chromeFt.titleBarActions.at(-1)).toEqual({ id: 'customize', label: 'Reset Layout', icon: 'layout-grid' });
+      expect(workbench.chromeFt.titleBarActions().at(-1)).toEqual({ id: 'customize', label: 'Reset Layout', icon: 'layout-grid' });
 
       workbench.chromeFt.runTitleBarAction('customize');
       await settle();

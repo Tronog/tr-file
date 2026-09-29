@@ -53,6 +53,7 @@
       type="button"
       class="chrome-btn"
       [class.is-active]="action.active"
+      [attr.aria-pressed]="action.active === undefined ? null : action.active"
       [disabled]="action.disabled ?? false"
       [attr.title]="action.label"
       [attr.aria-label]="action.label"
