@@ -142,7 +142,10 @@ Modal windows (PRD 002, §3) are `ModalService` (`prj/frontend/src/app/modal/`):
 modal.confirm(…)`, `prompt(…)`, `message(…)`, `show(…)` for a full VS Code message dialog,
 or `open(Component, …)` for a component of the app's own, which closes itself through
 `MODAL_REF`. `ModalHost` at the root draws the stack with the library's `UiModal` and
-`UiDialog`, and `App` makes everything behind it `inert` while one is open. The first user
+`UiDialog`, and `App` makes everything behind it `inert` while one is open. A dialog shown with
+`onTop: true` stays above every window opened after it — they go in beneath it, inert until it is
+answered (PRD 004, §2.2); a file operation's *Skip* / *Skip All* / *Retry* / *Abort* question is one,
+so its own progress window, opened at the same poll, can never cover it. The first user
 is an upload whose name is taken: `TransfersFeature` asks Replace / Skip, one conflict at a
 time, with "Do this for all remaining conflicts" for a batch.
 

@@ -351,6 +351,21 @@ describe('OperationsFeature', () => {
       expect(ops().rows()[0]).toMatchObject({ statusLabel: 'waiting', detail: 'Permission denied: secret.txt — /docs/secret.txt', cancellable: true });
     });
 
+    /** PRD 004, §2.2 — waiting at its first poll, the job's own progress window opens too: the question stays above it. */
+    it('asks above the job’s own progress window', async () => {
+      vi.spyOn(workbench.modal, 'confirm').mockResolvedValue(true);
+      vi.spyOn(fs(), 'start').mockResolvedValue(job());
+      vi.spyOn(fs(), 'status').mockResolvedValue(waiting);
+      await ops().trash(['docs/a.txt']);
+
+      await vi.advanceTimersByTimeAsync(OPERATION_POLL_MS);
+
+      const stack = workbench.modal.stack();
+      expect(stack.map((entry) => entry.kind)).toEqual(['component', 'dialog']);
+      expect(stack.at(-1)).toMatchObject({ kind: 'dialog', onTop: true });
+      expect((stack.at(-1) as { model: () => { message: string } }).model().message).toBe("Cannot move to the trash 'secret.txt'");
+    });
+
     it('sends the answer, and follows the job on from there', async () => {
       await startWaiting();
       vi.spyOn(workbench.modal, 'show').mockResolvedValue({ buttonId: 'skip-all', checked: false, value: '' });

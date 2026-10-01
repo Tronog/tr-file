@@ -288,6 +288,27 @@ describe('ModalService and ModalHost', () => {
     expect(windows[1]?.hasAttribute('inert')).toBe(false);
   });
 
+  /** PRD 004, §2.2 — a question something waits on stays above every window opened after it. */
+  it('keeps a window asked to stay on top above those opened after it', async () => {
+    void modal.message({ message: 'Under' });
+    const answer = modal.show({ message: 'Cannot copy', onTop: true, buttons: [{ id: 'skip', label: 'Skip' }] });
+    void modal.open(Custom, { label: 'Progress', inputs: { greeting: 'Copying' } });
+    void modal.message({ message: 'Later' });
+    await draw();
+
+    const windows = Array.from(fixture.nativeElement.querySelectorAll('ui-modal')) as HTMLElement[];
+    expect(windows.map((window) => window.textContent?.includes('Cannot copy'))).toEqual([false, false, false, true]);
+    expect(windows.map((window) => window.hasAttribute('inert'))).toEqual([true, true, true, false]);
+
+    // Answered, it goes, and the last window opened is the one in use.
+    windows[3]?.querySelector<HTMLButtonElement>('.buttons button')?.click();
+    expect((await answer)?.buttonId).toBe('skip');
+    await draw();
+    const left = Array.from(fixture.nativeElement.querySelectorAll('ui-modal')) as HTMLElement[];
+    expect(left.at(-1)?.textContent).toContain('Later');
+    expect(left.at(-1)?.hasAttribute('inert')).toBe(false);
+  });
+
   it('opens a component of the application’s own, which closes itself with a result', async () => {
     const answer = modal.open<string>(Custom, { label: 'Custom', inputs: { greeting: 'Hello' } });
     await draw();

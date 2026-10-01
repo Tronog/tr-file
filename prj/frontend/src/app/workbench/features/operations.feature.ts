@@ -464,6 +464,8 @@ export class OperationsFeature {
     try {
       const result = await this.parent.modal.show({
         severity: 'error',
+        // Above every window — the job's own progress window opens at the very poll that finds it waiting (PRD 004, §2.2).
+        onTop: true,
         message: `Cannot ${OperationsFeature.verbOf(job)} '${OperationsFeature.nameOf(problem.path)}'`,
         detail: `${problem.message}\n${shownPath(problem.path)}`,
         buttons: [

@@ -42,7 +42,7 @@ export class ModalService {
 
   /** Opens a message dialog; resolves with the button chosen, or `null` if dismissed. */
   show(options: DialogOptions): Promise<UiDialogResult | null> {
-    const { dismissible, validate, ...model } = options;
+    const { dismissible, validate, onTop, ...model } = options;
     return new Promise((resolve) => {
       const id = (this.sequence += 1);
       const entry: DialogEntry = {
@@ -51,12 +51,28 @@ export class ModalService {
         model: signal(validate && model.input ? this.checked(model, validate, model.input.value) : model),
         dismissible: dismissible ?? true,
         ...(validate ? { validate } : {}),
+        ...(onTop ? { onTop } : {}),
         resolve: (result) => {
           this.remove(id);
           resolve(result);
         },
       };
-      this.entries.update((entries) => [...entries, entry]);
+      this.push(entry);
+    });
+  }
+
+  /**
+   * Adds a window at the top of the stack — but under the `onTop` ones: an
+   * ordinary window opened while one of them is up goes beneath it, inert
+   * until it is answered (PRD 004, §2.2).
+   */
+  private push(entry: ModalEntry): void {
+    this.entries.update((entries) => {
+      if (entry.kind === 'dialog' && entry.onTop) {
+        return [...entries, entry];
+      }
+      const firstOnTop = entries.findIndex((candidate) => candidate.kind === 'dialog' && candidate.onTop === true);
+      return firstOnTop === -1 ? [...entries, entry] : [...entries.slice(0, firstOnTop), entry, ...entries.slice(firstOnTop)];
     });
   }
 
@@ -118,26 +134,25 @@ export class ModalService {
         resolve(result as R | null);
       };
       const ref: ModalRef<R> = { close };
-      this.entries.update((entries) => [
-        ...entries,
-        {
-          kind: 'component',
-          id,
-          component,
-          inputs: options.inputs ?? {},
-          injector: Injector.create({ providers: [{ provide: MODAL_REF, useValue: ref }], parent: this.injector }),
-          label: options.label,
-          dismissible: options.dismissible ?? true,
-          size: options.size ?? 'default',
-          resolve: close,
-        },
-      ]);
+      this.push({
+        kind: 'component',
+        id,
+        component,
+        inputs: options.inputs ?? {},
+        injector: Injector.create({ providers: [{ provide: MODAL_REF, useValue: ref }], parent: this.injector }),
+        label: options.label,
+        dismissible: options.dismissible ?? true,
+        size: options.size ?? 'default',
+        resolve: close,
+      });
     });
   }
 
   /** `Escape` or the close button on window `id`. */
   dismiss(id: number): void {
-    this.entries().find((entry) => entry.id === id)?.resolve(null);
+    this.entries()
+      .find((entry) => entry.id === id)
+      ?.resolve(null);
   }
 
   /** A button pressed in dialog `id`. */

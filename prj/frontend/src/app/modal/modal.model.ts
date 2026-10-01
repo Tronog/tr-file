@@ -7,6 +7,13 @@ export interface DialogOptions extends UiDialogModel {
   readonly dismissible?: boolean;
   /** Checks the field on every change; a message blocks the primary button. */
   readonly validate?: (value: string) => string | null;
+  /**
+   * Stays above every window opened after it, rather than going under the
+   * next one (PRD 004, §2.2): a question something is waiting on — a file
+   * operation's *Skip* / *Retry* — must never be covered by, say, the
+   * progress window of the very job that asks it.
+   */
+  readonly onTop?: boolean;
 }
 
 export interface ConfirmOptions {
@@ -48,6 +55,8 @@ export type ModalEntry = DialogEntry | ComponentEntry;
 export interface DialogEntry {
   readonly kind: 'dialog';
   readonly id: number;
+  /** Kept above the ordinary windows; see `DialogOptions.onTop`. */
+  readonly onTop?: boolean;
   readonly model: WritableSignal<UiDialogModel>;
   readonly dismissible: boolean;
   readonly validate?: (value: string) => string | null;
