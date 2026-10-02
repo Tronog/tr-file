@@ -178,6 +178,24 @@ describe('UiDiskUsage', () => {
     expect(events).toEqual(['action up', 'action refresh']);
   });
 
+  /** PRD 013, §2.1.1 — a scan is stopped with the toolbar's button, or `Escape` anywhere in the panel but a text field. */
+  it('stops a scan with its button or Escape', () => {
+    const { fixture, host, events } = setUp(
+      model({ toolbarActions: [...model().toolbarActions, { id: 'stop', label: 'Stop scanning (Escape)', icon: 'player-stop' }] }),
+    );
+    fixture.detectChanges();
+    (host.querySelector('ui-panel-toolbar [aria-label="Stop scanning (Escape)"]') as HTMLButtonElement).click();
+    const row = host.querySelector('.table-row') as HTMLElement;
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    row.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
+    // In the path bar, `Escape` is the field's: it ends the edit, and stops nothing.
+    const field = document.createElement('input');
+    host.querySelector('ui-breadcrumbs')?.appendChild(field);
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(events).toEqual(['action stop', 'action stop']);
+  });
+
   it('says why there is nothing to draw', () => {
     const { host } = setUp(model({ root: null, empty: { icon: 'database', title: 'Scanning…' } }));
     expect(host.querySelector('ui-empty-state')?.textContent).toContain('Scanning…');

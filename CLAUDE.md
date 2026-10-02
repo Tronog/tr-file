@@ -433,7 +433,9 @@ on the frontend): a scan per folder, polled every `DISK_USAGE_POLL_MS` (3 s) whi
 for the folder and depth the tab shows. Going into a folder of a scan, or back up, asks the same
 scan. A folder outside every scan of the window, one the scan did not go into (`mount`,
 `too-deep`), *Scan again*, or a scan the backend forgot starts a new one. A scan no tab shows any
-more is stopped. Shown with nothing open, it starts on the file manager's active folder. Its
+more is stopped. One running is aborted from its tab (§2.1.1) by the toolbar's *Stop scanning*, or
+`Escape` in the panel (`view.stopLoading`, as for a large folder), and what it found stays,
+its unfinished folders marked *not all scanned*. Shown with nothing open, it starts on the file manager's active folder. Its
 panels are not in the `Ctrl`+`Tab` ring, and its tabs are not kept in the session.
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`

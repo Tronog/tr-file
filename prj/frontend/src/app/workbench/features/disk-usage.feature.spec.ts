@@ -140,11 +140,14 @@ describe('DiskUsageFeature', () => {
     vi.spyOn(fs(), 'status').mockResolvedValue(scanOf('s1', 'docs', 'cancelled', { path: 'docs', depth: 2 }, folder('docs', 10, undefined, 'scanning')));
     du().open('docs');
     await flush();
+    expect(du().content(group())?.toolbarActions.find((action) => action.id === 'stop')?.label).toBe('Stop scanning (Escape)');
     du().runToolbarAction(group(), 'stop');
     await flush();
     expect(cancel).toHaveBeenCalledWith('s1');
     expect(du().content(group())?.summary).toBe('Stopped: 3 files · 2.0 KB so far');
     expect(du().content(group())?.toolbarActions.some((action) => action.id === 'stop')).toBe(false);
+    // What it had not finished says so, rather than that it is still being scanned (PRD 013, §2.1.1).
+    expect(du().content(group())?.root?.note).toBe('not all scanned');
 
     start.mockResolvedValue(scanOf('s2', 'docs', 'running', { depth: 2 }, folder('docs', 10)));
     du().runToolbarAction(group(), 'refresh');

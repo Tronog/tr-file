@@ -513,7 +513,8 @@ export class DiskUsageFeature {
     const actions: UiIconAction[] = [
       { id: 'up', label: 'Up one level', icon: 'arrow-up', ...(tab.path === '' ? { disabled: true } : {}) },
       { id: 'refresh', label: 'Scan again', icon: 'refresh' },
-      ...(running ? [{ id: 'stop', label: 'Stop scanning', icon: 'player-stop' } as const] : []),
+      // Stops the scan where it is (PRD 013, §2.1.1); its key is the panel's `view.stopLoading`, `Escape`.
+      ...(running ? [{ id: 'stop', label: this.stopLabel(), icon: 'player-stop' } as const] : []),
     ];
     return {
       breadcrumbs: files.breadcrumbsOf(tab.path),
@@ -524,7 +525,7 @@ export class DiskUsageFeature {
       depth: tab.depth,
       maxDepth: DISK_USAGE_MAX_SHOWN_DEPTH,
       ...DiskUsageFeature.optional('summary', this.summary(scan)),
-      root: tree === null ? null : this.item(tree, files.labelFor(report?.path ?? tab.path)),
+      root: tree === null ? null : this.item(tree, files.labelFor(report?.path ?? tab.path), '', running),
       ...(failure !== undefined
         ? { empty: { icon: 'alert-triangle', title: 'Could not scan this folder', hint: failure } }
         : tree === null
@@ -560,7 +561,14 @@ export class DiskUsageFeature {
     }
   }
 
-  private item(node: FsDiskUsageNode, name: string, parentId = ''): UiDiskUsageItem {
+  /** The Stop button's name, with the key that does the same as the user has it bound. */
+  private stopLabel(): string {
+    const key = this.parent.keybindingsFt.label('view.stopLoading');
+    return key === undefined ? 'Stop scanning' : `Stop scanning (${key})`;
+  }
+
+  /** `running`: the scan is still going — else a folder not all in was left so by a stop. */
+  private item(node: FsDiskUsageNode, name: string, parentId = '', running = true): UiDiskUsageItem {
     const files = this.parent.fileViewModel;
     const id = node.path ?? `${parentId}\u0000rest`;
     const count = (value: number, one: string, many: string): string => `${value.toLocaleString('en-US')} ${value === 1 ? one : many}`;
@@ -570,7 +578,7 @@ export class DiskUsageFeature {
         : node.kind === 'rest'
           ? count(node.count ?? 0, 'entry', 'entries')
           : undefined;
-    const note = DiskUsageFeature.noteOf(node);
+    const note = DiskUsageFeature.noteOf(node, running);
     return {
       id,
       name,
@@ -580,14 +588,14 @@ export class DiskUsageFeature {
       ...(detail === undefined ? {} : { detail }),
       ...(note === undefined ? {} : { note }),
       ...(node.kind === 'folder' && node.state !== 'unreadable' && node.path !== null ? { openable: true } : {}),
-      ...(node.children === undefined ? {} : { children: node.children.map((child) => this.item(child, child.name, id)) }),
+      ...(node.children === undefined ? {} : { children: node.children.map((child) => this.item(child, child.name, id, running)) }),
     };
   }
 
-  private static noteOf(node: FsDiskUsageNode): string | undefined {
+  private static noteOf(node: FsDiskUsageNode, running: boolean): string | undefined {
     switch (node.state) {
       case 'scanning':
-        return 'scanning…';
+        return running ? 'scanning…' : 'not all scanned';
       case 'unreadable':
         return 'unreadable';
       case 'mount':
