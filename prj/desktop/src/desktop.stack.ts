@@ -203,7 +203,9 @@ export class DesktopStack {
         return;
       }
       response.setHeader('Cache-Control', 'no-store');
-      response.sendFile(indexHtml, (error: unknown) => {
+      // Relative to `root`, or `send` refuses the whole path when any folder
+      // above it starts with a dot — an AppImage mounts at `/tmp/.mount_…`.
+      response.sendFile('index.html', { root: this.config.staticRoot }, (error: unknown) => {
         if (error) {
           next(error);
         }

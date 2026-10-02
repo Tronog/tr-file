@@ -35,7 +35,8 @@ function environment(env: NodeJS.ProcessEnv): Parameters<typeof DesktopConfig.re
 
 before(async () => {
   workspace = await mkdtemp(join(tmpdir(), 'tr-file-desktop-'));
-  staticRoot = join(workspace, 'browser');
+  // Under a dot-folder, as an AppImage mounts at `/tmp/.mount_…`.
+  staticRoot = join(workspace, '.mount_test', 'browser');
   filesRoot = join(workspace, 'files');
   await mkdir(staticRoot, { recursive: true });
   await mkdir(join(filesRoot, 'docs'), { recursive: true });

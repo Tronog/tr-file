@@ -307,11 +307,13 @@ export class ListingOrderFeature {
     }
     const key = keyOf(asked.path, asked.sort);
     this.inFlight.delete(key);
-    // An answer is kept unless the order on screen is of a later listing than the one it answers.
+    // An answer is kept unless the order on screen is of a later listing than the one it answers —
+    // made from it, names added or details filled in. A listing read afresh (a refresh) descends from
+    // none: it replaces the order of the old one, which can never be laid over it (PRD 001, Fix 7).
     const sortKey = sortKeyOf(asked.sort);
     const folder = this.orders().get(asked.path);
     const current = folder?.bySort.get(sortKey);
-    if (current === undefined || descendsFrom(asked.source, current.source)) {
+    if (current === undefined || current.source === asked.source || !descendsFrom(current.source, asked.source)) {
       const order: Order = { source: asked.source, order: answer.order };
       const bySort = new Map(folder?.bySort ?? []).set(sortKey, order);
       this.orders.update((orders) => new Map(orders).set(asked.path, { bySort, latest: order }));

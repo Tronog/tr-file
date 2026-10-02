@@ -474,6 +474,24 @@ describe('ListingOrderFeature', () => {
     expect(order.sorted('x', later, bySize, () => '')[0]).toBe(later[0]);
   });
 
+  it('takes the order of a listing read afresh — a refresh — over the one it had (PRD 001, Fix 7)', () => {
+    const internals = order as unknown as { ask: (path: string, sort: typeof bySize, entries: readonly FsEntry[]) => void };
+    const identity = (count: number) => Uint32Array.from({ length: count }, (_, index) => index);
+    const before = named(WORKER_SORT_THRESHOLD + 194);
+    internals.ask('x', bySize, before);
+    reply({ id: asks[0]?.id as number, order: identity(before.length) });
+    expect(order.ready('x', before, bySize)).toBe(true);
+
+    // Refresh: the same folder, read again — a new listing, not one made from the last.
+    const refreshed = named(WORKER_SORT_THRESHOLD + 194);
+    expect(order.ready('x', refreshed, bySize)).toBe(false);
+    internals.ask('x', bySize, refreshed);
+    reply({ id: asks[1]?.id as number, order: identity(refreshed.length) });
+
+    expect(order.ready('x', refreshed, bySize)).toBe(true);
+    expect(order.sorted('x', refreshed, bySize, () => '')[0]).toBe(refreshed[0]);
+  });
+
   it('keeps a by-name order through details without asking again, but not a by-size one', () => {
     const byName = { key: 'name', direction: 'asc' } as const;
     const entries = named(WORKER_SORT_THRESHOLD);
