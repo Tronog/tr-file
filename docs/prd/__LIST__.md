@@ -10,3 +10,4 @@
 010 - settings modal
 011 - GIT integration
 012 - image viewer
+013 - disk usage

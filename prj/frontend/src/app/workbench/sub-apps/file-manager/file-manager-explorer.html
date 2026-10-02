@@ -1,0 +1,155 @@
+@let chrome = workbench.chromeFt;
+@let explorer = workbench.explorerFt;
+@let explorerNav = workbench.explorerNavFt;
+@let preview = workbench.filePreviewFt;
+@let panes = workbench.sidebarPanesFt;
+@let contextMenu = workbench.contextMenuFt;
+@let search = workbench.searchFt;
+@let places = workbench.placesFt;
+@let explorerSide = workbench.preferencesFt.explorerSide();
+
+<!-- the Explorer sidebar: the directory tree, or the Search view (PRD 003, §5) -->
+<ui-sidebar
+  [side]="explorerSide"
+  data-focus-region="explorer"
+  [title]="chrome.sidebarView() === 'search' ? 'Search' : 'Explorer'"
+  [actions]="chrome.sidebarMoreActions"
+  (actionAt)="$event.id === 'more' && contextMenu.openSidebarMenu('explorer', $event.x, $event.y)"
+>
+ @if (chrome.sidebarView() === 'search') {
+  <ui-pane
+    title="Files by name"
+    [expanded]="panes.isExpanded('search-results')"
+    [actions]="search.actions()"
+    [grow]="true"
+    (toggle)="panes.toggle('search-results')"
+    (actionSelect)="search.runAction($event)"
+  >
+    <div class="search-view">
+      <ui-search-field
+        class="search-box"
+        placeholder="Search by name, or *.md"
+        label="Search files and folders by name"
+        [value]="search.query()"
+        [focusToken]="search.focusToken()"
+        (valueChange)="search.setQuery($event)"
+        (keydown.enter)="search.searchNow()"
+      />
+      <p class="sidebar-note search-scope">{{ search.scopeLabel() }}</p>
+      @if (search.error(); as message) {
+        <p class="sidebar-note" role="alert">{{ message }}</p>
+      }
+      <p class="sidebar-note" role="status">{{ search.summary() }}</p>
+      @if (search.nodes().length > 0) {
+        <ui-tree
+          label="Search results"
+          [nodes]="search.nodes()"
+          (activate)="search.reveal($event)"
+          (open)="search.open($event)"
+        />
+      }
+    </div>
+  </ui-pane>
+ } @else {
+  <!-- Places, Bookmarks and Recent (PRD 003, §6): the root, home, the user's folders, drives.
+       The panes stand in the order they were dragged into (PRD 002, §5.1). -->
+  @for (paneId of panes.shown('explorer'); track paneId) {
+    @switch (paneId) {
+      @case ('places') {
+        <ui-pane
+          [paneId]="paneId"
+          (paneMove)="panes.move('explorer', $event)"
+          [size]="panes.sizeOf(paneId)"
+          (paneResize)="panes.resize($event)"
+          title="Places"
+          [expanded]="panes.isExpanded('places')"
+          (toggle)="panes.toggle('places'); places.load()"
+        >
+          <ui-tree
+            label="Places"
+            [nodes]="places.placeNodes()"
+            (activate)="places.open($event)"
+            (contextMenu)="places.openMenu($event)"
+          />
+        </ui-pane>
+      }
+      @case ('bookmarks') {
+        <ui-pane
+          [paneId]="paneId"
+          (paneMove)="panes.move('explorer', $event)"
+          [size]="panes.sizeOf(paneId)"
+          (paneResize)="panes.resize($event)"
+          title="Bookmarks"
+          [expanded]="panes.isExpanded('bookmarks')"
+          (toggle)="panes.toggle('bookmarks')"
+        >
+          @if (places.bookmarkNodes().length === 0) {
+            <p class="sidebar-note">Right-click a folder and choose Add to Bookmarks to pin it here.</p>
+          } @else {
+            <ui-tree
+              label="Bookmarks"
+              [nodes]="places.bookmarkNodes()"
+              [reorderable]="true"
+              (reorder)="places.reorderBookmark($event)"
+              (activate)="places.open($event)"
+              (contextMenu)="places.openMenu($event)"
+            />
+          }
+        </ui-pane>
+      }
+      @case ('recent') {
+        <ui-pane
+          [paneId]="paneId"
+          (paneMove)="panes.move('explorer', $event)"
+          [size]="panes.sizeOf(paneId)"
+          (paneResize)="panes.resize($event)"
+          title="Recent"
+          [expanded]="panes.isExpanded('recent')"
+          (toggle)="panes.toggle('recent')"
+        >
+          @if (places.recentNodes().length === 0) {
+            <p class="sidebar-note">Folders you open are listed here.</p>
+          } @else {
+            <ui-tree
+              label="Recent folders"
+              [nodes]="places.recentNodes()"
+              (activate)="places.open($event)"
+              (contextMenu)="places.openMenu($event)"
+            />
+          }
+        </ui-pane>
+      }
+      @case ('explorer-tree') {
+        <ui-pane
+          [paneId]="paneId"
+          (paneMove)="panes.move('explorer', $event)"
+          [size]="panes.sizeOf(paneId)"
+          (paneResize)="panes.resize($event)"
+          [title]="explorer.title"
+          [expanded]="panes.isExpanded('explorer-tree')"
+          [actions]="explorer.actions"
+          [grow]="true"
+          (toggle)="panes.toggle('explorer-tree')"
+          (actionSelect)="explorer.runAction($event)"
+        >
+          @if (explorer.error(); as message) {
+            <p class="sidebar-note" role="alert">{{ message }}</p>
+          } @else if (explorer.loading()) {
+            <p class="sidebar-note">Loading…</p>
+          } @else {
+            <ui-tree
+              [nodes]="explorer.nodes()"
+              [label]="explorer.title + ' directory tree'"
+              (toggle)="explorer.toggle($event)"
+              (activate)="explorerNav.open($event)"
+              (open)="preview.openFromExplorer($event)"
+              (contextMenu)="contextMenu.openInTree($event)"
+            />
+          }
+        </ui-pane>
+      }
+    }
+  }
+
+ }
+</ui-sidebar>

@@ -1,4 +1,7 @@
 @for (item of items(); track item.id) {
+  @if (item.separatorBefore && !$first) {
+    <span class="activity-separator" role="separator"></span>
+  }
   <button
     type="button"
     class="activity-btn"

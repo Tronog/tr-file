@@ -1,30 +1,10 @@
-import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, effect, inject, viewChild } from '@angular/core';
-import {
-  UiActionList,
-  UiActivityBar,
-  UiBottomPanel,
-  UiContextMenu,
-  UiFileBrowser,
-  UiPane,
-  UiPanelGrid,
-  UiPanelGroup,
-  UiPermissionGrid,
-  UiQuickInput,
-  UiPreviewCard,
-  UiSearchField,
-  UiPropertyList,
-  UiSash,
-  UiSidebar,
-  UiSourceControl,
-  UiButton,
-  UiStatusBar,
-  UiTitleBar,
-  UiNotes,
-  UiTransferList,
-  UiTree,
-  UiWorkbench,
-} from '@tr-file/ui';
+import { UiActivityBar, UiContextMenu, UiQuickInput, UiStatusBar, UiTitleBar, UiWorkbench } from '@tr-file/ui';
+import { DiskUsageApp } from './sub-apps/disk-usage/disk-usage-app';
+import { FileManagerCenter } from './sub-apps/file-manager/file-manager-center';
+import { FileManagerDetails } from './sub-apps/file-manager/file-manager-details';
+import { FileManagerExplorer } from './sub-apps/file-manager/file-manager-explorer';
+import { SearchApp } from './sub-apps/search/search-app';
 import type { FocusRegionId } from './features/focus-cycle.feature';
 import { WorkbenchService } from './workbench.service';
 
@@ -33,8 +13,10 @@ const FOCUSABLE =
   'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * The file manager screen: the VS Code style workbench from PRD 001 Section 1,
- * showing the real file system served by `/api/fs`.
+ * The window: the VS Code style workbench from PRD 001 Section 1 — the title
+ * bar, the activity bar and the status bar every sub-application shares, and
+ * the sub-application shown in the rest (§1.1): the file manager, showing the
+ * real file system served by `/api/fs`, Search or Disk Usage.
  *
  * Render-only by design — it wires library components to the signals the
  * feature classes expose and forwards events straight back to them. The two
@@ -44,29 +26,16 @@ const FOCUSABLE =
 @Component({
   selector: 'app-workbench',
   imports: [
-    NgTemplateOutlet,
-    UiActionList,
+    DiskUsageApp,
+    FileManagerCenter,
+    FileManagerDetails,
+    FileManagerExplorer,
+    SearchApp,
     UiActivityBar,
-    UiBottomPanel,
     UiContextMenu,
-    UiFileBrowser,
-    UiPane,
-    UiSourceControl,
-    UiButton,
-    UiPanelGrid,
-    UiPanelGroup,
-    UiPermissionGrid,
     UiQuickInput,
-    UiPreviewCard,
-    UiPropertyList,
-    UiSearchField,
-    UiSash,
-    UiSidebar,
     UiStatusBar,
     UiTitleBar,
-    UiNotes,
-    UiTransferList,
-    UiTree,
     UiWorkbench,
   ],
   templateUrl: './workbench.html',

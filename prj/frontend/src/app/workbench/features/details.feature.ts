@@ -293,7 +293,7 @@ export class DetailsFeature {
         break;
       case 'disk-usage':
         if (isFolder(details)) {
-          void this.parent.diskUsageFt.open(details.path);
+          this.parent.diskUsageFt.open(details.path);
         }
         break;
       case 'copy-path':

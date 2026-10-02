@@ -42,6 +42,27 @@ library ported from `mockup/001/`; see `prj/libs/ui/README.md`, including why th
 not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin `WorkbenchService`
 holding shared state, plus feature classes holding everything else.
 
+**Sub-applications (PRD 001, §1.1).** The file manager is one of the window's sub-applications,
+beside *Search* and *Disk Usage* (both still placeholders). They share the title bar with its
+menus, the activity bar and the status bar — the `Workbench` component (`workbench.html`) — and
+the one shown fills the rest. `SubAppsFeature` keeps which (`active`, `show`, `fileManager`;
+`SUB_APPS` in `workbench/sub-apps/sub-app.model.ts`). Each one is a set of components in
+`workbench/sub-apps/`: the file manager is `FileManagerExplorer` (left slot), `FileManagerCenter`
+(panels and bottom panel) and `FileManagerDetails` (right slot); the others are one centre
+component each. A sub-application is drawn the first time it is shown and is kept, hidden
+(`is-inactive`), while another one is shown, so the file manager comes back with its panels as they
+were. The sidebars are the file manager's, so another sub-application hides them. The activity
+bar's first group is the sub-applications (*File Manager* also brings back its Explorer, as the
+Explorer button did; its name search is still `Ctrl`+`Shift`+`F`). Below a rule
+(`UiActivityItem.separatorBefore`) come the file manager's Transfers and Bookmarks. The palette
+has *View: Show …* (`view.app.<id>`). While another one is shown there is no panel to act on:
+`CommandsFeature.activeTarget` has no paths and no folder, so the file commands are greyed out and
+their keys do nothing, and the `Ctrl`+`Tab` ring is empty. Showing a folder (`navigateTo`), the
+name search, Notes or a tab of the bottom panel chosen from the activity or status bar brings the
+file manager forward, and the keyboard goes back to its active panel.
+A new sub-application is an entry in `SUB_APPS`, its components under `sub-apps/`, an
+`@if (apps.isOpened(…))` per slot in `workbench.html`, and a case in `ChromeFeature.selectActivity`.
+
 A panel is a frame plus content. `UiPanelGroup` renders the tab bar, loading rail and body
 frame (drops, focus, the `Ctrl` chords); what the active tab shows is a separate component
 the app projects into it — file management is `UiFileBrowser`, with its own model and toolbar
@@ -54,7 +75,7 @@ In the app `EditorGroupsFeature` keeps groups and tabs only; `PANEL_CONTENT`
 Which folders are open is `FileBrowserFeature`'s state, per panel; opening one is what
 fetches it.
 A new kind of content is a new tab kind, a library component, a feature class, and a
-`@case` in the leaf template of `workbench.html` — see `prj/libs/ui/README.md` § Panel content.
+`@case` in the leaf template of `sub-apps/file-manager/file-manager-center.html` — see `prj/libs/ui/README.md` § Panel content.
 
 The explorer tree lists *folders only* (§9.1.1) — it is a map of the workspace, and files
 belong to the panels. Clicking a folder in the explorer shows it in the *active* panel; that
@@ -276,7 +297,7 @@ zone — started by the `Workbench` component, like Git, so specs ask nothing.
 The panes of the Explorer and Details sidebars can be rearranged (PRD 002, §5.1): a `UiPane` with a
 `paneId` drags by its header onto another pane of the same sidebar (upper half before it, lower half
 after), or moves a slot with `Ctrl`+`↑`/`↓` on its header, and reports a `UiPaneMove`;
-`SidebarPanesFeature` keeps each sidebar's order (`order`, `move`), `workbench.html` draws the panes
+`SidebarPanesFeature` keeps each sidebar's order (`order`, `move`), the file manager's sidebar components draw the panes
 in it with `@for`/`@switch`, and the session remembers it (`paneOrder`, only where it is not the
 default). In Details the entry's card heads the first pane that is not Git (`detailsCardBefore`).
 Their heights too (§5.2): every boundary with an expanded pane above it and one at or below it has
@@ -397,8 +418,8 @@ way with `Shift`: `SystemOpenFeature.copyable` makes the `UiProperty` a `copy` b
 reports `{ id, shift }`), `copyPathValue` copies an entry of the root as *Copy Path* does and a path
 naming none (a link's target, the system trash's) as text — `FsTransport.copyText`, bridge
 `clipboard-write-text` — and the value says `Copied` for a moment (`badge`).
-A folder's *Size* and *On disk* there are pressable too (PRD 001, §9.3.2): they open the `disk-usage`
-sub-application on it, `DiskUsageFeature.open` — for now only a message saying it is not built yet.
+A folder's *Size* and *On disk* there are pressable too (PRD 001, §9.3.2): they open the Disk Usage
+sub-application on it (`DiskUsageFeature.open`, which keeps the `folder`).
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what

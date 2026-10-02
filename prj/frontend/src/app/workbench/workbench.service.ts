@@ -26,6 +26,7 @@ import { WindowControlsFeature } from './features/window-controls.feature';
 import { AppUpdateFeature } from './features/app-update.feature';
 import { HelpFeature } from './features/help.feature';
 import { DiskUsageFeature } from './features/disk-usage.feature';
+import { SubAppsFeature } from './features/sub-apps.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { OperationsFeature } from './features/operations.feature';
 import { FocusCycleFeature } from './features/focus-cycle.feature';
@@ -154,6 +155,9 @@ export class WorkbenchService {
   readonly uploadRequest = signal<{ readonly groupId: string; readonly path: string; readonly folder?: boolean } | null>(null);
 
   /* -- features ---------------------------------------------------------- */
+
+  /** Which sub-application fills the window (PRD 001, §1.1); read by nearly everything below. */
+  readonly subAppsFt = new SubAppsFeature(this);
 
   /** Shared formatting; constructed first because other features use it. */
   readonly fileViewModel = new FileViewModelFeature();

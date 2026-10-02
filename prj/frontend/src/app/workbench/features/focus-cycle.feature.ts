@@ -34,6 +34,10 @@ export class FocusCycleFeature {
 
   /** Every stop, in order. */
   readonly ring = computed<readonly FocusRegionId[]>(() => {
+    // The regions are the file manager's (PRD 001, §1.1); another sub-application has none yet.
+    if (!this.parent.subAppsFt.fileManager()) {
+      return [];
+    }
     // Left to right as the window shows them, wherever the settings put the
     // sidebars (PRD 010, §3): on one side together, the Explorer is outermost.
     const preferences = this.parent.preferencesFt;
@@ -72,6 +76,9 @@ export class FocusCycleFeature {
    */
   sequence(current: FocusRegionId | null, direction: -1 | 1): readonly FocusRegionId[] {
     const ring = this.ring();
+    if (ring.length === 0) {
+      return [];
+    }
     const at = current === null ? -1 : ring.indexOf(current);
     if (at === -1) {
       const active: FocusRegionId = `group:${this.parent.activeGroupId()}`;

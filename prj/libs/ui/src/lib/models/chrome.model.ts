@@ -77,6 +77,8 @@ export interface UiActivityItem {
   readonly hasMenu?: boolean;
   /** For a `hasMenu` item: its menu is open. */
   readonly expanded?: boolean;
+  /** Starts a new group of buttons, drawn with a short rule above it. */
+  readonly separatorBefore?: boolean;
 }
 
 /** Where a menu should open: the button that asked for it, in viewport pixels. */

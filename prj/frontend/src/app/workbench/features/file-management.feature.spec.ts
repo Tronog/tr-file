@@ -534,20 +534,20 @@ describe('File management (PRD 003, §5)', () => {
       expect(workbench.searchFt.summary()).toBe('1 result');
     });
 
-    it('opens from the activity bar and Ctrl+Shift+F, and shows a result in its folder', async () => {
-      workbench.chromeFt.selectActivity('search');
-      expect(workbench.chromeFt.sidebarView()).toBe('search');
+    it('opens on Ctrl+Shift+F, and shows a result in its folder', async () => {
       const token = workbench.searchFt.focusToken();
       const event = new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, cancelable: true });
       workbench.keybindingsFt.handleShortcut(event);
       expect(event.defaultPrevented).toBe(true);
       expect(workbench.searchFt.focusToken()).toBe(token + 1);
+      expect(workbench.chromeFt.sidebarView()).toBe('search');
 
       workbench.searchFt.reveal('docs/report.md');
       await answerListing('docs', [fsEntry('docs/report.md')]);
       expect(workbench.editorGroupsFt.stateOf(group)).toMatchObject({ path: 'docs', selection: ['docs/report.md'] });
 
-      workbench.chromeFt.selectActivity('explorer');
+      // The File Manager button goes back to its Explorer, as the Explorer button did (PRD 001, §1.1).
+      workbench.chromeFt.selectActivity('file-manager');
       expect(workbench.chromeFt.sidebarView()).toBe('explorer');
     });
   });

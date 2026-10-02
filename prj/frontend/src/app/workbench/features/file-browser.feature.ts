@@ -876,6 +876,8 @@ export class FileBrowserFeature implements PanelContentFeature {
 
   /** Points a group and its active tab at another folder. */
   navigateTo(groupId: string, path: string, label: string): void {
+    // A folder shown is shown in the file manager (PRD 001, §1.1): a bookmark's key, Jump to Folder…
+    this.parent.subAppsFt.show('file-manager');
     if (this.groups.stateOf(groupId)?.path !== path) {
       this.setFilter(groupId, '');
       // What is selected here, kept on the trail for Back / Forward to put back (PRD 002, §2.1).

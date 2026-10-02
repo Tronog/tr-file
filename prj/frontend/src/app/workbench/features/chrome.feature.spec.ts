@@ -423,8 +423,9 @@ describe('ChromeFeature', () => {
     expect(workbench.chromeFt.titleBarActions().map((action) => action.id)).toEqual(workbench.mockWorkbench.titleBarActions.map((action) => action.id));
     expect(workbench.chromeFt.commandLabel).toBe(workbench.mockWorkbench.commandLabel);
     expect(workbench.chromeFt.activityItems().map((item) => item.id)).toEqual([
-      'explorer',
+      'file-manager',
       'search',
+      'disk-usage',
       'transfers',
       'bookmarks',
     ]);

@@ -1,0 +1,178 @@
+@let groups = workbench.editorGroupsFt;
+@let files = workbench.fileBrowserFt;
+@let panelKeys = workbench.panelKeyboardFt;
+@let panelFocus = workbench.panelFocusFt;
+@let panel = workbench.bottomPanelFt;
+@let layout = workbench.panelLayoutFt;
+@let resize = workbench.resizeFt;
+@let contextMenu = workbench.contextMenuFt;
+@let archive = workbench.archiveBrowserFt;
+@let diff = workbench.gitDiffFt;
+@let trash = workbench.trashFt;
+
+<!-- The centre: the split panel grid above the bottom panel. -->
+<div class="editor-grid">
+  <ui-panel-grid
+    [node]="layout.grid()"
+    [maximizedGroupId]="layout.maximizedGroupId()"
+    (resize)="layout.resize($event)"
+  >
+    <ng-template #leaf let-groupId>
+      @if (groups.group(groupId); as group) {
+        <ui-panel-group
+          [attr.data-focus-region]="'group:' + groupId"
+          [group]="group"
+          [active]="groups.isActive(groupId)"
+          [acceptFiles]="groups.acceptsFiles(groupId)"
+          [focusBody]="panelFocus.token(groupId)"
+          (focusRequest)="groups.focus(groupId)"
+          (tabSelect)="groups.selectTab(groupId, $event)"
+          (tabActivate)="panelFocus.focusBody(groupId)"
+          (tabDoubleClick)="groups.runAction(groupId, 'maximize')"
+          (tabContextMenu)="contextMenu.openOnTab(groupId, $event)"
+          (bodyPress)="panelFocus.focusBody(groupId)"
+          (tabClose)="groups.closeTab(groupId, $event)"
+          (tabMove)="groups.moveTab(groupId, $event)"
+          (tabDrop)="groups.applyReorder($event)"
+          (zoneDrop)="groups.applyZoneDrop($event)"
+          (filesDrop)="files.dropFiles(groupId, $event)"
+          (actionSelect)="groups.runAction(groupId, $event)"
+        >
+          <!-- What the active tab shows; one case per kind of panel content. -->
+          @switch (groups.activeContent(groupId)) {
+            @case ('files') {
+              @if (files.browser(groupId); as browser) {
+                <ui-file-browser
+                  [browser]="browser"
+                  (toolbarAction)="files.runToolbarAction(groupId, $event)"
+                  (breadcrumbSelect)="files.openBreadcrumb(groupId, $event)"
+                  (viewChange)="files.setView(groupId, $event)"
+                  (selectionChange)="files.setSelection(groupId, $event)"
+                  (rowActivate)="files.openEntry(groupId, $event)"
+                  (rowToggle)="files.toggleEntry(groupId, $event)"
+                  (itemActivate)="files.openEntry(groupId, $event)"
+                  (command)="panelKeys.run(groupId, $event)"
+                  (entryDrop)="files.dropEntries(groupId, $event)"
+                  (sortChange)="files.toggleSort(groupId, $event)"
+                  (filterChange)="files.setFilter(groupId, $event)"
+                  (pathSubmit)="files.goToLocation(groupId, $event)"
+                  (locationInput)="files.locationInput(groupId, $event)"
+                  (contextMenu)="contextMenu.openInPanel(groupId, $event)"
+                  [nativeDrag]="files.nativeDrag()"
+                  (nativeDragStart)="files.startNativeDrag($event)"
+                  (filesDrop)="files.dropFiles(groupId, $event)"
+                  (itemsShown)="files.showItems($event)"
+                />
+              }
+            }
+            <!-- A file's git changes (PRD 011, §1): read-only, as VS Code's diff editor. -->
+            @case ('diff') {
+              @if (diff.browser(groupId); as browser) {
+                <ui-file-browser
+                  [browser]="browser"
+                  (toolbarAction)="diff.runToolbarAction(groupId, $event)"
+                  (breadcrumbSelect)="diff.openBreadcrumb(groupId, $event)"
+                  (command)="diff.runKey(groupId, $event.command)"
+                />
+              }
+            }
+            <!-- The trash (PRD 001, §14.1): what was thrown away, read-only. -->
+            @case ('trash') {
+              @if (trash.browser(groupId); as browser) {
+                <ui-file-browser
+                  [browser]="browser"
+                  (toolbarAction)="trash.runToolbarAction(groupId, $event)"
+                  (selectionChange)="trash.setSelection(groupId, $event)"
+                  (command)="trash.runKey(groupId, $event.command)"
+                />
+              }
+            }
+            <!-- Inside a zip (PRD 003, §6): read-only, one folder of it at a time. -->
+            @case ('archive') {
+              @if (archive.browser(groupId); as browser) {
+                <ui-file-browser
+                  [browser]="browser"
+                  (toolbarAction)="archive.runToolbarAction(groupId, $event)"
+                  (breadcrumbSelect)="archive.openBreadcrumb(groupId, $event)"
+                  (selectionChange)="archive.setSelection(groupId, $event)"
+                  (rowActivate)="archive.openEntry(groupId, $event)"
+                  (command)="archive.runKey(groupId, $event.command, $event.entryId)"
+                />
+              }
+            }
+          }
+        </ui-panel-group>
+      }
+    </ng-template>
+  </ui-panel-grid>
+</div>
+
+<!-- Nothing to resize while the panel is its tab bar. -->
+@if (!panel.collapsed()) {
+  <ui-sash
+    orientation="horizontal"
+    label="Resize bottom panel"
+    [value]="workbench.bottomPanelHeight()"
+    [min]="80"
+    [max]="720"
+    (resize)="resize.resizeBottomPanel($event)"
+  />
+}
+
+<ui-bottom-panel
+  data-focus-region="bottom"
+  class="bottom-panel"
+  label="Workbench panel"
+  [style.height.px]="panel.collapsed() ? null : workbench.bottomPanelHeight()"
+  [collapsed]="panel.collapsed()"
+  [bodyFocus]="panel.bodyFocus()"
+  [tabs]="panel.tabs()"
+  [actions]="panel.actions()"
+  (tabSelect)="panel.select($event)"
+  (actionSelect)="panel.runAction($event)"
+>
+  @if (panel.transfersVisible()) {
+    @if (panel.transfersEmpty()) {
+      <p class="panel-note">
+        No transfers yet — drop files onto a panel, or use its upload button.
+      </p>
+    } @else {
+      <ui-transfer-list [transfers]="panel.transfers()" (cancel)="workbench.transfersFt.cancel($event)" />
+    }
+  }
+
+  @if (panel.progressVisible()) {
+    @if (panel.operations().length === 0) {
+      <p class="panel-note">
+        Nothing running — copy, move or delete something, and its progress shows here.
+      </p>
+    } @else {
+      <ui-transfer-list [transfers]="panel.operations()" (cancel)="workbench.operationsFt.cancel($event)" />
+    }
+  }
+
+  @if (panel.problemsVisible()) {
+    @if (panel.problems().length === 0) {
+      <p class="panel-note">No problems. Every folder opened cleanly.</p>
+    } @else {
+      <ul class="problem-list">
+        @for (problem of panel.problems(); track problem.id) {
+          <li class="problem">
+            <span class="problem-path">{{ problem.path }}</span>
+            <span class="problem-message">{{ problem.message }}</span>
+          </li>
+        }
+      </ul>
+    }
+  }
+
+  @if (panel.notesVisible()) {
+    <ui-notes
+      placeholder="Write notes here — they are kept on this computer."
+      [text]="workbench.notesFt.text()"
+      [error]="workbench.notesFt.error()"
+      (textChange)="workbench.notesFt.edit($event)"
+      (commit)="workbench.notesFt.flush()"
+    />
+  }
+</ui-bottom-panel>

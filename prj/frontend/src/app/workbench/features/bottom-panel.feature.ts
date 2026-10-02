@@ -135,6 +135,8 @@ export class BottomPanelFeature {
 
   /** Opens the Notes tab with the cursor in it (PRD 001, §12.2). */
   showNotes(): void {
+    // The bottom panel is the file manager's (PRD 001, §1.1).
+    this.parent.subAppsFt.show('file-manager');
     this.select('notes');
     this.focusToken.update((token) => token + 1);
   }

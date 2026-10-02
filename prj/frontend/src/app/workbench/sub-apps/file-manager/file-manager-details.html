@@ -1,0 +1,136 @@
+@let chrome = workbench.chromeFt;
+@let details = workbench.detailsFt;
+@let panes = workbench.sidebarPanesFt;
+@let contextMenu = workbench.contextMenuFt;
+@let git = workbench.gitFt;
+@let trash = workbench.trashFt;
+@let detailsSide = workbench.preferencesFt.detailsSide();
+
+<!-- the Details sidebar: details of the selected entry -->
+<ui-sidebar
+  data-focus-region="details"
+  title="Details"
+  [side]="detailsSide"
+  [actions]="chrome.sidebarMoreActions"
+  (actionAt)="$event.id === 'more' && contextMenu.openSidebarMenu('details', $event.x, $event.y)"
+  [class.is-stale]="details.stale()"
+  [attr.aria-busy]="details.stale() ? 'true' : null"
+>
+  <!-- The panes stand in the order they were dragged into (PRD 002, §5.1); Git starts at the
+       top and shows only while the folder shown is in a repository (PRD 011, §2.1). What
+       describes the entry itself — the card, or why there is none — heads its first pane. -->
+  @for (paneId of panes.shown('details'); track paneId) {
+    @if (paneId === panes.detailsCardBefore()) {
+      <ng-container [ngTemplateOutlet]="detailsCard" />
+    }
+    @switch (paneId) {
+      @case ('git') {
+        @if (git.scm(); as scm) {
+          <ui-pane
+            [paneId]="paneId"
+            (paneMove)="panes.move('details', $event)"
+            [size]="panes.sizeOf(paneId)"
+            (paneResize)="panes.resize($event)"
+            class="git-pane"
+            title="Git"
+            [expanded]="panes.isExpanded('git')"
+            [actions]="git.paneActions()"
+            (toggle)="panes.toggle('git')"
+            (actionSelect)="git.runPaneAction($event)"
+            (actionAt)="$event.id === 'more' && contextMenu.openGitMenu($event.x, $event.y)"
+          >
+            <ui-source-control
+              [scm]="scm"
+              (messageChange)="git.setMessage($event)"
+              (commit)="git.commit()"
+              (branchSelect)="git.pickBranch()"
+              (syncSelect)="git.sync()"
+              (groupToggle)="git.toggleGroup($event)"
+              (groupAction)="git.groupAction($event)"
+              (itemOpen)="git.openChange($event)"
+              (itemAction)="git.itemAction($event)"
+              (moreCommits)="git.moreCommits()"
+            />
+          </ui-pane>
+        }
+      }
+      @case ('properties') {
+        @if (trash.showing() || details.hasDetails()) {
+          <ui-pane
+            [paneId]="paneId"
+            (paneMove)="panes.move('details', $event)"
+            [size]="panes.sizeOf(paneId)"
+            (paneResize)="panes.resize($event)"
+            title="Properties"
+            [expanded]="panes.isExpanded('properties')"
+            (toggle)="panes.toggle('properties')"
+          >
+            <ui-property-list
+              [properties]="trash.showing() ? trash.properties() : details.properties()"
+              (action)="trash.showing() ? trash.runProperty($event) : details.runProperty($event)"
+            />
+          </ui-pane>
+        }
+      }
+      @case ('permissions') {
+        @if (!trash.showing() && details.hasDetails()) {
+          @if (details.permissions(); as permissions) {
+            <ui-pane
+              [paneId]="paneId"
+              (paneMove)="panes.move('details', $event)"
+              [size]="panes.sizeOf(paneId)"
+              (paneResize)="panes.resize($event)"
+              title="Permissions"
+              [expanded]="panes.isExpanded('permissions')"
+              (toggle)="panes.toggle('permissions')"
+            >
+              <ui-permission-grid [permissions]="permissions" />
+            </ui-pane>
+          }
+        }
+      }
+      @case ('open-with') {
+        @if (trash.showing() || details.hasDetails()) {
+          <ui-pane
+            [paneId]="paneId"
+            (paneMove)="panes.move('details', $event)"
+            [size]="panes.sizeOf(paneId)"
+            (paneResize)="panes.resize($event)"
+            title="Actions"
+            [expanded]="panes.isExpanded('open-with')"
+            [grow]="true"
+            (toggle)="panes.toggle('open-with')"
+          >
+            @if (trash.showing()) {
+              <ui-action-list [items]="trash.actions()" (select)="trash.runAction($event)" />
+            } @else {
+              <ui-action-list [items]="details.actions()" (select)="details.runAction($event)" />
+              <!-- where a file action goes from and to (PRD 002, §2.7.1) -->
+              <ui-property-list class="transfer-paths" [properties]="details.transferPaths()" (action)="details.runProperty($event)" />
+            }
+          </ui-pane>
+        }
+      }
+    }
+  }
+  <!-- Every pane about the entry hidden (PRD 001, §9.2): the card still describes it, last. -->
+  @if (panes.detailsCardBefore() === undefined) {
+    <ng-container [ngTemplateOutlet]="detailsCard" />
+  }
+
+  <ng-template #detailsCard>
+    @if (trash.showing()) {
+      <!-- While a panel shows the trash, the sidebar describes it (PRD 001, §14.1). -->
+      <ui-preview-card [preview]="trash.preview()" />
+    } @else {
+      @if (details.error(); as message) {
+        <p class="sidebar-note" role="alert">{{ message }}</p>
+      } @else if (details.loading() && !details.hasDetails()) {
+        <p class="sidebar-note">Loading details…</p>
+      }
+      @if (details.preview(); as preview) {
+        <ui-preview-card [preview]="preview" />
+      }
+    }
+  </ng-template>
+</ui-sidebar>

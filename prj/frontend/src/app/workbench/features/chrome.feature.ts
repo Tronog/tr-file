@@ -126,8 +126,9 @@ export class ChromeFeature {
 
   readonly sidebarView = this.sidebar.asReadonly();
 
-  /** Shows a view of the left sidebar — and the sidebar, if it was hidden. */
+  /** Shows a view of the left sidebar — and the sidebar, if it was hidden, and the file manager it is in (PRD 001, §1.1). */
   showSidebar(view: 'explorer' | 'search'): void {
+    this.parent.subAppsFt.show('file-manager');
     this.sidebar.set(view);
     if (!this.isShown('explorer')) {
       this.shown.update((shown) => ({ ...shown, explorer: true }));
@@ -271,21 +272,24 @@ export class ChromeFeature {
   }
 
   /**
-   * A click in the activity bar: Explorer and Search switch the left sidebar
-   * (PRD 003, §5), Transfers opens its tab of the bottom panel, and the
-   * account button signs out. Bookmarks opens the explorer at its Bookmarks
-   * pane (PRD 003, §6).
+   * A click in the activity bar. The first group are the sub-applications
+   * (PRD 001, §1.1): each brings its own forward — the file manager with its
+   * Explorer, as the Explorer button did; its name search stays `Ctrl`+`Shift`+`F`.
+   * Below them, the file manager's: Transfers opens its tab of the bottom
+   * panel, Bookmarks the explorer at its Bookmarks pane (PRD 003, §6) — each
+   * bringing the file manager forward. The account button signs out.
    */
   selectActivity(id: string): void {
     switch (id) {
-      case 'explorer':
+      case 'file-manager':
         this.showSidebar('explorer');
         break;
       case 'search':
-        this.parent.searchFt.show();
+      case 'disk-usage':
+        this.parent.subAppsFt.show(id);
         break;
       case 'transfers':
-        this.parent.bottomPanelFt.select('transfers');
+        this.showBottomTab('transfers');
         break;
       case 'bookmarks':
         this.showBookmarks();
@@ -300,16 +304,23 @@ export class ChromeFeature {
     }
   }
 
+  /** A tab of the bottom panel, chosen by the user — in the file manager, which it is part of (PRD 001, §1.1). */
+  private showBottomTab(id: string): void {
+    this.parent.subAppsFt.show('file-manager');
+    this.parent.bottomPanelFt.select(id);
+  }
+
+  /** The sub-applications, the one shown marked (PRD 001, §1.1); then the file manager's own buttons. */
   readonly activityItems = computed<readonly UiActivityItem[]>(() => {
     const transfers = this.parent.transfersFt.activeCount();
-    const view = this.sidebar();
+    const apps = this.parent.subAppsFt;
     return [
-      { id: 'explorer', label: 'Explorer', icon: 'copy', ...(view === 'explorer' ? { active: true } : {}) },
-      { id: 'search', label: 'Search (Ctrl+Shift+F)', icon: 'search', ...(view === 'search' ? { active: true } : {}) },
+      ...apps.apps.map((app): UiActivityItem => ({ id: app.id, label: app.label, icon: app.icon, ...(apps.isActive(app.id) ? { active: true } : {}) })),
       {
         id: 'transfers',
         label: 'Transfers',
         icon: 'download',
+        separatorBefore: true,
         ...(transfers > 0 ? { badge: transfers } : {}),
       },
       { id: 'bookmarks', label: 'Bookmarks', icon: 'star' },
@@ -398,10 +409,10 @@ export class ChromeFeature {
         this.parent.showHidden.update((shown) => !shown);
         break;
       case 'problems':
-        this.parent.bottomPanelFt.select('problems');
+        this.showBottomTab('problems');
         break;
       case 'transfers':
-        this.parent.bottomPanelFt.select('transfers');
+        this.showBottomTab('transfers');
         break;
       case 'sort':
         this.parent.commandsFt.run('view.sortDescending');

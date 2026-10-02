@@ -214,7 +214,7 @@ describe('DetailsFeature', () => {
     const property = (label: string) => workbench.detailsFt.properties().find((candidate) => candidate.label === label);
 
     it('opens Disk Usage on the folder when Size or On disk is pressed', async () => {
-      const open = vi.spyOn(workbench.diskUsageFt, 'open').mockResolvedValue();
+      const open = vi.spyOn(workbench.diskUsageFt, 'open').mockReturnValue(undefined);
       await selectAndFlush('docs', fsDirectoryDetails('docs', { entryCount: 4 }));
       expect(property('Size')).toMatchObject({ action: 'disk-usage', actionLabel: 'Show disk usage' });
       expect(property('On disk')).toMatchObject({ action: 'disk-usage' });
@@ -224,7 +224,7 @@ describe('DetailsFeature', () => {
     });
 
     it('leaves a file\'s size a plain value', async () => {
-      const open = vi.spyOn(workbench.diskUsageFt, 'open').mockResolvedValue();
+      const open = vi.spyOn(workbench.diskUsageFt, 'open').mockReturnValue(undefined);
       await selectAndFlush('readme.md');
       expect(property('Size')?.action).toBeUndefined();
       expect(property('On disk')?.action).toBeUndefined();

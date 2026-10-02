@@ -21,6 +21,14 @@
   }
 }
 
+/* Between groups of buttons: the sub-applications above, what one of them offers below. */
+.activity-separator {
+  flex: none;
+  width: 24px;
+  margin: 4px 0;
+  border-top: 1px solid var(--vsc-border);
+}
+
 .activity-btn {
   position: relative;
   display: flex;

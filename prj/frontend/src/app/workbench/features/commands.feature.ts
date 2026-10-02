@@ -126,9 +126,18 @@ export class CommandsFeature {
     return this.table.get(id);
   }
 
-  /** What a menu or the palette acts on: the active panel's selection, in its folder. */
+  /**
+   * What a menu or the palette acts on: the active panel's selection, in its
+   * folder. While another sub-application is shown there is no panel to act on
+   * (PRD 001, §1.1) — nothing selected, no folder — so the file commands are
+   * disabled in the menus, the palette and the function-key strip, and their
+   * keys do nothing.
+   */
   activeTarget(): CommandTarget {
     const groupId = this.parent.activeGroupId();
+    if (!this.parent.subAppsFt.fileManager()) {
+      return { groupId, paths: [], folder: null };
+    }
     return { groupId, paths: this.parent.operationsFt.selectionIn(groupId), folder: this.folderOf(groupId) };
   }
 
@@ -499,6 +508,16 @@ export class CommandsFeature {
       { id: 'places.show', category: 'View', label: 'Show Bookmarks', run: () => p.chromeFt.showBookmarks() },
       /* The bottom panel's Notes (PRD 001, §12.2) */
       { id: 'view.notes', category: 'View', label: 'Show Notes', run: () => p.bottomPanelFt.showNotes() },
+      /* The sub-applications (PRD 001, §1.1), as the activity bar's first buttons. */
+      ...p.subAppsFt.apps.map(
+        (app): CommandSpec => ({
+          id: `view.app.${app.id}`,
+          category: 'View',
+          label: `Show ${app.label}`,
+          checked: () => p.subAppsFt.isActive(app.id),
+          run: () => p.chromeFt.selectActivity(app.id),
+        }),
+      ),
       /* PRD 001, §12.3 */
       { id: 'view.togglePanel', category: 'View', label: 'Toggle Panel', run: () => p.bottomPanelFt.toggleCollapsed() },
       { id: 'view.toggleExplorer', category: 'View', label: 'Toggle Explorer', run: () => p.chromeFt.toggleSidebar('explorer') },

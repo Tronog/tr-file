@@ -1,20 +1,20 @@
+import { signal } from '@angular/core';
 import type { WorkbenchService } from '../workbench.service';
-import { shownPath } from '../../file-system/fs-path';
 
 /**
- * The `disk-usage` sub-application (PRD 001, §9.3.2): what takes up the space
- * under a folder. Opened by pressing a folder's *Size* or *On disk* in the
- * details sidebar. Not built yet — `open` is the one way in, so the sidebar
- * already reaches it, and for now it says so.
+ * The Disk Usage sub-application's state (PRD 001, §1.1): what takes up the
+ * space under a folder. Opened on one by pressing its *Size* or *On disk* in
+ * the details sidebar (§9.3.2). Not built yet — `open` is the one way in, so
+ * the sidebar already reaches it, and the sub-application says it is to come.
  */
 export class DiskUsageFeature {
   constructor(private readonly parent: WorkbenchService) {}
 
-  async open(path: string): Promise<void> {
-    await this.parent.modal.message({
-      message: 'Disk Usage is not available yet.',
-      detail: `It will show what takes up the space in ${path === '' ? '/' : shownPath(path)}.`,
-      severity: 'info',
-    });
+  /** The folder it was opened on, or `null` when opened from the activity bar alone. */
+  readonly folder = signal<string | null>(null);
+
+  open(path: string): void {
+    this.folder.set(path);
+    this.parent.subAppsFt.show('disk-usage');
   }
 }
