@@ -60,6 +60,11 @@ export interface PanelTabState {
   readonly diff?: PanelDiffSpec;
   /** Its selection, kept while another tab of the panel is active; see `PanelTabMemory`. */
   readonly remembered?: PanelTabMemory;
+  /**
+   * The tab `Ctrl`+`Enter` (or `Ctrl`+double click) opened this one from, by id — it is the
+   * one chosen again when this one is closed (PRD 002, §2.5.1). Kept for the session only.
+   */
+  readonly openedFrom?: string;
 }
 
 /** What a listing can be ordered by: its columns (PRD 003, §5). */

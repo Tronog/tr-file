@@ -105,7 +105,9 @@ the list and the icon view let a panel-bound character past type-to-find while n
 typed (`isPanelCharacter`), and the group ignores it in a text field. `Ctrl`+`Enter` and
 `Ctrl`+double click (§2.5) open the focused entry in a new tab of the *other* panel — with two,
 the other one; with more, the previous one, or the next in layout order once it has gone
-(`EditorGroupsFeature.otherGroupOf`); splitting one off only when there is none — and take the keyboard there (`FileBrowserFeature.openEntryAside`); the key is
+(`EditorGroupsFeature.otherGroupOf`); splitting one off only when there is none — and take the keyboard there (`FileBrowserFeature.openEntryAside`);
+closing a tab opened so chooses the tab it was opened from again, wherever it is, and gives its panel the
+keyboard (§2.5.1; `PanelTabState.openedFrom`, session only, read by `EditorGroupsFeature.closeTab`); the key is
 `UiFileBrowser`'s, on its host, and the double click the views' `activateAside`; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring explorer → each
 panel in layout order → bottom panel (while open) → details, and round: `FocusCycleFeature`
 decides the ring, the `Workbench` component finds the `data-focus-region` that has focus and

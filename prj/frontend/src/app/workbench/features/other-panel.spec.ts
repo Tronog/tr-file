@@ -117,4 +117,51 @@ describe('New tabs and the other panel', () => {
     await settled();
     expect(tabsOf(right)).toEqual(['folder:', 'file:README.md', 'folder:*']);
   });
+
+  /** PRD 002, §2.5.1. */
+  describe('closing a tab Ctrl+Enter opened', () => {
+    const activeTabOf = (groupId: string) => workbench.editorGroupsFt.stateOf(groupId)?.tabs.find((tab) => tab.active)?.id;
+
+    it('goes back to the tab it was opened from, and gives that panel the keyboard', async () => {
+      workbench.editorGroupsFt.runAction(left, 'new-tab');
+      answer();
+      await settled();
+      const [first, from] = workbench.editorGroupsFt.stateOf(left)?.tabs.map((tab) => tab.id) ?? [];
+      workbench.fileBrowserFt.openEntryAside(left, 'docs');
+      answer();
+      await settled();
+      // Meanwhile the left panel shows another of its tabs.
+      workbench.editorGroupsFt.selectTab(left, first as string);
+      workbench.editorGroupsFt.focus(right);
+      const before = workbench.panelFocusFt.token(left);
+
+      workbench.editorGroupsFt.closeTab(right, activeTabOf(right) as string);
+      answer();
+      await settled();
+
+      expect(tabsOf(right)).toEqual(['folder:*']);
+      expect(workbench.activeGroupId()).toBe(left);
+      expect(activeTabOf(left)).toBe(from);
+      expect(workbench.panelFocusFt.token(left)).toBeGreaterThan(before);
+    });
+
+    it('stays where it is when the tab it was opened from has gone', async () => {
+      workbench.editorGroupsFt.runAction(left, 'new-tab');
+      answer();
+      await settled();
+      const [, from] = workbench.editorGroupsFt.stateOf(left)?.tabs.map((tab) => tab.id) ?? [];
+      workbench.fileBrowserFt.openEntryAside(left, 'docs');
+      answer();
+      await settled();
+      workbench.editorGroupsFt.closeTab(left, from as string);
+      workbench.editorGroupsFt.focus(right);
+
+      workbench.editorGroupsFt.closeTab(right, activeTabOf(right) as string);
+      answer();
+      await settled();
+
+      expect(workbench.activeGroupId()).toBe(right);
+      expect(tabsOf(right)).toEqual(['folder:*']);
+    });
+  });
 });

@@ -156,8 +156,9 @@ export class SessionFeature {
         id: group.id,
         path: group.path,
         view: group.view,
-        // What a tab remembers of its selection (PRD 001, Fix 4) lasts the session, not beyond it.
-        tabs: group.tabs.map(({ remembered: _remembered, ...tab }) => tab),
+        // What a tab remembers of its selection (PRD 001, Fix 4), and the tab it was opened from
+        // (PRD 002, §2.5.1), last the session, not beyond it.
+        tabs: group.tabs.map(({ remembered: _remembered, openedFrom: _openedFrom, ...tab }) => tab),
         selection: [],
         ...(group.sort === undefined ? {} : { sort: group.sort }),
       }),

@@ -182,7 +182,7 @@ export class EditorGroupsFeature {
    * Adds a tab to a group and chooses it — loaded, and the group made the
    * active one — as a click on it would. Returns the new tab's id.
    */
-  openTab(groupId: string, tab: Omit<PanelTabState, 'id' | 'active' | 'remembered'>): string | undefined {
+  openTab(groupId: string, tab: Omit<PanelTabState, 'id' | 'active' | 'remembered' | 'openedFrom'>): string | undefined {
     if (!this.stateOf(groupId)) {
       return undefined;
     }
@@ -204,9 +204,9 @@ export class EditorGroupsFeature {
       return;
     }
     const active = this.activeTabOf(group);
-    let tab: Omit<PanelTabState, 'id' | 'active' | 'remembered'>;
+    let tab: Omit<PanelTabState, 'id' | 'active' | 'remembered' | 'openedFrom'>;
     if (active !== undefined && active.kind !== 'file' && active.kind !== 'diff') {
-      const { id: _id, active: _active, remembered: _remembered, ...rest } = active;
+      const { id: _id, active: _active, remembered: _remembered, openedFrom: _openedFrom, ...rest } = active;
       tab = rest;
     } else {
       const path = active === undefined ? group.path : active.path.includes('/') ? active.path.slice(0, active.path.lastIndexOf('/')) : '';
@@ -236,6 +236,19 @@ export class EditorGroupsFeature {
     return at === -1 ? others[0] : ids[(at + 1) % ids.length];
   }
 
+  /**
+   * Notes on the tab `groupId` shows that `fromTabId` opened it (PRD 002, §2.5.1), so closing it
+   * goes back there; see `closeTab`.
+   */
+  markOpenedFrom(groupId: string, fromTabId: string): void {
+    this.update(groupId, (group) => {
+      const active = this.activeTabOf(group);
+      return active === undefined || active.id === fromTabId
+        ? group
+        : { ...group, tabs: group.tabs.map((tab) => (tab.id === active.id ? { ...tab, openedFrom: fromTabId } : tab)) };
+    });
+  }
+
   selectTab(groupId: string, tabId: string): void {
     const before = this.stateOf(groupId);
     this.groups.update((groups) =>
@@ -259,6 +272,7 @@ export class EditorGroupsFeature {
       return;
     }
 
+    const openedFrom = group.tabs.find((tab) => tab.id === tabId)?.openedFrom;
     const tabs = group.tabs.filter((tab) => tab.id !== tabId);
     if (tabs.length > 0) {
       this.groups.update((groups) =>
@@ -266,6 +280,13 @@ export class EditorGroupsFeature {
       );
     } else {
       this.removeGroup(groupId);
+    }
+
+    // A tab `Ctrl`+`Enter` opened goes back, closed, to the tab it was opened
+    // from (PRD 002, §2.5.1) — wherever that is now, while it is still open.
+    const origin = openedFrom === undefined ? undefined : this.groups().find((candidate) => candidate.tabs.some((tab) => tab.id === openedFrom));
+    if (origin !== undefined && openedFrom !== undefined) {
+      this.selectTab(origin.id, openedFrom);
     }
 
     // Whatever is left showing gets the keyboard: closing the tab someone was
@@ -394,7 +415,9 @@ export class EditorGroupsFeature {
       return;
     }
 
-    const newGroupId = this.openBeside(groupId, zone, (id) => ({ ...active, id: `${active.id}-${id}` }));
+    // A copy was opened by no one: closing it goes nowhere in particular (PRD 002, §2.5.1).
+    const { openedFrom: _openedFrom, ...copy } = active;
+    const newGroupId = this.openBeside(groupId, zone, (id) => ({ ...copy, id: `${active.id}-${id}` }));
     if (newGroupId === undefined) {
       return;
     }

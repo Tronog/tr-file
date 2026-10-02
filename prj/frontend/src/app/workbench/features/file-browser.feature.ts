@@ -721,6 +721,8 @@ export class FileBrowserFeature implements PanelContentFeature {
 
     const directory = isFolder(entry);
     const tab = { label: entry.name, path: entry.path, kind: directory ? ('folder' as const) : ('file' as const) };
+    const source = this.groups.stateOf(groupId);
+    const from = source === undefined ? undefined : this.groups.activeTabOf(source)?.id;
     let target = this.groups.otherGroupOf(groupId);
     if (target === undefined) {
       target = this.groups.openBeside(groupId, 'right', (id) => ({ id: `tab-${id}`, ...tab }));
@@ -740,6 +742,10 @@ export class FileBrowserFeature implements PanelContentFeature {
     }
     if (!directory) {
       this.parent.select(entry.path);
+    }
+    // Closed, it gives the keyboard back to the tab it was opened from (PRD 002, §2.5.1).
+    if (from !== undefined) {
+      this.groups.markOpenedFrom(target, from);
     }
 
     this.parent.panelFocusFt.focusBody(target);
