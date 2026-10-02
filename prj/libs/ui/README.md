@@ -169,6 +169,23 @@ the Commit button (`commit`), the changes by group — each row reports
 `kind: 'diff'` document of `UiDiffLine`s, coloured by kind. `UiPane.actionAt`
 reports a header button together with where it is, for a `…` menu.
 
+## Disk usage (PRD 013, §2.1)
+
+`UiDiskUsage` is panel content for what takes up the space in a folder. It has a file
+browser's path bar (`UiBreadcrumbs`, with the same editing and suggestions) and a toolbar
+(the app's buttons, a `UiSegmented` for the view, and the depth as − / +). It draws a
+`UiDiskUsageItem` tree, already sized and labelled, three ways:
+- **pie**: a sunburst, a ring per level, with a legend of the folder's own entries
+- **table**: rows depth first, each with a bar for its share of the folder
+- **rectangles**: a squarified treemap, folders under their names, laid out in pixels
+  the component measures
+
+The geometry is plain functions in `disk-usage/disk-usage-layout.ts` (`sunburst`,
+`treemap`, `squarify`, `tableRows`), and an entry keeps its top-level entry's hue
+everywhere. Clicking an `openable` folder, or `Enter` on it in the table or legend, emits
+`open`. The keymap's `go.up`, `view.refresh` and `view.stopLoading` emit the toolbar's
+`up` / `refresh` / `stop`, while those buttons are there. `Ctrl`+`L` edits the path bar.
+
 ## Deviations from the mockup
 
 1. **No Tabler.** `docs/ai/VSCODE-UI.md` makes Tabler the house UI kit, and the

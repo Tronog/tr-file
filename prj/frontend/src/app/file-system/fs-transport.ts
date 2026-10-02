@@ -3,6 +3,8 @@ import type { FsPathStyle } from './fs-path';
 import type {
   FsDetails,
   FsDirectoryListing,
+  FsDiskUsageReport,
+  FsDiskUsageScan,
   FsListingProgress,
   FsArchiveListing,
   FsClipboardFiles,
@@ -226,4 +228,15 @@ export interface FsTransport {
    * are `FsGitFeature`'s; a transport only carries them.
    */
   git<T>(action: FsGitAction, fields?: FsGitFields): Promise<T>;
+
+  /* -- disk usage (PRD 013, §1) ---------------------------------------------- */
+
+  /** Starts a scan of the folder `path` on the backend; answers at once, with `depth` levels of its first report. */
+  startDiskUsage(path: string, depth?: number): Promise<FsDiskUsageScan>;
+
+  /** How far a scan has got, with the tree under `report.path`. Rejects with `NOT_FOUND` once the backend has forgotten it. */
+  diskUsageStatus(id: string, report?: FsDiskUsageReport): Promise<FsDiskUsageScan>;
+
+  /** Stops a scan; answers with how it stands. */
+  cancelDiskUsage(id: string): Promise<FsDiskUsageScan>;
 }

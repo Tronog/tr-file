@@ -22,6 +22,8 @@ import type {
   FsUpload,
   FsUploadProgress,
   FsWatchResult,
+  FsDiskUsageReport,
+  FsDiskUsageScan,
 } from './file-system.model';
 import { FS_ABORTED, FsError } from './fs-error';
 import type { FsDetailsOptions, FsTransport, FsUploadOptions } from './fs-transport';
@@ -514,6 +516,20 @@ export class FsBridgeService implements FsTransport {
 
   async git<T>(action: FsGitAction, fields: FsGitFields = {}): Promise<T> {
     return this.invoke<T>({ command: 'git', ...fields, action });
+  }
+
+  /* -- disk usage (PRD 013, §1) ---------------------------------------------- */
+
+  async startDiskUsage(path: string, depth?: number): Promise<FsDiskUsageScan> {
+    return this.invoke<FsDiskUsageScan>({ command: 'du-start', path, ...(depth === undefined ? {} : { depth }) });
+  }
+
+  async diskUsageStatus(id: string, report: FsDiskUsageReport = {}): Promise<FsDiskUsageScan> {
+    return this.invoke<FsDiskUsageScan>({ command: 'du-status', scanId: id, ...report });
+  }
+
+  async cancelDiskUsage(id: string): Promise<FsDiskUsageScan> {
+    return this.invoke<FsDiskUsageScan>({ command: 'du-cancel', scanId: id });
   }
 
   private abandon(uploadId: string | undefined): void {

@@ -15,6 +15,7 @@
 
 import type { ArchiveListingDto } from '../archive/archive.model.js';
 import type { AuthStatusDto } from '../auth/auth.model.js';
+import type { DiskUsageScanDto } from '../disk-usage/disk-usage.model.js';
 import type { DirectoryListingDto, FileDetailsDto, FileEntryType, PlacesDto, SearchResultDto } from '../files/models/index.js';
 import type { WatchResultDto } from '../files/watch.service.js';
 import type { GitRequest } from '../git/git-request.js';
@@ -64,7 +65,10 @@ export type FsBridgeCommand =
   | 'op-extract'
   | 'git'
   | 'host-paths'
-  | 'time';
+  | 'time'
+  | 'du-start'
+  | 'du-status'
+  | 'du-cancel';
 
 /**
  * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
@@ -308,12 +312,36 @@ export interface FsTimeRequest {
   readonly command: 'time';
 }
 
+/** A disk usage scan started (PRD 013, §1) — `POST /api/disk-usage/scans`. */
+export interface FsDuStartRequest {
+  readonly command: 'du-start';
+  readonly path: string;
+  readonly depth?: number;
+}
+
+/** How far a scan has got, with the tree under `path` — `GET /api/disk-usage/scans/:id`. */
+export interface FsDuStatusRequest {
+  readonly command: 'du-status';
+  readonly scanId: string;
+  readonly path?: string;
+  readonly depth?: number;
+}
+
+/** A scan stopped — `POST /api/disk-usage/scans/:id/cancel`. */
+export interface FsDuCancelRequest {
+  readonly command: 'du-cancel';
+  readonly scanId: string;
+}
+
 /** What is in the trash (PRD 001, §14.1) — `GET /api/ops/trash-items`. */
 export interface FsOpTrashListRequest {
   readonly command: 'op-trash-list';
 }
 
 export type FsBridgeRequest =
+  | FsDuStartRequest
+  | FsDuStatusRequest
+  | FsDuCancelRequest
   | FsOpTrashListRequest
   | FsOpResolveRequest
   | FsTimeRequest
@@ -416,6 +444,9 @@ export interface FsBridgeResults {
   readonly git: unknown;
   readonly 'host-paths': { readonly paths: readonly string[] };
   readonly time: ServerTimeDto;
+  readonly 'du-start': DiskUsageScanDto;
+  readonly 'du-status': DiskUsageScanDto;
+  readonly 'du-cancel': DiskUsageScanDto;
 }
 
 export interface FsBridgeSuccess<T> {

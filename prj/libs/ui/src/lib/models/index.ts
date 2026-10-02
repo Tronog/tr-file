@@ -9,3 +9,4 @@ export * from './quick-input.model';
 export * from './source-control.model';
 export * from './settings.model';
 export * from './help.model';
+export * from './disk-usage.model';

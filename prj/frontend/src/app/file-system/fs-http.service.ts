@@ -32,6 +32,8 @@ import type {
   FsUpload,
   FsUploadProgress,
   FsWatchResult,
+  FsDiskUsageReport,
+  FsDiskUsageScan,
 } from './file-system.model';
 import type { AuthStatus } from '../auth/auth.model';
 import { FS_ABORTED, FsError } from './fs-error';
@@ -523,6 +525,30 @@ export class FsHttpService implements FsTransport {
     }
     const query = params.toString();
     return this.request(this.http.get<FsEnvelope<T>>(`/api/git/${action}${query === '' ? '' : `?${query}`}`));
+  }
+
+  /* -- disk usage (PRD 013, §1) ---------------------------------------------- */
+
+  async startDiskUsage(path: string, depth?: number): Promise<FsDiskUsageScan> {
+    return this.request(this.http.post<FsEnvelope<FsDiskUsageScan>>('/api/disk-usage/scans', { path, ...(depth === undefined ? {} : { depth }) }));
+  }
+
+  async diskUsageStatus(id: string, report: FsDiskUsageReport = {}): Promise<FsDiskUsageScan> {
+    let params = new HttpParams();
+    if (report.path !== undefined) {
+      params = params.set('path', report.path);
+    }
+    if (report.depth !== undefined) {
+      params = params.set('depth', String(report.depth));
+    }
+    const query = params.toString();
+    return this.request(
+      this.http.get<FsEnvelope<FsDiskUsageScan>>(`/api/disk-usage/scans/${encodeURIComponent(id)}${query === '' ? '' : `?${query}`}`),
+    );
+  }
+
+  async cancelDiskUsage(id: string): Promise<FsDiskUsageScan> {
+    return this.request(this.http.post<FsEnvelope<FsDiskUsageScan>>(`/api/disk-usage/scans/${encodeURIComponent(id)}/cancel`, {}));
   }
 
   private async request<T>(response: Observable<FsEnvelope<T>>): Promise<T> {

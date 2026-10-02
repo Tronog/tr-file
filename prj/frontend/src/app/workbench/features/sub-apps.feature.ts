@@ -38,7 +38,8 @@ export class SubAppsFeature {
 
   /**
    * Brings `id` forward. Back to the file manager, the keyboard goes into the
-   * active panel, as it does when the app starts (PRD 002, §3.1).
+   * active panel, as it does when the app starts (PRD 002, §3.1); Disk Usage
+   * starts on the file manager's folder when it has nothing open (PRD 013).
    */
   show(id: SubAppId): void {
     if (this.shown() === id) {
@@ -50,6 +51,8 @@ export class SubAppsFeature {
     }
     if (id === 'file-manager') {
       this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
+    } else if (id === 'disk-usage') {
+      this.parent.diskUsageFt.shown();
     }
   }
 }

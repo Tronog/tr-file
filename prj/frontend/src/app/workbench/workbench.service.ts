@@ -182,7 +182,7 @@ export class WorkbenchService {
   readonly filePreviewFt = new FilePreviewFeature(this);
   readonly chromeFt = new ChromeFeature(this);
   /** Owns the split tree; constructed before the feature that mutates it. */
-  readonly panelLayoutFt = new PanelLayoutFeature(this);
+  readonly panelLayoutFt = new PanelLayoutFeature(this.layout.grid);
   readonly explorerFt = new ExplorerFeature(this);
   readonly editorGroupsFt = new EditorGroupsFeature(this);
   /** File management: what folder and file tabs show, and navigating in them. */

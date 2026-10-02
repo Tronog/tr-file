@@ -1,6 +1,5 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
 import type { UiDropZone, UiGridNode, UiGridSplit, UiSplitResize } from '@tr-file/ui';
-import type { WorkbenchService } from '../workbench.service';
 
 /** Smallest share a split child may be squeezed to when a sibling grows. */
 const MIN_SHARE = 0.08;
@@ -18,8 +17,9 @@ export class PanelLayoutFeature {
   private readonly tree: WritableSignal<UiGridNode>;
   private readonly maximized = signal<string | null>(null);
 
-  constructor(parent: WorkbenchService) {
-    this.tree = signal(parent.layout.grid);
+  /** One per set of panels: the file manager's, and Disk Usage's (PRD 013). */
+  constructor(initial: UiGridNode) {
+    this.tree = signal(initial);
   }
 
   /** The layout rendered by `ui-panel-grid`. */

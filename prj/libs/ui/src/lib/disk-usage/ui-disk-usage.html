@@ -1,0 +1,137 @@
+@let du = model();
+
+@if (du.breadcrumbs.length) {
+  <ui-breadcrumbs
+    [items]="du.breadcrumbs"
+    [label]="breadcrumbLabel()"
+    [location]="du.location"
+    [suggestions]="du.locationSuggestions ?? []"
+    (crumbSelect)="breadcrumbSelect.emit($event)"
+    (pathSubmit)="pathSubmit.emit($event)"
+    (pathInput)="locationInput.emit($event)"
+  />
+}
+
+<ui-panel-toolbar [actions]="du.toolbarActions" [summary]="du.summary" (action)="toolbarAction.emit($event)">
+  <ui-segmented [options]="viewOptions" label="Visualization" [value]="du.view" (valueChange)="setView($event)" />
+  <span class="depth" role="group" aria-label="Depth">
+    <ui-icon-button icon="minus" label="Fewer levels" [disabled]="du.depth <= 1" (action)="depthChange.emit(du.depth - 1)" />
+    <span class="depth-value" aria-live="polite">Depth {{ du.depth }}</span>
+    <ui-icon-button icon="plus" label="More levels" [disabled]="du.depth >= du.maxDepth" (action)="depthChange.emit(du.depth + 1)" />
+  </span>
+</ui-panel-toolbar>
+
+<div uiPanelBody class="du-body">
+  @if (du.empty; as empty) {
+    <ui-empty-state [state]="empty" />
+  } @else if (du.root; as root) {
+    @switch (du.view) {
+      @case ('pie') {
+        <div class="pie">
+          <svg class="pie-chart" viewBox="0 0 200 200" role="img" [attr.aria-label]="root.name + ', ' + root.sizeLabel">
+            @for (slice of slices(); track slice.item.id) {
+              <path
+                [attr.d]="slice.d"
+                [class]="'slice ' + hueClass(slice.hue)"
+                [class.is-openable]="slice.item.openable"
+                [attr.fill-opacity]="opacity(slice.level, slice.item)"
+                (click)="choose(slice.item)"
+              >
+                <title>{{ titleOf(slice.item, slice.percent) }}</title>
+              </path>
+            }
+            <circle class="pie-hole" cx="100" cy="100" [attr.r]="pieInner - 1" />
+            <text class="pie-size" x="100" y="98" text-anchor="middle">{{ root.sizeLabel }}</text>
+            <text class="pie-detail" x="100" y="111" text-anchor="middle">{{ root.note ?? root.detail ?? '' }}</text>
+          </svg>
+          <div class="legend" role="list" aria-label="Entries" (keydown)="onRowKeydown($event)">
+            @for (row of legend(); track row.item.id; let first = $first) {
+              <div
+                class="legend-row"
+                role="listitem"
+                data-row
+                [attr.tabindex]="first ? 0 : -1"
+                [class.is-openable]="row.item.openable"
+                [attr.title]="titleOf(row.item, row.percent)"
+                (click)="choose(row.item)"
+                (keydown.enter)="choose(row.item)"
+              >
+                <span [class]="'swatch ' + hueClass(row.hue)"></span>
+                <span class="legend-name">{{ row.item.name }}</span>
+                <span class="legend-size">{{ row.item.sizeLabel }}</span>
+                <span class="legend-percent">{{ percent(row.percent) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+      @case ('table') {
+        <div class="table" role="table" aria-label="Disk usage" (keydown)="onRowKeydown($event)">
+          <div class="table-head" role="row">
+            <span role="columnheader">Name</span>
+            <span role="columnheader">Share</span>
+            <span role="columnheader" class="num">Size</span>
+            <span role="columnheader" class="num">Files</span>
+          </div>
+          @for (row of rows(); track row.item.id; let first = $first) {
+            <div
+              class="table-row"
+              role="row"
+              data-row
+              [attr.tabindex]="first ? 0 : -1"
+              [attr.aria-level]="row.level + 1"
+              [class.is-openable]="row.item.openable"
+              [attr.title]="titleOf(row.item, row.percent)"
+              (click)="choose(row.item)"
+              (keydown.enter)="choose(row.item)"
+            >
+              <span role="cell" class="name" [style.padding-left.px]="8 + row.level * 16">
+                <ui-icon [name]="row.item.kind === 'folder' ? 'folder' : row.item.kind === 'file' ? 'file' : 'dots'" />
+                <span class="name-text">{{ row.item.name }}</span>
+                @if (row.item.note; as note) {
+                  <span class="note">{{ note }}</span>
+                }
+              </span>
+              <span role="cell" class="share">
+                <span class="bar"><span [class]="'bar-fill ' + hueClass(row.hue)" [style.width.%]="row.percent"></span></span>
+                <span class="share-text">{{ percent(row.percent) }}</span>
+              </span>
+              <span role="cell" class="num">{{ row.item.sizeLabel }}</span>
+              <span role="cell" class="num dim">{{ row.item.detail ?? '' }}</span>
+            </div>
+          } @empty {
+            <p class="nothing">This folder holds nothing.</p>
+          }
+        </div>
+      }
+      @case ('rectangles') {
+        <div #treemapArea class="treemap" role="img" [attr.aria-label]="root.name + ', ' + root.sizeLabel">
+          @for (cell of cells(); track cell.item.id) {
+            @let fit = fits(cell.width, cell.height);
+            <div
+              [class]="'cell ' + hueClass(cell.hue)"
+              [class.is-folder]="cell.header"
+              [class.is-openable]="cell.item.openable"
+              [style.left.px]="cell.x"
+              [style.top.px]="cell.y"
+              [style.width.px]="cell.width"
+              [style.height.px]="cell.height"
+              [style.--cell-opacity]="opacity(cell.level, cell.item)"
+              [attr.title]="titleOf(cell.item, cell.percent)"
+              (click)="$event.stopPropagation(); choose(cell.item)"
+            >
+              @if (cell.header) {
+                <span class="cell-head" [style.height.px]="treemapHeader">{{ cell.item.name }} · {{ cell.item.sizeLabel }}</span>
+              } @else if (fit.name) {
+                <span class="cell-name">{{ cell.item.name }}</span>
+                @if (fit.size) {
+                  <span class="cell-size">{{ cell.item.sizeLabel }}</span>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  }
+</div>

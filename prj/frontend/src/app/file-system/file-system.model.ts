@@ -520,3 +520,54 @@ export interface FsGitDiff {
   readonly binary: boolean;
   readonly truncated: boolean;
 }
+
+/* -- disk usage (PRD 013, §1) ------------------------------------------------ */
+
+/** How far a folder of a scan is; see the backend's `DiskUsageFolderState`. */
+export type FsDiskUsageFolderState = 'scanning' | 'done' | 'unreadable' | 'too-deep' | 'mount';
+
+/** One entry of a disk usage report: a folder (with its entries, to the depth asked), a file, or the rest summed. */
+export interface FsDiskUsageNode {
+  readonly kind: 'folder' | 'file' | 'rest';
+  readonly name: string;
+  /** Root-relative; `null` for `rest`. */
+  readonly path: string | null;
+  readonly size: number;
+  readonly onDisk: number;
+  readonly files: number;
+  readonly folders: number;
+  readonly count?: number;
+  readonly state?: FsDiskUsageFolderState;
+  readonly children?: readonly FsDiskUsageNode[];
+}
+
+export interface FsDiskUsageTotals {
+  readonly size: number;
+  readonly onDisk: number;
+  readonly files: number;
+  readonly folders: number;
+  readonly errors: number;
+  readonly skipped: number;
+}
+
+/** A scan on the backend, as far as it has got, with the tree under one of its folders when asked. */
+export interface FsDiskUsageScan {
+  readonly id: string;
+  /** The folder scanned, root-relative. */
+  readonly path: string;
+  readonly state: 'running' | 'done' | 'cancelled' | 'failed';
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+  readonly elapsedMs: number;
+  readonly maxDepth: number;
+  readonly totals: FsDiskUsageTotals;
+  readonly current: string | null;
+  readonly error?: string;
+  readonly report?: { readonly path: string; readonly depth: number; readonly tree: FsDiskUsageNode | null };
+}
+
+/** The part of a scan's tree to report: under `path`, `depth` levels of it. */
+export interface FsDiskUsageReport {
+  readonly path?: string;
+  readonly depth?: number;
+}

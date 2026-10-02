@@ -335,6 +335,21 @@ export class RemoteBackend {
         return this.hostPaths(request.paths);
       case 'time':
         return this.time();
+      // Disk usage (PRD 013, §1) is scanned on the server, in its files.
+      case 'du-start':
+        return this.json('POST', '/disk-usage/scans', {
+          body: { path: request.path, ...(request.depth === undefined ? {} : { depth: request.depth }) },
+          accept: [202],
+        });
+      case 'du-status':
+        return this.json('GET', `/disk-usage/scans/${encodeURIComponent(request.scanId)}`, {
+          query: {
+            ...(request.path === undefined ? {} : { path: request.path }),
+            ...(request.depth === undefined ? {} : { depth: String(request.depth) }),
+          },
+        });
+      case 'du-cancel':
+        return this.json('POST', `/disk-usage/scans/${encodeURIComponent(request.scanId)}/cancel`, { body: {} });
     }
   }
 

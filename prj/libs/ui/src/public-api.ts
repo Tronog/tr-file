@@ -81,6 +81,9 @@ export { UiKeybindingsTable } from './lib/settings/ui-keybindings-table';
 
 /* panel content ----------------------------------------------------------- */
 export { UiFileBrowser } from './lib/file-browser/ui-file-browser';
+export { UiDiskUsage } from './lib/disk-usage/ui-disk-usage';
+export { DISK_USAGE_HUES, sunburst, squarify, tableRows, treemap } from './lib/disk-usage/disk-usage-layout';
+export type { DiskUsageCell, DiskUsageHue, DiskUsageRow, DiskUsageSlice } from './lib/disk-usage/disk-usage-layout';
 
 /* quick input — the command palette's box (PRD 009, §1) ------------------ */
 export { UiQuickInput } from './lib/quick-input/ui-quick-input';

@@ -21,6 +21,7 @@ import {
   WatchService,
   type PlacesProvider,
 } from './modules/files/index.js';
+import { DiskUsageRoutes, DiskUsageService } from './modules/disk-usage/index.js';
 import { GitRoutes, GitService } from './modules/git/index.js';
 import { HealthRoutes, HealthService } from './modules/health/index.js';
 import {
@@ -85,6 +86,8 @@ export class App {
   private readonly archives: ArchiveService;
   /** Git for the folders of the root (PRD 011, §1); shared by the routes and the bridge. */
   private readonly git: GitService;
+  /** Disk usage scans (PRD 013, §1); shared by the routes and the bridge. */
+  private readonly diskUsage: DiskUsageService;
   private readonly filesLogger: Logger;
 
   constructor(
@@ -105,6 +108,7 @@ export class App {
     this.places = new PlacesService(resolver, options.places ?? NO_PLACES, this.filesLogger);
     this.archives = new ArchiveService(resolver, this.filesLogger);
     this.operations = new OperationsService(resolver, trash, this.logger.child({ module: 'operations' }), this.archives);
+    this.diskUsage = new DiskUsageService(resolver, this.logger.child({ module: 'disk-usage' }));
     this.git = new GitService(resolver, this.logger.child({ module: 'git' }), { enabled: this.config.gitEnabled });
     this.auth = new AuthService(
       this.config.auth,
@@ -123,6 +127,7 @@ export class App {
       this.places,
       this.archives,
       this.git,
+      this.diskUsage,
     );
 
     this.instance = express();
@@ -132,12 +137,14 @@ export class App {
   }
 
   /**
-   * Releases what outlives a request: the folder watchers. None of it keeps
+   * Releases what outlives a request: the folder watchers, the large
+   * listings' workers and the disk usage scans. None of it keeps
    * the process alive, but a host that stops serving should let go of it.
    */
   close(): void {
     this.watches.close();
     this.filesService.largeListings.close();
+    this.diskUsage.close();
   }
 
   private configure(): void {
@@ -163,6 +170,7 @@ export class App {
       new OperationsRoutes(this.operations),
       new ArchiveRoutes(this.archives, this.filesLogger),
       new GitRoutes(this.git),
+      new DiskUsageRoutes(this.diskUsage),
     ];
   }
 

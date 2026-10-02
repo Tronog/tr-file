@@ -521,7 +521,7 @@ export class FileBrowserFeature implements PanelContentFeature {
    * ignored — kept per panel while neither the text nor the folder changes,
    * as a panel is drawn far more often than typed in.
    */
-  private locationSuggestions(groupId: string): readonly UiPathSuggestion[] {
+  locationSuggestionsFor(groupId: string): readonly UiPathSuggestion[] {
     const text = this.locationTyped()[groupId];
     const query = text === undefined ? null : locationQuery(text);
     if (query === null) {
@@ -559,8 +559,26 @@ export class FileBrowserFeature implements PanelContentFeature {
    * selected, so it is where the keyboard lands. What is not there is said so.
    */
   async goToLocation(groupId: string, text: string): Promise<void> {
+    const location = await this.resolveLocation(groupId, text);
+    if (location === null) {
+      return;
+    }
+    this.openFolder(groupId, location.folder, this.labelFor(location.folder));
+    if (location.file !== undefined) {
+      this.selectEntry(groupId, location.file);
+    }
+    this.parent.panelFocusFt.focusBody(groupId);
+  }
+
+  /**
+   * What a path typed in a path bar names — the folder, or the file and the
+   * folder it is in — as the disk spells it, or `null` once it has said why
+   * there is nothing there. `key` is the path bar's, whose suggestions end
+   * with the edit; Disk Usage's path bars come here too (PRD 013, §2.1).
+   */
+  async resolveLocation(key: string, text: string): Promise<{ readonly folder: string; readonly file?: string } | null> {
     // The edit is over: nothing more to suggest until the next.
-    this.locationTyped.update(({ [groupId]: _done, ...rest }) => rest);
+    this.locationTyped.update(({ [key]: _done, ...rest }) => rest);
     const segments = text.trim().replace(/\\/g, '/').split('/').filter((segment) => segment !== '' && segment !== '.');
     const shown = shownPath(segments.join('/'));
     if (segments.includes('..')) {
@@ -569,21 +587,14 @@ export class FileBrowserFeature implements PanelContentFeature {
         message: `'${text.trim()}' is not a path this panel can go to.`,
         detail: "Leave out '..': type the folder's own path from / up, e.g. /docs/prd.",
       });
-      return;
+      return null;
     }
     try {
       const details = await this.parent.fileSystem.readFt.details(segments.join('/'));
       // The path as the disk spells it — `s:\tronog` typed is `S:/Tronog` — or nothing opened from
       // it would match the paths its listing reports (PRD 004, §4.1).
       const path = details.path;
-      if (isFolder(details)) {
-        this.openFolder(groupId, path, this.labelFor(path));
-      } else {
-        const folder = parentOf(path);
-        this.openFolder(groupId, folder, this.labelFor(folder));
-        this.selectEntry(groupId, path);
-      }
-      this.parent.panelFocusFt.focusBody(groupId);
+      return isFolder(details) ? { folder: path } : { folder: parentOf(path), file: path };
     } catch (error) {
       const failure = FsError.from(error);
       await this.parent.modal.message({
@@ -591,6 +602,7 @@ export class FileBrowserFeature implements PanelContentFeature {
         message: failure.code === 'NOT_FOUND' ? `There is no file or folder at '${shown}'.` : `Could not open '${shown}'.`,
         detail: failure.code === 'NOT_FOUND' ? 'Check the path, and try again.' : failure.message,
       });
+      return null;
     }
   }
 
@@ -1022,7 +1034,8 @@ export class FileBrowserFeature implements PanelContentFeature {
     return [...this.expandedIn(group.id)].filter((path) => this.isShownInTree(group, path));
   }
 
-  private labelFor(path: string): string {
+  /** What a tab showing `path` is called: its folder, or the root's name. */
+  labelFor(path: string): string {
     return path === '' ? this.parent.workspaceName() : (path.split('/').at(-1) ?? path);
   }
 
@@ -1068,9 +1081,9 @@ export class FileBrowserFeature implements PanelContentFeature {
     const view = this.viewFor(group);
 
     return {
-      breadcrumbs: this.breadcrumbs(group.path),
+      breadcrumbs: this.breadcrumbsOf(group.path),
       location: shownPath(group.path),
-      locationSuggestions: this.locationSuggestions(group.id),
+      locationSuggestions: this.locationSuggestionsFor(group.id),
       // `Escape` stops a large folder being read (PRD 004, §3.1.4).
       ...(state?.large && state.status === 'loading' ? { stoppable: true } : {}),
       view,
@@ -1098,7 +1111,7 @@ export class FileBrowserFeature implements PanelContentFeature {
   /** A large folder whose order the Web Worker is still working out (PRD 004, §3.1). */
   private sortingViewModel(group: PanelGroupState, count: number): UiFileBrowserModel {
     return {
-      breadcrumbs: this.breadcrumbs(group.path),
+      breadcrumbs: this.breadcrumbsOf(group.path),
       location: shownPath(group.path),
       view: this.viewFor(group),
       toolbarActions: this.folderToolbar(group),
@@ -1125,7 +1138,7 @@ export class FileBrowserFeature implements PanelContentFeature {
     const notice = preview.noticeFor(tab.path);
 
     return {
-      breadcrumbs: this.breadcrumbs(tab.path),
+      breadcrumbs: this.breadcrumbsOf(tab.path),
       location: shownPath(tab.path),
       ...this.focusTokens(group.id),
       view: group.view,
@@ -1226,7 +1239,8 @@ export class FileBrowserFeature implements PanelContentFeature {
     return `${items} · details ${Math.floor((progress.detailed / progress.named) * 100)}%`;
   }
 
-  private breadcrumbs(path: string): readonly UiBreadcrumb[] {
+  /** The path bar's crumbs for `path`: the root, then each folder on the way. */
+  breadcrumbsOf(path: string): readonly UiBreadcrumb[] {
     const root: UiBreadcrumb = {
       id: 'root',
       label: this.parent.workspaceName(),

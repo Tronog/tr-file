@@ -43,13 +43,13 @@ not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin
 holding shared state, plus feature classes holding everything else.
 
 **Sub-applications (PRD 001, §1.1).** The file manager is one of the window's sub-applications,
-beside *Search* and *Disk Usage* (both still placeholders). They share the title bar with its
+beside *Search* (still a placeholder) and *Disk Usage* (PRD 013). They share the title bar with its
 menus, the activity bar and the status bar — the `Workbench` component (`workbench.html`) — and
 the one shown fills the rest. `SubAppsFeature` keeps which (`active`, `show`, `fileManager`;
 `SUB_APPS` in `workbench/sub-apps/sub-app.model.ts`). Each one is a set of components in
 `workbench/sub-apps/`: the file manager is `FileManagerExplorer` (left slot), `FileManagerCenter`
 (panels and bottom panel) and `FileManagerDetails` (right slot); the others are one centre
-component each. A sub-application is drawn the first time it is shown and is kept, hidden
+component each (`SearchApp`, `DiskUsageApp`). A sub-application is drawn the first time it is shown and is kept, hidden
 (`is-inactive`), while another one is shown, so the file manager comes back with its panels as they
 were. The sidebars are the file manager's, so another sub-application hides them. The activity
 bar's first group is the sub-applications (*File Manager* also brings back its Explorer, as the
@@ -419,7 +419,22 @@ reports `{ id, shift }`), `copyPathValue` copies an entry of the root as *Copy P
 naming none (a link's target, the system trash's) as text — `FsTransport.copyText`, bridge
 `clipboard-write-text` — and the value says `Copied` for a moment (`badge`).
 A folder's *Size* and *On disk* there are pressable too (PRD 001, §9.3.2): they open the Disk Usage
-sub-application on it (`DiskUsageFeature.open`, which keeps the `folder`).
+sub-application on it (`DiskUsageFeature.open`).
+
+**Disk Usage (PRD 013).** A workbench of panels of its own: `DiskUsageFeature` keeps its groups and
+tabs and a `PanelLayoutFeature` of its own (the class takes its starting grid), drawn by
+`DiskUsageApp` with the library's `UiPanelGrid` / `UiPanelGroup` (split, new tab, close, maximize).
+Each tab shows a folder in the library's `UiDiskUsage`: a pie (sunburst), a table with share bars,
+or rectangles (treemap), to a depth of 1–8. Its path bar works as a file browser's: crumbs,
+`FileBrowserFeature.locationSuggestionsFor` / `locationInput` under the key `disk-usage:<tab>`, and
+`resolveLocation`, which `goToLocation` now shares. The space is worked out on the backend (§1, the
+`disk-usage` module, `/api/disk-usage`, bridge `du-*`, mapped by `RemoteBackend`; `FsDiskUsageFeature`
+on the frontend): a scan per folder, polled every `DISK_USAGE_POLL_MS` (3 s) while it runs, asked only
+for the folder and depth the tab shows. Going into a folder of a scan, or back up, asks the same
+scan. A folder outside every scan of the window, one the scan did not go into (`mount`,
+`too-deep`), *Scan again*, or a scan the backend forgot starts a new one. A scan no tab shows any
+more is stopped. Shown with nothing open, it starts on the file manager's active folder. Its
+panels are not in the `Ctrl`+`Tab` ring, and its tabs are not kept in the session.
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what

@@ -352,6 +352,33 @@ take, `409 NOT_A_REPOSITORY`, `422 GIT_FAILED` with git's own reason (its
 `hint:` lines left out), `504 GIT_TIMEOUT`. The bridge has the same as one
 command, `{ command: 'git', action, …fields }`.
 
+## `/api/disk-usage` — disk usage (PRD 013, §1)
+
+What takes up the space under a folder, worked out by a scan that runs in the
+background (`modules/disk-usage`). A scan goes up to `DISK_USAGE_MAX_DEPTH`
+(100) levels below its folder, reading a few folders at once. It never follows
+a link (a link counts as itself), never crosses into another file system (a
+mount, `/proc`: shown as `mount`, scanned by starting on it, as `du -x`),
+and counts a file with several hard links once. Sizes are added up the folder
+chain as files are found, so a report of any folder of a scan is read off,
+never summed. Each folder keeps its 100 largest files by name and sums the rest.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/api/disk-usage/scans` | `{ path, depth? }` — starts a scan; `202` with the scan and its first report |
+| GET | `/api/disk-usage/scans/:id?path=&depth=` | How far it has got, with the tree under `path` (a folder of the scan) to `depth` levels (at most 8) |
+| POST | `/api/disk-usage/scans/:id/cancel` | Stops it; what it found stays |
+
+A report's folder lists its 100 largest entries, largest first, and the rest as one
+`rest` entry; each folder says whether all of it is in (`done`) or not (`scanning`),
+or why it was not gone into (`unreadable`, `too-deep`, `mount`). A folder of the
+scan not reached yet reports `tree: null`. The frontend asks every 3 seconds while
+a scan runs. A running scan nobody asks about for 2 minutes is stopped, and a
+finished one is forgotten after 30 (`404 NOT_FOUND`, and the frontend scans again).
+At most 16 scans are kept. Over every drive the root `''` is not a folder: start on
+a drive. Bridge commands: `du-start`, `du-status` (`scanId`), `du-cancel`;
+`RemoteBackend` maps them.
+
 ## `/api/ops` — file operations (PRD 005, §1)
 
 Copy, move, move to trash and empty trash, in `src/modules/operations` — and,

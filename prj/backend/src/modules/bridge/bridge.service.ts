@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
 import type { ArchiveService } from '../archive/index.js';
+import type { DiskUsageService } from '../disk-usage/index.js';
 import type { AuthService } from '../auth/index.js';
 import { WATCH_MAX_PATHS, type FileDetails, type FilesService, type PlacesService, type WatchService } from '../files/index.js';
 import { isGitAction, parseGitRequest, type GitService } from '../git/index.js';
@@ -86,6 +87,7 @@ export class FileSystemBridge {
     private readonly placesService: PlacesService,
     private readonly archives: ArchiveService,
     private readonly git: GitService,
+    private readonly diskUsage: DiskUsageService,
   ) {}
 
   /** A connection that has not signed in; the channel keeps one per window. */
@@ -358,6 +360,15 @@ export class FileSystemBridge {
         return { paths: this.files.hostPaths(request.paths) };
       case 'time':
         return serverTime();
+      case 'du-start':
+        return this.diskUsage.start(request.path, request.depth === undefined ? {} : { depth: request.depth });
+      case 'du-status':
+        return this.diskUsage.status(request.scanId, {
+          ...(request.path === undefined ? {} : { path: request.path }),
+          ...(request.depth === undefined ? {} : { depth: request.depth }),
+        });
+      case 'du-cancel':
+        return this.diskUsage.cancel(request.scanId);
     }
   }
 
@@ -640,6 +651,25 @@ export class FileSystemBridge {
       case 'time':
       case 'op-trash-list':
         return { command };
+      case 'du-start': {
+        const depth = FileSystemBridge.readOptionalCount(value, 'depth');
+        return { command, path: FileSystemBridge.readString(value, 'path'), ...(depth === undefined ? {} : { depth }) };
+      }
+      case 'du-status': {
+        const depth = FileSystemBridge.readOptionalCount(value, 'depth');
+        const path = (value as { path?: unknown }).path;
+        if (path !== undefined && typeof path !== 'string') {
+          throw HttpError.badRequest('path must be a string');
+        }
+        return {
+          command,
+          scanId: FileSystemBridge.readString(value, 'scanId'),
+          ...(path === undefined ? {} : { path }),
+          ...(depth === undefined ? {} : { depth }),
+        };
+      }
+      case 'du-cancel':
+        return { command, scanId: FileSystemBridge.readString(value, 'scanId') };
       case 'archive-list':
         return {
           command,

@@ -39,7 +39,9 @@ describe('Sub-applications in the window', () => {
     await render();
     const diskUsage = center.querySelector('app-disk-usage-app') as HTMLElement;
     expect(diskUsage.classList.contains('is-inactive')).toBe(false);
-    expect(diskUsage.textContent).toContain('/docs');
+    // Its own panels, the folder in a tab of them (PRD 013).
+    expect(diskUsage.querySelector('ui-panel-grid ui-panel-group ui-disk-usage')).not.toBeNull();
+    expect(diskUsage.querySelector('ui-tab-bar, [role="tablist"]')?.textContent).toContain('docs');
     // The file manager is kept, out of sight; its sidebars go with it.
     expect(center.querySelector('app-file-manager-center')?.classList.contains('is-inactive')).toBe(true);
     expect(hiddenSidebars(host)).toEqual([true, true]);

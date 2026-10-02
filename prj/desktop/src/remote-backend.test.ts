@@ -448,3 +448,32 @@ describe('RemoteBackend git (PRD 011, §1)', () => {
     await rm(join(root, 'tracked.txt'));
   });
 });
+
+describe('RemoteBackend disk usage (PRD 013, §1)', () => {
+  it('scans on the server, polled by id with the folder and depth asked, and stops', async () => {
+    const remote = await connected();
+    await mkdir(join(root, 'du', 'inner'), { recursive: true });
+    await writeFile(join(root, 'du', 'inner', 'big.bin'), 'b'.repeat(300));
+    await writeFile(join(root, 'du', 'small.txt'), 's'.repeat(30));
+    interface Scan {
+      id: string;
+      state: string;
+      report?: { path: string; depth: number; tree: { size: number; children?: { name: string }[] } | null };
+    }
+    const started = dataOf<Scan>(await remote.dispatch({ command: 'du-start', path: 'du' }));
+    let status: Scan;
+    for (;;) {
+      status = dataOf<Scan>(await remote.dispatch({ command: 'du-status', scanId: started.id, path: 'du', depth: 2 }));
+      if (status.state !== 'running') {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    assert.equal(status.report?.depth, 2);
+    assert.equal(status.report?.tree?.size, 330);
+    assert.deepEqual(status.report?.tree?.children?.map((child) => child.name), ['inner', 'small.txt']);
+    assert.equal(dataOf<Scan>(await remote.dispatch({ command: 'du-cancel', scanId: started.id })).id, started.id);
+    assert.equal(errorOf(await remote.dispatch({ command: 'du-status', scanId: 'nope' })).code, 'NOT_FOUND');
+    await rm(join(root, 'du'), { recursive: true, force: true });
+  });
+});

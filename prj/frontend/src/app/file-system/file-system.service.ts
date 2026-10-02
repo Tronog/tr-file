@@ -1,5 +1,6 @@
 import { Service, inject } from '@angular/core';
 import { FsEditFeature } from './features/fs-edit.feature';
+import { FsDiskUsageFeature } from './features/fs-disk-usage.feature';
 import { FsGitFeature } from './features/fs-git.feature';
 import { FsOperationsFeature } from './features/fs-operations.feature';
 import { FsReadFeature } from './features/fs-read.feature';
@@ -52,4 +53,7 @@ export class FileSystemService {
 
   /** Git in the folders of the root (PRD 011, §1). */
   readonly gitFt = new FsGitFeature(this);
+
+  /** What takes up the space under a folder, scanned on the backend (PRD 013, §1). */
+  readonly diskUsageFt = new FsDiskUsageFeature(this);
 }

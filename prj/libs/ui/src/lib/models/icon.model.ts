@@ -82,7 +82,11 @@ export type UiIconName =
   | 'keyboard'
   | 'palette'
   | 'sun'
-  | 'moon';
+  | 'moon'
+  | 'chart-pie'
+  | 'chart-treemap'
+  | 'table'
+  | 'player-stop';
 
 /** Icon sizes used across the workbench (16px is VS Code's list/tab size). */
 export type UiIconSize = 'sm' | 'md' | 'lg' | 'xl';
