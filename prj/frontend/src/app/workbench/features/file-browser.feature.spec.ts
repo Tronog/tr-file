@@ -229,6 +229,20 @@ describe('FileBrowserFeature', () => {
       expect(workbench.selectedEntryId()).toBe('main.ts');
       http.expectNone(() => true);
     });
+    it('describes the folder when the cursor stands on an entry with nothing selected (PRD 004, §1.3.3)', async () => {
+      await start();
+      workbench.fileBrowserFt.openEntry('group-root', 'docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [fsEntry('docs/a.md')])));
+      await settled();
+
+      workbench.fileBrowserFt.setSelection('group-root', { selected: [], focused: 'docs/a.md' });
+      http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDetails('docs')));
+      await settled();
+
+      expect(rowOf('group-root', 'docs/a.md')?.focused).toBe(true);
+      expect(rowOf('group-root', 'docs/a.md')?.selected).toBeFalsy();
+      expect(workbench.selectedEntryId()).toBe('docs');
+    });
   });
 
   describe('selectEntry()', () => {

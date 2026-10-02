@@ -136,8 +136,9 @@ press itself, like the editable path bar, is marked `data-own-press`) — hands 
 panel's content once it has rendered, and a click on a column header to sort gives focus back
 to the cursor's row in its new place — (`UiFileList`). Whenever focus is handed to a listing from
 outside — any of the above, `Tab` from another panel, a folder entered — while nothing is
-selected, the first row or tile takes the cursor and becomes the selection (PRD 002, §3.1); a
-click and the view's own key moves keep their own rules; `PanelFocusFeature` owns
+selected, the first row or tile takes the cursor but is *not* selected (PRD 002, §3.1; PRD 004,
+§1.3.3), and `FileBrowserFeature.setSelection` describes the *folder* in the details sidebar for a
+cursor with nothing selected; a click and the view's own key moves keep their own rules; `PanelFocusFeature` owns
 that request and `UiPanelGroup` answers it. The workbench asks for it once on start
 (§10.1), after the listing is in flight, so the keyboard is already in the folder content
 when the app opens rather than needing a click first. Row clicks only ever

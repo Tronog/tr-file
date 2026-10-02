@@ -38,7 +38,8 @@ const DEFAULT_ROW_HEIGHT = 22;
  * keyboard the same way it tracks the mouse.
  *
  * Focus handed to the table from outside while nothing is selected lands on
- * the first row and selects it (PRD 002, §3.1); see `onFocusArrived`.
+ * the first row, which takes the cursor but is not selected (PRD 002, §3.1;
+ * PRD 004, §1.3.3); see `onFocusArrived`.
  *
  * Selection is multiple (PRD 004, §1.2; see `UiListSelection`): `Ctrl`/`⌘`
  * click toggles a row, `Shift` click selects the range from the anchor, and
@@ -61,7 +62,7 @@ const DEFAULT_ROW_HEIGHT = 22;
  * header marked `sort` on its column says what it is. Once the rows are drawn
  * in the new order the keyboard goes back to them rather than staying on the
  * header (PRD 002, §3.1): to the cursor's row, wherever it moved to — or, with
- * nothing selected, to the first row, which becomes the selection.
+ * nothing selected, to the first row, which takes the cursor alone.
  *
  * With `tree` set the same table is a tree grid (PRD 002, §4.1): the rows are
  * a pre-flattened tree — `depth`, `expandable`, `expanded` already describe
@@ -205,9 +206,9 @@ export class UiFileList {
       }
       this.refocusAfterSort.set(false);
       // With nothing selected there is no place to go back to: the first row
-      // takes the cursor, and becomes the selection.
+      // takes the cursor, and still nothing is selected (PRD 004, §1.3.3).
       if (this.selectedIds().size === 0) {
-        this.focusRow(0);
+        this.focusRow(0, 'focus');
         return;
       }
       const index = this.rows().findIndex((row) => row.id === this.focusId());
@@ -267,8 +268,9 @@ export class UiFileList {
    * Focus arrived on a row from outside — the panel handing the keyboard
    * to its content (a click on its blank space, a tab chosen, `Tab` from
    * another panel, a folder entered), a sort — while nothing is selected
-   * (PRD 002, §3.1): the first row takes the cursor and becomes the
-   * selection. A pointer press selects by its own rules, and a move of this
+   * (PRD 002, §3.1): the first row takes the cursor, and nothing is selected
+   * — opening a folder picks nothing in it, so the details go on describing
+   * the folder (PRD 004, §1.3.3). A pointer press selects by its own rules, and a move of this
    * component's own (`Ctrl`+arrow, `Insert`) has already said what it means.
    */
   protected onFocusArrived(): void {
@@ -277,7 +279,7 @@ export class UiFileList {
       return;
     }
     if (this.selectedIds().size === 0) {
-      this.focusRow(0);
+      this.focusRow(0, 'focus');
     }
   }
 

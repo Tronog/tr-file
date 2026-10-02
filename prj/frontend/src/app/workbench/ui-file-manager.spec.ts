@@ -74,7 +74,7 @@ describe('UiFileList, sortable', () => {
     fixture.nativeElement.remove();
   });
 
-  it('focuses and selects the first row after a sort when nothing is selected', () => {
+  it('focuses the first row after a sort when nothing is selected, selecting nothing (PRD 004, §1.3.3)', () => {
     const changes: UiSelectionChange[] = [];
     fixture.componentRef.setInput('rows', ROWS.map(({ selected: _selected, ...row }) => row));
     fixture.componentRef.setInput('sortable', true);
@@ -84,7 +84,7 @@ describe('UiFileList, sortable', () => {
     (fixture.nativeElement.querySelector('th .sort-button') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(changes).toEqual([{ selected: ['docs'], focused: 'docs' }]);
+    expect(changes).toEqual([{ selected: [], focused: 'docs' }]);
     expect(document.activeElement).toBe(fixture.nativeElement.querySelector('tbody tr'));
   });
 

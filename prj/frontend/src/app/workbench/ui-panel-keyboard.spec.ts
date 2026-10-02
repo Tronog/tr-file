@@ -260,7 +260,7 @@ describe('UiFileList keyboard', () => {
     expect(document.activeElement).toBe(rows()[0]);
   });
 
-  /** PRD 002, §3.1: the keyboard never stands on a listing with nothing in hand. */
+  /** PRD 002, §3.1: the keyboard never stands outside a listing — on its first row, selecting nothing (PRD 004, §1.3.3). */
   describe('focus handed in with nothing selected', () => {
     let changes: UiSelectionChange[];
 
@@ -274,10 +274,10 @@ describe('UiFileList keyboard', () => {
       fixture.componentInstance.selectionChange.subscribe((change) => changes.push(change));
     });
 
-    it('selects the first row, and focuses it, wherever focus landed', () => {
+    it('puts the cursor on the first row, selecting nothing, wherever focus landed (PRD 004, §1.3.3)', () => {
       rows()[2]?.focus();
 
-      expect(changes).toEqual([{ selected: ['alpha.ts'], focused: 'alpha.ts' }]);
+      expect(changes).toEqual([{ selected: [], focused: 'alpha.ts' }]);
       expect(document.activeElement).toBe(rows()[0]);
     });
 
@@ -405,7 +405,7 @@ describe('UiIconView keyboard', () => {
   });
 
   /** PRD 002, §3.1, as in the list. */
-  it('selects the first tile when focus is handed in with nothing selected', () => {
+  it('puts the cursor on the first tile, selecting nothing, when focus is handed in with nothing selected', () => {
     const changes: UiSelectionChange[] = [];
     fixture.componentRef.setInput('items', ITEMS.map(({ selected: _selected, focused: _focused, ...item }) => item));
     fixture.detectChanges();
@@ -413,7 +413,7 @@ describe('UiIconView keyboard', () => {
 
     tiles()[3]?.focus();
 
-    expect(changes).toEqual([{ selected: ['alpha.ts'], focused: 'alpha.ts' }]);
+    expect(changes).toEqual([{ selected: [], focused: 'alpha.ts' }]);
     expect(document.activeElement).toBe(tiles()[0]);
   });
 });

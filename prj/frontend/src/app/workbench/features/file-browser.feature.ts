@@ -633,8 +633,10 @@ export class FileBrowserFeature implements PanelContentFeature {
   /**
    * Takes a selection from the list, tree or grid (PRD 004, §1.2): one entry
    * or many, and the one the cursor is on. The details sidebar follows the
-   * cursor; a box that caught nothing leaves the cursor, and the sidebar,
-   * where they were.
+   * cursor while something is selected; a cursor standing on an entry with
+   * nothing selected — where focus handed to a listing lands — describes the
+   * folder instead (PRD 004, §1.3.3). A box that caught nothing leaves the
+   * cursor, and the sidebar, where they were.
    */
   setSelection(groupId: string, change: UiSelectionChange): void {
     this.groups.update(groupId, (group) => ({
@@ -643,9 +645,11 @@ export class FileBrowserFeature implements PanelContentFeature {
       ...(change.focused === null ? {} : { focusedEntryId: change.focused }),
     }));
     this.groups.focus(groupId);
-    if (change.focused !== null) {
-      this.parent.select(change.focused);
+    if (change.focused === null) {
+      return;
     }
+    const folder = this.groups.stateOf(groupId)?.path;
+    this.parent.select(change.selected.length === 0 && folder !== undefined ? folder : change.focused);
   }
 
   /** Selects an entry inside a group, and only it; the details sidebar follows. */
