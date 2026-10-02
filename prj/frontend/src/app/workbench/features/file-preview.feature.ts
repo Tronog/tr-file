@@ -175,7 +175,8 @@ export class FilePreviewFeature {
    * `PgUp` / `PgDown` over an image (PRD 012, §1.1): the previous or next
    * image of its folder, in the order the panel would list it, round at
    * either end. The tab itself goes there — a viewer stepping through a
-   * folder, not a new tab per picture — and the details sidebar with it.
+   * folder, not a new tab per picture — and the details sidebar with it, and
+   * the cursor of the listing that opened it (§1.1.1; see `reflect`).
    *
    * No blank frames: the picture on screen stays until the next one has
    * loaded. A press while one is loading counts on from *that* one, and only
@@ -221,6 +222,39 @@ export class FilePreviewFeature {
       tab.id,
     );
     this.parent.select(next.path);
+    this.reflect(tab.openedFrom, folder, next.path);
+  }
+
+  /**
+   * PRD 012, §1.1.1: the listing an image was opened from — its tab, by id, in
+   * whichever panel it is now — moves its cursor and selection to the image
+   * stepped to, so closing the viewer lands on the last picture seen. Only
+   * while that tab still lists the image; a panel is not made active by it.
+   * A tab in the background has it put in what it remembers (PRD 001, Fix 4).
+   */
+  private reflect(openerTabId: string | undefined, folder: string, path: string): void {
+    const groups = this.parent.editorGroupsFt;
+    const group = openerTabId === undefined ? undefined : groups.states().find((candidate) => candidate.tabs.some((tab) => tab.id === openerTabId));
+    const opener = group?.tabs.find((tab) => tab.id === openerTabId);
+    if (group === undefined || opener === undefined || opener.kind !== 'folder') {
+      return;
+    }
+    if (groups.activeTabOf(group)?.id === opener.id) {
+      // Listed there: in its folder, or under it in the tree view — and not filtered out.
+      if (!this.parent.fileBrowserFt.entriesShown(group.id).includes(path)) {
+        return;
+      }
+      groups.update(group.id, (state) => ({ ...state, selection: [path], focusedEntryId: path }));
+      return;
+    }
+    if (opener.path !== folder) {
+      return;
+    }
+    const remembered = { path: folder, selection: [path], focusedEntryId: path };
+    groups.update(group.id, (state) => ({
+      ...state,
+      tabs: state.tabs.map((tab) => (tab.id === opener.id ? { ...tab, remembered } : tab)),
+    }));
   }
 
   /** Re-reads a file that is already open (the group's Refresh action). */

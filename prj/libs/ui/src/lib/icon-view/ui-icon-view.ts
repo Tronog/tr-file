@@ -192,6 +192,12 @@ export class UiIconView {
     return (anchor ?? items[0])?.id ?? null;
   });
 
+  /** The tile the application has the cursor on, if any. */
+  private readonly cursorId = computed(() => this.items().find((item) => item.focused)?.id ?? null);
+
+  /** The cursor last drawn; see the constructor. */
+  private drawnCursorId: string | null | undefined;
+
   /** Keys documented on every tile, so the set is discoverable. */
   protected readonly keyShortcuts = computed(() => `${listKeyShortcuts(this.keymap)} PageUp PageDown Home End`);
 
@@ -269,6 +275,27 @@ export class UiIconView {
       if (key !== this.shownKey) {
         this.shownKey = key;
         this.shown.emit(ids);
+      }
+    });
+
+    // A cursor the application moved while the keyboard is elsewhere — an
+    // image stepped through in the panel it was opened from (PRD 012, §1.1.1)
+    // — is scrolled into view; focus stays where it is.
+    afterRenderEffect(() => {
+      const cursor = this.cursorId();
+      const moved = this.drawnCursorId !== undefined && cursor !== this.drawnCursorId;
+      this.drawnCursorId = cursor;
+      if (!moved || cursor === null || this.host.contains(document.activeElement)) {
+        return;
+      }
+      const index = this.items().findIndex((item) => item.id === cursor);
+      if (this.virtual()) {
+        const line = Math.floor(index / this.perLine());
+        this.viewport.reveal(this.leading() + line * this.lineHeight(), this.lineHeight());
+      } else {
+        this.tiles()
+          .find((tile) => tile.nativeElement.dataset['itemId'] === cursor)
+          ?.nativeElement.scrollIntoView?.({ block: 'nearest' });
       }
     });
 

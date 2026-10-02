@@ -161,4 +161,70 @@ describe('Stepping through the images of a folder', () => {
     await step(1);
     expect(shown()).toEqual(['pics*']);
   });
+
+  /** PRD 012, §1.1.1 — the listing the picture was opened from follows it. */
+  describe('the listing it was opened from', () => {
+    const selectionOf = (id: string) => {
+      const group = workbench.editorGroupsFt.stateOf(id);
+      return { selection: group?.selection, focused: group?.focusedEntryId };
+    };
+
+    it('has its cursor on the last picture seen when the viewer is closed', async () => {
+      await openPicture('pics/a.png');
+      await step(1);
+      await step(1);
+
+      const viewer = workbench.editorGroupsFt.stateOf(groupId)?.tabs.find((tab) => tab.active)?.id as string;
+      workbench.editorGroupsFt.closeTab(groupId, viewer);
+      answer();
+      await settled();
+
+      expect(shown()).toEqual(['pics*']);
+      expect(selectionOf(groupId)).toEqual({ selection: ['pics/c.gif'], focused: 'pics/c.gif' });
+      expect(workbench.fileBrowserFt.browser(groupId)?.rows.find((row) => row.selected)?.id).toBe('pics/c.gif');
+    });
+
+    it('moves along in the other panel, which stays where it is, when Ctrl+Enter opened it there', async () => {
+      workbench.fileBrowserFt.navigateTo(groupId, 'pics', 'pics');
+      answer();
+      await settled();
+      workbench.fileBrowserFt.openEntryAside(groupId, 'pics/a.png');
+      await settled();
+      answer();
+      await settled();
+      const viewerGroup = workbench.activeGroupId();
+      expect(viewerGroup).not.toBe(groupId);
+
+      let finished = false;
+      void workbench.filePreviewFt.stepImage(viewerGroup, 1).then(() => (finished = true));
+      for (let round = 0; round < 10 && !finished; round++) {
+        await settled();
+        answer();
+      }
+
+      expect(selectionOf(groupId)).toEqual({ selection: ['pics/b.jpg'], focused: 'pics/b.jpg' });
+      expect(workbench.activeGroupId()).toBe(viewerGroup);
+    });
+
+    it('is left alone once it shows another folder', async () => {
+      await openPicture('pics/a.png');
+      const listing = workbench.editorGroupsFt.stateOf(groupId)?.tabs.find((tab) => !tab.active)?.id as string;
+      workbench.editorGroupsFt.selectTab(groupId, listing);
+      workbench.fileBrowserFt.navigateTo(groupId, '', 'root');
+      answer();
+      await settled();
+      const viewer = workbench.editorGroupsFt.stateOf(groupId)?.tabs.find((tab) => !tab.active)?.id as string;
+      workbench.editorGroupsFt.selectTab(groupId, viewer);
+      answer();
+      await settled();
+
+      await step(1);
+      workbench.editorGroupsFt.closeTab(groupId, viewer);
+      answer();
+      await settled();
+
+      expect(workbench.editorGroupsFt.pathOf(groupId)).toBe('');
+      expect(selectionOf(groupId).selection).toEqual([]);
+    });
+  });
 });

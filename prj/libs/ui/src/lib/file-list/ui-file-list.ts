@@ -125,11 +125,14 @@ export class UiFileList {
   /** A column header was clicked: sort by this column's key (or turn its order round). */
   readonly sort = output<string>();
 
+  /** The row the application has the cursor on, if any. */
+  private readonly cursorId = computed(() => this.rows().find((row) => row.focused)?.id ?? null);
+
   /** The one row that is keyboard reachable (roving tabindex). */
-  protected readonly focusId = computed(() => {
-    const rows = this.rows();
-    return (rows.find((row) => row.focused) ?? rows[0])?.id ?? null;
-  });
+  protected readonly focusId = computed(() => this.cursorId() ?? this.rows()[0]?.id ?? null);
+
+  /** The cursor last drawn; see the constructor. */
+  private drawnCursorId: string | null | undefined;
 
   /** Keys documented on every row, so the set is discoverable. */
   protected readonly keyShortcuts = computed(() => `${listKeyShortcuts(this.keymap)} PageUp PageDown Home End`);
@@ -214,6 +217,26 @@ export class UiFileList {
       const index = this.rows().findIndex((row) => row.id === this.focusId());
       if (index !== -1) {
         this.moveFocus(index);
+      }
+    });
+
+    // A cursor the application moved while the keyboard is elsewhere — an
+    // image stepped through in the panel it was opened from (PRD 012, §1.1.1)
+    // — is scrolled into view; focus stays where it is.
+    afterRenderEffect(() => {
+      const cursor = this.cursorId();
+      const moved = this.drawnCursorId !== undefined && cursor !== this.drawnCursorId;
+      this.drawnCursorId = cursor;
+      if (!moved || cursor === null || this.host.contains(document.activeElement)) {
+        return;
+      }
+      const index = this.rows().findIndex((row) => row.id === cursor);
+      if (this.virtual()) {
+        this.viewport.reveal(this.leading() + index * this.rowHeight(), this.rowHeight());
+      } else {
+        this.rowElements()
+          .find((element) => element.nativeElement.dataset['rowId'] === cursor)
+          ?.nativeElement.scrollIntoView?.({ block: 'nearest' });
       }
     });
 

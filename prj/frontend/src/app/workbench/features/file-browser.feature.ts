@@ -683,8 +683,13 @@ export class FileBrowserFeature implements PanelContentFeature {
       void this.parent.systemOpenFt.open(entry.path);
       return;
     } else {
+      const from = this.activeTabIdOf(groupId);
       this.groups.focus(groupId);
       this.parent.filePreviewFt.open(entry.path);
+      // The listing it was opened from follows it through its folder (PRD 012, §1.1.1).
+      if (from !== undefined) {
+        this.groups.markOpenedFrom(groupId, from);
+      }
     }
 
     // Either way the listing that had focus is gone — replaced by another
@@ -693,6 +698,11 @@ export class FileBrowserFeature implements PanelContentFeature {
     // `Alt`+`←`, and no `Ctrl`+`W` to close the tab that was just opened.
     // Whether the entry was opened by double click or by `Enter`.
     this.parent.panelFocusFt.focusBody(groupId);
+  }
+
+  private activeTabIdOf(groupId: string): string | undefined {
+    const group = this.groups.stateOf(groupId);
+    return group === undefined ? undefined : this.groups.activeTabOf(group)?.id;
   }
 
   /**
@@ -721,8 +731,7 @@ export class FileBrowserFeature implements PanelContentFeature {
 
     const directory = isFolder(entry);
     const tab = { label: entry.name, path: entry.path, kind: directory ? ('folder' as const) : ('file' as const) };
-    const source = this.groups.stateOf(groupId);
-    const from = source === undefined ? undefined : this.groups.activeTabOf(source)?.id;
+    const from = this.activeTabIdOf(groupId);
     let target = this.groups.otherGroupOf(groupId);
     if (target === undefined) {
       target = this.groups.openBeside(groupId, 'right', (id) => ({ id: `tab-${id}`, ...tab }));

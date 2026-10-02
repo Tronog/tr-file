@@ -88,6 +88,31 @@ describe('UiFileList, sortable', () => {
     expect(document.activeElement).toBe(fixture.nativeElement.querySelector('tbody tr'));
   });
 
+  /** PRD 012, §1.1.1: a cursor moved from elsewhere — an image stepped through — is brought into view. */
+  it('scrolls to a cursor the application moved while focus is elsewhere, leaving focus there', () => {
+    const scrolled: string[] = [];
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.dataset['rowId'] ?? '');
+    };
+    const outside = document.createElement('button');
+    document.body.append(fixture.nativeElement, outside);
+    try {
+      fixture.detectChanges();
+      outside.focus();
+
+      fixture.componentRef.setInput('rows', ROWS.map((row) => ({ ...row, focused: row.id === 'b.txt', selected: row.id === 'b.txt' })));
+      fixture.detectChanges();
+
+      expect(scrolled).toEqual(['b.txt']);
+      expect(document.activeElement).toBe(outside);
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+      fixture.nativeElement.remove();
+      outside.remove();
+    }
+  });
+
   it('keeps plain headers when it is not sortable', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.sort-button')).toBeNull();

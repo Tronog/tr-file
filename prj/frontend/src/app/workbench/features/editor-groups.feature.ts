@@ -237,8 +237,9 @@ export class EditorGroupsFeature {
   }
 
   /**
-   * Notes on the tab `groupId` shows that `fromTabId` opened it (PRD 002, §2.5.1), so closing it
-   * goes back there; see `closeTab`.
+   * Notes on the tab `groupId` shows that `fromTabId` opened it — a file opened from a listing, or
+   * anything `Ctrl`+`Enter` opened (PRD 002, §2.5.1; PRD 012, §1.1.1) — so closing it goes back
+   * there (see `closeTab`), and an image stepped through moves that listing's cursor along.
    */
   markOpenedFrom(groupId: string, fromTabId: string): void {
     this.update(groupId, (group) => {

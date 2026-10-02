@@ -107,7 +107,8 @@ typed (`isPanelCharacter`), and the group ignores it in a text field. `Ctrl`+`En
 the other one; with more, the previous one, or the next in layout order once it has gone
 (`EditorGroupsFeature.otherGroupOf`); splitting one off only when there is none — and take the keyboard there (`FileBrowserFeature.openEntryAside`);
 closing a tab opened so chooses the tab it was opened from again, wherever it is, and gives its panel the
-keyboard (§2.5.1; `PanelTabState.openedFrom`, session only, read by `EditorGroupsFeature.closeTab`); the key is
+keyboard (§2.5.1; `PanelTabState.openedFrom`, session only, read by `EditorGroupsFeature.closeTab`;
+a file opened from a listing in its own panel notes it too); the key is
 `UiFileBrowser`'s, on its host, and the double click the views' `activateAside`; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring explorer → each
 panel in layout order → bottom panel (while open) → details, and round: `FocusCycleFeature`
 decides the ring, the `Workbench` component finds the `data-focus-region` that has focus and
@@ -155,7 +156,11 @@ contain (§7.3.1). The viewer's model lives in `UiImageViewService`, provided pe
 `PgUp` / `PgDown` over an image (PRD 012, §1.1; keymap `image.previous` / `image.next`, answered by
 `UiFileBrowser` only while it shows one) step the tab through its folder's images, in the order the
 panel sorts that folder and round at the ends (`FilePreviewFeature.stepImage`): the next picture is
-loaded before the tab moves to it, and a press meanwhile counts on from the one loading.
+loaded before the tab moves to it, and a press meanwhile counts on from the one loading. The listing
+it was opened from (§1.1.1; its tab is the viewer's `openedFrom`) follows: its cursor and selection move
+to each picture — in its remembered state when that tab is in the background — while it still lists it,
+without becoming the active panel, and `UiFileList` / `UiIconView` scroll a cursor moved while focus is
+elsewhere into view (`FilePreviewFeature.reflect`).
 In the viewer itself (§1.2) `+` / `-` zoom, `1` is 100 % and `0` the default fit — keymap commands
 in their own context, `when: 'image'`, so a digit is never taken from type-to-find in a listing —
 and the arrows pan an image larger than the view (`UiImageViewService.panBy`; navigation, so fixed).
