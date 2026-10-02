@@ -79,8 +79,8 @@ export class DetailsFeature {
       details.parent === null
         ? { label: 'Location', value: this.locationOf(details), mono: true }
         : this.pathValue({ label: 'Location', value: this.locationOf(details), mono: true }, 'copy-location'),
-      { label: 'Size', value: `${details.size.toLocaleString('en-US')} bytes (${files.formatBytes(details.size)})` },
-      { label: 'On disk', value: files.formatBytes(details.sizeOnDisk) },
+      this.sizeValue({ label: 'Size', value: `${details.size.toLocaleString('en-US')} bytes (${files.formatBytes(details.size)})` }, details),
+      this.sizeValue({ label: 'On disk', value: files.formatBytes(details.sizeOnDisk) }, details),
       { label: 'Created', value: files.fullTimestamp(details.createdAt) },
       { label: 'Modified', value: files.fullTimestamp(details.modifiedAt) },
       { label: 'Accessed', value: files.fullTimestamp(details.accessedAt) },
@@ -153,6 +153,11 @@ export class DetailsFeature {
     ];
   });
 
+  /** A folder's Size or On disk: pressed, it opens Disk Usage on the folder (PRD 001, §9.3.2). */
+  private sizeValue(property: UiProperty, details: FsDetails): UiProperty {
+    return isFolder(details) ? { ...property, action: 'disk-usage', actionLabel: 'Show disk usage' } : property;
+  }
+
   /** A value that is a path: copied when pressed, the UNIX way with `Shift` (PRD 001, §9.3.1). */
   private pathValue(property: UiProperty, key: string): UiProperty {
     return this.parent.systemOpenFt.copyable(property, key);
@@ -178,7 +183,7 @@ export class DetailsFeature {
     }
   }
 
-  /** A value of the Properties list or the transfer paths pressed: a path copied, or the entries counted. */
+  /** A value of the Properties list or the transfer paths pressed: a path copied, the entries counted, or Disk Usage opened. */
   runProperty(activation: UiPropertyActivation): void {
     const value = this.copyableOf(activation.id);
     if (value !== null) {
@@ -285,6 +290,11 @@ export class DetailsFeature {
         break;
       case 'count-entries':
         void this.countEntries(details.path);
+        break;
+      case 'disk-usage':
+        if (isFolder(details)) {
+          void this.parent.diskUsageFt.open(details.path);
+        }
         break;
       case 'copy-path':
         void this.parent.systemOpenFt.copyPaths([details.path]);

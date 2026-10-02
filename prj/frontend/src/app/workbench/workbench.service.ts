@@ -25,6 +25,7 @@ import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
 import { AppUpdateFeature } from './features/app-update.feature';
 import { HelpFeature } from './features/help.feature';
+import { DiskUsageFeature } from './features/disk-usage.feature';
 import { WorkbenchResizeFeature } from './features/workbench-resize.feature';
 import { OperationsFeature } from './features/operations.feature';
 import { FocusCycleFeature } from './features/focus-cycle.feature';
@@ -245,6 +246,8 @@ export class WorkbenchService {
   readonly helpFt = new HelpFeature(this);
   /** The backend machine's date and time, at the right of the status bar (PRD 001, §13.1). */
   readonly serverClockFt = new ServerClockFeature(this);
+  /** What takes up a folder's space, opened from its Size in Details (PRD 001, §9.3.2). */
+  readonly diskUsageFt = new DiskUsageFeature(this);
 
   /** What the root is called: the backend's name for it (PRD 003, §6). */
   readonly workspaceName = computed(() => this.placesFt.rootLabel());

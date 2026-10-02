@@ -209,6 +209,31 @@ describe('DetailsFeature', () => {
     });
   });
 
+  /** PRD 001, §9.3.2 — a folder's Size and On disk open Disk Usage on it; a file's are plain values. */
+  describe('a folder\'s size', () => {
+    const property = (label: string) => workbench.detailsFt.properties().find((candidate) => candidate.label === label);
+
+    it('opens Disk Usage on the folder when Size or On disk is pressed', async () => {
+      const open = vi.spyOn(workbench.diskUsageFt, 'open').mockResolvedValue();
+      await selectAndFlush('docs', fsDirectoryDetails('docs', { entryCount: 4 }));
+      expect(property('Size')).toMatchObject({ action: 'disk-usage', actionLabel: 'Show disk usage' });
+      expect(property('On disk')).toMatchObject({ action: 'disk-usage' });
+
+      workbench.detailsFt.runProperty({ id: 'disk-usage', shift: false });
+      expect(open).toHaveBeenCalledWith('docs');
+    });
+
+    it('leaves a file\'s size a plain value', async () => {
+      const open = vi.spyOn(workbench.diskUsageFt, 'open').mockResolvedValue();
+      await selectAndFlush('readme.md');
+      expect(property('Size')?.action).toBeUndefined();
+      expect(property('On disk')?.action).toBeUndefined();
+
+      workbench.detailsFt.runAction('disk-usage');
+      expect(open).not.toHaveBeenCalled();
+    });
+  });
+
   /** PRD 001, §9.3.1 — a path in Details copies itself when pressed; the UNIX way with `Shift`. */
   describe('copying paths', () => {
     const property = (label: string) =>

@@ -397,6 +397,8 @@ way with `Shift`: `SystemOpenFeature.copyable` makes the `UiProperty` a `copy` b
 reports `{ id, shift }`), `copyPathValue` copies an entry of the root as *Copy Path* does and a path
 naming none (a link's target, the system trash's) as text — `FsTransport.copyText`, bridge
 `clipboard-write-text` — and the value says `Copied` for a moment (`badge`).
+A folder's *Size* and *On disk* there are pressable too (PRD 001, §9.3.2): they open the `disk-usage`
+sub-application on it, `DiskUsageFeature.open` — for now only a message saying it is not built yet.
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what
