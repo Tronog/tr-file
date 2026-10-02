@@ -8,6 +8,10 @@
       [class.is-selected]="node.selected"
       [class.is-focused]="node.focused"
       [class.is-cut]="node.cut"
+      [class.is-dragging]="draggedId() === node.id"
+      [class.drop-before]="dropAt()?.id === node.id && dropAt()?.position === 'before'"
+      [class.drop-after]="dropAt()?.id === node.id && dropAt()?.position === 'after'"
+      [attr.draggable]="reorderable() ? 'true' : null"
       [class.deco-modified]="node.decoration === 'modified'"
       [class.deco-untracked]="node.decoration === 'untracked'"
       [class.deco-ignored]="node.decoration === 'ignored'"
@@ -20,6 +24,11 @@
       (click)="activate.emit(node.id)"
       (dblclick)="open.emit(node.id)"
       (contextmenu)="onRowContextMenu($event, node)"
+      (dragstart)="onDragStart($event, node)"
+      (dragend)="onDragEnd()"
+      (dragover)="onDragOver($event, node)"
+      (dragleave)="onDragLeave($event, node)"
+      (drop)="onDrop($event, node)"
     >
       <span class="indent" aria-hidden="true">
         @for (guide of node.guides; track $index) {

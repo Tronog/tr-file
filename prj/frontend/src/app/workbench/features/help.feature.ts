@@ -2,6 +2,7 @@ import { computed, signal } from '@angular/core';
 import { chordParts, displayKey, type UiCheatsheetHue, type UiCheatsheetRow, type UiCheatsheetSection, type UiHelpTab, type UiKeyContext } from '@tr-file/ui';
 import { HelpModal } from '../help/help-modal';
 import type { WorkbenchService } from '../workbench.service';
+import { BOOKMARK_KEYS, openBookmarkCommand } from './places.feature';
 
 /** The Help window's pages (PRD 001, §16). */
 export type HelpTabId = 'cheatsheet';
@@ -87,6 +88,12 @@ const SUBJECTS: readonly { readonly id: string; readonly title: string; readonly
     hue: 'pink',
     commands: ['image.previous', 'image.next', 'image.zoomIn', 'image.zoomOut', 'image.actualSize', 'image.fit'],
   },
+  {
+    id: 'bookmarks',
+    title: 'Bookmarks',
+    hue: 'yellow',
+    commands: Array.from({ length: BOOKMARK_KEYS }, (_, index) => openBookmarkCommand(index + 1)),
+  },
 ];
 
 /** Where a key applies, when it is narrower than its card says. */
@@ -160,6 +167,7 @@ const FIXED: readonly { readonly id: string; readonly title: string; readonly hu
     hue: 'blue',
     rows: [
       [[['Ctrl', '↑'], ['Ctrl', '↓']], 'On a section header: move the section'],
+      [[['Ctrl', '↑'], ['Ctrl', '↓']], 'On a bookmark: move it up / down'],
       [[['↑'], ['↓']], 'On a section’s resize handle: resize'],
       [[['←'], ['→']], 'On a sidebar’s edge: resize the sidebar'],
       [[['Ctrl', 'Enter']], 'Git message box: commit'],

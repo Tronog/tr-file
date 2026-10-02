@@ -88,6 +88,22 @@ export interface UiPaneMove {
 }
 
 /**
+ * MIME type carrying a dragged row of a reorderable `UiTree` (PRD 002, §6.1);
+ * the payload is the row's id.
+ */
+export const UI_TREE_ROW_MIME = 'application/x-tr-file-tree-row';
+
+/**
+ * A row of a reorderable tree dropped on another row of the same tree — or
+ * moved a slot up or down with `Ctrl`+`↑`/`↓` — to go before or after it.
+ */
+export interface UiTreeMove {
+  readonly id: string;
+  readonly targetId: string;
+  readonly position: 'before' | 'after';
+}
+
+/**
  * The sash on a pane's top edge was dragged (PRD 002, §5.2): the height, in
  * pixels, of every expanded pane of that sidebar — the two either side of the
  * sash as moved, the rest as they stand. Given back as each pane's `size`,

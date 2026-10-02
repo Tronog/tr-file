@@ -2,6 +2,7 @@ import { computed, inject, signal } from '@angular/core';
 import { UI_DEFAULT_KEYBINDINGS, UiKeymap, chordOf, displayChord, type UiKeyContext, type UiKeybinding } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 import type { CommandTarget } from './commands.feature';
+import { BOOKMARK_KEYS, openBookmarkCommand } from './places.feature';
 
 /** Where the user's changes to the key bindings are kept (PRD 010, §2) — for every backend alike. */
 export const KEYBINDINGS_KEY = 'tr-file.keybindings.v1';
@@ -22,6 +23,12 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'view.toggleDetails', key: 'Ctrl+D', when: 'window' },
   // PRD 001, §8.6.1 — the desktop's; in a browser the command is disabled and the key does nothing.
   { command: 'file.checkForUpdates', key: 'Ctrl+U', when: 'window' },
+  // The bookmarks, in their order, from any panel (PRD 002, §6.1).
+  ...Array.from({ length: BOOKMARK_KEYS }, (_, index): UiKeybinding => ({
+    command: openBookmarkCommand(index + 1),
+    key: `Ctrl+${index + 1}`,
+    when: 'window',
+  })),
   { command: 'workbench.focusNextPart', key: 'Ctrl+Tab', when: 'window' },
   { command: 'workbench.focusPreviousPart', key: 'Ctrl+Shift+Tab', when: 'window' },
   { command: 'workbench.nextPanel', key: 'Tab', when: 'panel' },

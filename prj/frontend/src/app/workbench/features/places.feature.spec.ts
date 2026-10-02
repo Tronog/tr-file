@@ -102,8 +102,8 @@ describe('PlacesFeature', () => {
       places().addBookmark('home/me/projects');
 
       expect(places().bookmarkNodes().map((node) => [node.label, node.meta, node.icon])).toEqual([
-        ['projects', undefined, 'star'],
-        ['share', undefined, 'star'],
+        ['projects', 'Ctrl+1', 'star'],
+        ['share', 'Ctrl+2', 'star'],
       ]);
 
       places().renameBookmark('srv/share', '  The share ');
@@ -117,6 +117,45 @@ describe('PlacesFeature', () => {
 
       places().removeBookmark('srv/share');
       expect(places().isBookmarked('srv/share')).toBe(false);
+    });
+
+    it('reorders by a row dropped before or after another (PRD 002, §6.1)', () => {
+      for (const path of ['a', 'b', 'c', 'd']) {
+        places().addBookmark(path);
+      }
+      places().reorderBookmark({ id: 'bookmark:a', targetId: 'bookmark:c', position: 'after' });
+      expect(places().bookmarks().map((bookmark) => bookmark.path)).toEqual(['b', 'c', 'a', 'd']);
+      places().reorderBookmark({ id: 'bookmark:d', targetId: 'bookmark:b', position: 'before' });
+      expect(places().bookmarks().map((bookmark) => bookmark.path)).toEqual(['d', 'b', 'c', 'a']);
+      places().reorderBookmark({ id: 'bookmark:c', targetId: 'bookmark:c', position: 'before' });
+      places().reorderBookmark({ id: 'bookmark:x', targetId: 'bookmark:c', position: 'before' });
+      expect(places().bookmarks().map((bookmark) => bookmark.path)).toEqual(['d', 'b', 'c', 'a']);
+      expect(workbench.settings.get(`${BOOKMARKS_KEY}:local`)).toEqual(places().bookmarks());
+      expect(places().bookmarkNodes().map((node) => node.meta)).toEqual(['Ctrl+1', 'Ctrl+2', 'Ctrl+3', 'Ctrl+4']);
+    });
+
+    it('opens the nth bookmark in the active panel with Ctrl+1 … Ctrl+9, from anywhere (PRD 002, §6.1)', async () => {
+      places().addBookmark('home/me/projects');
+      places().addBookmark('srv/share');
+      const press = (key: string): KeyboardEvent => {
+        const event = new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true });
+        workbench.keybindingsFt.handleShortcut(event);
+        return event;
+      };
+
+      expect(press('2').defaultPrevented).toBe(true);
+      await flushListings();
+      expect(workbench.editorGroupsFt.stateOf(workbench.activeGroupId())?.path).toBe('srv/share');
+
+      press('1');
+      await flushListings();
+      expect(workbench.editorGroupsFt.stateOf(workbench.activeGroupId())?.path).toBe('home/me/projects');
+
+      // No third bookmark: claimed, and nothing moves.
+      expect(press('3').defaultPrevented).toBe(true);
+      expect(workbench.commandsFt.isEnabled('places.openBookmark3', workbench.commandsFt.activeTarget())).toBe(false);
+      expect(workbench.editorGroupsFt.stateOf(workbench.activeGroupId())?.path).toBe('home/me/projects');
+      expect(workbench.keybindingsFt.describe('places.openBookmark2').label).toBe('Bookmark 2: share');
     });
 
     it('follows a renamed folder — keeping a label the user chose', () => {

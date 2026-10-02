@@ -2,6 +2,7 @@ import type { UiMenuItem, UiPanelView } from '@tr-file/ui';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
 import type { PanelSortKey } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
+import { BOOKMARK_KEYS, openBookmarkCommand } from './places.feature';
 import { DEFAULT_PANE_ORDER, PANE_LABELS } from './sidebar-panes.feature';
 
 /**
@@ -455,6 +456,21 @@ export class CommandsFeature {
         enabled: (t) => t.folder !== null && p.placesFt.canMoveBookmark(t.folder, 1),
         run: (t) => p.placesFt.moveBookmark(t.folder as string, 1),
       },
+      // `Ctrl`+`1` to `Ctrl`+`9` (PRD 002, §6.1): the bookmarks in their order, in the active panel.
+      ...Array.from({ length: BOOKMARK_KEYS }, (_, index): CommandSpec => {
+        const n = index + 1;
+        const bookmark = () => p.placesFt.bookmarks()[index];
+        return {
+          id: openBookmarkCommand(n),
+          category: 'Go',
+          label: () => {
+            const label = bookmark()?.label;
+            return label === undefined ? `Bookmark ${n}` : `Bookmark ${n}: ${label}`;
+          },
+          enabled: () => bookmark() !== undefined,
+          run: () => p.placesFt.openBookmark(n),
+        };
+      }),
       {
         id: 'places.removeRecent',
         category: 'Places',

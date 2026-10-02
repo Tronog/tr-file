@@ -44,6 +44,31 @@
   &.is-cut {
     opacity: 0.5;
   }
+
+  // A reorderable tree (PRD 002, §6.1): the row dragged, and where it would go.
+  &.is-dragging {
+    opacity: 0.5;
+  }
+
+  &.drop-before::before,
+  &.drop-after::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    height: 2px;
+    background: var(--vsc-accent);
+    pointer-events: none;
+  }
+
+  &.drop-before::before {
+    top: 0;
+  }
+
+  &.drop-after::after {
+    bottom: 0;
+  }
 }
 
 /* git decorations tint the label and the right-hand meta hint */

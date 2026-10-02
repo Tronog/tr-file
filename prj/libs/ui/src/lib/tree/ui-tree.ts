@@ -1,6 +1,13 @@
-import { Component, afterRenderEffect, computed, input, output, viewChildren, type ElementRef } from '@angular/core';
+import { Component, Injector, afterNextRender, afterRenderEffect, computed, inject, input, output, signal, viewChildren, type ElementRef } from '@angular/core';
 import { UiIcon } from '../icon/ui-icon';
-import type { UiContextMenuRequest, UiTreeNode } from '../models';
+import { UI_TREE_ROW_MIME, type UiContextMenuRequest, type UiTreeMove, type UiTreeNode } from '../models';
+
+/**
+ * The row being dragged, and the tree it is in. A drag's payload cannot be
+ * read before the drop, so this is how a row under the pointer knows whether
+ * the drag is one of its own tree's — rows move within their tree.
+ */
+let dragging: { readonly id: string; readonly tree: UiTree } | null = null;
 
 /**
  * The directory tree.
@@ -17,6 +24,11 @@ import type { UiContextMenuRequest, UiTreeNode } from '../models';
  * decorative: arrows move between rows, `ArrowRight`/`ArrowLeft` open and close
  * a directory, and `Enter` (the row is a button) activates it. Without this,
  * a keyboard user could never expand anything.
+ *
+ * A `reorderable` tree — a flat list the user orders, like the Bookmarks
+ * (PRD 002, §6.1) — lets a row be dragged onto another of the same tree (the
+ * upper half puts it before, the lower half after), or moved a slot with
+ * `Ctrl`+`↑`/`↓`, and reports a `UiTreeMove`; the order is the application's.
  */
 @Component({
   selector: 'ui-tree',
@@ -50,6 +62,20 @@ export class UiTree {
    * menu key (PRD 003, §5). The menu is the application's to draw.
    */
   readonly contextMenu = output<UiContextMenuRequest>();
+
+  /** Whether rows can be dragged into another order, and moved with `Ctrl`+`↑`/`↓`. */
+  readonly reorderable = input(false);
+
+  /** A row should move before or after another; see `reorderable`. */
+  readonly reorder = output<UiTreeMove>();
+
+  /** The row being dragged out of this tree; dimmed. */
+  protected readonly draggedId = signal<string | null>(null);
+
+  /** The row a drag is over, and which half of it. */
+  protected readonly dropAt = signal<{ readonly id: string; readonly position: 'before' | 'after' } | null>(null);
+
+  private readonly injector = inject(Injector);
 
   /** The single tab stop: the focused row, else the first one. */
   protected readonly tabStopId = computed(() => {
@@ -107,6 +133,14 @@ export class UiTree {
       return;
     }
 
+    if (this.reorderable() && event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        this.moveBy(index, event.key === 'ArrowUp' ? -1 : 1);
+      }
+      return;
+    }
+
     switch (event.key) {
       case 'ArrowDown':
         this.focusRow(index + 1);
@@ -141,6 +175,90 @@ export class UiTree {
     }
 
     event.preventDefault();
+  }
+
+  /* -- reordering ------------------------------------------------------------ */
+
+  protected onDragStart(event: DragEvent, node: UiTreeNode): void {
+    const transfer = event.dataTransfer;
+    if (!this.reorderable() || !transfer) {
+      return;
+    }
+    transfer.setData(UI_TREE_ROW_MIME, node.id);
+    transfer.effectAllowed = 'move';
+    dragging = { id: node.id, tree: this };
+    this.draggedId.set(node.id);
+  }
+
+  protected onDragEnd(): void {
+    dragging = null;
+    this.draggedId.set(null);
+    this.dropAt.set(null);
+  }
+
+  protected onDragOver(event: DragEvent, node: UiTreeNode): void {
+    if (!this.accepts(event, node)) {
+      return;
+    }
+    event.preventDefault();
+    (event.dataTransfer as DataTransfer).dropEffect = 'move';
+    this.dropAt.set({ id: node.id, position: UiTree.positionAt(event) });
+  }
+
+  protected onDragLeave(event: DragEvent, node: UiTreeNode): void {
+    const related = event.relatedTarget;
+    if (related instanceof Node && (event.currentTarget as HTMLElement).contains(related)) {
+      return;
+    }
+    if (this.dropAt()?.id === node.id) {
+      this.dropAt.set(null);
+    }
+  }
+
+  protected onDrop(event: DragEvent, node: UiTreeNode): void {
+    this.dropAt.set(null);
+    if (!this.accepts(event, node) || dragging === null) {
+      return;
+    }
+    event.preventDefault();
+    this.reorder.emit({ id: dragging.id, targetId: node.id, position: UiTree.positionAt(event) });
+  }
+
+  /** A row of this tree, other than `node`, is dragged over `node`. */
+  private accepts(event: DragEvent, node: UiTreeNode): boolean {
+    const types = event.dataTransfer?.types;
+    return (
+      this.reorderable() &&
+      types !== undefined &&
+      Array.from(types).includes(UI_TREE_ROW_MIME) &&
+      dragging !== null &&
+      dragging.tree === this &&
+      dragging.id !== node.id
+    );
+  }
+
+  /** `Ctrl`+`↑`/`↓`: a slot up or down, past the neighbour; the row keeps the keyboard. */
+  private moveBy(index: number, by: -1 | 1): void {
+    const nodes = this.nodes();
+    const node = nodes[index];
+    const target = nodes[index + by];
+    if (node === undefined || target === undefined) {
+      return;
+    }
+    this.reorder.emit({ id: node.id, targetId: target.id, position: by === -1 ? 'before' : 'after' });
+    // Moving the element in the DOM can take focus from it; give it back.
+    afterNextRender(
+      () => {
+        const at = this.nodes().findIndex((candidate) => candidate.id === node.id);
+        this.focusRow(at);
+      },
+      { injector: this.injector },
+    );
+  }
+
+  private static positionAt(event: DragEvent): 'before' | 'after' {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
   }
 
   /** Index of the row the event came from, or `-1` when it came from nowhere. */

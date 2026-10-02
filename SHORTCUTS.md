@@ -37,6 +37,7 @@ the configurable keys as they are bound now, the user's changes included.
 | `Ctrl`+`D` | Show or hide Details | Anywhere |
 | `Ctrl`+`U` | Check for updates (desktop) | Anywhere |
 | `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` | Focus next / previous part: Explorer → each panel → bottom panel (while open) → Details, and round | Anywhere |
+| `Ctrl`+`1` … `Ctrl`+`9` | Go to the first … ninth bookmark, in the active panel (desktop; a browser keeps them for its tabs) | Anywhere |
 
 ### Function keys (Midnight Commander)
 
@@ -164,6 +165,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | Key | Action |
 | --- | --- |
 | `Ctrl`+`↑` / `Ctrl`+`↓` on a section header | Move the section up / down |
+| `Ctrl`+`↑` / `Ctrl`+`↓` on a bookmark | Move the bookmark up / down (or drag it) |
 | `↑` / `↓` on a section's resize handle | Resize the sections either side |
 | `←` / `→` on a sidebar's edge handle | Resize the sidebar |
 

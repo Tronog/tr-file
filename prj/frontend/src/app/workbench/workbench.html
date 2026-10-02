@@ -154,6 +154,8 @@
               <ui-tree
                 label="Bookmarks"
                 [nodes]="places.bookmarkNodes()"
+                [reorderable]="true"
+                (reorder)="places.reorderBookmark($event)"
                 (activate)="places.open($event)"
                 (contextMenu)="places.openMenu($event)"
               />

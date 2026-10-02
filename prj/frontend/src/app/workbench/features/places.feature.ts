@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import type { UiContextMenuRequest, UiIconName, UiTreeNode } from '@tr-file/ui';
+import type { UiContextMenuRequest, UiIconName, UiTreeMove, UiTreeNode } from '@tr-file/ui';
 import type { FsPlaceKind, FsPlaces } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
 import { TRASH_PLACE } from './trash.feature';
@@ -11,6 +11,12 @@ export const RECENT_KEY = 'tr-file.recent.v1';
 
 /** How many recent folders are kept. */
 export const RECENT_LIMIT = 12;
+
+/** How many bookmarks have a key of their own: `Ctrl`+`1` to `Ctrl`+`9` (PRD 002, §6.1). */
+export const BOOKMARK_KEYS = 9;
+
+/** The command that opens the `n`th bookmark (1 based) in the active panel. */
+export const openBookmarkCommand = (n: number): string => `places.openBookmark${n}`;
 
 /** A folder the user pinned, and what they call it. */
 export interface Bookmark {
@@ -104,8 +110,17 @@ export class PlacesFeature {
     },
   ]);
 
+  /** In the user's order; each of the first nine with its key beside it (PRD 002, §6.1). */
   readonly bookmarkNodes = computed<readonly UiTreeNode[]>(() =>
-    this.bookmarkList().map((bookmark) => this.node('bookmark', bookmark.path, bookmark.label, 'star')),
+    this.bookmarkList().map((bookmark, index) =>
+      this.node(
+        'bookmark',
+        bookmark.path,
+        bookmark.label,
+        'star',
+        index < BOOKMARK_KEYS ? this.parent.keybindingsFt.label(openBookmarkCommand(index + 1)) : undefined,
+      ),
+    ),
   );
 
   readonly recentNodes = computed<readonly UiTreeNode[]>(() =>
@@ -125,6 +140,17 @@ export class PlacesFeature {
     const groupId = this.parent.activeGroupId();
     this.parent.fileBrowserFt.openFolder(groupId, path, this.labelFor(path));
     this.parent.panelFocusFt.focusBody(groupId);
+  }
+
+  /**
+   * The `n`th bookmark (1 based) in the active panel — `Ctrl`+`1` to `Ctrl`+`9`
+   * from any panel (PRD 002, §6.1). Nothing when there are fewer.
+   */
+  openBookmark(n: number): void {
+    const bookmark = this.bookmarkList()[n - 1];
+    if (bookmark !== undefined) {
+      this.open(`bookmark:${bookmark.path}`);
+    }
   }
 
   /** A folder of the Places panes in a new panel beside the active one. */
@@ -185,6 +211,26 @@ export class PlacesFeature {
     }
     [list[at], list[to]] = [list[to] as Bookmark, list[at] as Bookmark];
     this.saveBookmarks(list);
+  }
+
+  /** A bookmark row dragged onto another, or moved with `Ctrl`+`↑`/`↓` (PRD 002, §6.1). */
+  reorderBookmark(move: UiTreeMove): void {
+    const path = PlacesFeature.pathOf(move.id);
+    const target = PlacesFeature.pathOf(move.targetId);
+    const list = this.bookmarkList();
+    const moved = list.find((bookmark) => bookmark.path === path);
+    if (moved === undefined || target === null || target === path) {
+      return;
+    }
+    const rest = list.filter((bookmark) => bookmark !== moved);
+    const at = rest.findIndex((bookmark) => bookmark.path === target);
+    if (at === -1) {
+      return;
+    }
+    const next = [...rest.slice(0, at + (move.position === 'after' ? 1 : 0)), moved, ...rest.slice(at + (move.position === 'after' ? 1 : 0))];
+    if (next.some((bookmark, index) => bookmark !== list[index])) {
+      this.saveBookmarks(next);
+    }
   }
 
   canMoveBookmark(path: string, by: -1 | 1): boolean {

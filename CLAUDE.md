@@ -405,7 +405,11 @@ drive, `FilePathResolver.drives()`, paths like `C:/Users`, shown so and never `/
 home folder `/api/fs/places` names. `PlacesFeature` fills the explorer's Places pane (root,
 home, user folders, drives, mounts — a server names its root only, so in a browser the pane
 starts closed and asks when opened), Bookmarks and Recent; the activity bar's Bookmarks opens
-that pane. Bookmarks, recent folders and the session (`SessionFeature`: groups, tabs, views,
+that pane. Bookmarks are in the user's order (PRD 002, §6.1): the pane's `UiTree` is `reorderable` — a
+row drags onto another (upper half before, lower half after) or moves a slot with `Ctrl`+`↑`/`↓`,
+reported as a `UiTreeMove` that `PlacesFeature.reorderBookmark` applies — and the first nine are
+`Ctrl`+`1` … `Ctrl`+`9` from anywhere (window keys `places.openBookmark<n>`, `openBookmark`, in the
+active panel), each row showing its key. Bookmarks, recent folders and the session (`SessionFeature`: groups, tabs, views,
 sorts, grid, sizes, panes, bottom panel, hidden files) are kept per backend in
 `SettingsService` (`prj/frontend/src/app/settings/`) — `localStorage` in a browser, a file
 the main process keeps on the desktop, whose page origin is new on every start — loaded by
