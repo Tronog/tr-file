@@ -306,6 +306,15 @@ dropped and the OS centres the window; a size larger than the screen is cut to
 it. Wayland compositors place windows themselves, so there only the size and
 the state are restored.
 
+So does its zoom (§8.2.3), kept there too and given back as the window's
+`zoomFactor` — Chromium's own per-origin zoom would forget it, the page's
+origin being new on every start. The title bar's zoom control asks for it over
+the window channel (`zoomIn`, `zoomOut`, `resetZoom`, `setZoom` with a factor
+clamped to 50–300 %); `Ctrl`+`=` / `-` / `0` are the application menu's
+accelerators. Both go through `applyZoom` (`window-controls.channel.ts`), which
+pushes the new level to the page and to `MainWindow` to remember; the levels
+are `window-zoom.ts`'s.
+
 ## Layout
 
 | File | Role |

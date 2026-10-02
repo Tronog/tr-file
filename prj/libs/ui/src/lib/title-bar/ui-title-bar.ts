@@ -1,8 +1,9 @@
-import { Component, ElementRef, computed, input, output, viewChildren } from '@angular/core';
+import { Component, ElementRef, computed, input, output, signal, viewChild, viewChildren } from '@angular/core';
 import { UiContextMenu } from '../context-menu/ui-context-menu';
 import { UiIcon } from '../icon/ui-icon';
 import type { UiIconAction, UiIconName } from '../models/icon.model';
-import type { UiMenuBarItem, UiMenuBarSelection, UiTitleBarUpgrade, UiWindowControl } from '../models/chrome.model';
+import type { UiMenuBarItem, UiMenuBarSelection, UiTitleBarUpgrade, UiTitleBarZoom, UiWindowControl, UiZoomRequest } from '../models/chrome.model';
+import { UiZoomMenu } from './ui-zoom-menu';
 
 /**
  * The window title bar: menu bar on the left, command centre in the middle and
@@ -21,13 +22,14 @@ import type { UiMenuBarItem, UiMenuBarSelection, UiTitleBarUpgrade, UiWindowCont
  */
 @Component({
   selector: 'ui-title-bar',
-  imports: [UiIcon, UiContextMenu],
+  imports: [UiIcon, UiContextMenu, UiZoomMenu],
   templateUrl: './ui-title-bar.html',
   styleUrl: './ui-title-bar.scss',
   host: {
     '[class.is-draggable]': 'draggable()',
     '[style.padding-left.px]': 'leadingInset() || null',
     '(dblclick)': 'onDoubleClick($event)',
+    '(window:resize)': 'onWindowResize()',
   },
 })
 export class UiTitleBar {
@@ -43,6 +45,16 @@ export class UiTitleBar {
   readonly commandKeys = input<readonly string[]>([]);
 
   readonly actions = input<readonly UiIconAction[]>([]);
+
+  /**
+   * The window's zoom (PRD 001, §8.2.3): a button before the actions — beside
+   * the theme's, which leads them — dropping down zoom out / in, 100 % and a
+   * slider; or nothing when `null`, as in a browser, whose own zoom it is.
+   */
+  readonly zoom = input<UiTitleBarZoom | null>(null);
+
+  /** The zoom control asked for a level. */
+  readonly zoomRequest = output<UiZoomRequest>();
 
   /**
    * A newer version of the application is there (PRD 001, §8.6): a blue
@@ -90,6 +102,46 @@ export class UiTitleBar {
 
   /** A double-click on the drag region; conventionally toggles maximise. */
   readonly dragAreaDoubleClick = output<void>();
+
+  /** Whether the zoom dropdown is open — the bar's own, as nothing outside it cares. */
+  protected readonly zoomOpen = signal(false);
+
+  private readonly zoomButton = viewChild<ElementRef<HTMLButtonElement>>('zoomButton');
+
+  /** Bumped as the window resizes — which zooming it does — so the dropdown keeps under its button. */
+  private readonly resized = signal(0);
+
+  /** Where the zoom dropdown hangs: under its button, right edges aligned. */
+  protected readonly zoomPlace = computed(() => {
+    this.resized();
+    if (!this.zoomOpen()) {
+      return null;
+    }
+    const rect = this.zoomButton()?.nativeElement.getBoundingClientRect();
+    const width = globalThis.window?.innerWidth ?? 0;
+    return { top: (rect?.bottom ?? 0) + 2, right: Math.max(4, width - (rect?.right ?? width)) };
+  });
+
+  /** What the zoom button says: its level, but for 100 %, which needs no saying. */
+  protected readonly zoomLabel = computed(() => {
+    const percent = this.zoom()?.percent ?? 100;
+    return `Zoom (${Math.round(percent)}%)`;
+  });
+
+  protected toggleZoom(): void {
+    this.zoomOpen.update((open) => !open);
+  }
+
+  protected onZoomDismiss(refocus: boolean): void {
+    this.zoomOpen.set(false);
+    if (refocus) {
+      this.zoomButton()?.nativeElement.focus();
+    }
+  }
+
+  protected onWindowResize(): void {
+    this.resized.update((tick) => tick + 1);
+  }
 
   /**
    * Reports a double-click only when it landed on the bar itself.

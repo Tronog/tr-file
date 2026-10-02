@@ -154,8 +154,17 @@ bar reports `menuOpen` with the gear's rect, and `ChromeFeature` (`settingsMenu`
 `openMenu`, `closeSettingsMenu`) shows `UiContextMenu` fixed beside it, opening upward. Its
 items are commands of the table, laid out in `MockDataWorkbenchService.settingsMenuItems`:
 hidden files, restore the layout on start, reset it, clear recent folders (PRD 003, §6).
+On the desktop the title bar's buttons start with the window's zoom (PRD 001, §8.2.3): `UiTitleBar`'s
+`zoom` input draws a button (its level beside it when not 100 %) dropping down `UiZoomMenu` — zoom out /
+in, 100 %, and a slider applied when let go of, since zooming rescales the slider too — and reports a
+`UiZoomRequest`; `WindowControlsFeature.zoom` / `zoomTo` send it to the main process over the window
+channel (`zoomIn`, `zoomOut`, `resetZoom`, `setZoom`), which steps through browser-like levels
+(`desktop/src/window-zoom.ts`), applies `webContents.setZoomFactor`, pushes the level back in the
+window state and keeps it in `window-state.json`. `Ctrl`+`=` / `-` / `0` are the main process's
+menu accelerators (`app-menu.ts`, through the same `applyZoom`), not keymap keys; *View › Zoom In /
+Out / Reset Zoom* run the same. In a browser there is no zoom control — the browser's own zoom is.
 The title bar's buttons (`ChromeFeature.titleBarActions`, `runTitleBarAction`) are commands of the
-table: first, leftmost, the light/dark toggle (PRD 001, §8.2.2; `view.toggleTheme`,
+table: first of them, leftmost but for the zoom, the light/dark toggle (PRD 001, §8.2.2; `view.toggleTheme`,
 `PreferencesFeature.toggleTheme`) — a sun in the dark, a moon in the light, choosing the other of the
 theme in force outright, so a window following the system stops following it —, then *Toggle Explorer* / *Toggle Details* (`view.toggleExplorer` / `view.toggleDetails`, `Ctrl`+`E` /
 `Ctrl`+`D` — PRD 001, §9.2.1 —, drawn on the

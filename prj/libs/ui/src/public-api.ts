@@ -17,6 +17,7 @@ export { UiIconSprite } from './lib/icon/ui-icon-sprite';
 /* shell ------------------------------------------------------------------- */
 export { UiWorkbench } from './lib/workbench/ui-workbench';
 export { UiTitleBar } from './lib/title-bar/ui-title-bar';
+export { UiZoomMenu } from './lib/title-bar/ui-zoom-menu';
 export { UiActivityBar } from './lib/activity-bar/ui-activity-bar';
 export { UiStatusBar } from './lib/status-bar/ui-status-bar';
 

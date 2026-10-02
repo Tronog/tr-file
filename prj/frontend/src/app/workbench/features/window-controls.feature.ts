@@ -1,6 +1,10 @@
 import { computed } from '@angular/core';
-import type { UiWindowControl } from '@tr-file/ui';
+import type { UiTitleBarZoom, UiWindowControl, UiZoomRequest } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
+
+/** The window's zoom range, in percent — the main process's `MIN_ZOOM` / `MAX_ZOOM` (PRD 001, §8.2.3). */
+export const ZOOM_MIN_PERCENT = 50;
+export const ZOOM_MAX_PERCENT = 300;
 
 /** Room left at the leading edge for macOS's traffic lights, in pixels. */
 const TRAFFIC_LIGHT_INSET = 78;
@@ -82,6 +86,39 @@ export class WindowControlsFeature {
       return;
     }
     this.parent.desktopWindow.toggleMaximize();
+  }
+
+  /**
+   * The title bar's zoom control (PRD 001, §8.2.3): the window's zoom level,
+   * or `null` in a browser — a page cannot set the browser's zoom, which is
+   * the browser's own `Ctrl`+`+` / `-` there.
+   */
+  readonly zoom = computed<UiTitleBarZoom | null>(() =>
+    this.parent.desktopWindow.isAvailable
+      ? { percent: Math.round(this.parent.desktopWindow.state().zoom * 100), min: ZOOM_MIN_PERCENT, max: ZOOM_MAX_PERCENT }
+      : null,
+  );
+
+  /** Whether the window can be zoomed from here: on the desktop only. */
+  readonly canZoom = computed(() => this.parent.desktopWindow.isAvailable);
+
+  /** The zoom control asked for a level; the main process steps and clamps it. */
+  zoomTo(request: UiZoomRequest): void {
+    const window = this.parent.desktopWindow;
+    switch (request.kind) {
+      case 'in':
+        window.zoomIn();
+        break;
+      case 'out':
+        window.zoomOut();
+        break;
+      case 'reset':
+        window.resetZoom();
+        break;
+      case 'set':
+        window.setZoom(request.percent / 100);
+        break;
+    }
   }
 
   private isMac(): boolean {

@@ -48,6 +48,19 @@ export interface UiTitleBarUpgrade {
   readonly busy?: boolean;
 }
 
+/**
+ * The window's zoom (PRD 001, §8.2.3), drawn as a button beside the theme's
+ * that drops down zoom out / in, 100 % and a slider. In percent.
+ */
+export interface UiTitleBarZoom {
+  readonly percent: number;
+  readonly min: number;
+  readonly max: number;
+}
+
+/** What the zoom control asked for: a step, back to 100 %, or a level of the slider's, in percent. */
+export type UiZoomRequest = { readonly kind: 'in' } | { readonly kind: 'out' } | { readonly kind: 'reset' } | { readonly kind: 'set'; readonly percent: number };
+
 /** An icon button in the activity bar. */
 export interface UiActivityItem {
   readonly id: string;

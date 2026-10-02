@@ -13,12 +13,14 @@ import { WorkbenchService } from '../workbench.service';
 interface State {
   maximized: boolean;
   fullScreen: boolean;
+  zoom?: number;
 }
 
 /** Stands in for the preload's `window.trFileWindow`. */
 class FakeWindowApi {
   readonly version = 1;
   readonly sent: string[] = [];
+  readonly factors: number[] = [];
 
   state: State = { maximized: false, fullScreen: false };
 
@@ -26,8 +28,12 @@ class FakeWindowApi {
 
   constructor(readonly platform: string) {}
 
-  invoke = async (request: { command: string }): Promise<State> => {
+  invoke = async (request: { command: string; factor?: number }): Promise<State> => {
     this.sent.push(request.command);
+    if (request.factor !== undefined) {
+      this.factors.push(request.factor);
+      this.state = { ...this.state, zoom: request.factor };
+    }
     if (request.command === 'toggleMaximize') {
       this.state = { ...this.state, maximized: !this.state.maximized };
     }
@@ -90,6 +96,11 @@ describe('WindowControlsFeature in a browser', () => {
     expect(controls.controls()).toEqual([]);
     expect(controls.draggable()).toBe(false);
     expect(controls.leadingInset()).toBe(0);
+  });
+
+  it('has no zoom control: the browser zooms its own page (PRD 001, §8.2.3)', () => {
+    expect(workbench.windowControlsFt.zoom()).toBeNull();
+    expect(workbench.commandsFt.isEnabled('view.zoomIn', workbench.commandsFt.activeTarget())).toBe(false);
   });
 
   it('does nothing when asked to act on a window it does not have', () => {
@@ -169,6 +180,26 @@ describe('WindowControlsFeature in the desktop shell', () => {
 
     expect(api.sent).toEqual(['state', 'toggleMaximize']);
     expect(labels()).toEqual(['Minimize', 'Restore Down', 'Close']);
+  });
+
+  it('shows the window zoom, and sends each zoom request through (PRD 001, §8.2.3)', async () => {
+    expect(workbench.windowControlsFt.zoom()).toEqual({ percent: 100, min: 50, max: 300 });
+
+    workbench.windowControlsFt.zoomTo({ kind: 'set', percent: 125 });
+    await settled();
+    expect(api.factors).toEqual([1.25]);
+    expect(workbench.windowControlsFt.zoom()?.percent).toBe(125);
+
+    workbench.windowControlsFt.zoomTo({ kind: 'in' });
+    workbench.windowControlsFt.zoomTo({ kind: 'out' });
+    workbench.commandsFt.run('view.resetZoom');
+    await settled();
+    expect(api.sent).toEqual(['state', 'setZoom', 'zoomIn', 'zoomOut', 'resetZoom']);
+
+    // Zoomed by the keys of the main process's menu: the control follows.
+    api.push({ maximized: false, fullScreen: false, zoom: 0.9 });
+    expect(workbench.windowControlsFt.zoom()?.percent).toBe(90);
+    expect(workbench.commandsFt.menuItem('view.zoomIn').keybinding).toBe('Ctrl+=');
   });
 
   it('ignores a button it does not know', async () => {

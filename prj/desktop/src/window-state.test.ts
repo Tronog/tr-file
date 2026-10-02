@@ -28,22 +28,25 @@ describe('WindowStateFile', () => {
   it('keeps the state a moment after it changes, and at once when flushed', async () => {
     const file = join(folder, 'state.json');
     const states = new WindowStateFile(file);
-    states.keep({ x: 10, y: 20, width: 1000, height: 700, maximized: false, fullScreen: false });
-    states.keep({ x: 30, y: 40, width: 1100, height: 800, maximized: true, fullScreen: false });
+    states.keep({ x: 10, y: 20, width: 1000, height: 700, maximized: false, fullScreen: false, zoom: 1 });
+    states.keep({ x: 30, y: 40, width: 1100, height: 800, maximized: true, fullScreen: false, zoom: 1.25 });
     await assert.rejects(readFile(file, 'utf8'));
 
     states.flush();
-    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { x: 30, y: 40, width: 1100, height: 800, maximized: true, fullScreen: false });
-    assert.deepEqual(new WindowStateFile(file).read(), { x: 30, y: 40, width: 1100, height: 800, maximized: true, fullScreen: false });
+    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { x: 30, y: 40, width: 1100, height: 800, maximized: true, fullScreen: false, zoom: 1.25 });
+    assert.deepEqual(new WindowStateFile(file).read(), { x: 30, y: 40, width: 1100, height: 800, maximized: true, fullScreen: false, zoom: 1.25 });
   });
 
   it('keeps only what holds together', () => {
-    assert.deepEqual(WindowStateFile.parse({ x: 'far', y: 5, width: 100, height: 99_999.4, maximized: 'yes', fullScreen: true }), {
+    assert.deepEqual(WindowStateFile.parse({ x: 'far', y: 5, width: 100, height: 99_999.4, maximized: 'yes', fullScreen: true, zoom: 9 }), {
       width: DEFAULT_WINDOW_STATE.width,
       height: 99_999,
       maximized: false,
       fullScreen: true,
+      zoom: 3,
     });
+    // A file from before the zoom was kept (PRD 001, §8.2.3): 100 %.
+    assert.equal(WindowStateFile.parse({ width: 1000, height: 700 }).zoom, 1);
     assert.deepEqual(WindowStateFile.parse([]), { ...DEFAULT_WINDOW_STATE, width: DEFAULT_WINDOW_STATE.width });
   });
 });
@@ -53,25 +56,25 @@ describe('fitToScreens', () => {
   const monitor: WindowRect = { x: 1920, y: 0, width: 2560, height: 1400 };
 
   it('keeps a place on a screen that is there', () => {
-    const state = { x: 2100, y: 100, width: 1600, height: 1000, maximized: true, fullScreen: false };
+    const state = { x: 2100, y: 100, width: 1600, height: 1000, maximized: true, fullScreen: false, zoom: 1 };
     assert.deepEqual(fitToScreens(state, [laptop, monitor]), state);
   });
 
   it('lets the OS centre a window whose screen has gone, and fits it to the one left', () => {
-    const state = { x: 2100, y: 100, width: 2400, height: 1300, maximized: false, fullScreen: false };
-    assert.deepEqual(fitToScreens(state, [laptop]), { width: 1920, height: 1040, maximized: false, fullScreen: false });
+    const state = { x: 2100, y: 100, width: 2400, height: 1300, maximized: false, fullScreen: false, zoom: 1 };
+    assert.deepEqual(fitToScreens(state, [laptop]), { width: 1920, height: 1040, maximized: false, fullScreen: false, zoom: 1 });
   });
 
   it('will not keep a window whose title bar is off every screen', () => {
-    assert.equal(fitToScreens({ x: 100, y: -500, width: 1000, height: 700, maximized: false, fullScreen: false }, [laptop]).x, undefined);
-    assert.equal(fitToScreens({ x: 1900, y: 100, width: 1000, height: 700, maximized: false, fullScreen: false }, [laptop]).x, undefined);
-    assert.equal(fitToScreens({ x: -950, y: 100, width: 1000, height: 700, maximized: false, fullScreen: false }, [laptop]).x, undefined);
+    assert.equal(fitToScreens({ x: 100, y: -500, width: 1000, height: 700, maximized: false, fullScreen: false, zoom: 1 }, [laptop]).x, undefined);
+    assert.equal(fitToScreens({ x: 1900, y: 100, width: 1000, height: 700, maximized: false, fullScreen: false, zoom: 1 }, [laptop]).x, undefined);
+    assert.equal(fitToScreens({ x: -950, y: 100, width: 1000, height: 700, maximized: false, fullScreen: false, zoom: 1 }, [laptop]).x, undefined);
     // A hundred pixels of it are enough to grab it by.
-    assert.equal(fitToScreens({ x: -900, y: 100, width: 1000, height: 700, maximized: false, fullScreen: false }, [laptop]).x, -900);
+    assert.equal(fitToScreens({ x: -900, y: 100, width: 1000, height: 700, maximized: false, fullScreen: false, zoom: 1 }, [laptop]).x, -900);
   });
 
   it('leaves the state alone when no screen is known', () => {
-    const state = { x: 5000, y: 5000, width: 1000, height: 700, maximized: false, fullScreen: false };
+    const state = { x: 5000, y: 5000, width: 1000, height: 700, maximized: false, fullScreen: false, zoom: 1 };
     assert.deepEqual(fitToScreens(state, []), state);
   });
 });

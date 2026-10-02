@@ -63,6 +63,38 @@
     </button>
   }
 
+  @if (zoom(); as zoom) {
+    <!-- The window's zoom (PRD 001, §8.2.3), beside the theme's button. -->
+    <button
+      #zoomButton
+      type="button"
+      class="chrome-btn zoom-btn"
+      data-zoom-toggle
+      aria-haspopup="dialog"
+      [class.is-active]="zoomOpen()"
+      [attr.aria-expanded]="zoomOpen()"
+      [attr.title]="zoomLabel()"
+      [attr.aria-label]="zoomLabel()"
+      (click)="toggleZoom()"
+    >
+      <ui-icon name="zoom-in" />
+      @if (zoom.percent !== 100) {
+        <span class="zoom-percent">{{ zoom.percent }}%</span>
+      }
+    </button>
+    @if (zoomPlace(); as place) {
+      <ui-zoom-menu
+        [style.top.px]="place.top"
+        [style.right.px]="place.right"
+        [percent]="zoom.percent"
+        [min]="zoom.min"
+        [max]="zoom.max"
+        (request)="zoomRequest.emit($event)"
+        (dismiss)="onZoomDismiss($event)"
+      />
+    }
+  }
+
   @for (action of actions(); track action.id) {
     <button
       type="button"

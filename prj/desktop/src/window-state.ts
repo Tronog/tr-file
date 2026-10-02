@@ -1,6 +1,8 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+import { clampZoom } from './window-zoom.js';
+
 /** A rectangle on the desktop, in screen pixels — Electron's `Rectangle`. */
 export interface WindowRect {
   readonly x: number;
@@ -23,10 +25,12 @@ export interface WindowState {
   readonly height: number;
   readonly maximized: boolean;
   readonly fullScreen: boolean;
+  /** The page's zoom factor (PRD 001, §8.2.3); `1` when never zoomed. */
+  readonly zoom: number;
 }
 
 /** A window on first start. */
-export const DEFAULT_WINDOW_STATE: WindowState = { width: 1440, height: 900, maximized: false, fullScreen: false };
+export const DEFAULT_WINDOW_STATE: WindowState = { width: 1440, height: 900, maximized: false, fullScreen: false, zoom: 1 };
 
 /** The smallest the window may be; `MainWindow` says the same to Electron. */
 export const MIN_WINDOW_SIZE = { width: 800, height: 560 } as const;
@@ -107,7 +111,14 @@ export class WindowStateFile {
     const place = typeof raw['x'] === 'number' && typeof raw['y'] === 'number' && Number.isFinite(raw['x']) && Number.isFinite(raw['y'])
       ? { x: Math.round(raw['x']), y: Math.round(raw['y']) }
       : {};
-    return { ...place, width: size('width'), height: size('height'), maximized: raw['maximized'] === true, fullScreen: raw['fullScreen'] === true };
+    return {
+      ...place,
+      width: size('width'),
+      height: size('height'),
+      maximized: raw['maximized'] === true,
+      fullScreen: raw['fullScreen'] === true,
+      zoom: clampZoom(raw['zoom']),
+    };
   }
 }
 

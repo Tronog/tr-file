@@ -1,5 +1,7 @@
 import { Menu, type MenuItemConstructorOptions } from 'electron';
 
+import { zoomFocused } from './window-controls.channel.js';
+
 /**
  * The application menu — which this app never shows.
  *
@@ -32,9 +34,14 @@ export function installAppMenu(): void {
       { role: 'forceReload' },
       { role: 'toggleDevTools' },
       { type: 'separator' },
-      { role: 'resetZoom' },
-      { role: 'zoomIn' },
-      { role: 'zoomOut' },
+      // Not the zoom roles: through `applyZoom`, so the title bar's zoom control follows and the
+      // level is remembered (PRD 001, §8.2.3). `=` and the keypad zoom in and out as well.
+      { label: 'Actual Size', accelerator: 'CommandOrControl+0', click: () => zoomFocused(0) },
+      { label: 'Zoom In', accelerator: 'CommandOrControl+Plus', click: () => zoomFocused(1) },
+      { label: 'Zoom In', accelerator: 'CommandOrControl+=', click: () => zoomFocused(1) },
+      { label: 'Zoom In', accelerator: 'CommandOrControl+numadd', click: () => zoomFocused(1) },
+      { label: 'Zoom Out', accelerator: 'CommandOrControl+-', click: () => zoomFocused(-1) },
+      { label: 'Zoom Out', accelerator: 'CommandOrControl+numsub', click: () => zoomFocused(-1) },
       { type: 'separator' },
       { role: 'togglefullscreen' },
     ],

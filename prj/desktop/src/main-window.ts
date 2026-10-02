@@ -5,7 +5,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import { DARK_BACKGROUND } from './window-background.js';
 import { DEFAULT_WINDOW_STATE, fitToScreens, MIN_WINDOW_SIZE, type WindowRect, type WindowState, type WindowStateFile } from './window-state.js';
 import { toggleVisibility } from './window-visibility.js';
-import { WINDOW_STATE_EVENT, WindowControlsChannel } from './window-controls.channel.js';
+import { WINDOW_STATE_EVENT, WindowControlsChannel, watchZoom } from './window-controls.channel.js';
 
 /**
  * The compiled preload, beside this file. CommonJS (`.cjs`) because a
@@ -85,6 +85,9 @@ export class MainWindow {
         nodeIntegration: false,
         sandbox: true,
         webviewTag: false,
+        // As it was left (PRD 001, §8.2.3): the page's origin is new on every start, so Chromium's own
+        // per-origin zoom would forget it.
+        zoomFactor: saved.zoom,
       },
     });
 
@@ -200,6 +203,7 @@ export class MainWindow {
     let normal: WindowRect | null = saved.x !== undefined && saved.y !== undefined ? { x: saved.x, y: saved.y, width: saved.width, height: saved.height } : null;
     let maximized = saved.maximized;
     let fullScreen = saved.fullScreen;
+    let zoom = saved.zoom;
     const note = (): void => {
       if (window.isDestroyed() || window.isMinimized()) {
         return;
@@ -210,8 +214,12 @@ export class MainWindow {
         normal = window.getBounds();
       }
       const place = normal ?? { ...window.getBounds(), width: saved.width, height: saved.height };
-      file.keep({ ...place, maximized, fullScreen });
+      file.keep({ ...place, maximized, fullScreen, zoom });
     };
+    watchZoom(window, (factor) => {
+      zoom = factor;
+      note();
+    });
 
     window.on('resize', note);
     window.on('move', note);

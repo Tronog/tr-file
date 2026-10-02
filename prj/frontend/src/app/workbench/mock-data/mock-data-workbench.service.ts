@@ -132,6 +132,10 @@ export class MockDataWorkbenchService {
         { id: 'view.togglePanel', label: 'Toggle Panel' },
         { id: 'view.notes', label: 'Show Notes' },
         { id: 'view.resetLayout', label: 'Reset Layout' },
+        // The desktop's zoom (PRD 001, §8.2.3), also the title bar's control.
+        { id: 'view.zoomIn', label: 'Zoom In', separatorBefore: true },
+        { id: 'view.zoomOut', label: 'Zoom Out' },
+        { id: 'view.resetZoom', label: 'Reset Zoom' },
       ],
     },
     {

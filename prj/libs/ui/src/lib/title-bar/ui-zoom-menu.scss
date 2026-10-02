@@ -1,0 +1,79 @@
+@use 'mixins' as *;
+
+:host {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 220px;
+  padding: 8px;
+  border: 1px solid var(--vsc-menu-border);
+  border-radius: 5px;
+  background: var(--vsc-menu-bg);
+  box-shadow: var(--vsc-shadow);
+  color: var(--vsc-fg);
+  font-size: var(--vsc-font-size);
+  // In a frameless window the bar it hangs from drags the window; this must take clicks.
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.zoom-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.zoom-step {
+  @include icon-button(24px);
+}
+
+.zoom-value {
+  min-width: 48px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-reset {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: var(--vsc-radius);
+  background: transparent;
+  color: var(--vsc-fg);
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--vsc-hover-bg);
+  }
+
+  &:disabled {
+    color: var(--vsc-fg-dim);
+    cursor: default;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.zoom-slider {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--vsc-accent);
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.zoom-step:disabled {
+  color: var(--vsc-fg-dim);
+  background: transparent;
+  cursor: default;
+}

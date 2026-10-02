@@ -160,6 +160,16 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | --- | --- |
 | `←` `↑` `→` `↓` | Pan a zoomed image |
 
+### Window zoom (desktop)
+
+The main process's keys, before the page's — so not configurable. In a browser these are the browser's own zoom.
+
+| Key | Action |
+| --- | --- |
+| `Ctrl`+`=`, `Ctrl`+`+` | Zoom in, a level at a time |
+| `Ctrl`+`-` | Zoom out |
+| `Ctrl`+`0` | Back to 100 % |
+
 ### Sidebars
 
 | Key | Action |

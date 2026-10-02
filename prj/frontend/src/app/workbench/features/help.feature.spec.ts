@@ -78,7 +78,7 @@ describe('HelpFeature (PRD 001, §16)', () => {
 
   it('narrows the cards to what the search matches', () => {
     workbench.helpFt.setQuery('zoom out');
-    expect(workbench.helpFt.cheatsheet().map((candidate) => candidate.id)).toEqual(['image']);
+    expect(workbench.helpFt.cheatsheet().map((candidate) => candidate.id)).toEqual(['image', 'zoom']);
     expect(workbench.helpFt.cheatsheet()[0]?.rows.map((row) => row.label)).toEqual(['Zoom Out']);
 
     // A card whose title matches stays whole.

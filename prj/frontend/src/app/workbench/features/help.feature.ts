@@ -174,6 +174,16 @@ const FIXED: readonly { readonly id: string; readonly title: string; readonly hu
     ],
   },
   {
+    id: 'zoom',
+    title: 'Zoom (desktop)',
+    hue: 'teal',
+    rows: [
+      [[['Ctrl', '='], ['Ctrl', '+']], 'Zoom in'],
+      [[['Ctrl', '-']], 'Zoom out'],
+      [[['Ctrl', '0']], 'Back to 100 %'],
+    ],
+  },
+  {
     id: 'pickers',
     title: 'Command palette and pickers',
     hue: 'orange',

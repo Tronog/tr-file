@@ -44,6 +44,16 @@ type CommandSpec = Omit<WorkbenchCommand, 'label' | 'palette' | 'enabled'> & {
 const always = (): boolean => true;
 
 /**
+ * Keys a menu shows that are not the keymap's: the desktop's zoom, answered by
+ * the main process's accelerators before the page (PRD 001, §8.2.3).
+ */
+const FIXED_KEYS: Readonly<Record<string, string>> = {
+  'view.zoomIn': 'Ctrl+=',
+  'view.zoomOut': 'Ctrl+-',
+  'view.resetZoom': 'Ctrl+0',
+};
+
+/**
  * The commands that act on files and then leave the keyboard where it was
  * (PRD 001, Fix 5). Opening, revealing, filtering, searching are not among
  * them: they send the keyboard somewhere of their own on purpose.
@@ -184,7 +194,7 @@ export class CommandsFeature {
     }
     const checked = command.checked?.(target);
     // The key shown is the one in force (PRD 010, §2), whatever the user bound.
-    const keybinding = this.parent.keybindingsFt.label(id);
+    const keybinding = this.parent.keybindingsFt.label(id) ?? FIXED_KEYS[id];
     return {
       id,
       label: command.label(target),
@@ -524,6 +534,10 @@ export class CommandsFeature {
         run: () => p.preferencesFt.toggleTheme(),
       },
       { id: 'view.resetLayout', category: 'View', label: 'Reset Layout', run: () => void p.sessionFt.confirmResetLayout() },
+      // The window's zoom (PRD 001, §8.2.3) — the desktop's; a browser zooms its own page.
+      { id: 'view.zoomIn', category: 'View', label: 'Zoom In', enabled: () => p.windowControlsFt.canZoom(), run: () => p.windowControlsFt.zoomTo({ kind: 'in' }) },
+      { id: 'view.zoomOut', category: 'View', label: 'Zoom Out', enabled: () => p.windowControlsFt.canZoom(), run: () => p.windowControlsFt.zoomTo({ kind: 'out' }) },
+      { id: 'view.resetZoom', category: 'View', label: 'Reset Zoom', enabled: () => p.windowControlsFt.canZoom(), run: () => p.windowControlsFt.zoomTo({ kind: 'reset' }) },
 
       /* The settings window (PRD 010) */
       { id: 'workbench.openSettings', category: 'Preferences', label: 'Open Settings', run: () => p.settingsEditorFt.open('general') },

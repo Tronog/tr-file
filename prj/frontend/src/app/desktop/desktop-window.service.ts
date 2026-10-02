@@ -4,10 +4,12 @@ import { Service, signal } from '@angular/core';
 export interface DesktopWindowState {
   readonly maximized: boolean;
   readonly fullScreen: boolean;
+  /** The page's zoom factor, `1` for 100 % (PRD 001, §8.2.3). */
+  readonly zoom: number;
 }
 
 /** Everything the page may ask of its own window. */
-export type DesktopWindowCommand = 'state' | 'minimize' | 'toggleMaximize' | 'close';
+export type DesktopWindowCommand = 'state' | 'minimize' | 'toggleMaximize' | 'close' | 'zoomIn' | 'zoomOut' | 'resetZoom' | 'setZoom';
 
 /** The object the Electron preload script exposes on `window`. */
 interface DesktopWindowApi {
@@ -15,7 +17,7 @@ interface DesktopWindowApi {
   readonly version: number;
   /** `process.platform` of the host, e.g. `'darwin'`. */
   readonly platform: string;
-  invoke(request: { command: DesktopWindowCommand }): Promise<unknown>;
+  invoke(request: { command: DesktopWindowCommand; factor?: number }): Promise<unknown>;
   /** Subscribes to changes the window made by itself; returns unsubscribe. */
   onState(listener: (state: unknown) => void): () => void;
 }
@@ -30,7 +32,7 @@ declare global {
 /** The contract version this service speaks. */
 const WINDOW_VERSION = 1;
 
-const CLOSED: DesktopWindowState = { maximized: false, fullScreen: false };
+const CLOSED: DesktopWindowState = { maximized: false, fullScreen: false, zoom: 1 };
 
 /**
  * The application's own window (PRD 001, §8.2).
@@ -105,6 +107,24 @@ export class DesktopWindowService {
     void this.send('close');
   }
 
+  /** A level up or down, as a browser steps — the main process decides which (PRD 001, §8.2.3). */
+  zoomIn(): void {
+    void this.send('zoomIn');
+  }
+
+  zoomOut(): void {
+    void this.send('zoomOut');
+  }
+
+  resetZoom(): void {
+    void this.send('resetZoom');
+  }
+
+  /** Any factor; the main process keeps it within its range. */
+  setZoom(factor: number): void {
+    void this.send('setZoom', factor);
+  }
+
   /* -- internals ---------------------------------------------------------- */
 
   private get api(): DesktopWindowApi | undefined {
@@ -119,14 +139,14 @@ export class DesktopWindowService {
    * showing the right icon before the window's own event arrives. A channel
    * that fails is ignored: there is no window left to report it on.
    */
-  private async send(command: DesktopWindowCommand): Promise<void> {
+  private async send(command: DesktopWindowCommand, factor?: number): Promise<void> {
     const api = this.api;
     if (api === undefined) {
       return;
     }
 
     try {
-      const state = DesktopWindowService.read(await api.invoke({ command }));
+      const state = DesktopWindowService.read(await api.invoke(factor === undefined ? { command } : { command, factor }));
       this.state.set(state);
     } catch {
       // The main process is gone, or refused. Either way the window is not
@@ -139,7 +159,7 @@ export class DesktopWindowService {
     if (typeof value !== 'object' || value === null) {
       return CLOSED;
     }
-    const { maximized, fullScreen } = value as Partial<DesktopWindowState>;
-    return { maximized: maximized === true, fullScreen: fullScreen === true };
+    const { maximized, fullScreen, zoom } = value as Partial<DesktopWindowState>;
+    return { maximized: maximized === true, fullScreen: fullScreen === true, zoom: typeof zoom === 'number' && Number.isFinite(zoom) && zoom > 0 ? zoom : 1 };
   }
 }
