@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, globalShortcut, nativeTheme, screen, shell,
 
 import { installAppMenu } from './app-menu.js';
 import { DesktopConfig } from './desktop.config.js';
+import { desktopIconSource, desktopLaunch, ensureDesktopEntry, ensureDesktopIcon } from './desktop-entry.js';
 import { DesktopStack } from './desktop.stack.js';
 import { DragOutChannel } from './drag-out.channel.js';
 import { electronClipboard } from './electron-clipboard.js';
@@ -113,7 +114,22 @@ class DesktopApplication {
     // (PRD 001, §8.5); X11 and the other platforms need nothing. Before
     // `ready`, which may come while the lock below is waited for.
     if (process.platform === 'linux') {
-      app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal');
+      // Both, or Electron 44 refuses every accelerator on Wayland: without the
+      // preferred trigger, `register` returns false for any key.
+      app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal,GlobalShortcutsPortalPreferredTrigger');
+      // The portal binds shortcuts only for an app id it finds a desktop file
+      // for, and neither an AppImage nor `electron .` installs one.
+      try {
+        const dataHome = process.env.XDG_DATA_HOME || join(app.getPath('home'), '.local', 'share');
+        const launch = desktopLaunch(process.env, process.execPath, app.getAppPath(), app.isPackaged);
+        if (ensureDesktopEntry(join(dataHome, 'applications'), launch)) {
+          this.stack.log.info('desktop entry written', { exec: launch.exec });
+        }
+        // The icon the entry names, for the app grid and the portal's dialog.
+        ensureDesktopIcon(dataHome, desktopIconSource(process.resourcesPath, app.getAppPath(), app.isPackaged));
+      } catch (error) {
+        this.stack.log.warn('desktop entry could not be written', { error: error instanceof Error ? error.message : String(error) });
+      }
     }
 
     if (app.requestSingleInstanceLock()) {

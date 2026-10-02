@@ -31,6 +31,9 @@ extraResources:
     to: app/browser
     filter:
       - '**/*'
+  # The icon the main process installs for its desktop entry on Linux (§8.5).
+  - from: build/icon.png
+    to: icon.png
 
 asar: true
 

@@ -577,8 +577,13 @@ with a native dialog in the main process, so the renderer cannot skip it.
 Section 8.5: `Ctrl`+`` ` `` shows and hides the desktop window system-wide — a global shortcut the
 main process registers (`desktop/src/window-visibility.ts`, `VisibilityShortcut`), which hides the
 window being looked at and brings back a hidden, minimised or background one; on Linux the
-`GlobalShortcutsPortal` feature lets a Wayland session grant it. A chord already taken is logged,
-not fatal.
+`GlobalShortcutsPortal` and `GlobalShortcutsPortalPreferredTrigger` features (both, or Electron 44
+refuses every key) let a Wayland session grant it — but only to an app id with an
+installed desktop file, so on Linux the main process writes `~/.local/share/applications/tr-file.desktop`
+for the copy that is running, with its icon in the user's hicolor theme (`desktop/src/desktop-entry.ts`; the AppImage, or `electron .` in
+development). Electron 44 cannot propose a punctuation key to the portal (electron#52223), so GNOME
+binds the shortcut with no key: `Ctrl`+`` ` `` is assigned once in Settings › Apps › tr-file › Global
+Shortcuts. A chord already taken is logged, not fatal.
 
 Section 8.6: the desktop updates itself from a folder on the share (`S:\Library\Software\Applications\Tronog\TR-File`,
 `/S/Library/Software/Applications/Tronog/TR-File`; `TR_FILE_UPDATE_DIR`, `off`). `SelfUpdate`
