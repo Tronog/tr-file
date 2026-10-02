@@ -232,6 +232,25 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
     expect(chrome.hiddenSidebars()).toEqual([]);
   });
 
+  it('toggles both sidebars on Ctrl+/ — either shown, both go; both hidden, both come back (PRD 001, §9.2.1)', async () => {
+    await setUp();
+    const chrome = workbench.chromeFt;
+    expect(keys().label('view.toggleSidebars')).toBe('Ctrl+/');
+
+    const both = key('/', { ctrlKey: true });
+    keys().handleShortcut(both);
+    expect(both.defaultPrevented).toBe(true);
+    expect(chrome.hiddenSidebars()).toEqual(['explorer', 'details']);
+
+    keys().handleShortcut(key('/', { ctrlKey: true }));
+    expect(chrome.hiddenSidebars()).toEqual([]);
+
+    // One shown: it goes too, rather than the two trading places.
+    chrome.toggleSidebar('details');
+    keys().handleShortcut(key('/', { ctrlKey: true }));
+    expect(chrome.hiddenSidebars()).toEqual(['explorer', 'details']);
+  });
+
   it('toggles the bottom panel on Ctrl+Shift+` — from a text field too (PRD 001, §12.3)', async () => {
     await setUp();
     const panel = workbench.bottomPanelFt;

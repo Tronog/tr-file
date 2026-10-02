@@ -274,6 +274,7 @@ describe('CommandPaletteFeature', () => {
       'View: Toggle Panel',
       'View: Toggle Explorer',
       'View: Toggle Details',
+      'View: Toggle Explorer and Details',
       'Preferences: Restore Layout on Start',
       'Preferences: Switch to Light Theme',
       'View: Reset Layout',
@@ -671,7 +672,11 @@ describe('SavedServersFeature', () => {
 
     const again = make();
     expect(again.servers()).toEqual([expect.objectContaining({ user: 'ana', host: 'nas.local', port: 22 })]);
-    expect(localStorage.getItem(SAVED_SERVERS_KEY)).not.toContain('pw');
+    // No password field, and not its value under another name — the random id may hold any letters, so not a search for `pw`.
+    const stored = JSON.parse(localStorage.getItem(SAVED_SERVERS_KEY) ?? '[]') as Record<string, unknown>[];
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).not.toHaveProperty('password');
+    expect(Object.entries(stored[0] ?? {}).filter(([key, value]) => key !== 'id' && value === 'pw')).toEqual([]);
   });
 
   it('keeps one entry per user, host and port', () => {

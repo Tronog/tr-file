@@ -21,6 +21,7 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   // PRD 001, §9.2.1.
   { command: 'view.toggleExplorer', key: 'Ctrl+E', when: 'window' },
   { command: 'view.toggleDetails', key: 'Ctrl+D', when: 'window' },
+  { command: 'view.toggleSidebars', key: 'Ctrl+/', when: 'window' },
   // PRD 001, §8.6.1 — the desktop's; in a browser the command is disabled and the key does nothing.
   { command: 'file.checkForUpdates', key: 'Ctrl+U', when: 'window' },
   // The bookmarks, in their order, from any panel (PRD 002, §6.1).

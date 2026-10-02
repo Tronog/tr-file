@@ -83,9 +83,21 @@ export class ChromeFeature {
    * put away (PRD 001, §12.3) — else it would be left on nothing.
    */
   toggleSidebar(sidebar: SidebarName): void {
-    const hiding = this.isShown(sidebar);
-    const hadFocus = hiding && ChromeFeature.focusIsIn(sidebar);
-    this.shown.update((shown) => ({ ...shown, [sidebar]: !hiding }));
+    this.setShown([sidebar], !this.isShown(sidebar));
+  }
+
+  /**
+   * Both sidebars at once (PRD 001, §9.2.1, `Ctrl`+`/`): either shown, both
+   * go — the panels get the whole window —; both hidden, both come back.
+   */
+  toggleSidebars(): void {
+    this.setShown(['explorer', 'details'], !this.isShown('explorer') && !this.isShown('details'));
+  }
+
+  /** Shows or hides `sidebars`; one hidden with the keyboard in it hands it to the active panel. */
+  private setShown(sidebars: readonly SidebarName[], show: boolean): void {
+    const hadFocus = !show && sidebars.some((sidebar) => this.isShown(sidebar) && ChromeFeature.focusIsIn(sidebar));
+    this.shown.update((shown) => ({ ...shown, ...Object.fromEntries(sidebars.map((sidebar) => [sidebar, show])) }));
     if (hadFocus) {
       this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
     }

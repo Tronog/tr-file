@@ -167,7 +167,7 @@ The title bar's buttons (`ChromeFeature.titleBarActions`, `runTitleBarAction`) a
 table: first of them, leftmost but for the zoom, the light/dark toggle (PRD 001, §8.2.2; `view.toggleTheme`,
 `PreferencesFeature.toggleTheme`) — a sun in the dark, a moon in the light, choosing the other of the
 theme in force outright, so a window following the system stops following it —, then *Toggle Explorer* / *Toggle Details* (`view.toggleExplorer` / `view.toggleDetails`, `Ctrl`+`E` /
-`Ctrl`+`D` — PRD 001, §9.2.1 —, drawn on the
+`Ctrl`+`D` — PRD 001, §9.2.1; `Ctrl`+`/` is both, `view.toggleSidebars`, `ChromeFeature.toggleSidebars`: either shown, both are hidden, else both shown —, drawn on the
 side each sidebar is on, pressed while shown — `ChromeFeature.isShown`, the session's
 `hiddenSidebars`; hidden, a sidebar leaves the `Ctrl`+`Tab` ring, gives the keyboard back to the
 active panel, and comes back for anything shown in it), *Toggle Panel* (§12.3), and last, the
