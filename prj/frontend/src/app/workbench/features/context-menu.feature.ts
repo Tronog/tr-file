@@ -1,22 +1,14 @@
-import { computed, signal } from '@angular/core';
-import type { UiContextMenuRequest, UiMenuItem } from '@tr-file/ui';
+import { UiContextMenuFeature, type UiContextMenuRequest, type UiMenuLayout, type UiOpenContextMenu } from '@tr-file/ui';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import type { CommandTarget } from './commands.feature';
 import type { PlaceSection } from './places.feature';
-import { DEFAULT_PANE_ORDER, type SidebarId } from './sidebar-panes.feature';
 import type { WorkbenchService } from '../workbench.service';
 
 /** A context menu on screen: where, what it offers, and what its commands act on. */
-export interface OpenContextMenu {
-  readonly x: number;
-  readonly y: number;
-  readonly label: string;
-  readonly items: readonly UiMenuItem[];
-  readonly target: CommandTarget;
-}
+export type OpenContextMenu = UiOpenContextMenu<CommandTarget>;
 
 /** A menu's rows by command id; `'-'` starts a new section, drawn as a separator. */
-type Layout = readonly string[];
+type Layout = UiMenuLayout;
 
 /** A file, or several entries: what is done *to* them. */
 const ENTRY_FILE: Layout = [
@@ -63,8 +55,6 @@ const TREE_FOLDER: Layout = [
 /** The workspace root in the tree: nothing to rename, move or delete. */
 const TREE_ROOT: Layout = ['file.newFile', 'file.newFolder', '-', 'edit.paste', '-', 'file.reveal', 'file.copyPath'];
 
-const TAB: Layout = ['tab.close', 'tab.closeOthers', 'tab.closeRight', '-', 'file.copyPath', 'file.reveal'];
-
 /** The Places panes (PRD 003, §6): a place, a bookmark, a recent folder. */
 const PLACE: Layout = ['places.open', 'places.openToSide', '-', 'places.addBookmark', '-', 'file.reveal', 'file.copyPath'];
 const BOOKMARK: Layout = [
@@ -90,30 +80,19 @@ const GIT: Layout = [
 
 /**
  * The right-click menus (PRD 003, §5) — on an entry, on a listing's blank
- * space, on a folder in the explorer, on a tab — and `Shift`+`F10` for each.
+ * space, on a folder in the explorer, on a place — and `Shift`+`F10` for each:
+ * the library's `UiContextMenuFeature`, which has a tab's menu
+ * (`trFileWorkbenchConfig`'s `tabMenu`) and a sidebar's `…` already.
  *
  * Every row is a command of `CommandsFeature`, laid out here per kind of
  * target, so a right-click offers nothing the menus and the palette do not,
  * enabled by the same rules; a row that does not apply is shown disabled
- * rather than left out, so the menu keeps its shape. The library's
- * `UiContextMenu` draws it, and asks to close.
+ * rather than left out, so the menu keeps its shape.
  */
-export class ContextMenuFeature {
-  private readonly current = signal<OpenContextMenu | null>(null);
-
-  constructor(private readonly parent: WorkbenchService) {}
-
-  readonly menu = this.current.asReadonly();
-
-  /**
-   * The open menu as a list of one, for the template to track by identity: a
-   * second right-click is a new menu — placed, and focused, afresh — not the
-   * old one with new rows.
-   */
-  readonly menus = computed<readonly OpenContextMenu[]>(() => {
-    const menu = this.current();
-    return menu === null ? [] : [menu];
-  });
+export class ContextMenuFeature extends UiContextMenuFeature<CommandTarget> {
+  constructor(protected override readonly parent: WorkbenchService) {
+    super(parent);
+  }
 
   /** A right-click in a panel: on an entry, or on blank space (`target: null`). */
   openInPanel(groupId: string, request: UiContextMenuRequest): void {
@@ -136,14 +115,6 @@ export class ContextMenuFeature {
     this.show(request, 'Folder actions', path === '' ? TREE_ROOT : TREE_FOLDER, this.parent.commandsFt.folderTarget(path));
   }
 
-  /** A right-click on a tab. */
-  openOnTab(groupId: string, request: UiContextMenuRequest): void {
-    if (request.target === null) {
-      return;
-    }
-    this.show(request, 'Tab actions', TAB, this.parent.commandsFt.tabTarget(groupId, request.target));
-  }
-
   /** A right-click on a place, a bookmark or a recent folder (PRD 003, §6): the folder is what is acted on. */
   openOnPlace(request: UiContextMenuRequest, section: PlaceSection, path: string): void {
     const layout = section === 'bookmark' ? BOOKMARK : section === 'recent' ? RECENT : PLACE;
@@ -154,43 +125,5 @@ export class ContextMenuFeature {
   /** The Git pane's `…` button, opening below it (PRD 011, §1). */
   openGitMenu(x: number, y: number): void {
     this.show({ target: null, x, y }, 'Git actions', GIT, this.parent.commandsFt.activeTarget());
-  }
-
-  /**
-   * A sidebar's `…` (PRD 001, §9.2): its panes, in the order they stand, each
-   * checked while shown — choosing one hides or shows it.
-   */
-  openSidebarMenu(sidebar: SidebarId, x: number, y: number): void {
-    const panes = this.parent.sidebarPanesFt.order(sidebar);
-    const layout = panes.filter((id) => DEFAULT_PANE_ORDER[sidebar].includes(id)).map((id) => `view.pane.${id}`);
-    this.show({ target: null, x, y }, sidebar === 'explorer' ? 'Explorer views' : 'Details views', layout, this.parent.commandsFt.activeTarget());
-  }
-
-  /** A row was chosen: the menu closes, and its command runs against what was right-clicked. */
-  run(id: string): void {
-    const menu = this.current();
-    this.close();
-    if (menu !== null) {
-      this.parent.commandsFt.run(id, menu.target);
-    }
-  }
-
-  close(): void {
-    this.current.set(null);
-  }
-
-  private show(request: UiContextMenuRequest, label: string, layout: Layout, target: CommandTarget): void {
-    const commands = this.parent.commandsFt;
-    const items: UiMenuItem[] = [];
-    let separate = false;
-    for (const id of layout) {
-      if (id === '-') {
-        separate = items.length > 0;
-        continue;
-      }
-      items.push(commands.menuItem(id, target, separate));
-      separate = false;
-    }
-    this.current.set({ x: request.x, y: request.y, label, items, target });
   }
 }

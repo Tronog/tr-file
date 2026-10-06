@@ -1,7 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import { UI_PANE_MIME, UiPane, UiSidebar, type UiPaneMove, type UiPaneResize } from '@tr-file/ui';
-import { SidebarPanesFeature } from './features/sidebar-panes.feature';
+import { UI_PANE_MIME, UiPane, UiSidebar, type UiPaneMove, type UiPaneResize } from '../../public-api';
 
 /**
  * PRD 002, §5.1 — the panes of a sidebar move by drag and drop, and by `Ctrl`+`↑`/`↓`;
@@ -211,40 +210,5 @@ describe('Resizing sidebar panes', () => {
     expect(pane('a').classList).toContain('is-sized');
     expect(pane('b').style.flex).toBe('');
     expect(pane('c').style.flex).toBe('');
-  });
-});
-
-describe('SidebarPanesFeature order', () => {
-  it('places a moved pane before or after its target, in its own sidebar only', () => {
-    const panes = new SidebarPanesFeature({ fileSystem: { transport: { systemShell: false } } } as never);
-    expect(panes.order('details')).toEqual(['git', 'properties', 'permissions', 'open-with']);
-
-    panes.move('details', { paneId: 'git', targetId: 'open-with', position: 'after' });
-    expect(panes.order('details')).toEqual(['properties', 'permissions', 'open-with', 'git']);
-    expect(panes.detailsCardBefore()).toBe('properties');
-
-    panes.move('details', { paneId: 'open-with', targetId: 'properties', position: 'before' });
-    expect(panes.order('details')).toEqual(['open-with', 'properties', 'permissions', 'git']);
-
-    // An id of the other sidebar changes nothing.
-    panes.move('details', { paneId: 'places', targetId: 'git', position: 'before' });
-    expect(panes.order('details')).toEqual(['open-with', 'properties', 'permissions', 'git']);
-    expect(panes.order('explorer')).toEqual(['places', 'bookmarks', 'recent', 'explorer-tree']);
-    expect(panes.changedOrders()).toEqual({ details: ['open-with', 'properties', 'permissions', 'git'] });
-  });
-
-  it('keeps pane heights, and gives a pane opened among sized ones an equal share', () => {
-    const panes = new SidebarPanesFeature({ fileSystem: { transport: { systemShell: false } } } as never);
-    panes.resize({ sizes: { bookmarks: 100, 'explorer-tree': 299.6, nope: Number.NaN } });
-    expect(panes.sizeOf('explorer-tree')).toBe(300);
-    expect(panes.paneSizes()).toEqual({ bookmarks: 100, 'explorer-tree': 300 });
-
-    panes.toggle('recent');
-    expect(panes.sizeOf('recent')).toBe(200);
-    // Closing and opening again keeps what it had.
-    panes.resize({ sizes: { recent: 50 } });
-    panes.toggle('recent');
-    panes.toggle('recent');
-    expect(panes.sizeOf('recent')).toBe(50);
   });
 });

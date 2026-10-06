@@ -1,0 +1,246 @@
+@let wb = workbench;
+@let apps = wb.subAppsFt;
+@let chrome = wb.chromeFt;
+@let resize = wb.resizeFt;
+@let palette = wb.commandPaletteFt;
+@let contextMenu = wb.contextMenuFt;
+@let preferences = wb.preferencesFt;
+@let left = wb.config.sidebars[0];
+@let right = wb.config.sidebars[1];
+
+<!-- The `left` slot is the first sidebar and the `right` one the second, at
+     whichever edge the settings put each — both may be at the same one (PRD 010, §3). -->
+<ui-workbench
+  [leftAt]="preferences.sideOf(left.id)"
+  [rightAt]="preferences.sideOf(right.id)"
+  [leftSashLabel]="'Resize ' + left.label"
+  [rightSashLabel]="'Resize ' + right.label"
+  [leftVisible]="apps.mainShown() && chrome.isShown(left.id)"
+  [rightVisible]="apps.mainShown() && chrome.isShown(right.id)"
+  [leftWidth]="wb.leftSidebarWidth()"
+  [rightWidth]="wb.rightSidebarWidth()"
+  [leftMin]="resize.leftBounds.min"
+  [leftMax]="resize.leftBounds.max"
+  [rightMin]="resize.rightBounds.min"
+  [rightMax]="resize.rightBounds.max"
+  (leftResize)="resize.resizeLeftSidebar($event)"
+  (rightResize)="resize.resizeRightSidebar($event)"
+>
+  <h1 uiSlot="title" class="app-heading">{{ wb.config.title }}</h1>
+
+  <ui-title-bar
+    uiSlot="title"
+    [brandIcon]="wb.config.icon ?? 'layout-grid'"
+    [menuItems]="chrome.menuItems()"
+    [commandLabel]="chrome.commandLabel"
+    [commandKeys]="chrome.commandKeys"
+    [actions]="chrome.titleBarActions()"
+    [zoom]="zoom()"
+    (zoomRequest)="zoomRequest.emit($event)"
+    [upgrade]="upgrade()"
+    (upgradeSelect)="upgradeSelect.emit()"
+    [windowControls]="windowControls()"
+    [draggable]="draggable()"
+    [leadingInset]="leadingInset()"
+    (windowControlSelect)="windowControlSelect.emit($event)"
+    (commandSelect)="palette.show()"
+    (actionSelect)="chrome.runTitleBarAction($event)"
+    (menuOpenChange)="chrome.setMenuOpen($event)"
+    (menuItemSelect)="chrome.runMenuItem($event)"
+    (dragAreaDoubleClick)="dragAreaDoubleClick.emit()"
+  />
+
+  <ui-activity-bar
+    uiSlot="activity"
+    [side]="preferences.activitySide()"
+    [items]="chrome.activityItems()"
+    [bottomItems]="chrome.activityBottomItems()"
+    (select)="chrome.selectActivity($event)"
+    (menuOpen)="chrome.openMenu($event)"
+  />
+
+  <!-- The sidebars: the application's own, or drawn from its panes' templates. -->
+  <div uiSlot="left" class="shell-slot">
+    <ng-container *ngTemplateOutlet="sidebar; context: { $implicit: left }" />
+  </div>
+
+  <!-- The main sub-application: the panels above the bottom panel (PRD 001, §1.1). -->
+  <div uiSlot="center" class="editor-area" [class.is-inactive]="!apps.mainShown()">
+    @let groups = wb.editorGroupsFt;
+    @let panelFocus = wb.panelFocusFt;
+    @let layout = wb.panelLayoutFt;
+    @let panel = wb.bottomPanelFt;
+
+    <div class="editor-grid">
+      <ui-panel-grid [node]="layout.grid()" [maximizedGroupId]="layout.maximizedGroupId()" (resize)="layout.resize($event)">
+        <ng-template #leaf let-groupId>
+          @if (groups.group(groupId); as group) {
+            <ui-panel-group
+              [attr.data-focus-region]="'group:' + groupId"
+              [group]="group"
+              [active]="groups.isActive(groupId)"
+              [acceptFiles]="groups.acceptsFiles(groupId)"
+              [focusBody]="panelFocus.token(groupId)"
+              (focusRequest)="groups.focus(groupId)"
+              (tabSelect)="groups.selectTab(groupId, $event)"
+              (tabActivate)="panelFocus.focusBody(groupId)"
+              (tabDoubleClick)="groups.runAction(groupId, 'maximize')"
+              (tabContextMenu)="contextMenu.openOnTab(groupId, $event)"
+              (bodyPress)="panelFocus.focusBody(groupId)"
+              (tabClose)="groups.closeTab(groupId, $event)"
+              (tabMove)="groups.moveTab(groupId, $event)"
+              (tabDrop)="groups.applyReorder($event)"
+              (zoneDrop)="groups.applyZoneDrop($event)"
+              (filesDrop)="panelFilesDrop.emit({ groupId, drop: $event })"
+              (actionSelect)="groups.runAction(groupId, $event)"
+            >
+              <!-- What the active tab shows: the application's template for its content. -->
+              @let content = groups.activeContent(groupId);
+              @if (content !== null && contentTemplates().get(content); as template) {
+                <ng-container uiNodeInjector #node="uiNodeInjector">
+                  <ng-container *ngTemplateOutlet="template; context: { $implicit: groupId }; injector: node.injector" />
+                </ng-container>
+              }
+            </ui-panel-group>
+          }
+        </ng-template>
+      </ui-panel-grid>
+    </div>
+
+    <!-- Nothing to resize while the panel is its tab bar. -->
+    @if (!panel.collapsed()) {
+      <ui-sash
+        orientation="horizontal"
+        label="Resize bottom panel"
+        [value]="wb.bottomPanelHeight()"
+        [min]="resize.bottomBounds.min"
+        [max]="resize.bottomBounds.max"
+        (resize)="resize.resizeBottomPanel($event)"
+      />
+    }
+
+    <ui-bottom-panel
+      data-focus-region="bottom"
+      class="bottom-panel"
+      [label]="wb.config.bottomPanel.label"
+      [style.height.px]="panel.collapsed() ? null : wb.bottomPanelHeight()"
+      [collapsed]="panel.collapsed()"
+      [bodyFocus]="panel.bodyFocus()"
+      [tabs]="panel.tabs()"
+      [actions]="panel.actions()"
+      (tabSelect)="panel.select($event)"
+      (actionSelect)="panel.runAction($event)"
+    >
+      @if (bottomTemplates().get(panel.activeTab()); as template) {
+        <ng-container *ngTemplateOutlet="template" />
+      }
+    </ui-bottom-panel>
+  </div>
+
+  <!-- Every other sub-application, drawn the first time it is shown and kept, hidden, while another is. -->
+  <div uiSlot="center" class="shell-slot">
+    @for (app of apps.apps; track app.id) {
+      @if (app.id !== apps.main && apps.isOpened(app.id) && subAppTemplates().get(app.id); as template) {
+        <div class="shell-sub-app" [class.is-inactive]="!apps.isActive(app.id)">
+          <ng-container *ngTemplateOutlet="template" />
+        </div>
+      }
+    }
+  </div>
+
+  <div uiSlot="right" class="shell-slot">
+    <ng-container *ngTemplateOutlet="sidebar; context: { $implicit: right }" />
+  </div>
+
+  <ui-status-bar
+    uiSlot="status"
+    [leadingItems]="chrome.statusLeadingItems()"
+    [trailingItems]="chrome.statusTrailingItems()"
+    [functionKeys]="functionKeys()"
+    (select)="chrome.runStatusAction($event)"
+    (functionKeySelect)="functionKeySelect.emit($event)"
+  />
+</ui-workbench>
+
+<!-- A sidebar: the application's template for it, or its panes, in the order they stand (PRD 002, §5.1). -->
+<ng-template #sidebar let-def>
+  @if (sidebarTemplates().get(def.id); as template) {
+    <ng-container *ngTemplateOutlet="template" />
+  } @else {
+    @let panes = wb.sidebarPanesFt;
+    <ui-sidebar
+      [side]="preferences.sideOf(def.id)"
+      [attr.data-focus-region]="def.id"
+      [title]="def.label"
+      [actions]="chrome.sidebarMoreActions"
+      (actionAt)="$event.id === 'more' && contextMenu.openSidebarMenu(def.id, $event.x, $event.y)"
+    >
+      @for (paneId of panes.shown(def.id); track paneId) {
+        @let pane = paneTemplates().get(paneId);
+        <ui-pane
+          [paneId]="paneId"
+          [title]="pane?.paneTitle() ?? panes.pane(paneId)?.label ?? paneId"
+          [actions]="pane?.paneActions() ?? []"
+          [grow]="pane?.paneGrow() ?? false"
+          [expanded]="panes.isExpanded(paneId)"
+          [size]="panes.sizeOf(paneId)"
+          (toggle)="panes.toggle(paneId); pane?.paneToggle?.emit(panes.isExpanded(paneId))"
+          (actionSelect)="pane?.paneAction?.emit($event)"
+          (paneMove)="panes.move(def.id, $event)"
+          (paneResize)="panes.resize($event)"
+        >
+          @if (pane) {
+            <ng-container *ngTemplateOutlet="pane.template" />
+          }
+        </ui-pane>
+      }
+    </ui-sidebar>
+  }
+</ng-template>
+
+<!-- The Settings gear's menu (PRD 007, §1): fixed, beside the gear, opening upward. -->
+@if (chrome.settingsMenu(); as menu) {
+  <ui-context-menu
+    label="Settings"
+    [origin]="menu.leftward ? 'bottom-right' : 'bottom-left'"
+    [fixed]="true"
+    [x]="menu.x"
+    [y]="menu.y"
+    [items]="chrome.settingsMenuItems()"
+    (select)="chrome.runSettingsItem($event)"
+    (dismiss)="chrome.closeSettingsMenu()"
+  />
+}
+
+<!-- The right-click menus (PRD 003, §5). -->
+@for (menu of contextMenu.menus(); track menu) {
+  <ui-context-menu
+    [label]="menu.label"
+    [fixed]="true"
+    [x]="menu.x"
+    [y]="menu.y"
+    [items]="menu.items"
+    (select)="contextMenu.run($event)"
+    (dismiss)="contextMenu.close()"
+  />
+}
+
+<!-- The command palette (PRD 009, §1): VS Code's quick input, at the top of the window. -->
+@if (palette.isOpen()) {
+  <ui-quick-input
+    emptyText="No matching commands"
+    [label]="palette.label()"
+    [value]="palette.query()"
+    [placeholder]="palette.placeholder()"
+    [items]="palette.items()"
+    [activeId]="palette.activeId()"
+    [message]="palette.message()"
+    [showList]="palette.showList()"
+    [busy]="palette.busy()"
+    (valueChange)="palette.setQuery($event)"
+    (activeChange)="palette.setActive($event)"
+    (accept)="palette.accept()"
+    (itemButton)="palette.itemButton($event)"
+    (dismiss)="palette.close()"
+  />
+}

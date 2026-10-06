@@ -42,10 +42,10 @@ describe('BottomPanelFeature', () => {
     expect(tab('transfers')).toEqual({ id: 'transfers', label: 'Transfers' });
     expect(tab('progress')).toEqual({ id: 'progress', label: 'Progress' });
     expect(tab('problems')).toEqual({ id: 'problems', label: 'Problems' });
-    expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
-    expect(workbench.bottomPanelFt.transfersVisible()).toBe(false);
+    expect(workbench.bottomPanelFt.isVisible('notes')).toBe(true);
+    expect(workbench.bottomPanelFt.isVisible('transfers')).toBe(false);
     expect(workbench.bottomPanelFt.transfersEmpty()).toBe(true);
-    expect(workbench.bottomPanelFt.problemsVisible()).toBe(false);
+    expect(workbench.bottomPanelFt.isVisible('problems')).toBe(false);
     expect(workbench.bottomPanelFt.problems()).toEqual([]);
   });
 
@@ -75,8 +75,8 @@ describe('BottomPanelFeature', () => {
 
     expect(tab('problems')?.active).toBe(true);
     expect(tab('transfers')?.active).toBeUndefined();
-    expect(workbench.bottomPanelFt.problemsVisible()).toBe(true);
-    expect(workbench.bottomPanelFt.transfersVisible()).toBe(false);
+    expect(workbench.bottomPanelFt.isVisible('problems')).toBe(true);
+    expect(workbench.bottomPanelFt.isVisible('transfers')).toBe(false);
   });
 
   describe('runAction()', () => {
@@ -130,7 +130,7 @@ describe('BottomPanelFeature', () => {
       workbench.bottomPanelFt.select('problems');
 
       expect(workbench.bottomPanelFt.collapsed()).toBe(false);
-      expect(workbench.bottomPanelFt.problemsVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('problems')).toBe(true);
     });
   });
 
@@ -138,7 +138,7 @@ describe('BottomPanelFeature', () => {
     const panel = workbench.bottomPanelFt;
     panel.select('transfers');
     panel.select('notes');
-    expect(panel.notesVisible()).toBe(true);
+    expect(panel.isVisible('notes')).toBe(true);
     expect(panel.actions().map((action) => action.id)).toEqual(['toggle']);
   });
 
@@ -155,7 +155,7 @@ describe('BottomPanelFeature', () => {
     const before = workbench.bottomPanelFt.bodyFocus();
     workbench.commandsFt.run('view.notes');
     expect(workbench.bottomPanelFt.collapsed()).toBe(false);
-    expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
+    expect(workbench.bottomPanelFt.isVisible('notes')).toBe(true);
     expect(workbench.bottomPanelFt.bodyFocus()).toBe(before + 1);
   });
 

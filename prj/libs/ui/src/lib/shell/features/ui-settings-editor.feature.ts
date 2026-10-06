@@ -1,6 +1,6 @@
 import { computed, signal } from '@angular/core';
+import type { UiKeyContext } from '../../keyboard/keymap';
 import type {
-  UiKeyContext,
   UiKeybindingRecording,
   UiKeybindingRequest,
   UiKeybindingRow,
@@ -9,23 +9,23 @@ import type {
   UiSettingsEditorModel,
   UiSettingsGroup,
   UiSettingsSection,
-} from '@tr-file/ui';
-import { SettingsModal } from '../settings-editor/settings-modal';
-import type { WorkbenchService } from '../workbench.service';
-import type { KeybindingEntry } from './keybindings.feature';
-import { PREFERENCES, type Preference } from './preferences.feature';
+} from '../../models/settings.model';
+import { UiSettingsModal } from '../ui-settings-modal';
+import type { UiPreference } from '../ui-workbench.config';
+import type { UiWorkbenchService } from '../ui-workbench.service';
+import type { UiKeybindingEntry } from './ui-keybindings.feature';
 
-/** The settings window's pages (PRD 010, §1). */
-export type SettingsSectionId = 'general' | 'appearance' | 'keyboard-shortcuts';
-
-const SECTIONS: readonly UiSettingsSection[] = [
+/** The pages of settings, unless the configuration has its own (`settingsSections`). */
+const SETTINGS_SECTIONS: readonly UiSettingsSection[] = [
   { id: 'general', label: 'General', icon: 'settings' },
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
-  { id: 'keyboard-shortcuts', label: 'Keyboard Shortcuts', icon: 'keyboard' },
 ];
 
+/** The last page, always: every key (PRD 010, §2). */
+const KEYBOARD_SHORTCUTS: UiSettingsSection = { id: 'keyboard-shortcuts', label: 'Keyboard Shortcuts', icon: 'keyboard' };
+
 /** Where a key applies, as the Keyboard Shortcuts page says it. */
-const WHEN_LABELS: Readonly<Record<UiKeyContext, string>> = {
+const WHEN_LABELS: Readonly<Partial<Record<UiKeyContext, string>>> = {
   window: 'Anywhere',
   panel: 'In a panel',
   list: 'On a row',
@@ -35,34 +35,40 @@ const WHEN_LABELS: Readonly<Record<UiKeyContext, string>> = {
 /**
  * The settings window (PRD 010): what it shows and what is done in it.
  *
- * *General* and *Appearance* list `PREFERENCES`, their values from
- * `PreferencesFeature`; *Keyboard Shortcuts* lists `KeybindingsFeature`'s
- * table, and records a key for a row: the next key pressed, shown with the
- * commands it already runs, then kept on `Enter` or dropped on `Escape`.
- * The search box filters the page shown — the settings of both pages at once,
- * the way VS Code searches every setting.
+ * The pages of settings list the configuration's `preferences`, their values
+ * from `UiPreferencesFeature`; *Keyboard Shortcuts* lists
+ * `UiKeybindingsFeature`'s table, and records a key for a row: the next key
+ * pressed, shown with the commands it already runs, then kept on `Enter` or
+ * dropped on `Escape`. The search box filters the page shown — the settings
+ * of every page at once, the way VS Code searches every setting.
  *
- * `SettingsModal` puts `UiSettingsEditor` in a large modal window; this
+ * `UiSettingsModal` puts `UiSettingsEditor` in a large modal window; this
  * feature is its model.
  */
-export class SettingsEditorFeature {
-  private readonly section = signal<SettingsSectionId>('general');
+export class UiSettingsEditorFeature {
+  /** The window's pages: the configuration's pages of settings, then *Keyboard Shortcuts*. */
+  readonly sections: readonly UiSettingsSection[];
+
+  private readonly section = signal<string>('general');
   private readonly query = signal('');
   private readonly recording = signal<{ readonly rowId: string; readonly mode: 'change' | 'add'; readonly key: string | null } | null>(null);
   private readonly opened = signal(false);
 
-  constructor(private readonly parent: WorkbenchService) {}
+  constructor(protected readonly parent: UiWorkbenchService) {
+    this.sections = [...(parent.config.settingsSections ?? SETTINGS_SECTIONS), KEYBOARD_SHORTCUTS];
+    this.section.set(this.sections[0]?.id ?? KEYBOARD_SHORTCUTS.id);
+  }
 
   readonly isOpen = this.opened.asReadonly();
 
-  /** Opens the window at `section` — or, when it is open, turns to it. */
-  open(section: SettingsSectionId = 'general'): void {
+  /** Opens the window at `section` (the first page by default) — or, when it is open, turns to it. */
+  open(section: string = this.sections[0]?.id ?? KEYBOARD_SHORTCUTS.id): void {
     this.selectSection(section);
     if (this.opened()) {
       return;
     }
     this.opened.set(true);
-    void this.parent.modal.open(SettingsModal, { label: 'Settings', size: 'large', inputs: { editor: this } }).then(() => {
+    void this.parent.modal.open(UiSettingsModal, { label: 'Settings', size: 'large', inputs: { editor: this } }).then(() => {
       this.opened.set(false);
       this.recording.set(null);
       this.query.set('');
@@ -70,8 +76,8 @@ export class SettingsEditorFeature {
   }
 
   selectSection(section: string): void {
-    if (SECTIONS.some((candidate) => candidate.id === section) && section !== this.section()) {
-      this.section.set(section as SettingsSectionId);
+    if (this.sections.some((candidate) => candidate.id === section) && section !== this.section()) {
+      this.section.set(section);
       this.query.set('');
       this.recording.set(null);
     }
@@ -161,11 +167,11 @@ export class SettingsEditorFeature {
   readonly model = computed<UiSettingsEditorModel>(() => {
     const section = this.section();
     return {
-      sections: SECTIONS,
+      sections: this.sections,
       active: section,
       query: this.query(),
       page:
-        section === 'keyboard-shortcuts'
+        section === KEYBOARD_SHORTCUTS.id
           ? {
               kind: 'keybindings',
               rows: this.keybindingRows(),
@@ -177,16 +183,16 @@ export class SettingsEditorFeature {
   });
 
   /** A page's settings under their headings — or, while searching, every match, page by page. */
-  private settingGroups(section: 'general' | 'appearance'): readonly UiSettingsGroup[] {
-    const words = SettingsEditorFeature.words(this.query());
-    const shown = PREFERENCES.filter((preference) =>
+  private settingGroups(section: string): readonly UiSettingsGroup[] {
+    const words = UiSettingsEditorFeature.words(this.query());
+    const shown = this.parent.preferencesFt.all.filter((preference) =>
       words.length === 0
         ? preference.section === section
-        : SettingsEditorFeature.matches(`${preference.category} ${preference.title} ${preference.description} ${preference.id}`, words),
+        : UiSettingsEditorFeature.matches(`${preference.category} ${preference.title} ${preference.description} ${preference.id}`, words),
     );
     const groups: UiSettingsGroup[] = [];
     for (const preference of shown) {
-      const title = words.length === 0 ? preference.group : `${SECTIONS.find((candidate) => candidate.id === preference.section)?.label} › ${preference.group}`;
+      const title = words.length === 0 ? preference.group : `${this.sections.find((candidate) => candidate.id === preference.section)?.label} › ${preference.group}`;
       const id = `${preference.section}-${preference.group}`.toLowerCase();
       const group = groups.find((candidate) => candidate.id === id);
       const setting = this.settingOf(preference);
@@ -199,7 +205,7 @@ export class SettingsEditorFeature {
     return groups;
   }
 
-  private settingOf(preference: Preference): UiSetting {
+  private settingOf(preference: UiPreference): UiSetting {
     const preferences = this.parent.preferencesFt;
     const { kind } = preference;
     return {
@@ -219,9 +225,9 @@ export class SettingsEditorFeature {
 
   /** The rows, sorted by what they are called, and filtered by the search box. */
   private readonly keybindingRows = computed<readonly UiKeybindingRow[]>(() => {
-    const words = SettingsEditorFeature.words(this.query());
+    const words = UiSettingsEditorFeature.words(this.query());
     return [...this.parent.keybindingsFt.entries()]
-      .filter((entry) => SettingsEditorFeature.matches(`${entry.category} ${entry.label} ${entry.command} ${entry.binding?.key ?? ''} ${entry.source}`, words))
+      .filter((entry) => UiSettingsEditorFeature.matches(`${entry.category} ${entry.label} ${entry.command} ${entry.binding?.key ?? ''} ${entry.source}`, words))
       .sort((a, b) => `${a.category}: ${a.label}`.localeCompare(`${b.category}: ${b.label}`) || (a.binding === null ? 1 : 0) - (b.binding === null ? 1 : 0))
       .map((entry) => ({
         id: entry.id,
@@ -229,7 +235,7 @@ export class SettingsEditorFeature {
         category: entry.category,
         label: entry.label,
         key: entry.binding?.key ?? null,
-        when: entry.binding === null ? '' : WHEN_LABELS[entry.binding.when],
+        when: entry.binding === null ? '' : (WHEN_LABELS[entry.binding.when] ?? entry.binding.when),
         source: entry.source,
         ...(entry.modified ? { modified: true } : {}),
       }));
@@ -253,7 +259,7 @@ export class SettingsEditorFeature {
     return { rowId: recording.rowId, mode: recording.mode, key: recording.key, conflicts };
   }
 
-  private entryOf(rowId: string): KeybindingEntry | undefined {
+  private entryOf(rowId: string): UiKeybindingEntry | undefined {
     return this.parent.keybindingsFt.entries().find((entry) => entry.id === rowId);
   }
 

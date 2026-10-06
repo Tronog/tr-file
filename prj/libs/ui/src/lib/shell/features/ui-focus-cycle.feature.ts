@@ -1,20 +1,20 @@
 import { computed, inject } from '@angular/core';
-import { UiKeymap } from '@tr-file/ui';
-import type { WorkbenchService } from '../workbench.service';
-import { FOCUS_COMMANDS } from './keybindings.feature';
+import { UiKeymap } from '../../keyboard/keymap';
+import type { UiWorkbenchService } from '../ui-workbench.service';
+import { UI_FOCUS_COMMANDS } from './ui-keybindings.feature';
 
 /** `Tab` / `Shift`+`Tab` between panels, as the keymap binds them (`when: 'panel'`). */
 const PANEL_COMMANDS = ['workbench.nextPanel', 'workbench.previousPanel'] as const;
 
-/** The regions `Ctrl`+`Tab` moves between; a panel group is `group:<id>`. */
-export type FocusRegionId = 'explorer' | 'bottom' | 'details' | `group:${string}`;
+/** The regions `Ctrl`+`Tab` moves between: a sidebar by its id, `bottom`, and a panel group as `group:<id>`. */
+export type UiFocusRegionId = string;
 
 /**
  * `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab`: from one part of the workbench to the
- * next (PRD 002, §2.6) — the explorer, each panel in layout order, the bottom
- * panel while it is open, the details sidebar, and round again.
+ * next (PRD 002, §2.6) — the sidebars on the left, each panel in layout order,
+ * the bottom panel while it is open, the sidebars on the right, and round again.
  *
- * This decides the ring and what a step means; the component does the DOM
+ * This decides the ring and what a step means; the shell does the DOM
  * half — which region focus is in now, and what to focus in the next one —
  * since only it can see elements. A panel is entered the way choosing its
  * tab enters it (`PanelFocusFeature`), so it becomes the active panel and the
@@ -27,30 +27,28 @@ export type FocusRegionId = 'explorer' | 'bottom' | 'details' | `group:${string}
  * Plain `Tab` / `Shift`+`Tab` in a panel's body walk the panels only (§2.6),
  * which works in a browser too; see `panelDirectionOf`.
  */
-export class FocusCycleFeature {
+export class UiFocusCycleFeature {
   private readonly keymap = inject(UiKeymap);
 
-  constructor(private readonly parent: WorkbenchService) {}
+  constructor(protected readonly parent: UiWorkbenchService) {}
 
   /** Every stop, in order. */
-  readonly ring = computed<readonly FocusRegionId[]>(() => {
-    // The regions are the file manager's (PRD 001, §1.1); another sub-application has none yet.
-    if (!this.parent.subAppsFt.fileManager()) {
+  readonly ring = computed<readonly UiFocusRegionId[]>(() => {
+    // The regions are the main sub-application's (PRD 001, §1.1); another has none.
+    if (!this.parent.subAppsFt.mainShown()) {
       return [];
     }
     // Left to right as the window shows them, wherever the settings put the
-    // sidebars (PRD 010, §3): on one side together, the Explorer is outermost.
-    const preferences = this.parent.preferencesFt;
+    // sidebars (PRD 010, §3): on one side together, the first is outermost.
     // A hidden sidebar is not in it.
-    const explorer = this.parent.chromeFt.isShown('explorer') ? preferences.explorerSide() : null;
-    const details = this.parent.chromeFt.isShown('details') ? preferences.detailsSide() : null;
+    const preferences = this.parent.preferencesFt;
+    const sidebars = this.parent.config.sidebars.filter((sidebar) => this.parent.chromeFt.isShown(sidebar.id));
+    const at = (side: 'left' | 'right'): readonly string[] => sidebars.filter((sidebar) => preferences.sideOf(sidebar.id) === side).map((sidebar) => sidebar.id);
     return [
-      ...(explorer === 'left' ? (['explorer'] as const) : []),
-      ...(details === 'left' ? (['details'] as const) : []),
-      ...this.parent.panelLayoutFt.groupIds().map((id): FocusRegionId => `group:${id}`),
-      ...(this.parent.bottomPanelFt.collapsed() ? [] : (['bottom'] as const)),
-      ...(details === 'right' ? (['details'] as const) : []),
-      ...(explorer === 'right' ? (['explorer'] as const) : []),
+      ...at('left'),
+      ...this.parent.panelLayoutFt.groupIds().map((id) => `group:${id}`),
+      ...(this.parent.bottomPanelFt.collapsed() ? [] : ['bottom']),
+      ...[...at('right')].reverse(),
     ];
   });
 
@@ -60,7 +58,7 @@ export class FocusCycleFeature {
    * `-1` back, `0` for any other key.
    */
   directionOf(event: KeyboardEvent): -1 | 0 | 1 {
-    const command = this.keymap.commandFor(event, 'window', FOCUS_COMMANDS);
+    const command = this.keymap.commandFor(event, 'window', UI_FOCUS_COMMANDS);
     // Not while a window or the palette has the keyboard: they keep it.
     if (command === null || this.parent.modal.isOpen() || this.parent.commandPaletteFt.isOpen()) {
       return 0;
@@ -74,19 +72,19 @@ export class FocusCycleFeature {
    * caller, which is why this is a list and not one answer. From outside
    * every region — the title bar, nowhere — the first stop is the active panel.
    */
-  sequence(current: FocusRegionId | null, direction: -1 | 1): readonly FocusRegionId[] {
+  sequence(current: UiFocusRegionId | null, direction: -1 | 1): readonly UiFocusRegionId[] {
     const ring = this.ring();
     if (ring.length === 0) {
       return [];
     }
     const at = current === null ? -1 : ring.indexOf(current);
     if (at === -1) {
-      const active: FocusRegionId = `group:${this.parent.activeGroupId()}`;
+      const active: UiFocusRegionId = `group:${this.parent.activeGroupId()}`;
       return [active, ...ring.filter((region) => region !== active)];
     }
     return Array.from({ length: ring.length - 1 }, (_, step) => {
       const index = (at + direction * (step + 1) + ring.length * ring.length) % ring.length;
-      return ring[index] as FocusRegionId;
+      return ring[index] as UiFocusRegionId;
     });
   }
 
@@ -129,8 +127,8 @@ export class FocusCycleFeature {
     return maximized === null ? this.parent.panelLayoutFt.groupIds() : [maximized];
   });
 
-  /** Enters a panel as choosing its tab does; `false` for a region the component must focus. */
-  enter(region: FocusRegionId): boolean {
+  /** Enters a panel as choosing its tab does; `false` for a region the shell must focus. */
+  enter(region: UiFocusRegionId): boolean {
     if (!region.startsWith('group:')) {
       return false;
     }

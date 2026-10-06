@@ -1,125 +1,23 @@
 import { computed, signal } from '@angular/core';
-import type {
-  UiActivityItem,
-  UiIconAction,
-  UiMenuAnchor,
-  UiMenuBarItem,
-  UiMenuBarSelection,
-  UiMenuItem,
-  UiStatusItem,
-} from '@tr-file/ui';
+import { UiChromeFeature, type UiActivityItem, type UiCommandTarget, type UiMenuItem, type UiStatusItem } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 import { isFolder } from '../../file-system/fs-entry-kind';
 
 /** The two sidebars the title bar shows and hides. */
 export type SidebarName = 'explorer' | 'details';
 
-/** What each title-bar button runs: commands of the table, so the palette and the View menu run the same. */
-const TITLE_BAR_COMMANDS: Readonly<Record<string, string>> = {
-  'toggle-theme': 'view.toggleTheme',
-  'toggle-left': 'view.toggleExplorer',
-  'toggle-panel': 'view.togglePanel',
-  'toggle-right': 'view.toggleDetails',
-  customize: 'view.resetLayout',
-};
-
 /**
- * The window chrome: title bar, activity bar and status bar.
+ * The window chrome: title bar, activity bar and status bar — the library's
+ * `UiChromeFeature`, with what the file manager reports in them.
  *
- * The menus are still static configuration, but everything that reports state —
- * problem count, active transfers, selection, hidden-file visibility — is derived
- * from the live workbench, so the bars never claim something that is not true.
+ * Everything that reports state — problem count, active transfers,
+ * selection, hidden-file visibility, the server's clock — is derived from the
+ * live workbench, so the bars never claim something that is not true.
  */
-export class ChromeFeature {
-  readonly commandLabel: string;
-  readonly commandKeys: readonly string[];
-  readonly sidebarMoreActions: readonly UiIconAction[];
-
-  /** Whether the Explorer and Details sidebars are shown — the title bar's two sidebar buttons. */
-  private readonly shown = signal<Readonly<Record<SidebarName, boolean>>>({ explorer: true, details: true });
-
-  constructor(private readonly parent: WorkbenchService) {
-    const mock = parent.mockWorkbench;
-    this.commandLabel = mock.commandLabel;
-    this.commandKeys = mock.commandKeys;
-    this.sidebarMoreActions = mock.sidebarMoreActions;
+export class ChromeFeature extends UiChromeFeature {
+  constructor(protected override readonly parent: WorkbenchService) {
+    super(parent);
   }
-
-  /**
-   * The title bar's layout buttons (PRD 001, §15.1): the Explorer, the bottom
-   * panel and Details — each pressed while what it toggles is showing, and a
-   * sidebar's drawn on the side the settings put it (PRD 010, §3) — then
-   * *Reset Layout*.
-   */
-  readonly titleBarActions = computed<readonly UiIconAction[]>(() => {
-    const preferences = this.parent.preferencesFt;
-    const icon = (side: 'left' | 'right'): UiIconAction['icon'] => (side === 'left' ? 'sidebar-left' : 'sidebar-right');
-    return this.parent.mockWorkbench.titleBarActions.map((action): UiIconAction => {
-      switch (action.id) {
-        case 'toggle-left':
-          return { ...action, icon: icon(preferences.explorerSide()), active: this.isShown('explorer') };
-        case 'toggle-right':
-          return { ...action, icon: icon(preferences.detailsSide()), active: this.isShown('details') };
-        case 'toggle-panel':
-          return { ...action, active: !this.parent.bottomPanelFt.collapsed() };
-        // Leftmost of the group (PRD 001, §8.2.2): the sun in the dark, the moon in the light — what a press turns to.
-        case 'toggle-theme':
-          return preferences.effectiveTheme() === 'dark'
-            ? { ...action, label: 'Switch to Light Theme', icon: 'sun' }
-            : { ...action, label: 'Switch to Dark Theme', icon: 'moon' };
-        default:
-          return action;
-      }
-    });
-  });
-
-  isShown(sidebar: SidebarName): boolean {
-    return this.shown()[sidebar];
-  }
-
-  /**
-   * Hides or shows a sidebar. Hidden with the keyboard in it, the keyboard
-   * goes to the active panel's content, as it does when the bottom panel is
-   * put away (PRD 001, §12.3) — else it would be left on nothing.
-   */
-  toggleSidebar(sidebar: SidebarName): void {
-    this.setShown([sidebar], !this.isShown(sidebar));
-  }
-
-  /**
-   * Both sidebars at once (PRD 001, §9.2.1, `Ctrl`+`/`): either shown, both
-   * go — the panels get the whole window —; both hidden, both come back.
-   */
-  toggleSidebars(): void {
-    this.setShown(['explorer', 'details'], !this.isShown('explorer') && !this.isShown('details'));
-  }
-
-  /** Shows or hides `sidebars`; one hidden with the keyboard in it hands it to the active panel. */
-  private setShown(sidebars: readonly SidebarName[], show: boolean): void {
-    const hadFocus = !show && sidebars.some((sidebar) => this.isShown(sidebar) && ChromeFeature.focusIsIn(sidebar));
-    this.shown.update((shown) => ({ ...shown, ...Object.fromEntries(sidebars.map((sidebar) => [sidebar, show])) }));
-    if (hadFocus) {
-      this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
-    }
-  }
-
-  /** Puts the sidebars back as a restored session had them. */
-  restoreSidebars(hidden: readonly SidebarName[]): void {
-    this.shown.set({ explorer: !hidden.includes('explorer'), details: !hidden.includes('details') });
-  }
-
-  /** The hidden sidebars, for the session. */
-  hiddenSidebars(): readonly SidebarName[] {
-    return (['explorer', 'details'] as const).filter((sidebar) => !this.isShown(sidebar));
-  }
-
-  private static focusIsIn(region: SidebarName): boolean {
-    const focused = globalThis.document?.activeElement;
-    return focused instanceof Element && focused.closest(`[data-focus-region="${region}"]`) !== null;
-  }
-
-  /** The main menu that is open, if any (PRD 008, §1). */
-  private readonly openMenuId = signal<string | null>(null);
 
   /** Which view the left sidebar shows: the explorer, or the Search view (PRD 003, §5). */
   private readonly sidebar = signal<'explorer' | 'search'>('explorer');
@@ -130,9 +28,7 @@ export class ChromeFeature {
   showSidebar(view: 'explorer' | 'search'): void {
     this.parent.subAppsFt.show('file-manager');
     this.sidebar.set(view);
-    if (!this.isShown('explorer')) {
-      this.shown.update((shown) => ({ ...shown, explorer: true }));
-    }
+    this.revealSidebar('explorer');
   }
 
   /** The activity bar's Bookmarks (PRD 003, §6): the explorer, with its Bookmarks pane open. */
@@ -143,67 +39,26 @@ export class ChromeFeature {
   }
 
   /**
-   * What the Settings menu offers (PRD 007, §1; PRD 003, §6): commands of the
-   * table, laid out in `MockDataWorkbenchService.settingsMenuItems` — checked
-   * and enabled as they stand.
+   * Go's choice of computer follows the connection (PRD 008, §1): Local
+   * Computer is checked while the workbench talks to its own backend, Remote
+   * Computer once it talks to a remote one.
    */
-  readonly settingsMenuItems = computed<readonly UiMenuItem[]>(() => {
-    const commands = this.parent.commandsFt;
-    // The menu's own words — *Settings*, not the palette's *Open Settings* — with the command's state.
-    return this.parent.mockWorkbench.settingsMenuItems.map((item) =>
-      commands.command(item.id) === undefined ? item : { ...commands.menuItem(item.id, commands.activeTarget(), !!item.separatorBefore), label: item.label },
-    );
-  });
-
-  /**
-   * The main menu, with the open one marked. Each row is a command of the
-   * table (`CommandsFeature`), labelled, enabled and checked as it stands for
-   * the active panel — so File › Rename… greys out with nothing selected, and
-   * View shows the panel's own view and sort. Go's choice of computer follows
-   * the connection: Local Computer is checked while the workbench talks to its
-   * own backend, Remote Computer once it talks to a remote one.
-   */
-  readonly menuItems = computed<readonly UiMenuBarItem[]>(() => {
-    const open = this.openMenuId();
-    const backend = this.parent.backend();
-    const commands = this.parent.commandsFt;
-    const target = commands.activeTarget();
-    return this.parent.mockWorkbench.menuItems.map((menu) => ({
-      ...menu,
-      open: menu.id === open,
-      items: (menu.items ?? []).map((item) => {
-        if (item.id === 'go.local' || item.id === 'go.remote') {
-          return { ...item, checked: item.id === (backend === 'local' ? 'go.local' : 'go.remote') };
-        }
-        return commands.command(item.id) === undefined ? item : commands.menuItem(item.id, target, !!item.separatorBefore);
-      }),
-    }));
-  });
-
-  /** `F9` (PRD 004, §2): the first menu opens, as Midnight Commander's pull-down does. */
-  openMainMenu(): void {
-    this.openMenuId.set(this.parent.mockWorkbench.menuItems[0]?.id ?? null);
-  }
-
-  /** Opens the main menu `id`, or closes the open one with `null`. */
-  setMenuOpen(id: string | null): void {
-    this.openMenuId.set(id);
+  protected override menuRow(item: UiMenuItem, target: UiCommandTarget): UiMenuItem {
+    if (item.id === 'go.local' || item.id === 'go.remote') {
+      return { ...item, checked: item.id === (this.parent.backend() === 'local' ? 'go.local' : 'go.remote') };
+    }
+    return super.menuRow(item, target);
   }
 
   /**
-   * An entry of the main menu was chosen; the menu closes either way.
-   *
    * - **Go › Local Computer** (§1.2) — this computer's backend, the default:
    *   disconnects from a remote server, if the window is on one.
    * - **Go › Remote Computer…** (§1.3) — the command palette, straight at
    *   *Connect to Remote Server*.
-   * - **File › Copy To… / Move To… / Move to Trash / Empty Trash…** — the
-   *   file operations of PRD 005, §1, on the active panel's selection.
-   * - **Edit › Cut / Copy / Paste** — the file clipboard (§2), on the active panel.
+   * - Everything else is a command of the table, on the active panel.
    */
-  runMenuItem(selection: UiMenuBarSelection): void {
-    this.openMenuId.set(null);
-    switch (selection.itemId) {
+  protected override runMenuRow(itemId: string): void {
+    switch (itemId) {
       case 'go.local':
         void this.parent.connection.disconnect();
         break;
@@ -211,27 +66,30 @@ export class ChromeFeature {
         this.parent.commandPaletteFt.run('remote.connect');
         break;
       default:
-        // Everything else is a command of the table, run on the active panel.
-        this.parent.commandsFt.run(selection.itemId);
+        super.runMenuRow(itemId);
         break;
     }
   }
 
-  /** Where the Settings menu is open — its bottom-left corner — or `null` (PRD 007, §1). */
-  private readonly settingsMenuAt = signal<{ readonly x: number; readonly y: number; readonly leftward?: boolean } | null>(null);
-
-  readonly settingsMenu = this.settingsMenuAt.asReadonly();
-
+  /** The sub-applications, the one shown marked (PRD 001, §1.1); then the file manager's own buttons, Transfers counting. */
+  override readonly activityItems = computed<readonly UiActivityItem[]>(() => {
+    const transfers = this.parent.transfersFt.activeCount();
+    const apps = this.parent.subAppsFt;
+    return [
+      ...apps.apps.map((app): UiActivityItem => ({ id: app.id, label: app.label, icon: app.icon, ...(apps.isActive(app.id) ? { active: true } : {}) })),
+      ...(this.parent.config.activityItems ?? []).map((item) => (item.id === 'transfers' && transfers > 0 ? { ...item, badge: transfers } : item)),
+    ];
+  });
 
   /**
    * Account and settings. While someone is signed in the account button says
    * who, and is how they sign out (PRD 003, §2); the Settings gear says
    * whether its menu is open.
    */
-  readonly activityBottomItems = computed<readonly UiActivityItem[]>(() => {
+  override readonly activityBottomItems = computed<readonly UiActivityItem[]>(() => {
     const auth = this.parent.auth;
-    const menuOpen = this.settingsMenuAt() !== null;
-    return this.parent.mockWorkbench.activityBottomItems.map((item) => {
+    const menuOpen = this.settingsMenu() !== null;
+    return (this.parent.config.activityBottomItems ?? []).map((item) => {
       if (item.id === 'account' && auth.canSignOut()) {
         return { ...item, label: `Sign out ${auth.username() ?? ''}`.trim() };
       }
@@ -243,51 +101,25 @@ export class ChromeFeature {
   });
 
   /**
-   * A menu button in the activity bar was pressed. The Settings gear opens its
-   * menu beside it, growing upward from the gear's bottom edge the way VS
-   * Code's Manage menu does — or closes it, when it is already open.
+   * The file manager comes back with its Explorer, as the Explorer button
+   * did; its name search stays `Ctrl`+`Shift`+`F`.
    */
-  openMenu(anchor: UiMenuAnchor): void {
-    if (anchor.id !== 'settings') {
+  override selectActivity(id: string): void {
+    if (id === 'file-manager') {
+      this.showSidebar('explorer');
       return;
     }
-    if (this.settingsMenuAt() !== null) {
-      this.settingsMenuAt.set(null);
-      return;
-    }
-    // With the activity bar on the right (PRD 010, §3) the menu opens leftward, from the gear's left edge.
-    this.settingsMenuAt.set(
-      this.parent.preferencesFt.explorerSide() === 'right' ? { x: anchor.left, y: anchor.bottom, leftward: true } : { x: anchor.right, y: anchor.bottom },
-    );
-  }
-
-  closeSettingsMenu(): void {
-    this.settingsMenuAt.set(null);
-  }
-
-  /** A Settings menu entry was chosen. None does anything yet; the menu just closes. */
-  runSettingsItem(id: string): void {
-    this.closeSettingsMenu();
-    this.parent.commandsFt.run(id);
+    super.selectActivity(id);
   }
 
   /**
-   * A click in the activity bar. The first group are the sub-applications
-   * (PRD 001, §1.1): each brings its own forward — the file manager with its
-   * Explorer, as the Explorer button did; its name search stays `Ctrl`+`Shift`+`F`.
-   * Below them, the file manager's: Transfers opens its tab of the bottom
-   * panel, Bookmarks the explorer at its Bookmarks pane (PRD 003, §6) — each
-   * bringing the file manager forward. The account button signs out.
+   * Below the sub-applications, the file manager's: Transfers opens its tab
+   * of the bottom panel, Bookmarks the explorer at its Bookmarks pane
+   * (PRD 003, §6) — each bringing the file manager forward. The account
+   * button signs out.
    */
-  selectActivity(id: string): void {
+  protected override runActivity(id: string): void {
     switch (id) {
-      case 'file-manager':
-        this.showSidebar('explorer');
-        break;
-      case 'search':
-      case 'disk-usage':
-        this.parent.subAppsFt.show(id);
-        break;
       case 'transfers':
         this.showBottomTab('transfers');
         break;
@@ -310,24 +142,7 @@ export class ChromeFeature {
     this.parent.bottomPanelFt.select(id);
   }
 
-  /** The sub-applications, the one shown marked (PRD 001, §1.1); then the file manager's own buttons. */
-  readonly activityItems = computed<readonly UiActivityItem[]>(() => {
-    const transfers = this.parent.transfersFt.activeCount();
-    const apps = this.parent.subAppsFt;
-    return [
-      ...apps.apps.map((app): UiActivityItem => ({ id: app.id, label: app.label, icon: app.icon, ...(apps.isActive(app.id) ? { active: true } : {}) })),
-      {
-        id: 'transfers',
-        label: 'Transfers',
-        icon: 'download',
-        separatorBefore: true,
-        ...(transfers > 0 ? { badge: transfers } : {}),
-      },
-      { id: 'bookmarks', label: 'Bookmarks', icon: 'star' },
-    ];
-  });
-
-  readonly statusLeadingItems = computed<readonly UiStatusItem[]>(() => {
+  override readonly statusLeadingItems = computed<readonly UiStatusItem[]>(() => {
     const problems = this.parent.fsDataFt.errors().length;
     const transfers = this.parent.transfersFt.activeCount();
     const items: UiStatusItem[] = [
@@ -367,7 +182,7 @@ export class ChromeFeature {
     return items;
   });
 
-  readonly statusTrailingItems = computed<readonly UiStatusItem[]>(() => {
+  override readonly statusTrailingItems = computed<readonly UiStatusItem[]>(() => {
     const clock = this.parent.serverClockFt;
     const time = clock.label();
     return [
@@ -391,19 +206,7 @@ export class ChromeFeature {
   });
 
   /** Status-bar items that do something when clicked. */
-  /**
-   * A title-bar button (PRD 001, §15.1): the sidebars and the bottom panel
-   * (§12.3) are shown and hidden; the last one resets the layout, once the
-   * user has said so.
-   */
-  runTitleBarAction(id: string): void {
-    const command = TITLE_BAR_COMMANDS[id];
-    if (command !== undefined) {
-      this.parent.commandsFt.run(command);
-    }
-  }
-
-  runStatusAction(id: string): void {
+  override runStatusAction(id: string): void {
     switch (id) {
       case 'hidden':
         this.parent.showHidden.update((shown) => !shown);

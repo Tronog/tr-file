@@ -114,3 +114,63 @@ export type {
 /* bottom panel ------------------------------------------------------------ */
 export { UiBottomPanel } from './lib/bottom-panel/ui-bottom-panel';
 export { UiNotes } from './lib/notes/ui-notes';
+
+/* the workbench (PRD 001, §17.1): a configurable shell and the service that runs it */
+export { UiWorkbenchService, provideUiWorkbench } from './lib/shell/ui-workbench.service';
+export { UI_WORKBENCH_CONFIG } from './lib/shell/ui-workbench.config';
+export type {
+  UiBottomPanelConfig,
+  UiEditorConfig,
+  UiHelpConfig,
+  UiHelpFixedCard,
+  UiHelpSubject,
+  UiPaneDef,
+  UiPreference,
+  UiPreferenceOption,
+  UiSidebarDef,
+  UiSubApp,
+  UiTitleBarActionDef,
+  UiWorkbenchConfig,
+  UiWorkbenchLayout,
+} from './lib/shell/ui-workbench.config';
+export type { UiGroupState, UiNewTab, UiPanelContentDef, UiPanelContentDriver, UiTabState } from './lib/shell/ui-editor.model';
+export type { UiCommand, UiCommandSpec, UiCommandTarget, UiTargetFn } from './lib/shell/ui-commands.model';
+export { UiSubAppsFeature } from './lib/shell/features/ui-sub-apps.feature';
+export { UiResizeFeature } from './lib/shell/features/ui-resize.feature';
+export { UiPanelFocusFeature } from './lib/shell/features/ui-panel-focus.feature';
+export { UiFocusCycleFeature } from './lib/shell/features/ui-focus-cycle.feature';
+export type { UiFocusRegionId } from './lib/shell/features/ui-focus-cycle.feature';
+export { UiSidebarPanesFeature } from './lib/shell/features/ui-sidebar-panes.feature';
+export { UiBottomPanelFeature } from './lib/shell/features/ui-bottom-panel.feature';
+export { UiChromeFeature } from './lib/shell/features/ui-chrome.feature';
+export { UiCommandsFeature } from './lib/shell/features/ui-commands.feature';
+export { UiKeybindingsFeature, UI_FOCUS_COMMANDS, UI_KEY_COMMANDS, uiKeybindingsKey } from './lib/shell/features/ui-keybindings.feature';
+export type { UiKeybindingEntry } from './lib/shell/features/ui-keybindings.feature';
+export { UiCommandPaletteFeature } from './lib/shell/features/ui-command-palette.feature';
+export type { UiInputStep, UiPaletteCommand, UiPaletteStep, UiPickStep } from './lib/shell/features/ui-command-palette.feature';
+export { UiContextMenuFeature } from './lib/shell/features/ui-context-menu.feature';
+export type { UiMenuLayout, UiOpenContextMenu } from './lib/shell/features/ui-context-menu.feature';
+export { UiEditorGroupsFeature } from './lib/shell/features/ui-editor-groups.feature';
+export { UiSessionFeature, uiRestoreSessionKey, uiSessionKey } from './lib/shell/features/ui-session.feature';
+export type { UiSessionSnapshot } from './lib/shell/features/ui-session.feature';
+export {
+  UiPreferencesFeature,
+  uiColorThemePreference,
+  uiResetLayoutPreference,
+  uiRestoreLayoutPreference,
+  uiSidebarLocationPreference,
+} from './lib/shell/features/ui-preferences.feature';
+export { UiSettingsEditorFeature } from './lib/shell/features/ui-settings-editor.feature';
+export { UiSettingsModal } from './lib/shell/ui-settings-modal';
+export { UiHelpFeature } from './lib/shell/features/ui-help.feature';
+export { UiHelpModal } from './lib/shell/ui-help-modal';
+export { UiWorkbenchShell } from './lib/shell/ui-workbench-shell';
+export type { UiPanelFilesDrop } from './lib/shell/ui-workbench-shell';
+export {
+  UiBottomTabTemplate,
+  UiNodeInjector,
+  UiPaneTemplate,
+  UiPanelContentTemplate,
+  UiSidebarTemplate,
+  UiSubAppTemplate,
+} from './lib/shell/ui-shell-templates';

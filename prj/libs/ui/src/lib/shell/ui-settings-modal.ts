@@ -1,14 +1,15 @@
 import { Component, inject, input } from '@angular/core';
-import { UiSettingsEditor, UI_MODAL_REF, type UiModalRef } from '@tr-file/ui';
-import type { SettingsEditorFeature } from '../features/settings-editor.feature';
+import { UI_MODAL_REF, type UiModalRef } from '../modal/ui-modal-ref';
+import { UiSettingsEditor } from '../settings/ui-settings-editor';
+import type { UiSettingsEditorFeature } from './features/ui-settings-editor.feature';
 
 /**
  * The settings window (PRD 010): `UiSettingsEditor` in a large modal window,
- * opened by `SettingsEditorFeature`, whose model it draws and to which it
+ * opened by `UiSettingsEditorFeature`, whose model it draws and to which it
  * reports everything done in it. The close button closes it, as `Escape` does.
  */
 @Component({
-  selector: 'app-settings-modal',
+  selector: 'ui-settings-modal',
   imports: [UiSettingsEditor],
   template: `
     @let feature = editor();
@@ -35,8 +36,8 @@ import type { SettingsEditorFeature } from '../features/settings-editor.feature'
     }
   `,
 })
-export class SettingsModal {
-  readonly editor = input.required<SettingsEditorFeature>();
+export class UiSettingsModal {
+  readonly editor = input.required<UiSettingsEditorFeature>();
 
   protected readonly ref = inject<UiModalRef<null>>(UI_MODAL_REF);
 }

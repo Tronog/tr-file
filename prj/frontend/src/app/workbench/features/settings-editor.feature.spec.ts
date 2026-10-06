@@ -56,7 +56,7 @@ describe('Settings', () => {
       preferences().set('window.restoreLayout', false);
 
       expect(workbench.showHidden()).toBe(true);
-      expect(workbench.sessionFt.restoresSessions).toBe(false);
+      expect(workbench.sessionFt.restoresSessions()).toBe(false);
       expect(workbench.commandsFt.menuItem('settings.restoreSession').checked).toBe(false);
     });
 

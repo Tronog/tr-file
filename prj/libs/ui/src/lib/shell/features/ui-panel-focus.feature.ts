@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import type { WorkbenchService } from '../workbench.service';
+import type { UiWorkbenchService } from '../ui-workbench.service';
 
 /**
  * Where focus goes when a panel is chosen (PRD 001, §6.3 and §6.3.1).
@@ -24,14 +24,14 @@ import type { WorkbenchService } from '../workbench.service';
  * answers it after its next render — which is what "after it becomes visible"
  * means in a signal-driven view.
  */
-export class PanelFocusFeature {
+export class UiPanelFocusFeature {
   /** One token per group id; a group that has never been asked has none. */
   private readonly tokens = signal<Readonly<Record<string, number>>>({});
 
   /** Bumped globally rather than per group, so every token stays distinct. */
   private seq = 0;
 
-  constructor(private readonly parent: WorkbenchService) {}
+  constructor(protected readonly parent: UiWorkbenchService) {}
 
   /** The token a group's body watches. `0` until it has ever been asked. */
   token(groupId: string): number {
@@ -49,7 +49,7 @@ export class PanelFocusFeature {
   }
 
   /**
-   * An action on files is over — its dialog answered or dismissed, its job
+   * An action is over — its dialog answered or dismissed, its job
    * ended and the folders it changed read again (PRD 001, Fix 5): the keyboard
    * goes back into the content of the panel it was started from (or the
    * active one, if that panel has gone), wherever the dialogs, the menu or

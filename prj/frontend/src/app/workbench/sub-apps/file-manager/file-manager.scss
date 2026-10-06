@@ -1,34 +1,12 @@
 /*
- * The file manager's parts (PRD 001, §1.1): its Explorer, its centre and its
- * Details. One stylesheet for the three, since they share their notes and
- * the panes' looks.
+ * The file manager's sidebars (PRD 001, §1.1): its Explorer and its Details.
+ * One stylesheet for the two, since they share their notes and the panes'
+ * looks.
  */
 
 /* The sidebars' components are only their `ui-sidebar`, as far as layout goes. */
 :host {
   display: contents;
-}
-
-/* The centre column: the split grid takes the free space, the bottom panel
-   keeps the height the workbench state holds. */
-:host(.editor-area) {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  background: var(--vsc-editor-bg);
-}
-
-.editor-grid {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-}
-
-.bottom-panel {
-  flex: none;
 }
 
 /* A short message where a tree or a details list would otherwise be. */
@@ -59,40 +37,6 @@
   }
 }
 
-.panel-note {
-  margin: 0;
-  padding: 6px 2px;
-  color: var(--vsc-fg-muted);
-  font-size: var(--vsc-font-size-sm);
-}
-
-/* Failed listings, as shown by the panel's Problems tab. */
-.problem-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.problem {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  padding: 3px 2px;
-  font-size: var(--vsc-font-size-sm);
-}
-
-.problem-path {
-  flex: none;
-  min-width: 140px;
-  color: var(--vsc-fg);
-  font-family: var(--vsc-font-mono);
-  font-size: var(--vsc-font-size-xs);
-}
-
-.problem-message {
-  color: var(--vsc-git-conflict);
-}
-
 /* The previous entry's details, while the selected one's are on their way
    (DetailsFeature.stale). The dimming waits a moment, so a quick answer never
    shows it at all — only a slow one says the sidebar is catching up. */
@@ -120,9 +64,4 @@ ui-sidebar.is-stale ui-pane {
 
 .search-scope {
   padding-bottom: 0;
-}
-
-/* Kept, but out of sight, while another sub-application is shown. */
-:host(.is-inactive) {
-  display: none;
 }

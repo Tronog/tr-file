@@ -7,7 +7,7 @@ import { RESTORE_SESSION_KEY, SESSION_KEY, SessionFeature, type SessionSnapshot 
 
 /** PRD 003, §6 — the layout, remembered between sessions. */
 
-const SAVED: SessionSnapshot = {
+const SAVED = {
   version: 1,
   grid: {
     kind: 'split',

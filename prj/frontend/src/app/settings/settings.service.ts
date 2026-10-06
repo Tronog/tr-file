@@ -15,6 +15,9 @@ declare global {
   }
 }
 
+/** What the app's settings keys start with: `tr-file.session.v1`, `tr-file.preferences.v1`, … */
+export const STORAGE_PREFIX = 'tr-file';
+
 /** The settings contract the preload speaks. */
 const SETTINGS_VERSION = 1;
 

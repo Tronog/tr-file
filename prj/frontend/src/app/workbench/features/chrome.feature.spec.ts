@@ -373,23 +373,23 @@ describe('ChromeFeature', () => {
     });
 
     it('problems and transfers switch the bottom panel tab', () => {
-      expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('notes')).toBe(true);
 
       workbench.chromeFt.runStatusAction('problems');
 
-      expect(workbench.bottomPanelFt.problemsVisible()).toBe(true);
-      expect(workbench.bottomPanelFt.transfersVisible()).toBe(false);
+      expect(workbench.bottomPanelFt.isVisible('problems')).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('transfers')).toBe(false);
 
       workbench.chromeFt.runStatusAction('transfers');
 
-      expect(workbench.bottomPanelFt.transfersVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('transfers')).toBe(true);
     });
 
     it('ignores an item that does nothing', () => {
       workbench.chromeFt.runStatusAction('sort');
 
       expect(workbench.showHidden()).toBe(false);
-      expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('notes')).toBe(true);
     });
   });
 
