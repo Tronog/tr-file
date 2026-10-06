@@ -7,7 +7,8 @@ It is a full stack application consisting of
   * development - ports directly exposed
   * production - behind nginx proxy
 * Electron desktop shell - `prj/desktop`
-* other future libraries - `prj/libs`
+* libraries - `prj/libs`: the workbench (`@tr-file/ui`) and the file manager's components (`@tr-file/file-ui`)
+* a demo app on the workbench library alone - `prj/demo`
 
 # Layout
 `prj/` is the pnpm workspace root. Sources, docker definitions, the workspace
@@ -20,14 +21,18 @@ prj/
 ├── pnpm-workspace.yaml
 ├── pnpm-lock.yaml
 ├── tsconfig.base.json    # packages extend ../tsconfig.base.json
+├── tsconfig.angular.json # …and the Angular ones (frontend, libs, demo) this, which extends it
 ├── compose.dev.yaml
 ├── compose.prod.yaml
 ├── docker/nginx/default.conf
 ├── backend/
 ├── frontend/
 ├── desktop/              # @tr-file/desktop — Electron shell
+├── demo/                 # @tr-file/demo — a notes app on @tr-file/ui alone (port 4300)
+├── scripts/              # check-library-boundaries.mjs
 └── libs/
-    └── ui/               # @tr-file/ui — workbench component library
+    ├── ui/               # @tr-file/ui — the workbench library (ng-packagr)
+    └── file-ui/          # @tr-file/file-ui — the file manager's components on it
 ```
 
 Use pnpm (via `corepack enable pnpm`). Run `pnpm install` from `prj/`.
@@ -37,19 +42,44 @@ Refer to `docs/ai/ANGULAR.md` for architecture (component / component service / 
 Refer to `docs/ai/VSCODE-UI.md` for all Tabler UI markup, layouts and classes — use it instead of
 fetching the Tabler docs.
 
-The workbench UI lives in `prj/libs/ui` (`@tr-file/ui`), a zoneless, signal-based component
-library ported from `mockup/001/`; see `prj/libs/ui/README.md`, including why that library does
-not load Tabler. The app composes it in `prj/frontend/src/app/workbench`: a thin `WorkbenchService`
-holding shared state, plus feature classes holding everything else.
+**The libraries (PRD 001, §17.1).** The workbench is a library of its own, `prj/libs/ui`
+(`@tr-file/ui`): zoneless and signal-based, ported from `mockup/001/` — see `prj/libs/ui/README.md`,
+including why it does not load Tabler. It holds nothing of an application's business (nothing that
+touches a backend, directly or through a feature or a service): the presentational components, and
+a configurable shell — `UiWorkbenchService` with its features (sub-apps, panels and their layout,
+focus, sidebar panes, bottom panel, chrome, command table, keys, palette, context menus, preferences,
+the settings and Help windows, the session), driven by a `UiWorkbenchConfig` and drawn by
+`<ui-workbench-shell>` with the application's templates — plus `UiModalService`, `UiThemeService`
+and the settings store (`UI_SETTINGS_STORE`, `UI_STORAGE_PREFIX`). The file manager's components —
+`UiFileBrowser`, `UiFileList`, `UiIconView`, `UiDiskUsage`, `UiSourceControl`, `UiTransferList`,
+`UiPermissionGrid`, their models and keys (`provideFileUi`) — are `prj/libs/file-ui`
+(`@tr-file/file-ui`, `prj/libs/file-ui/README.md`). Both are ng-packagr libraries with their own
+tests (`pnpm build:libs`, `pnpm test:libs`, after `scripts/check-library-boundaries.mjs`); the
+apps compile their sources (`paths`). `prj/demo` (`pnpm demo`) is a notes app on `@tr-file/ui`
+alone, built against the packaged library by `pnpm demo:build`.
+
+The app composes them in `prj/frontend/src/app/workbench`: `WorkbenchService` extends
+`UiWorkbenchService` — a thin service holding the app's shared state, plus feature classes holding
+everything else — configured by `trFileWorkbenchConfig` (`workbench.config.ts`: sub-apps, the
+sidebars' panes, menus, keys, settings, the cheatsheet, how a session is read). Where the file
+manager does more than the library, it overrides the library feature's `create…` with a subclass:
+`EditorGroupsFeature`, `CommandsFeature`, `ChromeFeature`, `BottomPanelFeature`,
+`CommandPaletteFeature`, `ContextMenuFeature`, `KeybindingsFeature`, `PreferencesFeature`,
+`SessionFeature`, `SidebarPanesFeature`, `SubAppsFeature`. The rest are the library's as they are
+(`UiPanelFocusFeature`, `UiFocusCycleFeature`, `UiSettingsEditorFeature`, `UiHelpFeature`,
+`UiResizeFeature`, `UiPanelLayout`). `provideTrFile()` (`app.providers.ts`: the settings store) is
+the app's; `provideTrFileWorkbench()` (`provideFileUi`, `provideUiWorkbench`) is the lazy workbench
+route's, and both are every spec's (`test-setup.ts`).
 
 **Sub-applications (PRD 001, §1.1).** The file manager is one of the window's sub-applications,
 beside *Search* (still a placeholder) and *Disk Usage* (PRD 013). They share the title bar with its
-menus, the activity bar and the status bar — the `Workbench` component (`workbench.html`) — and
-the one shown fills the rest. `SubAppsFeature` keeps which (`active`, `show`, `fileManager`;
-`SUB_APPS` in `workbench/sub-apps/sub-app.model.ts`). Each one is a set of components in
-`workbench/sub-apps/`: the file manager is `FileManagerExplorer` (left slot), `FileManagerCenter`
-(panels and bottom panel) and `FileManagerDetails` (right slot); the others are one centre
-component each (`SearchApp`, `DiskUsageApp`). A sub-application is drawn the first time it is shown and is kept, hidden
+menus, the activity bar and the status bar — `<ui-workbench-shell>`, in the `Workbench` component
+(`workbench.html`) — and the one shown fills the rest. `SubAppsFeature` keeps which (`active`,
+`show`, `fileManager`; the config's `subApps`). The file manager is the main one: its sidebars are
+`FileManagerExplorer` and `FileManagerDetails` (`workbench/sub-apps/`, given to the shell as
+`uiSidebar` templates), its centre is the shell's panels and bottom panel, with tr-file's
+`uiPanelContent` and `uiBottomTab` templates; the others are one centre component each
+(`SearchApp`, `DiskUsageApp`, `uiSubApp` templates). A sub-application is drawn the first time it is shown and is kept, hidden
 (`is-inactive`), while another one is shown, so the file manager comes back with its panels as they
 were. The sidebars are the file manager's, so another sub-application hides them. The activity
 bar's first group is the sub-applications (*File Manager* also brings back its Explorer, as the
@@ -60,22 +90,24 @@ has *View: Show …* (`view.app.<id>`). While another one is shown there is no p
 their keys do nothing, and the `Ctrl`+`Tab` ring is empty. Showing a folder (`navigateTo`), the
 name search, Notes or a tab of the bottom panel chosen from the activity or status bar brings the
 file manager forward, and the keyboard goes back to its active panel.
-A new sub-application is an entry in `SUB_APPS`, its components under `sub-apps/`, an
-`@if (apps.isOpened(…))` per slot in `workbench.html`, and a case in `ChromeFeature.selectActivity`.
+A new sub-application is an entry in the config's `subApps`, its component under `sub-apps/` and a
+`uiSubApp` template in `workbench.html`.
 
 A panel is a frame plus content. `UiPanelGroup` renders the tab bar, loading rail and body
 frame (drops, focus, the `Ctrl` chords); what the active tab shows is a separate component
 the app projects into it — file management is `UiFileBrowser`, with its own model and toolbar
 (`UiPanelToolbar`), marking its body `uiPanelBody` so the frame knows where focus goes.
-In the app `EditorGroupsFeature` keeps groups and tabs only; `PANEL_CONTENT`
-(`panel-group.model.ts`) maps each tab kind to a content type, whose feature
-(`FileBrowserFeature` for `'files'`) implements `PanelContentFeature` and renders its model.
+`EditorGroupsFeature` keeps groups and tabs only; the config's `editor.contents` maps each tab kind
+to a content type, whose feature (`FileBrowserFeature` for `'files'`) implements
+`PanelContentFeature` (the library's `UiPanelContentDriver`), is registered for it by
+`WorkbenchService` (`registerContent`) and renders its model.
 `UiFileBrowser` has three views — list, grid, and tree (PRD 002 §4.1): the list's
 `UiFileList` with `tree` set, whose folders open in place with the same detail columns.
 Which folders are open is `FileBrowserFeature`'s state, per panel; opening one is what
 fetches it.
-A new kind of content is a new tab kind, a library component, a feature class, and a
-`@case` in the leaf template of `sub-apps/file-manager/file-manager-center.html` — see `prj/libs/ui/README.md` § Panel content.
+A new kind of content is a new tab kind in `editor.contents`, a component, a feature class
+registered as its driver, and a `uiPanelContent` template in `workbench.html` — see
+`prj/libs/ui/README.md` § Panel content.
 
 The explorer tree lists *folders only* (§9.1.1) — it is a map of the workspace, and files
 belong to the panels. Clicking a folder in the explorer shows it in the *active* panel; that
@@ -110,12 +142,13 @@ closing a tab opened so chooses the tab it was opened from again, wherever it is
 keyboard (§2.5.1; `PanelTabState.openedFrom`, session only, read by `EditorGroupsFeature.closeTab`;
 a file opened from a listing in its own panel notes it too); the key is
 `UiFileBrowser`'s, on its host, and the double click the views' `activateAside`; `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` (PRD 002 §2.6) walk the ring explorer → each
-panel in layout order → bottom panel (while open) → details, and round: `FocusCycleFeature`
-decides the ring, the `Workbench` component finds the `data-focus-region` that has focus and
-focuses into the next (a panel through `PanelFocusFeature`, a sidebar where focus last was in it).
+panel in layout order → bottom panel (while open) → details, and round: `UiFocusCycleFeature`
+decides the ring, `<ui-workbench-shell>` finds the `data-focus-region` that has focus and
+focuses into the next (a panel through `UiPanelFocusFeature`, a sidebar where focus last was in it,
+else its first tab stop that takes focus).
 Plain `Tab` / `Shift`+`Tab` in a panel's *body* (`data-panel-body`, set by `UiPanelBody`; never
 in a text field or the chrome above it) walk the panels only, in layout order and round
-(`FocusCycleFeature.panelDirectionOf` / `nextPanel`) — Midnight Commander's `Tab`; with one
+(`UiFocusCycleFeature.panelDirectionOf` / `nextPanel`) — Midnight Commander's `Tab`; with one
 panel (or one maximized) `Tab` keeps its usual meaning.
 A browser keeps those chords for its own tabs, so they reach the page on the desktop only; the desktop shell installs its own accelerator
 table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
@@ -141,7 +174,7 @@ to the cursor's row in its new place — (`UiFileList`). Whenever focus is hande
 outside — any of the above, `Tab` from another panel, a folder entered — while nothing is
 selected, the first row or tile takes the cursor but is *not* selected (PRD 002, §3.1; PRD 004,
 §1.3.3), and `FileBrowserFeature.setSelection` describes the *folder* in the details sidebar for a
-cursor with nothing selected; a click and the view's own key moves keep their own rules; `PanelFocusFeature` owns
+cursor with nothing selected; a click and the view's own key moves keep their own rules; `UiPanelFocusFeature` owns
 that request and `UiPanelGroup` answers it. The workbench asks for it once on start
 (§10.1), after the listing is in flight, so the keyboard is already in the folder content
 when the app opens rather than needing a click first. Row clicks only ever
@@ -167,10 +200,10 @@ and the arrows pan an image larger than the view (`UiImageViewService.panBy`; na
 Selecting an image also shows it on the details card, fitted `contain` and non-interactive
 (§9); the panel and the sidebar read from the same cache, so a file is fetched once.
 
-Modal windows (PRD 002, §3) are `ModalService` (`prj/frontend/src/app/modal/`): `await
+Modal windows (PRD 002, §3) are the library's `UiModalService`: `await
 modal.confirm(…)`, `prompt(…)`, `message(…)`, `show(…)` for a full VS Code message dialog,
 or `open(Component, …)` for a component of the app's own, which closes itself through
-`MODAL_REF`. `ModalHost` at the root draws the stack with the library's `UiModal` and
+`UI_MODAL_REF`. `UiModalHost` at the root draws the stack with `UiModal` and
 `UiDialog`, and `App` makes everything behind it `inert` while one is open. A dialog shown with
 `onTop: true` stays above every window opened after it — they go in beneath it, inert until it is
 answered (PRD 004, §2.2); a file operation's *Skip* / *Skip All* / *Retry* / *Abort* question is one,
@@ -235,9 +268,10 @@ bar names the server, a remote that needs signing in shows the normal sign-in sc
 Go › Local Computer disconnects.
 
 **Settings (PRD 010).** The gear menu's *Settings* / *Keyboard Shortcuts* (and `Ctrl`+`,`) open
-the settings window: `SettingsEditorFeature` opens `SettingsModal` — the library's
+the settings window: the library's `UiSettingsEditorFeature` opens `UiSettingsModal` —
 `UiSettingsEditor` in a `size: 'large'` modal — with *General*, *Appearance* and *Keyboard
-Shortcuts* pages and a search box. The settings are `PREFERENCES` in `PreferencesFeature`: hidden
+Shortcuts* pages and a search box. The settings are `PREFERENCES` (`workbench.config.ts`, the
+library's own built by `uiColorThemePreference` and the like), their values `PreferencesFeature`'s: hidden
 files and restoring the layout are read and written where they already live (the session,
 `SessionFeature`); auto refresh, the function-key bar and thumbnails are kept under
 `tr-file.preferences.v1`, only while they differ from their default; *Reset Layout* and *Clear
@@ -250,33 +284,36 @@ together the two stand side by side, the Explorer outermost), the activity bar's
 Each sidebar's sash sits in it, on the edge facing the centre.
 *Workbench: Color Theme* (PRD 010, §4) is Dark Modern (the default), Light Modern or Follow the
 System: the library's tokens are dark on `:root` and light under `data-theme="light"`, which the
-root `ThemeService` (`prj/frontend/src/app/settings/`) sets — from the stored preference as the app
+library's root `UiThemeService` sets — from the stored preference (the settings store, under
+`UI_STORAGE_PREFIX`) as the app
 starts (before the sign-in screen), on each change, and with the OS while following it. Two things
 paint before Angular does, and both read the same preference: an inline script in `index.html` (a
 browser's `localStorage`) and, on the desktop, the window's `backgroundColor`
 (`desktop/src/window-background.ts`, from the main process's settings file).
 
 **Help (PRD 001, §16).** `F1` (`help.show`, Midnight Commander's key for it; also the Help menu) opens
-the Help window: `HelpFeature` opens `HelpModal` — the library's `UiHelp` (tabs, a search box, close)
+the Help window: the library's `UiHelpFeature` opens `UiHelpModal` — `UiHelp` (tabs, a search box, close)
 in a `size: 'large'` modal — whose one tab so far is the *Cheatsheet* (§16.1, `help.cheatsheet`):
 `UiCheatsheet` cards, one colour each (`--vsc-hue-*`), keys as keycaps. The configurable cards are built
-from `KeybindingsFeature.bindings()` as it is now, grouped by `SUBJECTS` (a bound command none names goes
-under *Other*; the function keys have their own card and are not repeated), then the fixed keys
-(`FIXED`) — keep both in step with `SHORTCUTS.md`. A new page of help is a tab in `HelpFeature.tabs` and
-a `@case` in `HelpModal`.
+from `KeybindingsFeature.bindings()` as it is now, grouped by `HELP.subjects` (`workbench.config.ts`; a
+bound command none names goes under *Other*; the function keys have their own card, `keyCard`, and are
+not repeated), then the fixed keys (`HELP.fixed`) — keep both in step with `SHORTCUTS.md`. A new page of
+help is a tab in the config's `help.tabs` and a `@case` in `UiHelpModal`.
 
 **Every key is configurable (PRD 010, §2).** The library's components never test a key for a
-command themselves: they ask the library's root `UiKeymap` (`prj/libs/ui/src/lib/keyboard/keymap.ts`)
-which of their commands it is bound to, in their context — `list`, `panel` or `window` (VS Code's
-`when`). `KeybindingsFeature` owns the table: `UI_DEFAULT_KEYBINDINGS` plus
-`WORKBENCH_DEFAULT_KEYBINDINGS`, less what the user removed, plus what they added
-(`tr-file.keybindings.v1`), handed to `UiKeymap` on every change. It runs the `window` keys itself
-(`handleShortcut`, from the `Workbench` component: the palette, search, the function keys, `Ctrl`+`H`,
+command themselves: they ask `UiKeymap` (`prj/libs/ui/src/lib/keyboard/keymap.ts`; the workbench
+route's own, which `provideUiWorkbench` brings) which of their commands it is bound to, in their
+context — `list`, `panel` or `window` (VS Code's `when`). `KeybindingsFeature` (the library's
+`UiKeybindingsFeature`) owns the table: the components' defaults — `FILE_UI_DEFAULT_KEYBINDINGS`
+(`provideFileUi`) then `UI_DEFAULT_KEYBINDINGS` — plus `WORKBENCH_DEFAULT_KEYBINDINGS`, less what the
+user removed, plus what they added (`tr-file.keybindings.v1`), handed to `UiKeymap` on every change
+(`default-keybindings.golden.spec.ts` freezes the order). It runs the `window` keys itself
+(`handleShortcut`, from `<ui-workbench-shell>`: the palette, search, the function keys, `Ctrl`+`H`,
 `Ctrl`+`,` — each a command of `CommandsFeature` on the active panel; `F2`–`F4` act on the cursor's
 entry), and it is where menus, the palette and the function-key strip read the key they show
 (`label`, `keysFor`, `windowCommandOf`) — so the table has no key labels of its own. `Ctrl`+`Tab` and
 `Tab` between panels are keymap commands too (`workbench.focusNextPart`, `workbench.nextPanel`),
-answered by `FocusCycleFeature` because they move DOM focus. Navigation keys (arrows, `Home`/`End`,
+answered by `UiFocusCycleFeature` because they move DOM focus. Navigation keys (arrows, `Home`/`End`,
 page keys, type-to-find, `Escape`, keys inside menus and dialogs) are not commands and stay fixed.
 A new key for the app: a binding in one of the default tables, and the component asks the keymap
 for its command id.
@@ -319,7 +356,7 @@ Each sidebar's `…` (PRD 001, §9.2) opens a menu of its panes, checked while s
 reports `actionAt` with the button's place, `ContextMenuFeature.openSidebarMenu` lists the
 `view.pane.<id>` commands (not in the palette), and `SidebarPanesFeature` keeps what is hidden
 (`shown`, `toggleShown`, the session's `hiddenPanes`) — never the last pane a sidebar shows.
-*Permissions* starts hidden (`DEFAULT_HIDDEN_PANES`), and so does it for a session saved before panes
+*Permissions* starts hidden (`hidden` in `DETAILS`, `workbench.config.ts`), and so does it for a session saved before panes
 could be hidden. The
 templates draw `panes.shown(…)`; with every pane about the entry hidden the Details card goes last.
 
@@ -430,7 +467,7 @@ A folder's *Size* and *On disk* there are pressable too (PRD 001, §9.3.2): they
 sub-application on it (`DiskUsageFeature.open`).
 
 **Disk Usage (PRD 013).** A workbench of panels of its own: `DiskUsageFeature` keeps its groups and
-tabs and a `PanelLayoutFeature` of its own (the class takes its starting grid), drawn by
+tabs and a `UiPanelLayout` of its own (the class takes its starting grid), drawn by
 `DiskUsageApp` with the library's `UiPanelGrid` / `UiPanelGroup` (split, new tab, close, maximize).
 Each tab shows a folder in the library's `UiDiskUsage`: a pie (sunburst), a table with share bars,
 or rectangles (treemap), to a depth of 1–8. Its path bar works as a file browser's: crumbs,

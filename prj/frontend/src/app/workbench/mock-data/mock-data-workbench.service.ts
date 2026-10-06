@@ -169,15 +169,6 @@ export class MockDataWorkbenchService {
   readonly commandLabel = 'Search commands…';
   readonly commandKeys: readonly string[] = ['Ctrl', 'Shift', 'P'];
 
-  readonly titleBarActions: readonly UiIconAction[] = [
-    // Its label and icon follow the theme in force; see `ChromeFeature.titleBarActions` (PRD 001, §8.2.2).
-    { id: 'toggle-theme', label: 'Switch to Light Theme', icon: 'sun' },
-    { id: 'toggle-left', label: 'Toggle Explorer', icon: 'sidebar-left', active: true },
-    { id: 'toggle-panel', label: 'Toggle Panel', icon: 'panel-bottom', active: true },
-    { id: 'toggle-right', label: 'Toggle Details', icon: 'sidebar-right', active: true },
-    { id: 'customize', label: 'Reset Layout', icon: 'layout-grid' },
-  ];
-
   readonly activityBottomItems: readonly UiActivityItem[] = [
     { id: 'account', label: 'Account', icon: 'user' },
     { id: 'settings', label: 'Settings', icon: 'settings', hasMenu: true },
