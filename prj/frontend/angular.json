@@ -35,7 +35,7 @@
             "outputPath": "dist/frontend",
             "stylePreprocessorOptions": {
               "includePaths": [
-                "../libs/ui/src/styles"
+                "../libs/ui/styles"
               ]
             }
           },

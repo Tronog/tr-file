@@ -1,0 +1,9 @@
+/* The library's sources, its specs and the editor: see tsconfig.lib.json for the build. */
+{
+  "extends": "../../tsconfig.angular.json",
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.lib.json" },
+    { "path": "./tsconfig.spec.json" }
+  ]
+}

@@ -1,0 +1,29 @@
+/* The browser and Angular options every Angular package of the workspace shares:
+   the app (`frontend`), the libraries (`libs/ui`, `libs/file-ui`) and the demo.
+   The base targets NodeNext/CommonJS-interop for the backend; the browser build
+   needs the bundler resolution mode and DOM libs instead. */
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "dom"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "importHelpers": true,
+    "declaration": false,
+    "emitDecoratorMetadata": false,
+    "noPropertyAccessFromIndexSignature": true,
+    /* inherited from the base and kept: strict, noImplicitOverride,
+       noImplicitReturns, noFallthroughCasesInSwitch, noUnusedLocals,
+       noUnusedParameters, exactOptionalPropertyTypes, skipLibCheck, sourceMap */
+    "esModuleInterop": true
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  }
+}

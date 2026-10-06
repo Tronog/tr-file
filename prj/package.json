@@ -8,9 +8,11 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "build:libs": "pnpm --filter \"./libs/**\" build",
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:libs": "pnpm --filter \"./libs/**\" test",
     "desktop": "pnpm --filter frontend build && pnpm --filter @tr-file/desktop start",
     "desktop:dev": "pnpm --filter frontend build && pnpm --filter @tr-file/desktop dev:static",
     "desktop:package": "pnpm build && pnpm --filter @tr-file/desktop package",

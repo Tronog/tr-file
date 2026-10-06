@@ -1,36 +1,15 @@
 /* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
 /* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
 {
-  "extends": "../tsconfig.base.json",
-  "compileOnSave": false,
+  "extends": "../tsconfig.angular.json",
   "compilerOptions": {
-    /* Angular-specific overrides of ../tsconfig.base.json.
-       The base targets NodeNext/CommonJS-interop for the backend; the browser
-       build needs the bundler resolution mode and DOM libs instead. */
-    "target": "ES2022",
-    "lib": ["ES2022", "dom"],
-    "module": "preserve",
-    "moduleResolution": "bundler",
-    "isolatedModules": true,
-    "importHelpers": true,
-    "declaration": false,
-    "emitDecoratorMetadata": false,
-    "noPropertyAccessFromIndexSignature": true,
-    /* inherited from the base and kept: strict, noImplicitOverride,
-       noImplicitReturns, noFallthroughCasesInSwitch, noUnusedLocals,
-       noUnusedParameters, exactOptionalPropertyTypes, skipLibCheck, sourceMap */
-    "esModuleInterop": true,
-    /* The UI component library is consumed as source and compiled by this
-       app's build — no ng-packagr step, one type-check across both. */
+    /* The libraries are consumed as source and compiled by this app's build —
+       one type-check across all of them, and edits to a library are live in
+       `ng serve`. Their own builds (ng-packagr, `pnpm build:libs`) check the
+       packaged form. */
     "paths": {
       "@tr-file/ui": ["../libs/ui/src/public-api.ts"]
     }
-  },
-  "angularCompilerOptions": {
-    "enableI18nLegacyMessageIdFormat": false,
-    "strictInjectionParameters": true,
-    "strictInputAccessModifiers": true,
-    "strictTemplates": true
   },
   "files": [],
   "references": [

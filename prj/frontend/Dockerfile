@@ -36,7 +36,7 @@ RUN pnpm install --frozen-lockfile --filter "frontend..."
 # ---------------------------------------------------------------------------
 FROM deps AS development
 WORKDIR /app
-COPY tsconfig.base.json ./
+COPY tsconfig.base.json tsconfig.angular.json ./
 COPY libs ./libs
 COPY frontend ./frontend
 WORKDIR /app/frontend
@@ -48,8 +48,8 @@ CMD ["pnpm", "exec", "ng", "serve", "--host", "0.0.0.0", "--port", "4200", "--pr
 # ---------------------------------------------------------------------------
 FROM deps AS build
 WORKDIR /app
-COPY tsconfig.base.json ./
-# @tr-file/ui ships TypeScript source and is compiled by this build.
+COPY tsconfig.base.json tsconfig.angular.json ./
+# The libraries (@tr-file/ui, …) are compiled from source by this build.
 COPY libs ./libs
 COPY frontend ./frontend
 RUN pnpm --filter frontend build
