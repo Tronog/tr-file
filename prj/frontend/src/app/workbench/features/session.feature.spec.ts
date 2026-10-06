@@ -164,6 +164,25 @@ describe('SessionFeature', () => {
     expect(saved?.paneOrder).toEqual({ explorer: ['explorer-tree', 'places', 'bookmarks', 'recent'] });
   });
 
+  it('writes back, unchanged, the session it restored (PRD 001, §17.1)', () => {
+    vi.useFakeTimers();
+    localStorage.setItem(`${SESSION_KEY}:local`, JSON.stringify(SAVED));
+    create();
+    workbench.start();
+    workbench.leftSidebarWidth.set(334);
+    TestBed.tick();
+    workbench.leftSidebarWidth.set(333);
+    TestBed.tick();
+    workbench.sessionFt.flush();
+    http.match(() => true);
+
+    expect(JSON.parse(localStorage.getItem(`${SESSION_KEY}:local`) ?? 'null')).toEqual({
+      ...SAVED,
+      bottomPanel: { collapsed: false },
+      paneOrder: { details: ['properties', 'permissions', 'git', 'open-with'] },
+    });
+  });
+
   /** PRD 001, §15.1.1 — the title bar's layout button, and every other way to Reset Layout, ask first. */
   describe('Reset Layout', () => {
     const settle = () => new Promise((resolve) => setTimeout(resolve));
