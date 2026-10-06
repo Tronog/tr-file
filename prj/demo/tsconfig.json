@@ -1,0 +1,13 @@
+/* The demo reads `@tr-file/ui` from its sources, as tr-file does — edits to the
+   library are live in `ng serve`. `tsconfig.app.dist.json` builds it against the
+   packaged library instead (`pnpm demo:build`). */
+{
+  "extends": "../tsconfig.angular.json",
+  "compilerOptions": {
+    "paths": {
+      "@tr-file/ui": ["../libs/ui/src/public-api.ts"]
+    }
+  },
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.spec.json" }]
+}

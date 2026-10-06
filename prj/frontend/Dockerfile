@@ -26,6 +26,7 @@ COPY backend/package.json ./backend/
 COPY desktop/package.json ./desktop/
 COPY libs/ui/package.json ./libs/ui/
 COPY libs/file-ui/package.json ./libs/file-ui/
+COPY demo/package.json ./demo/
 
 # lmdb / msgpackr-extract have no musl prebuild and there is no compiler in the
 # image; pnpm demotes those optional install scripts to warnings. Expected.

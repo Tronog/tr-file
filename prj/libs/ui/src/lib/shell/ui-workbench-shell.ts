@@ -183,9 +183,10 @@ export class UiWorkbenchShell {
 
   /**
    * Focuses a sidebar or the bottom panel: where focus last was in it, else
-   * its first tab stop — a roving `tabindex="0"` first, so a tree is entered on
-   * its current row. `false` when it has nothing to focus, so the next region
-   * is tried.
+   * its first tab stop that takes focus — a roving `tabindex="0"` first, so a
+   * tree is entered on its current row; one that is not shown (a collapsed
+   * pane's sash) is passed over. `false` when it has nothing to focus, so the
+   * next region is tried.
    */
   private focusRegion(region: UiFocusRegionId): boolean {
     const element = this.host.querySelector<HTMLElement>(`[data-focus-region="${region}"]`);
@@ -193,15 +194,18 @@ export class UiWorkbenchShell {
       return false;
     }
     const remembered = this.lastFocused.get(region);
-    const target =
-      (remembered?.isConnected && element.contains(remembered) && remembered.matches(FOCUSABLE) ? remembered : null) ??
-      element.querySelector<HTMLElement>('[tabindex="0"]') ??
-      element.querySelector<HTMLElement>(FOCUSABLE);
-    if (target === null) {
-      return false;
+    const candidates = [
+      ...(remembered?.isConnected && element.contains(remembered) && remembered.matches(FOCUSABLE) ? [remembered] : []),
+      ...element.querySelectorAll<HTMLElement>('[tabindex="0"]'),
+      ...element.querySelectorAll<HTMLElement>(FOCUSABLE),
+    ];
+    for (const candidate of candidates) {
+      candidate.focus();
+      if (document.activeElement === candidate) {
+        return true;
+      }
     }
-    target.focus();
-    return document.activeElement === target;
+    return false;
   }
 
   private regionOf(target: EventTarget | null): UiFocusRegionId | null {

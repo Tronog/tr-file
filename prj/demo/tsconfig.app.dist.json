@@ -1,0 +1,10 @@
+/* The demo against `@tr-file/ui` as built by ng-packagr (`libs/ui/dist`): a
+   consumer of the published package, not of its sources. */
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "paths": {
+      "@tr-file/ui": ["../libs/ui/dist"]
+    }
+  }
+}
