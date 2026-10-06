@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
-import { provideFileUi } from '@tr-file/file-ui';
+import { provideTrFile } from './app.providers';
 import { routes } from './app.routes';
 import { csrfInterceptor, sessionExpiryInterceptor } from './file-system/fs-http.interceptors';
 import { RemoteConnectionService } from './file-system/remote-connection.service';
@@ -21,8 +21,9 @@ export const appConfig: ApplicationConfig = {
     // stray `provideZoneChangeDetection` creeping back in.
     provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
-    // The file manager's components, and their keys among the keymap's defaults.
-    provideFileUi(),
+    // The libraries: the file manager's components and their keys, and the
+    // app's settings as the place they remember things.
+    provideTrFile(),
     // Deliberately the default XHR backend, not `withFetch()`: Angular's fetch
     // backend emits no upload-progress events, which FsTransferFeature needs.
     // Every write carries the CSRF header, and a 401 sends the app back to the

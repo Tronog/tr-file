@@ -77,18 +77,39 @@ export { UiPanelGroup, UI_LOADING_RAIL_DELAY_MS } from './lib/panel-group/ui-pan
 export { UiPanelBody } from './lib/panel-group/ui-panel-body';
 export { UiPanelToolbar } from './lib/panel-toolbar/ui-panel-toolbar';
 export { UiPanelGrid } from './lib/panel-grid/ui-panel-grid';
+/* the layout of the panels, as data (PRD 001, §1) */
+export { UiPanelLayout } from './lib/layout/ui-panel-layout';
 
-/* settings (PRD 010) ------------------------------------------------------ */
+/* settings (PRD 010) and themes (PRD 010, §4) ----------------------------- */
+export { UI_SETTINGS_STORE, UI_STORAGE_PREFIX, UiLocalStorageSettingsStore, UiMemorySettingsStore, uiPreferencesKey } from './lib/settings/ui-settings-store';
+export type { UiSettingsStore } from './lib/settings/ui-settings-store';
+export { UiThemeService, UI_THEME_PREFERENCE } from './lib/theme/ui-theme.service';
+export type { UiColorTheme } from './lib/theme/ui-theme.service';
 export { UiSettingsEditor } from './lib/settings/ui-settings-editor';
 export { UiKeybindingsTable } from './lib/settings/ui-keybindings-table';
 
 /* quick input — the command palette's box (PRD 009, §1) ------------------ */
 export { UiQuickInput } from './lib/quick-input/ui-quick-input';
+export { fuzzyMatch } from './lib/palette/fuzzy-match';
+export type { UiFuzzyMatch } from './lib/palette/fuzzy-match';
 
 /* modal windows (PRD 002, §3) -------------------------------------------- */
 export { UiModal } from './lib/modal/ui-modal';
 export { UiDialog } from './lib/modal/ui-dialog';
 export { UiProgressDialog } from './lib/modal/ui-progress-dialog';
+export { UiModalService } from './lib/modal/ui-modal.service';
+export { UiModalHost } from './lib/modal/ui-modal-host';
+export { UI_MODAL_REF } from './lib/modal/ui-modal-ref';
+export type { UiModalRef } from './lib/modal/ui-modal-ref';
+export type {
+  UiComponentModalOptions,
+  UiConfirmOptions,
+  UiDialogOptions,
+  UiModalComponentEntry,
+  UiModalDialogEntry,
+  UiModalEntry,
+  UiPromptOptions,
+} from './lib/modal/ui-modal-options';
 
 /* bottom panel ------------------------------------------------------------ */
 export { UiBottomPanel } from './lib/bottom-panel/ui-bottom-panel';

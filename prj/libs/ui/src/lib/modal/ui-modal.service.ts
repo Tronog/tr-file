@@ -1,14 +1,14 @@
 import { Injector, Service, computed, inject, signal, type Type } from '@angular/core';
-import type { UiDialogResult } from '@tr-file/ui';
-import { MODAL_REF, type ModalRef } from './modal-ref';
+import type { UiDialogResult } from '../models';
+import { UI_MODAL_REF, type UiModalRef } from './ui-modal-ref';
 import type {
-  ComponentModalOptions,
-  ConfirmOptions,
-  DialogEntry,
-  DialogOptions,
-  ModalEntry,
-  PromptOptions,
-} from './modal.model';
+  UiComponentModalOptions,
+  UiConfirmOptions,
+  UiModalDialogEntry,
+  UiDialogOptions,
+  UiModalEntry,
+  UiPromptOptions,
+} from './ui-modal-options';
 
 /**
  * Modal windows (PRD 002, §3), the way VS Code has them.
@@ -24,14 +24,14 @@ import type {
  * nearly every caller wants. `open` puts one of the application's own
  * components in a window, for anything a message dialog cannot say.
  *
- * The windows themselves are drawn by `ModalHost`, once, at the root; this
+ * The windows themselves are drawn by `UiModalHost`, once, at the root; this
  * service only keeps the stack. Closing without an answer — `Escape`, the
  * close button — resolves with `null`.
  */
 @Service()
-export class ModalService {
+export class UiModalService {
   private readonly injector = inject(Injector);
-  private readonly entries = signal<readonly ModalEntry[]>([]);
+  private readonly entries = signal<readonly UiModalEntry[]>([]);
   private sequence = 0;
 
   /** Open windows, bottom first; only the last is interactive. */
@@ -41,11 +41,11 @@ export class ModalService {
   readonly isOpen = computed(() => this.entries().length > 0);
 
   /** Opens a message dialog; resolves with the button chosen, or `null` if dismissed. */
-  show(options: DialogOptions): Promise<UiDialogResult | null> {
+  show(options: UiDialogOptions): Promise<UiDialogResult | null> {
     const { dismissible, validate, onTop, ...model } = options;
     return new Promise((resolve) => {
       const id = (this.sequence += 1);
-      const entry: DialogEntry = {
+      const entry: UiModalDialogEntry = {
         kind: 'dialog',
         id,
         model: signal(validate && model.input ? this.checked(model, validate, model.input.value) : model),
@@ -66,7 +66,7 @@ export class ModalService {
    * ordinary window opened while one of them is up goes beneath it, inert
    * until it is answered (PRD 004, §2.2).
    */
-  private push(entry: ModalEntry): void {
+  private push(entry: UiModalEntry): void {
     this.entries.update((entries) => {
       if (entry.kind === 'dialog' && entry.onTop) {
         return [...entries, entry];
@@ -77,7 +77,7 @@ export class ModalService {
   }
 
   /** A question with one way forward and a way out; `true` for the way forward. */
-  async confirm(options: ConfirmOptions): Promise<boolean> {
+  async confirm(options: UiConfirmOptions): Promise<boolean> {
     const result = await this.show({
       severity: options.severity ?? 'question',
       message: options.message,
@@ -91,7 +91,7 @@ export class ModalService {
   }
 
   /** Asks for a line of text; resolves with it, or `null` when cancelled. */
-  async prompt(options: PromptOptions): Promise<string | null> {
+  async prompt(options: UiPromptOptions): Promise<string | null> {
     const result = await this.show({
       severity: 'none',
       message: options.message,
@@ -113,7 +113,7 @@ export class ModalService {
   }
 
   /** Tells the user something, with a single button to acknowledge it. */
-  async message(options: { message: string; detail?: string; severity?: DialogOptions['severity'] }): Promise<void> {
+  async message(options: { message: string; detail?: string; severity?: UiDialogOptions['severity'] }): Promise<void> {
     await this.show({
       severity: options.severity ?? 'info',
       message: options.message,
@@ -123,23 +123,23 @@ export class ModalService {
   }
 
   /**
-   * Puts `component` in a modal window. The component injects `MODAL_REF` and
+   * Puts `component` in a modal window. The component injects `UI_MODAL_REF` and
    * closes the window with its result; `Escape` closes it with `null`.
    */
-  open<R>(component: Type<unknown>, options: ComponentModalOptions): Promise<R | null> {
+  open<R>(component: Type<unknown>, options: UiComponentModalOptions): Promise<R | null> {
     return new Promise((resolve) => {
       const id = (this.sequence += 1);
       const close = (result: unknown): void => {
         this.remove(id);
         resolve(result as R | null);
       };
-      const ref: ModalRef<R> = { close };
+      const ref: UiModalRef<R> = { close };
       this.push({
         kind: 'component',
         id,
         component,
         inputs: options.inputs ?? {},
-        injector: Injector.create({ providers: [{ provide: MODAL_REF, useValue: ref }], parent: this.injector }),
+        injector: Injector.create({ providers: [{ provide: UI_MODAL_REF, useValue: ref }], parent: this.injector }),
         label: options.label,
         dismissible: options.dismissible ?? true,
         size: options.size ?? 'default',
@@ -172,7 +172,7 @@ export class ModalService {
     }
   }
 
-  private checked(model: DialogOptions, validate: (value: string) => string | null, value: string) {
+  private checked(model: UiDialogOptions, validate: (value: string) => string | null, value: string) {
     const { dismissible: _dismissible, validate: _validate, ...plain } = model;
     const error = validate(value);
     const { error: _previous, ...input } = plain.input ?? { value };

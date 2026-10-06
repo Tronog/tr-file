@@ -4,12 +4,12 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { App } from '../app';
-import { ModalService } from '../modal/modal.service';
 import { csrfInterceptor, sessionExpiryInterceptor } from '../file-system/fs-http.interceptors';
 import { settled } from '../workbench/testing/fs-fixtures';
 import { AuthService } from './auth.service';
 import { Login } from './login/login';
 import { SessionExpiryService } from './session-expiry.service';
+import { UiModalService } from '@tr-file/ui';
 
 /** PRD 003, §2 — signing in, and the header that keeps other sites out. */
 
@@ -281,11 +281,11 @@ describe('App', () => {
     const content = (): HTMLElement => fixture.nativeElement.querySelector('.app-content');
     expect(content().hasAttribute('inert')).toBe(false);
 
-    void TestBed.inject(ModalService).message({ message: 'Hello' });
+    void TestBed.inject(UiModalService).message({ message: 'Hello' });
     fixture.detectChanges();
 
     expect(content().hasAttribute('inert')).toBe(true);
-    expect(fixture.nativeElement.querySelector('app-modal-host ui-modal')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('ui-modal-host ui-modal')).not.toBeNull();
   });
 
   it('goes straight to the workbench when nobody has to sign in', async () => {

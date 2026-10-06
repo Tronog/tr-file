@@ -17,7 +17,6 @@ import { FsDataFeature } from './features/fs-data.feature';
 import { PanelFocusFeature } from './features/panel-focus.feature';
 import { PanelHistoryFeature } from './features/panel-history.feature';
 import { PanelKeyboardFeature } from './features/panel-keyboard.feature';
-import { PanelLayoutFeature } from './features/panel-layout.feature';
 import { PreviewRetentionFeature } from './features/preview-retention.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
 import { ListingOrderFeature } from './listing/listing-order.feature';
@@ -33,7 +32,6 @@ import { FocusCycleFeature } from './features/focus-cycle.feature';
 import { FileClipboardFeature } from './features/file-clipboard.feature';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';
 import { AuthService } from '../auth/auth.service';
-import { ModalService } from '../modal/modal.service';
 import { CommandPaletteFeature } from './features/command-palette.feature';
 import { SavedServersFeature } from './features/saved-servers.feature';
 import { RemoteConnectionService } from '../file-system/remote-connection.service';
@@ -59,6 +57,7 @@ import { GitFeature } from './features/git.feature';
 import { FolderViewsFeature } from './features/folder-views.feature';
 import { GitDiffFeature } from './features/git-diff.feature';
 import type { MockWorkbenchLayout } from './mock-data/mock-data.model';
+import { UiModalService, UiPanelLayout } from '@tr-file/ui';
 
 /**
  * The workbench's common state, and the seam every feature talks through.
@@ -93,7 +92,7 @@ export class WorkbenchService {
   readonly auth = inject(AuthService);
 
   /** Modal windows — questions the workbench has to ask (PRD 002, §3). */
-  readonly modal = inject(ModalService);
+  readonly modal = inject(UiModalService);
 
   /**
    * Seed for the parts of the workbench no backend owns yet — the menus, the
@@ -182,7 +181,7 @@ export class WorkbenchService {
   readonly filePreviewFt = new FilePreviewFeature(this);
   readonly chromeFt = new ChromeFeature(this);
   /** Owns the split tree; constructed before the feature that mutates it. */
-  readonly panelLayoutFt = new PanelLayoutFeature(this.layout.grid);
+  readonly panelLayoutFt = new UiPanelLayout(this.layout.grid);
   readonly explorerFt = new ExplorerFeature(this);
   readonly editorGroupsFt = new EditorGroupsFeature(this);
   /** File management: what folder and file tabs show, and navigating in them. */

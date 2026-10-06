@@ -1,7 +1,7 @@
 import { effect, untracked } from '@angular/core';
 import type { UiGridNode } from '@tr-file/ui';
 import type { UiPanelView } from '@tr-file/file-ui';
-import type { SettingsStore } from '../../settings/settings.service';
+import type { UiSettingsStore } from '@tr-file/ui';
 import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
 import type { PanelDiffSpec, PanelGroupState, PanelSort, PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
@@ -76,12 +76,12 @@ export class SessionFeature {
   }
 
   /** Whether sessions are restored; the Settings menu switches it. */
-  static restores(store: SettingsStore): boolean {
+  static restores(store: UiSettingsStore): boolean {
     return store.get<boolean>(RESTORE_SESSION_KEY) !== false;
   }
 
   /** The last session on this backend, if there is one worth restoring. */
-  static restore(store: SettingsStore, scope: string): SessionSnapshot | null {
+  static restore(store: UiSettingsStore, scope: string): SessionSnapshot | null {
     if (!SessionFeature.restores(store)) {
       return null;
     }

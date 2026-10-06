@@ -1,9 +1,8 @@
 import { computed, signal } from '@angular/core';
 import type { UiQuickInputMessage, UiQuickPickButtonEvent, UiQuickPickItem } from '@tr-file/ui';
-import { chordParts, displayKey } from '@tr-file/ui';
+import { chordParts, displayKey, fuzzyMatch } from '@tr-file/ui';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import { FsError } from '../../file-system/fs-error';
-import { fuzzyMatch } from '../command-palette/fuzzy-match';
 import { describeRemoteTarget, parseRemoteTarget, type RemoteTarget } from '../command-palette/remote-target';
 import type { SavedServer } from './saved-servers.feature';
 import type { WorkbenchService } from '../workbench.service';

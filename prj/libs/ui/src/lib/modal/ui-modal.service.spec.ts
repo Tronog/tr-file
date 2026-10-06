@@ -1,12 +1,12 @@
 import { Component, inject, input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiButton, UiDialog, UiModal } from '@tr-file/ui';
-import type { UiDialogModel, UiDialogResult } from '@tr-file/ui';
-import { settled } from '../workbench/testing/fs-fixtures';
-import { ModalHost } from './modal-host';
-import { MODAL_REF, type ModalRef } from './modal-ref';
-import { ModalService } from './modal.service';
+import { UiButton, UiDialog, UiModal } from '../../public-api';
+import type { UiDialogModel, UiDialogResult } from '../../public-api';
+import { settled } from '../../testing/settled';
+import { UiModalHost } from './ui-modal-host';
+import { UI_MODAL_REF, type UiModalRef } from './ui-modal-ref';
+import { UiModalService } from './ui-modal.service';
 
 /** PRD 002, §3 — modal windows that behave like VS Code's. */
 
@@ -201,20 +201,20 @@ describe('UiDialog', () => {
 })
 class Custom {
   readonly greeting = input('');
-  protected readonly ref = inject<ModalRef<string>>(MODAL_REF);
+  protected readonly ref = inject<UiModalRef<string>>(UI_MODAL_REF);
 }
 
-describe('ModalService and ModalHost', () => {
-  let fixture: ComponentFixture<ModalHost>;
-  let modal: ModalService;
+describe('UiModalService and UiModalHost', () => {
+  let fixture: ComponentFixture<UiModalHost>;
+  let modal: UiModalService;
   const $ = (selector: string): HTMLElement | null => fixture.nativeElement.querySelector(selector);
   const buttons = (): HTMLButtonElement[] => Array.from(fixture.nativeElement.querySelectorAll('.buttons button'));
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ModalHost] }).compileComponents();
-    fixture = TestBed.createComponent(ModalHost);
+    await TestBed.configureTestingModule({ imports: [UiModalHost] }).compileComponents();
+    fixture = TestBed.createComponent(UiModalHost);
     document.body.appendChild(fixture.nativeElement);
-    modal = TestBed.inject(ModalService);
+    modal = TestBed.inject(UiModalService);
     fixture.detectChanges();
   });
 

@@ -1,8 +1,8 @@
 import type { Injector, Type, WritableSignal } from '@angular/core';
-import type { UiDialogModel, UiDialogResult, UiDialogSeverity } from '@tr-file/ui';
+import type { UiDialogModel, UiDialogResult, UiDialogSeverity } from '../models';
 
-/** A message dialog: `ModalService.show` and the helpers built on it. */
-export interface DialogOptions extends UiDialogModel {
+/** A message dialog: `UiModalService.show` and the helpers built on it. */
+export interface UiDialogOptions extends UiDialogModel {
   /** `false` hides the close button and makes `Escape` shake the window instead. */
   readonly dismissible?: boolean;
   /** Checks the field on every change; a message blocks the primary button. */
@@ -16,7 +16,7 @@ export interface DialogOptions extends UiDialogModel {
   readonly onTop?: boolean;
 }
 
-export interface ConfirmOptions {
+export interface UiConfirmOptions {
   readonly message: string;
   readonly detail?: string;
   readonly severity?: UiDialogSeverity;
@@ -25,7 +25,7 @@ export interface ConfirmOptions {
   readonly cancelLabel?: string;
 }
 
-export interface PromptOptions {
+export interface UiPromptOptions {
   readonly message: string;
   readonly detail?: string;
   readonly value?: string;
@@ -39,7 +39,7 @@ export interface PromptOptions {
 }
 
 /** Opening a component of the application's own in a modal window. */
-export interface ComponentModalOptions {
+export interface UiComponentModalOptions {
   /** Inputs to set on the component. */
   readonly inputs?: Readonly<Record<string, unknown>>;
   /** The window's accessible name. */
@@ -49,13 +49,13 @@ export interface ComponentModalOptions {
   readonly size?: 'default' | 'large';
 }
 
-/** One open modal window, as `ModalHost` renders it. */
-export type ModalEntry = DialogEntry | ComponentEntry;
+/** One open modal window, as `UiModalHost` renders it. */
+export type UiModalEntry = UiModalDialogEntry | UiModalComponentEntry;
 
-export interface DialogEntry {
+export interface UiModalDialogEntry {
   readonly kind: 'dialog';
   readonly id: number;
-  /** Kept above the ordinary windows; see `DialogOptions.onTop`. */
+  /** Kept above the ordinary windows; see `UiDialogOptions.onTop`. */
   readonly onTop?: boolean;
   readonly model: WritableSignal<UiDialogModel>;
   readonly dismissible: boolean;
@@ -63,7 +63,7 @@ export interface DialogEntry {
   readonly resolve: (result: UiDialogResult | null) => void;
 }
 
-export interface ComponentEntry {
+export interface UiModalComponentEntry {
   readonly kind: 'component';
   readonly id: number;
   readonly component: Type<unknown>;

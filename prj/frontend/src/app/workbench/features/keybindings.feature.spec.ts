@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { UiKeymap, chordOf, isChord } from '@tr-file/ui';
 import { UiFileList } from '@tr-file/file-ui';
 import type { UiPanelKey } from '@tr-file/file-ui';
-import { MemorySettingsStore, SettingsService } from '../../settings/settings.service';
+import { UiMemorySettingsStore } from '@tr-file/ui';
+import { SettingsService } from '../../settings/settings.service';
 import { fsDirectory, fsEntry, fsEnvelope, fsListing, listUrl, settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
 import { KEYBINDINGS_KEY } from './keybindings.feature';
@@ -54,11 +55,11 @@ describe('chordOf', () => {
 
 describe('KeybindingsFeature (PRD 010, §2)', () => {
   let workbench: WorkbenchService;
-  let store: MemorySettingsStore;
+  let store: UiMemorySettingsStore;
   const group = 'group-root';
 
   const setUp = async (stored?: unknown): Promise<void> => {
-    store = new MemorySettingsStore();
+    store = new UiMemorySettingsStore();
     if (stored !== undefined) {
       store.set(KEYBINDINGS_KEY, stored);
     }

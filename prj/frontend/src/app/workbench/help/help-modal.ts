@@ -1,6 +1,5 @@
 import { Component, inject, input } from '@angular/core';
-import { UiCheatsheet, UiHelp } from '@tr-file/ui';
-import { MODAL_REF, type ModalRef } from '../../modal/modal-ref';
+import { UiCheatsheet, UiHelp, UI_MODAL_REF, type UiModalRef } from '@tr-file/ui';
 import type { HelpFeature } from '../features/help.feature';
 
 /**
@@ -41,5 +40,5 @@ import type { HelpFeature } from '../features/help.feature';
 export class HelpModal {
   readonly help = input.required<HelpFeature>();
 
-  protected readonly ref = inject<ModalRef<null>>(MODAL_REF);
+  protected readonly ref = inject<UiModalRef<null>>(UI_MODAL_REF);
 }

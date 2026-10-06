@@ -1,15 +1,16 @@
 import { NgComponentOutlet } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { UiDialog, UiModal } from '@tr-file/ui';
-import { ModalService } from './modal.service';
+import { UiDialog } from './ui-dialog';
+import { UiModal } from './ui-modal';
+import { UiModalService } from './ui-modal.service';
 
 /**
- * Draws `ModalService`'s windows (PRD 002, §3). Rendered once, at the root,
+ * Draws `UiModalService`'s windows (PRD 002, §3). Rendered once, at the root,
  * after everything else; only the top window is interactive — the ones under
  * it are `inert`, as the rest of the page is while any is open.
  */
 @Component({
-  selector: 'app-modal-host',
+  selector: 'ui-modal-host',
   imports: [NgComponentOutlet, UiDialog, UiModal],
   template: `
     @for (entry of modal.stack(); track entry.id; let top = $last) {
@@ -44,6 +45,6 @@ import { ModalService } from './modal.service';
     }
   `,
 })
-export class ModalHost {
-  protected readonly modal = inject(ModalService);
+export class UiModalHost {
+  protected readonly modal = inject(UiModalService);
 }

@@ -1,4 +1,5 @@
 import { Service } from '@angular/core';
+import { UiLocalStorageSettingsStore, type UiSettingsStore } from '@tr-file/ui';
 
 /** What the desktop's preload puts on `window` (PRD 003, §6); see `prj/desktop`. */
 interface SettingsBridgeApi {
@@ -18,16 +19,6 @@ declare global {
 const SETTINGS_VERSION = 1;
 
 /**
- * Something that keeps values by key between sessions. `SettingsService` is
- * the app's; a test hands a feature a map instead.
- */
-export interface SettingsStore {
-  get<T>(key: string): T | undefined;
-  /** Keeps `value`; `null` forgets the key. Never throws: storage that refuses only means nothing is remembered. */
-  set(key: string, value: unknown): void;
-}
-
-/**
  * What the app remembers between sessions (PRD 003, §6): the layout, the
  * bookmarks, the recent folders, the saved servers.
  *
@@ -40,11 +31,14 @@ export interface SettingsStore {
  *
  * Values are plain JSON. A store that is missing, full or refused is no
  * memory, never an error: the session works, it just starts fresh next time.
+ * It is the library's `UI_SETTINGS_STORE` too (`provideTrFile`).
  */
 @Service()
-export class SettingsService implements SettingsStore {
+export class SettingsService implements UiSettingsStore {
   /** The desktop's settings, once loaded; `null` in a browser. */
   private desktop: Map<string, unknown> | null = null;
+
+  private readonly local = new UiLocalStorageSettingsStore();
 
   private get api(): SettingsBridgeApi | undefined {
     const api = globalThis.window?.trFileSettings;
@@ -75,12 +69,7 @@ export class SettingsService implements SettingsStore {
     if (this.desktop !== null) {
       return this.desktop.get(key) as T | undefined;
     }
-    try {
-      const raw = globalThis.localStorage?.getItem(key);
-      return raw === null || raw === undefined ? undefined : (JSON.parse(raw) as T);
-    } catch {
-      return undefined;
-    }
+    return this.local.get<T>(key);
   }
 
   set(key: string, value: unknown): void {
@@ -93,32 +82,6 @@ export class SettingsService implements SettingsStore {
       void this.api?.set(key, value ?? null).catch(() => undefined);
       return;
     }
-    try {
-      if (value === null || value === undefined) {
-        globalThis.localStorage?.removeItem(key);
-      } else {
-        globalThis.localStorage?.setItem(key, JSON.stringify(value));
-      }
-    } catch {
-      // Not remembered past this session; nothing else is lost.
-    }
-  }
-}
-
-/** A store that remembers for as long as it lives — for tests, and for nowhere better to keep things. */
-export class MemorySettingsStore implements SettingsStore {
-  private readonly values = new Map<string, unknown>();
-
-  get<T>(key: string): T | undefined {
-    const value = this.values.get(key);
-    return value === undefined ? undefined : (structuredClone(value) as T);
-  }
-
-  set(key: string, value: unknown): void {
-    if (value === null || value === undefined) {
-      this.values.delete(key);
-    } else {
-      this.values.set(key, structuredClone(value));
-    }
+    this.local.set(key, value);
   }
 }

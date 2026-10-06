@@ -6,7 +6,7 @@
  * characters, and matches at the start of a word beat matches inside one.
  */
 
-export interface FuzzyMatch {
+export interface UiFuzzyMatch {
   /** Higher is better. */
   readonly score: number;
   /** Matched characters of the text, as merged `[start, end)` ranges. */
@@ -16,7 +16,7 @@ export interface FuzzyMatch {
 const SEPARATORS = new Set([' ', ':', '-', '_', '.', '/', '\\', '…', '(', '[']);
 
 /** How well `text` matches `query`, or `null` when it does not. An empty query matches everything. */
-export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
+export function fuzzyMatch(query: string, text: string): UiFuzzyMatch | null {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const lower = text.toLowerCase();
   let score = 0;

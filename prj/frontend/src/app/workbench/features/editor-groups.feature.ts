@@ -36,7 +36,7 @@ const NO_TABS = {
  * changes groups only through the operations below. This feature asks it,
  * through `PanelContentFeature`, when a tab needs loading and what the group
  * frame should show about it. The shape of the split layout lives in
- * `PanelLayoutFeature`.
+ * `UiPanelLayout`.
  */
 export class EditorGroupsFeature {
   private readonly groups: WritableSignal<readonly PanelGroupState[]>;

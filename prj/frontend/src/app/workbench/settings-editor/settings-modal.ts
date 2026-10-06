@@ -1,6 +1,5 @@
 import { Component, inject, input } from '@angular/core';
-import { UiSettingsEditor } from '@tr-file/ui';
-import { MODAL_REF, type ModalRef } from '../../modal/modal-ref';
+import { UiSettingsEditor, UI_MODAL_REF, type UiModalRef } from '@tr-file/ui';
 import type { SettingsEditorFeature } from '../features/settings-editor.feature';
 
 /**
@@ -39,5 +38,5 @@ import type { SettingsEditorFeature } from '../features/settings-editor.feature'
 export class SettingsModal {
   readonly editor = input.required<SettingsEditorFeature>();
 
-  protected readonly ref = inject<ModalRef<null>>(MODAL_REF);
+  protected readonly ref = inject<UiModalRef<null>>(UI_MODAL_REF);
 }

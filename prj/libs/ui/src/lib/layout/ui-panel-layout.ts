@@ -1,5 +1,5 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
-import type { UiDropZone, UiGridNode, UiGridSplit, UiSplitResize } from '@tr-file/ui';
+import type { UiDropZone, UiGridNode, UiGridSplit, UiSplitResize } from '../models';
 
 /** Smallest share a split child may be squeezed to when a sibling grows. */
 const MIN_SHARE = 0.08;
@@ -13,11 +13,11 @@ const MIN_SHARE = 0.08;
  * are maintained everywhere: a split always has at least two children (a split
  * left with one collapses into it), and a group id appears at most once.
  */
-export class PanelLayoutFeature {
+export class UiPanelLayout {
   private readonly tree: WritableSignal<UiGridNode>;
   private readonly maximized = signal<string | null>(null);
 
-  /** One per set of panels: the file manager's, and Disk Usage's (PRD 013). */
+  /** One per set of panels — an application may have several (tr-file: the file manager's, and Disk Usage's, PRD 013). */
   constructor(initial: UiGridNode) {
     this.tree = signal(initial);
   }

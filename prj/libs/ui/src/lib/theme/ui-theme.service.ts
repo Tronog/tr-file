@@ -1,12 +1,11 @@
 import { DestroyRef, Service, computed, effect, inject, signal } from '@angular/core';
-import { SettingsService } from './settings.service';
+import { UI_SETTINGS_STORE, UI_STORAGE_PREFIX, uiPreferencesKey } from '../settings/ui-settings-store';
 
 /** The colour themes (PRD 010, §4): VS Code's Dark Modern and Light Modern, or whichever the system prefers. */
-export type ColorTheme = 'dark' | 'light' | 'system';
+export type UiColorTheme = 'dark' | 'light' | 'system';
 
-/** Where the preferences are kept — `PreferencesFeature`'s key, of which the theme is one. */
-const PREFERENCES_KEY = 'tr-file.preferences.v1';
-const THEME_PREFERENCE = 'workbench.colorTheme';
+/** The theme's key among the preferences (`uiPreferencesKey`). */
+export const UI_THEME_PREFERENCE = 'workbench.colorTheme';
 
 /**
  * The window's colour theme (PRD 010, §4). The library's tokens are Dark
@@ -15,17 +14,19 @@ const THEME_PREFERENCE = 'workbench.colorTheme';
  * built, so the sign-in screen is themed too, and again whenever the choice or
  * the system's preference changes.
  *
- * The choice itself is a preference of the settings window
- * (`PreferencesFeature`, *Workbench: Color Theme*), kept with the others under
- * `tr-file.preferences.v1`; `index.html` reads it from there once more, before
- * the first paint, so a light window does not flash dark while it loads.
+ * The choice itself is a preference of the settings window (*Workbench:
+ * Color Theme*), kept with the others in `UI_SETTINGS_STORE` under
+ * `<prefix>.preferences.v1`, as `workbench.colorTheme`. An application that
+ * paints before Angular does — an inline script in `index.html` — can read it
+ * from there too, so a light window does not flash dark while it loads.
  */
 @Service()
-export class ThemeService {
-  private readonly settings = inject(SettingsService);
+export class UiThemeService {
+  private readonly settings = inject(UI_SETTINGS_STORE);
+  private readonly key = uiPreferencesKey(inject(UI_STORAGE_PREFIX));
 
   /** What was chosen. */
-  readonly choice = signal<ColorTheme>(ThemeService.read(this.settings.get<unknown>(PREFERENCES_KEY)));
+  readonly choice = signal<UiColorTheme>(UiThemeService.read(this.settings.get<unknown>(this.key)));
 
   /** Whether the system prefers light — followed while the choice is `system`. */
   private readonly systemLight = signal(false);
@@ -61,8 +62,8 @@ export class ThemeService {
   }
 
   /** The stored choice, or the default for anything else. */
-  private static read(stored: unknown): ColorTheme {
-    const value = typeof stored === 'object' && stored !== null ? (stored as Record<string, unknown>)[THEME_PREFERENCE] : undefined;
+  private static read(stored: unknown): UiColorTheme {
+    const value = typeof stored === 'object' && stored !== null ? (stored as Record<string, unknown>)[UI_THEME_PREFERENCE] : undefined;
     return value === 'light' || value === 'system' ? value : 'dark';
   }
 }

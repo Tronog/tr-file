@@ -2,7 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import type { UiSettingsEditorModel } from '@tr-file/ui';
-import { MemorySettingsStore, SettingsService } from '../../settings/settings.service';
+import { UiMemorySettingsStore } from '@tr-file/ui';
+import { SettingsService } from '../../settings/settings.service';
 import { fsDirectory, fsEntry, fsEnvelope, fsListing, listUrl, settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
 import { PREFERENCES_KEY } from './preferences.feature';
@@ -10,10 +11,10 @@ import { PREFERENCES_KEY } from './preferences.feature';
 /** PRD 010 — the settings window: its settings (§1) and its keys (§2). */
 describe('Settings', () => {
   let workbench: WorkbenchService;
-  let store: MemorySettingsStore;
+  let store: UiMemorySettingsStore;
 
   beforeEach(async () => {
-    store = new MemorySettingsStore();
+    store = new UiMemorySettingsStore();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), { provide: SettingsService, useValue: store }],
     });
@@ -218,5 +219,28 @@ describe('Settings', () => {
       editor().resetAllKeybindings();
       expect(workbench.keybindingsFt.keysFor('edit.search')).toEqual(['Ctrl+Shift+F']);
     });
+  });
+  /** PRD 010, §4 — the colour theme is a setting like the others, and the library's `UiThemeService` applies it. */
+  it('chooses the colour theme, and remembers it', () => {
+    editor().open('appearance');
+    expect(settings().find((candidate) => candidate.id === 'workbench.colorTheme')?.control).toEqual({
+      kind: 'select',
+      value: 'dark',
+      options: [
+        { value: 'dark', label: 'Dark Modern' },
+        { value: 'light', label: 'Light Modern' },
+        { value: 'system', label: 'Follow the System' },
+      ],
+    });
+
+    editor().changeSetting({ id: 'workbench.colorTheme', value: 'light' });
+    TestBed.tick();
+
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    expect(store.get(PREFERENCES_KEY)).toEqual({ 'workbench.colorTheme': 'light' });
+
+    workbench.preferencesFt.reset('workbench.colorTheme');
+    TestBed.tick();
+    expect(document.documentElement.dataset['theme']).toBeUndefined();
   });
 });

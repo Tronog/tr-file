@@ -4,7 +4,8 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { UiActivityBar, UiContextMenu, UiWorkbench } from '@tr-file/ui';
 import type { UiSashResize } from '@tr-file/ui';
-import { MemorySettingsStore, SettingsService } from '../settings/settings.service';
+import { UiMemorySettingsStore } from '@tr-file/ui';
+import { SettingsService } from '../settings/settings.service';
 import { PREFERENCES_KEY } from './features/preferences.feature';
 import { WorkbenchService } from './workbench.service';
 import { provideOnePanel } from './testing/one-panel';
@@ -127,10 +128,10 @@ describe('Sidebar location (PRD 010, §3)', () => {
 
   describe('the settings', () => {
     let workbench: WorkbenchService;
-    let store: MemorySettingsStore;
+    let store: UiMemorySettingsStore;
 
     beforeEach(() => {
-      store = new MemorySettingsStore();
+      store = new UiMemorySettingsStore();
       TestBed.configureTestingModule({
         providers: [provideHttpClient(), provideHttpClientTesting(), provideOnePanel(), { provide: SettingsService, useValue: store }],
       });

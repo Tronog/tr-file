@@ -1,5 +1,5 @@
 import { computed, inject, signal } from '@angular/core';
-import { ThemeService, type ColorTheme } from '../../settings/theme.service';
+import { UiThemeService, type UiColorTheme } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /** Where the preferences of their own are kept (PRD 010, §1) — for every backend alike. */
@@ -153,7 +153,7 @@ export class PreferencesFeature {
   private readonly stored = signal<Readonly<Record<string, boolean | string>>>({});
 
   /** Applies the colour theme; it keeps the choice it read at start in step with this one. */
-  private readonly theme = inject(ThemeService);
+  private readonly theme = inject(UiThemeService);
 
   /** Mirrors `SessionFeature.restoresSessions`, which is read from storage and so cannot be watched. */
   private readonly restoreLayout = signal(true);
@@ -232,7 +232,7 @@ export class PreferencesFeature {
     }
     this.keep(id, value, kind.default);
     if (id === 'workbench.colorTheme') {
-      this.theme.choice.set(value as ColorTheme);
+      this.theme.choice.set(value as UiColorTheme);
     }
   }
 
