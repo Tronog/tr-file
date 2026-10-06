@@ -1,4 +1,5 @@
-import type { UiMenuItem, UiPanelView } from '@tr-file/ui';
+import type { UiMenuItem } from '@tr-file/ui';
+import type { UiPanelView } from '@tr-file/file-ui';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
 import type { PanelSortKey } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';

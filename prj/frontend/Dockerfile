@@ -25,6 +25,7 @@ COPY backend/package.json ./backend/
 # resolve, even the ones this image never builds.
 COPY desktop/package.json ./desktop/
 COPY libs/ui/package.json ./libs/ui/
+COPY libs/file-ui/package.json ./libs/file-ui/
 
 # lmdb / msgpackr-extract have no musl prebuild and there is no compiler in the
 # image; pnpm demotes those optional install scripts to warnings. Expected.

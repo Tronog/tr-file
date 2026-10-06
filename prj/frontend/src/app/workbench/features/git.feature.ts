@@ -1,14 +1,13 @@
 import { DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import type { UiIconAction, UiQuickPickItem } from '@tr-file/ui';
 import type {
-  UiIconAction,
-  UiQuickPickItem,
   UiScmActionEvent,
   UiScmCommit,
   UiScmGroup,
   UiScmItem,
   UiScmModel,
   UiScmTone,
-} from '@tr-file/ui';
+} from '@tr-file/file-ui';
 import type {
   FsGitChange,
   FsGitChangeKind,

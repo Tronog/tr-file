@@ -1,8 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { UiFileList, UiKeymap, chordOf, isChord } from '@tr-file/ui';
-import type { UiPanelKey } from '@tr-file/ui';
+import { UiKeymap, chordOf, isChord } from '@tr-file/ui';
+import { UiFileList } from '@tr-file/file-ui';
+import type { UiPanelKey } from '@tr-file/file-ui';
 import { MemorySettingsStore, SettingsService } from '../../settings/settings.service';
 import { fsDirectory, fsEntry, fsEnvelope, fsListing, listUrl, settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';

@@ -1,4 +1,4 @@
-import type { UiPanelKey } from '@tr-file/ui';
+import type { UiPanelKey } from '@tr-file/file-ui';
 import type { WorkbenchService } from '../workbench.service';
 import type { CommandTarget } from './commands.feature';
 

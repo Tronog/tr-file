@@ -1,4 +1,5 @@
 import { computed, inject, signal } from '@angular/core';
+import { FILE_UI_DEFAULT_KEYBINDINGS } from '@tr-file/file-ui';
 import { UI_DEFAULT_KEYBINDINGS, UiKeymap, chordOf, displayChord, type UiKeyContext, type UiKeybinding } from '@tr-file/ui';
 import type { WorkbenchService } from '../workbench.service';
 import type { CommandTarget } from './commands.feature';
@@ -49,8 +50,12 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'file.quit', key: 'F10', when: 'window' },
 ];
 
-/** Every binding as it is before the user changes anything. */
-export const DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [...UI_DEFAULT_KEYBINDINGS, ...WORKBENCH_DEFAULT_KEYBINDINGS];
+/**
+ * Every binding as it is before the user changes anything: the file manager's
+ * components' (`FILE_UI_DEFAULT_KEYBINDINGS`), the generic library's
+ * (`UI_DEFAULT_KEYBINDINGS`) and the window's — in `UiKeymap.defaults`' order.
+ */
+export const DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [...FILE_UI_DEFAULT_KEYBINDINGS, ...UI_DEFAULT_KEYBINDINGS, ...WORKBENCH_DEFAULT_KEYBINDINGS];
 
 /**
  * Names for the commands that are keys only — gestures of a list, moves of
@@ -115,7 +120,8 @@ const same = (a: UiKeybinding, b: UiKeybinding): boolean => a.command === b.comm
  * (PRD 010, §2) — VS Code's keybindings: a key, a command, and `when` it
  * applies (`UiKeyContext`).
  *
- * The defaults are the library's (`UI_DEFAULT_KEYBINDINGS`) and the window's
+ * The defaults are the libraries' (`FILE_UI_DEFAULT_KEYBINDINGS`,
+ * `UI_DEFAULT_KEYBINDINGS`) and the window's
  * (`WORKBENCH_DEFAULT_KEYBINDINGS`); the user's changes are kept as what was
  * taken away and what was added (`KEYBINDINGS_KEY`), so a default the app
  * adds later still arrives. The table in force is handed to the library's

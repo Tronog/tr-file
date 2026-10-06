@@ -1,5 +1,6 @@
 import { effect, untracked } from '@angular/core';
-import type { UiGridNode, UiPanelView } from '@tr-file/ui';
+import type { UiGridNode } from '@tr-file/ui';
+import type { UiPanelView } from '@tr-file/file-ui';
 import type { SettingsStore } from '../../settings/settings.service';
 import type { MockWorkbenchLayout } from '../mock-data/mock-data.model';
 import type { PanelDiffSpec, PanelGroupState, PanelSort, PanelTabState } from '../panel-group.model';

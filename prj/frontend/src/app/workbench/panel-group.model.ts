@@ -1,4 +1,4 @@
-import type { UiPanelView } from '@tr-file/ui';
+import type { UiPanelView } from '@tr-file/file-ui';
 
 /**
  * What a tab is showing: a directory listing, one file read-only, a folder

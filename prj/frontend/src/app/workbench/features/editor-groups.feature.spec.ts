@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import type { UiFileRow } from '@tr-file/ui';
+import type { UiFileRow } from '@tr-file/file-ui';
 import {
   fsDirectory,
   fsEntry,

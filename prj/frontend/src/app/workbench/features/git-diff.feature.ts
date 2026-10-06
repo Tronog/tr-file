@@ -1,5 +1,6 @@
 import { computed, signal } from '@angular/core';
-import type { UiBreadcrumb, UiDiffLine, UiDocumentModel, UiEmptyStateModel, UiFileBrowserModel, UiIconAction } from '@tr-file/ui';
+import type { UiBreadcrumb, UiDiffLine, UiDocumentModel, UiEmptyStateModel, UiIconAction } from '@tr-file/ui';
+import type { UiFileBrowserModel } from '@tr-file/file-ui';
 import type { FsGitDiff } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import type { PanelContentFeature } from '../panel-content.model';

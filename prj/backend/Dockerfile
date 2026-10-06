@@ -27,6 +27,7 @@ COPY frontend/package.json frontend/package.json
 # resolve, even the ones this image never builds.
 COPY desktop/package.json desktop/package.json
 COPY libs/ui/package.json libs/ui/package.json
+COPY libs/file-ui/package.json libs/file-ui/package.json
 # Filtered, so the desktop shell's Electron binary (~230 MB) stays out of here.
 RUN pnpm install --frozen-lockfile --filter "@tr-file/backend..."
 
@@ -39,6 +40,7 @@ COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 COPY desktop/package.json desktop/package.json
 COPY libs/ui/package.json libs/ui/package.json
+COPY libs/file-ui/package.json libs/file-ui/package.json
 RUN pnpm install --frozen-lockfile --prod --filter "@tr-file/backend..."
 
 # ---------------------------------------------------------------------------

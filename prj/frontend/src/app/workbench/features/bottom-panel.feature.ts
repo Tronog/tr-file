@@ -1,5 +1,6 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
-import type { UiIconAction, UiPanelTab, UiTransfer } from '@tr-file/ui';
+import type { UiIconAction, UiPanelTab } from '@tr-file/ui';
+import type { UiTransfer } from '@tr-file/file-ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /**

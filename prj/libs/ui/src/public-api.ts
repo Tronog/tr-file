@@ -2,9 +2,9 @@
  * @tr-file/ui — the workbench component library.
  *
  * A VS Code style shell built as small, purely presentational Angular
- * components: signal inputs in, outputs out, no service or HTTP dependency, no
- * zone.js. Application state (and, later, real backend data) lives in the app —
- * see `frontend/src/app/workbench`.
+ * components: signal inputs in, outputs out, no HTTP dependency, no zone.js.
+ * Nothing in it knows what the application is about — the file manager's own
+ * components are `@tr-file/file-ui`.
  */
 
 /* view models ------------------------------------------------------------- */
@@ -29,10 +29,8 @@ export { UiTree } from './lib/tree/ui-tree';
 /* details sidebar widgets ------------------------------------------------- */
 export { UiPreviewCard } from './lib/details/ui-preview-card';
 export { UiPropertyList } from './lib/details/ui-property-list';
-export { UiPermissionGrid } from './lib/details/ui-permission-grid';
 export { UiChipList } from './lib/details/ui-chip-list';
 export { UiActionList } from './lib/details/ui-action-list';
-export { UiSourceControl } from './lib/source-control/ui-source-control';
 
 /* controls ---------------------------------------------------------------- */
 export { UiIconButton } from './lib/controls/ui-icon-button';
@@ -45,6 +43,7 @@ export { UiSearchField } from './lib/controls/ui-search-field';
 export {
   UiKeymap,
   UI_DEFAULT_KEYBINDINGS,
+  UI_KEYBINDING_DEFAULTS,
   chordOf,
   chordParts,
   displayChord,
@@ -52,6 +51,12 @@ export {
   isChord,
 } from './lib/keyboard/keymap';
 export type { UiKeybinding, UiKeyContext } from './lib/keyboard/keymap';
+/* lists: selection, keyboard navigation, type-to-find, virtual scrolling — for list components built on the library */
+export { clickMode, moveMode, UiListSelection } from './lib/keyboard/list-selection';
+export type { UiSelectMode } from './lib/keyboard/list-selection';
+export { isTypeaheadKey, pageStep, UiTypeahead } from './lib/keyboard/list-navigation';
+export { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from './lib/virtual/ui-virtual-viewport';
+export type { UiVirtualRange } from './lib/virtual/ui-virtual-viewport';
 export { UiSash } from './lib/sash/ui-sash';
 /* help (PRD 001, §16) */
 export { UiHelp } from './lib/help/ui-help';
@@ -64,8 +69,6 @@ export type { UiMenuDismissReason } from './lib/context-menu/ui-context-menu';
 
 /* editor area ------------------------------------------------------------- */
 export { UiTabBar } from './lib/tabs/ui-tab-bar';
-export { UiFileList } from './lib/file-list/ui-file-list';
-export { UiIconView } from './lib/icon-view/ui-icon-view';
 export { UiDocumentView } from './lib/document-view/ui-document-view';
 export { UiImageView } from './lib/image-view/ui-image-view';
 export { UiImageViewService } from './lib/image-view/ui-image-view.service';
@@ -79,12 +82,6 @@ export { UiPanelGrid } from './lib/panel-grid/ui-panel-grid';
 export { UiSettingsEditor } from './lib/settings/ui-settings-editor';
 export { UiKeybindingsTable } from './lib/settings/ui-keybindings-table';
 
-/* panel content ----------------------------------------------------------- */
-export { UiFileBrowser } from './lib/file-browser/ui-file-browser';
-export { UiDiskUsage } from './lib/disk-usage/ui-disk-usage';
-export { DISK_USAGE_HUES, sunburst, squarify, tableRows, treemap } from './lib/disk-usage/disk-usage-layout';
-export type { DiskUsageCell, DiskUsageHue, DiskUsageRow, DiskUsageSlice } from './lib/disk-usage/disk-usage-layout';
-
 /* quick input — the command palette's box (PRD 009, §1) ------------------ */
 export { UiQuickInput } from './lib/quick-input/ui-quick-input';
 
@@ -95,5 +92,4 @@ export { UiProgressDialog } from './lib/modal/ui-progress-dialog';
 
 /* bottom panel ------------------------------------------------------------ */
 export { UiBottomPanel } from './lib/bottom-panel/ui-bottom-panel';
-export { UiTransferList } from './lib/transfers/ui-transfer-list';
 export { UiNotes } from './lib/notes/ui-notes';

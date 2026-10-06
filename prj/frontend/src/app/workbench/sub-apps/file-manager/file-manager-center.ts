@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
-import { UiBottomPanel, UiFileBrowser, UiNotes, UiPanelGrid, UiPanelGroup, UiSash, UiTransferList } from '@tr-file/ui';
+import { UiBottomPanel, UiNotes, UiPanelGrid, UiPanelGroup, UiSash } from '@tr-file/ui';
+import { UiFileBrowser, UiTransferList } from '@tr-file/file-ui';
 import { WorkbenchService } from '../../workbench.service';
 
 /**

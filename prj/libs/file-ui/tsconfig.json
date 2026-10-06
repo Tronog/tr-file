@@ -1,0 +1,15 @@
+/* The library's sources, its specs and the editor: `@tr-file/ui` is read from
+   its sources, as the app reads both. See tsconfig.lib.json for the build. */
+{
+  "extends": "../../tsconfig.angular.json",
+  "compilerOptions": {
+    "paths": {
+      "@tr-file/ui": ["../ui/src/public-api.ts"]
+    }
+  },
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.lib.json" },
+    { "path": "./tsconfig.spec.json" }
+  ]
+}

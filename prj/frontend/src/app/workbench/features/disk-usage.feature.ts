@@ -1,13 +1,11 @@
 import { computed, signal } from '@angular/core';
 import type {
-  UiDiskUsageItem,
-  UiDiskUsageModel,
-  UiDiskUsageView,
   UiGridNode,
   UiIconAction,
   UiPanelGroupModel,
   UiTab,
 } from '@tr-file/ui';
+import type { UiDiskUsageItem, UiDiskUsageModel, UiDiskUsageView } from '@tr-file/file-ui';
 import type { FsDiskUsageNode, FsDiskUsageScan } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import { shownPath } from '../../file-system/fs-path';

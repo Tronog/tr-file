@@ -2,15 +2,13 @@ import { computed, signal } from '@angular/core';
 import type {
   UiActionListItem,
   UiEmptyStateModel,
-  UiFileBrowserModel,
-  UiFileColumn,
-  UiFileRow,
   UiIconAction,
   UiPreview,
   UiProperty,
   UiPropertyActivation,
   UiSelectionChange,
 } from '@tr-file/ui';
+import type { UiFileBrowserModel, UiFileColumn, UiFileRow } from '@tr-file/file-ui';
 import type { FsTrashItem, FsTrashListing } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import type { PanelContentFeature } from '../panel-content.model';

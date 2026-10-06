@@ -8,7 +8,8 @@
        `ng serve`. Their own builds (ng-packagr, `pnpm build:libs`) check the
        packaged form. */
     "paths": {
-      "@tr-file/ui": ["../libs/ui/src/public-api.ts"]
+      "@tr-file/ui": ["../libs/ui/src/public-api.ts"],
+      "@tr-file/file-ui": ["../libs/file-ui/src/public-api.ts"]
     }
   },
   "files": [],

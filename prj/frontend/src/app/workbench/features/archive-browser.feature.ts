@@ -2,12 +2,10 @@ import { computed, signal } from '@angular/core';
 import type {
   UiBreadcrumb,
   UiEmptyStateModel,
-  UiFileBrowserModel,
-  UiFileColumn,
-  UiFileRow,
   UiIconAction,
   UiSelectionChange,
 } from '@tr-file/ui';
+import type { UiFileBrowserModel, UiFileColumn, UiFileRow } from '@tr-file/file-ui';
 import type { FsArchiveEntry, FsArchiveListing } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import type { PanelContentFeature } from '../panel-content.model';

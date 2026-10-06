@@ -1,17 +1,19 @@
 import { computed, effect, signal, untracked } from '@angular/core';
 import type {
   UiBreadcrumb,
-  UiEntryDrop,
   UiFilesDrop,
-  UiFileBrowserModel,
-  UiFileColumn,
-  UiFileRow,
   UiIconAction,
-  UiIconViewItem,
-  UiPanelView,
   UiPathSuggestion,
   UiSelectionChange,
 } from '@tr-file/ui';
+import type {
+  UiEntryDrop,
+  UiFileBrowserModel,
+  UiFileColumn,
+  UiFileRow,
+  UiIconViewItem,
+  UiPanelView,
+} from '@tr-file/file-ui';
 import type { FsEntry } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import { nameFilter } from '../listing/listing-order';

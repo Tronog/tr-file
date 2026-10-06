@@ -1,3 +1,5 @@
+import { TestBed } from '@angular/core/testing';
+import { UiKeymap } from '@tr-file/ui';
 import { DEFAULT_KEYBINDINGS } from './keybindings.feature';
 
 /**
@@ -33,14 +35,15 @@ const GOLDEN = [
   'panel Ctrl+Shift+C file.copyPath',
   'panel Shift+F10 panel.contextMenu',
   'panel ContextMenu panel.contextMenu',
+  // The file browser's last two; before §17.1 they followed the tab keys, which share no key with them.
+  'panel PageUp image.previous',
+  'panel PageDown image.next',
   'panel / view.splitRight',
   'panel Ctrl+T tab.new',
   'panel Ctrl+Up view.toggleMaximize',
   'panel Ctrl+W tab.close',
   'panel Ctrl+PageUp tab.previous',
   'panel Ctrl+PageDown tab.next',
-  'panel PageUp image.previous',
-  'panel PageDown image.next',
   'image Plus image.zoomIn',
   'image - image.zoomOut',
   'image 1 image.actualSize',
@@ -75,5 +78,10 @@ const GOLDEN = [
 describe('the default key bindings', () => {
   it('are the table they were, in its order', () => {
     expect(DEFAULT_KEYBINDINGS.map((binding) => `${binding.when} ${binding.key} ${binding.command}`)).toEqual(GOLDEN);
+  });
+
+  it('start with what the libraries give the keymap, in the same order', () => {
+    const keymap = TestBed.inject(UiKeymap);
+    expect(DEFAULT_KEYBINDINGS.slice(0, keymap.defaults.length)).toEqual(keymap.defaults);
   });
 });

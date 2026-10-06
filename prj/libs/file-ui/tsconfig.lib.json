@@ -1,0 +1,17 @@
+/* The library as ng-packagr builds it (`pnpm --filter @tr-file/file-ui build`):
+   against `@tr-file/ui` as *built* (`libs/ui/dist`, so build that first —
+   `pnpm build:libs` does), the way a consumer of both packages sees it. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "inlineSources": true,
+    "types": [],
+    "paths": {
+      "@tr-file/ui": ["../ui/dist"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/test-setup.ts", "src/testing/**"]
+}

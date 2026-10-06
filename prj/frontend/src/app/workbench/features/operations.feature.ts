@@ -1,5 +1,6 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
-import type { UiProgressDialogModel, UiTransfer } from '@tr-file/ui';
+import type { UiProgressDialogModel } from '@tr-file/ui';
+import type { UiTransfer } from '@tr-file/file-ui';
 import type {
   FsConflictPolicy,
   FsOperationDecision,
