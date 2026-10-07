@@ -383,9 +383,15 @@ a drive. Bridge commands: `du-start`, `du-status` (`scanId`), `du-cancel`;
 
 ## `/api/processes` — Task Manager (PRD 014, §1)
 
-The machine's processes, measured every 2 seconds from the moment the backend
-starts (`modules/processes`, `ProcessesService`), whether anyone asks or not;
-the last 10 minutes (300 samples) are kept — the machine's CPU (as a whole and
+The machine's processes, measured from the moment the backend starts
+(`modules/processes`, `ProcessesService`), whether anyone asks or not — every
+2 seconds while someone watches, every 10 while no one does (PRD 014, §4.1). A
+client asking (`/api/processes`, `/history`, or the bridge's `proc-list` /
+`proc-history`) *is* watching, for 5 s (`PROCESS_WATCH_LEASE_MS`); the frontend
+asks every 2 s only while Task Manager is shown, not paused, in a window that is
+not hidden or minimised. Coming from the idle pace, an ask brings the next sample
+forward to at once. The last 10 minutes by the clock are kept (up to 300
+samples), each with when it was taken (`times`) — the machine's CPU (as a whole and
 per logical processor), memory, disk (read and written apart) and each network
 adapter's send and receive (PRD 014, §2.1), and each running process's CPU,
 memory and disk, dropped when it ends. **Off in production unless

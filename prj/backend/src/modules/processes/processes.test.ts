@@ -4,12 +4,21 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { after, describe, it, mock } from 'node:test';
 
 import { App } from '../../app.js';
 import { AppConfig } from '../../config/index.js';
 import { Logger } from '../../core/index.js';
-import { PROCESS_HISTORY_SAMPLES, type ProcessSource, type RawAdapter, type RawProcess } from './processes.model.js';
+import {
+  PROCESS_HISTORY_MS,
+  PROCESS_HISTORY_SAMPLES,
+  PROCESS_IDLE_SAMPLE_MS,
+  PROCESS_SAMPLE_MS,
+  PROCESS_WATCH_LEASE_MS,
+  type ProcessSource,
+  type RawAdapter,
+  type RawProcess,
+} from './processes.model.js';
 import { ProcessesService } from './processes.service.js';
 import { LinuxProcessSource } from './sources/linux-process-source.js';
 
@@ -164,6 +173,83 @@ describe('ProcessesService', () => {
     source.network = [{ name: 'eth0', received: 5000, sent: 2000 }];
     await service.sample();
     assert.deepEqual(Object.keys(service.historyOf([]).totals.network), ['eth0']);
+  });
+
+  it('measures every 10 s while no one watches, every 2 s while a client asks, and at once when one starts to (§4.1)', async () => {
+    const source = new FakeSource();
+    let samples = 0;
+    source.sample = async () => {
+      samples += 1;
+      return [raw(70)];
+    };
+    mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_000_000 });
+    const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
+    const advance = async (ms: number) => {
+      for (let step = 0; step < ms; step += 500) {
+        mock.timers.tick(500);
+        await settle();
+      }
+    };
+    const service = new ProcessesService(logger, { enabled: true, canEnd: false, source });
+    try {
+      service.start();
+      mock.timers.tick(0);
+      await settle();
+      assert.equal(samples, 1);
+      assert.equal(service.currentIntervalMs, PROCESS_IDLE_SAMPLE_MS);
+      await advance(PROCESS_IDLE_SAMPLE_MS);
+      assert.equal(samples, 2);
+
+      // A client asks: it is sampled at once, then every two seconds.
+      await advance(3000);
+      assert.equal(service.snapshot().intervalMs, PROCESS_SAMPLE_MS);
+      mock.timers.tick(0);
+      await settle();
+      assert.equal(samples, 3);
+      for (let poll = 0; poll < 3; poll += 1) {
+        await advance(PROCESS_SAMPLE_MS);
+        service.snapshot();
+      }
+      assert.equal(samples, 6);
+
+      // No one asks any more: back to ten seconds once the lease is over.
+      await advance(PROCESS_WATCH_LEASE_MS + PROCESS_SAMPLE_MS);
+      const before = samples;
+      await advance(PROCESS_IDLE_SAMPLE_MS - 1000);
+      assert.equal(service.currentIntervalMs, PROCESS_IDLE_SAMPLE_MS);
+      assert.ok(samples - before <= 1);
+
+      // Each sample says when it was taken, oldest first.
+      const history = service.historyOf(['70:1000070']);
+      assert.equal(history.times.length, samples);
+      assert.ok(history.times.every((time, index) => index === 0 || time > (history.times[index - 1] ?? 0)));
+      assert.equal(history.processes['70:1000070']?.cpu.length, samples);
+    } finally {
+      service.close();
+      mock.timers.reset();
+    }
+  });
+
+  it('keeps ten minutes by the clock, however far apart the samples were', async () => {
+    const source = new FakeSource();
+    source.processes = [raw(80)];
+    const service = new ProcessesService(logger, { enabled: true, canEnd: false, source });
+    const realNow = Date.now;
+    let now = 5_000_000;
+    Date.now = () => now;
+    try {
+      // Twenty minutes at the idle pace.
+      for (let sample = 0; sample < 120; sample += 1) {
+        await service.sample();
+        now += PROCESS_IDLE_SAMPLE_MS;
+      }
+      const history = service.historyOf(['80:1000080']);
+      assert.equal(history.times.length, PROCESS_HISTORY_MS / PROCESS_IDLE_SAMPLE_MS);
+      assert.equal(history.totals.cpu.length, history.times.length);
+      assert.equal(history.processes['80:1000080']?.memory.length, history.times.length);
+    } finally {
+      Date.now = realNow;
+    }
   });
 
   it('ends a process by its key, and a tree youngest first — asking first, then making it', async () => {

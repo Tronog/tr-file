@@ -11,6 +11,12 @@ export type UiPerfHue = 'blue' | 'purple' | 'green' | 'orange';
 export interface UiPerfSeries {
   readonly label: string;
   readonly values: readonly (number | null)[];
+  /**
+   * Where each value stands across the graph, `0` the left edge and `1` the
+   * right — for samples taken unevenly (PRD 014, §4.1: two seconds apart
+   * while watched, ten while not). Spread evenly when left out.
+   */
+  readonly x?: readonly number[];
   /** Drawn dashed, as Task Manager draws a second line (write, send). */
   readonly dashed?: boolean;
 }

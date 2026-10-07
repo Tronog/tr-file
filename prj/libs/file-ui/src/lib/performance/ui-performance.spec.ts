@@ -44,6 +44,8 @@ describe('UiPerformance', () => {
     expect(linePath({ label: 'x', values: [null, 0, 1] })).toBe('M50 100 L100 0');
     expect(linePath({ label: 'x', values: [0.5, null, 0.5] })).toBe('M0 50 M100 50');
     expect(areaPath({ label: 'x', values: [0, 1] })).toBe('M0 100 L0 100 L100 0 L100 100 Z');
+    // Placed by when each was taken (PRD 014, §4.1).
+    expect(linePath({ label: 'x', values: [0, 1], x: [0.75, 1] })).toBe('M75 100 L100 0');
   });
 
   it('lists the resources with their load, and draws the one chosen with its numbers', () => {

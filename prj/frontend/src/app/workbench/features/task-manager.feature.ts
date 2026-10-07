@@ -1,4 +1,4 @@
-import { DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { DOCUMENT, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { UiPerfSpan, UiPerformanceModel, UiProcessListModel, UiProcessMenuRequest } from '@tr-file/file-ui';
 import type { UiStatusItem } from '@tr-file/ui';
 import type { FsProcess, FsProcessesHistory, FsProcessesSnapshot } from '../../file-system/file-system.model';
@@ -20,7 +20,11 @@ export type TaskManagerView = 'processes' | 'graph';
 /** Where the columns and the order are remembered. */
 export const TASK_MANAGER_KEY = 'tr-file.task-manager.v1';
 
-/** How often the list is asked for again: the backend measures every two seconds (PRD 014, §1). */
+/**
+ * How often the list is asked for again while shown: the backend measures
+ * every two seconds while a client asks this often, and every ten while none
+ * does (PRD 014, §4.1).
+ */
 export const TASK_MANAGER_POLL_MS = 2000;
 
 /** After a failed ask, how long before the next. */
@@ -84,6 +88,8 @@ export class TaskManagerFeature {
   readonly filterFocus = signal(0);
 
   private readonly running = signal(false);
+  /** The window is on screen: not minimised, not a background tab (§4.1). */
+  private readonly visible = signal(true);
   private timer: ReturnType<typeof setTimeout> | null = null;
   private asking = false;
   /** Processes being ended, so a second press does not end them twice. */
@@ -108,13 +114,25 @@ export class TaskManagerFeature {
       this.cpuView.set(remembered.cpuView);
     }
 
-    // Asked while shown and not paused; nothing otherwise — the backend keeps measuring either way.
+    // A hidden or minimised window asks nothing, so the backend slows to its idle pace (§4.1).
+    const document = inject(DOCUMENT);
+    const onVisibility = () => this.visible.set(document.visibilityState !== 'hidden');
+    onVisibility();
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // Asked while shown, on screen and not paused; nothing otherwise — the backend keeps measuring either way.
     effect(() => {
-      const wanted = this.running() && this.parent.subAppsFt.isActive('task-manager') && !this.paused();
+      const wanted = this.wanted();
       untracked(() => (wanted ? this.poll() : this.stopPolling()));
     });
-    inject(DestroyRef).onDestroy(() => this.stop());
+    inject(DestroyRef).onDestroy(() => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      this.stop();
+    });
   }
+
+  /** Whether to ask: started, Task Manager the sub-application shown, the window on screen, and not paused. */
+  private readonly wanted = computed(() => this.running() && this.parent.subAppsFt.isActive('task-manager') && this.visible() && !this.paused());
 
   /** Starts following the sub-application; the workbench component calls it, so a service built for a test asks nothing. */
   start(): void {
@@ -496,14 +514,15 @@ export class TaskManagerFeature {
         }
       }
       this.failure.set(null);
-      delay = snapshot.intervalMs > 0 ? snapshot.intervalMs : TASK_MANAGER_POLL_MS;
+      // Every two seconds whatever pace the backend says it is at: asking is what keeps it at the fast one.
+      delay = TASK_MANAGER_POLL_MS;
     } catch (error) {
       this.failure.set(FsError.from(error).message);
       delay = RETRY_MS;
     } finally {
       this.asking = false;
     }
-    if (this.running() && this.parent.subAppsFt.isActive('task-manager') && !this.paused()) {
+    if (this.wanted()) {
       this.timer = setTimeout(() => void this.poll(), delay);
     }
   }

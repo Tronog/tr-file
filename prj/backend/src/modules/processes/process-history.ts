@@ -31,13 +31,14 @@ export class SampleRing {
     this.length = Math.min(this.length + 1, this.capacity);
   }
 
-  /** Oldest first. */
-  series(): ProcessSeriesDto {
+  /** Oldest first; with `last`, only that many of the newest. */
+  series(last = this.length): ProcessSeriesDto {
     const cpu: number[] = [];
     const memory: number[] = [];
     const disk: (number | null)[] = [];
-    const start = (this.next - this.length + this.capacity) % this.capacity;
-    for (let index = 0; index < this.length; index += 1) {
+    const count = Math.min(this.length, Math.max(0, last));
+    const start = (this.next - count + this.capacity) % this.capacity;
+    for (let index = 0; index < count; index += 1) {
       const at = (start + index) % this.capacity;
       cpu.push(Math.round((this.cpu[at] ?? 0) * 10) / 10);
       memory.push(this.memory[at] ?? 0);
@@ -64,12 +65,13 @@ export class ValueRing {
     this.length = Math.min(this.length + 1, this.capacity);
   }
 
-  /** Oldest first, rounded to `decimals`. */
-  series(decimals = 0): (number | null)[] {
+  /** Oldest first, rounded to `decimals`; with `last`, only that many of the newest. */
+  series(decimals = 0, last = this.length): (number | null)[] {
     const scale = 10 ** decimals;
     const out: (number | null)[] = [];
-    const start = (this.next - this.length + this.capacity) % this.capacity;
-    for (let index = 0; index < this.length; index += 1) {
+    const count = Math.min(this.length, Math.max(0, last));
+    const start = (this.next - count + this.capacity) % this.capacity;
+    for (let index = 0; index < count; index += 1) {
       const value = this.values[(start + index) % this.capacity] ?? Number.NaN;
       out.push(Number.isNaN(value) ? null : Math.round(value * scale) / scale);
     }
@@ -77,7 +79,7 @@ export class ValueRing {
   }
 
   /** Oldest first, a value never seen as `0`. */
-  numbers(decimals = 0): number[] {
-    return this.series(decimals).map((value) => value ?? 0);
+  numbers(decimals = 0, last?: number): number[] {
+    return this.series(decimals, last).map((value) => value ?? 0);
   }
 }

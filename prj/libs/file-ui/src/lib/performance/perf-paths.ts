@@ -3,8 +3,12 @@ import type { UiPerfSeries } from '../models';
 /** A graph is drawn in a 100 × 100 box, stretched to fit: x across time, y up from the bottom. */
 export const PERF_BOX = 100;
 
-/** The points of a series in the box, oldest at the left and the newest at the right edge; `null` breaks the line. */
-function runs(values: readonly (number | null)[]): { x: number; y: number }[][] {
+/**
+ * The points of a series in the box, oldest at the left and the newest at the
+ * right edge — or where its `x` puts them; `null` breaks the line.
+ */
+function runs(series: UiPerfSeries): { x: number; y: number }[][] {
+  const { values } = series;
   const out: { x: number; y: number }[][] = [];
   let run: { x: number; y: number }[] = [];
   const last = Math.max(1, values.length - 1);
@@ -16,7 +20,7 @@ function runs(values: readonly (number | null)[]): { x: number; y: number }[][] 
       }
       return;
     }
-    run.push({ x: (index / last) * PERF_BOX, y: PERF_BOX - Math.max(0, Math.min(1, value)) * PERF_BOX });
+    run.push({ x: (series.x?.[index] ?? index / last) * PERF_BOX, y: PERF_BOX - Math.max(0, Math.min(1, value)) * PERF_BOX });
   });
   if (run.length > 0) {
     out.push(run);
@@ -28,14 +32,14 @@ const fixed = (value: number): string => (Math.round(value * 100) / 100).toStrin
 
 /** The SVG path of a series' line. */
 export function linePath(series: UiPerfSeries): string {
-  return runs(series.values)
+  return runs(series)
     .map((run) => run.map((point, index) => `${index === 0 ? 'M' : 'L'}${fixed(point.x)} ${fixed(point.y)}`).join(' '))
     .join(' ');
 }
 
 /** The SVG path of the area under a series, down to the bottom — Task Manager fills under its first line. */
 export function areaPath(series: UiPerfSeries): string {
-  return runs(series.values)
+  return runs(series)
     .map((run) => {
       const first = run[0];
       const last = run.at(-1);

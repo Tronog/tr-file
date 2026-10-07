@@ -236,6 +236,8 @@ describe('TaskManagerFeature', () => {
     const history = vi.spyOn(workbench.fileSystem.processesFt, 'history').mockResolvedValue({
       intervalMs: TASK_MANAGER_POLL_MS,
       at: null,
+      // Ten seconds apart while no one watched, then two (§4.1).
+      times: [1_000_000, 1_010_000],
       totals: {
         cpu: [10, 50],
         memory: [2 ** 30, 2 * 2 ** 30],
@@ -265,16 +267,14 @@ describe('TaskManagerFeature', () => {
       ['disk', 'Disk', 'R: 0 KB/s  W: 0 KB/s'],
       ['net:eth0', 'Ethernet', 'S: 8 Kbps  R: 1.0 Mbps'],
     ]);
-    // Sixty seconds of two-second samples, the two measured at the right.
-    const cpu = graph.page?.graphs[0]?.series[0]?.values ?? [];
-    expect(cpu).toHaveLength(30);
-    expect(cpu.slice(-3)).toEqual([null, 0.1, 0.5]);
+    // Each sample where it was taken in the last sixty seconds, the newest at the right edge.
+    expect(graph.page?.graphs[0]?.series[0]).toMatchObject({ values: [0.1, 0.5], x: [50 / 60, 1] });
     expect(graph.page?.stats.find((stat) => stat.label === 'Up time')?.value).toBe('1:01:01:01');
 
     tm().setCpuView('logical');
     expect(tm().performance().page?.graphs.map((one) => one.label)).toEqual(['CPU 0', 'CPU 1']);
     tm().setSpan('10m');
-    expect(tm().performance().page?.graphs[0]?.series[0]?.values).toHaveLength(300);
+    expect(tm().performance().page?.graphs[0]?.series[0]?.x).toEqual([590 / 600, 1]);
 
     tm().selectResource('net:eth0');
     const network = tm().performance().page;
@@ -288,6 +288,26 @@ describe('TaskManagerFeature', () => {
     await vi.advanceTimersByTimeAsync(TASK_MANAGER_POLL_MS);
     expect(history).toHaveBeenCalledTimes(1);
     expect(JSON.parse(localStorage.getItem(TASK_MANAGER_KEY) ?? 'null')).toMatchObject({ view: 'processes', span: '10m', cpuView: 'logical' });
+  });
+
+  it('asks every two seconds while shown, and nothing while the window is hidden or minimised (§4.1)', async () => {
+    const list = answer(snapshot([process(1)], { intervalMs: 10_000 }));
+    await open();
+    // Whatever pace the backend says it is at, asking every two seconds is what keeps it fast.
+    await vi.advanceTimersByTimeAsync(TASK_MANAGER_POLL_MS * 2);
+    expect(list).toHaveBeenCalledTimes(3);
+
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    TestBed.tick();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(list).toHaveBeenCalledTimes(3);
+
+    hidden.mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    TestBed.tick();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(list).toHaveBeenCalledTimes(4);
   });
 
   it('keeps the group selected when it is closed over the process selected in it', async () => {

@@ -1,15 +1,28 @@
 /**
  * The processes of the backend machine (PRD 014, §1) — what Windows 10's Task
  * Manager shows on its *Processes* tab: each process's CPU, memory and disk,
- * sampled every `PROCESS_SAMPLE_MS` on the backend, and the last ten minutes
- * of it kept.
+ * sampled on the backend every `PROCESS_SAMPLE_MS` while someone watches
+ * and every `PROCESS_IDLE_SAMPLE_MS` while no one does (§4.1), and the last
+ * ten minutes of it kept.
  */
 
-/** How often the processes are measured. */
+/** How often the processes are measured while Task Manager is shown somewhere (PRD 014, §4.1). */
 export const PROCESS_SAMPLE_MS = 2000;
 
-/** How many samples are kept: ten minutes of them. */
-export const PROCESS_HISTORY_SAMPLES = 300;
+/** How often while it is not: no client watching, or its window hidden or minimised. */
+export const PROCESS_IDLE_SAMPLE_MS = 10_000;
+
+/**
+ * How long a client's ask counts as watching: a little over two of its
+ * two-second polls, so one slow answer does not drop the pace.
+ */
+export const PROCESS_WATCH_LEASE_MS = 5000;
+
+/** How far back the history reaches. */
+export const PROCESS_HISTORY_MS = 10 * 60 * 1000;
+
+/** How many samples are kept: ten minutes of them at the faster pace. */
+export const PROCESS_HISTORY_SAMPLES = PROCESS_HISTORY_MS / PROCESS_SAMPLE_MS;
 
 /**
  * Task Manager's three headings: *Apps* (a process with a window of its own —
@@ -114,6 +127,7 @@ export interface ProcessesSnapshotDto extends ProcessesInfoDto {
   readonly sequence: number;
   /** When it was taken, ISO 8601; `null` before the first. */
   readonly at: string | null;
+  /** How often it is measured now: `PROCESS_SAMPLE_MS` while watched, `PROCESS_IDLE_SAMPLE_MS` otherwise. */
   readonly intervalMs: number;
   readonly platform: NodeJS.Platform;
   readonly cpuCount: number;
@@ -122,7 +136,7 @@ export interface ProcessesSnapshotDto extends ProcessesInfoDto {
   readonly processes: readonly ProcessDto[];
 }
 
-/** A series of samples, oldest first, one every `intervalMs`, ending at the latest. */
+/** A series of samples, oldest first, ending at the latest — each value taken at the matching one of the last of `times`. */
 export interface ProcessSeriesDto {
   readonly cpu: readonly number[];
   readonly memory: readonly number[];
@@ -137,6 +151,13 @@ export interface ProcessesHistoryDto {
   readonly intervalMs: number;
   /** When the last of them was taken. */
   readonly at: string | null;
+  /**
+   * When each sample of the last ten minutes was taken, ms since the epoch,
+   * oldest first — two seconds apart while watched, ten while not (§4.1). A
+   * series shorter than this (a process started since, an adapter come up)
+   * matches its end.
+   */
+  readonly times: readonly number[];
   readonly totals: ProcessSeriesDto & {
     readonly memoryTotal: number;
     readonly diskRead: readonly (number | null)[];

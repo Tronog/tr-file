@@ -656,6 +656,8 @@ export interface FsProcessSeries {
 export interface FsProcessesHistory {
   readonly intervalMs: number;
   readonly at: string | null;
+  /** When each sample was taken, ms since the epoch, oldest first; a shorter series matches its end (PRD 014, §4.1). */
+  readonly times: readonly number[];
   readonly totals: FsProcessSeries & {
     readonly memoryTotal: number;
     readonly diskRead: readonly (number | null)[];

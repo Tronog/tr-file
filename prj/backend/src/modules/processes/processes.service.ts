@@ -3,8 +3,11 @@ import { cpus, freemem, hostname, totalmem, uptime } from 'node:os';
 import { HttpError, type Logger } from '../../core/index.js';
 import { SampleRing, ValueRing } from './process-history.js';
 import {
+  PROCESS_HISTORY_MS,
   PROCESS_HISTORY_SAMPLES,
+  PROCESS_IDLE_SAMPLE_MS,
   PROCESS_SAMPLE_MS,
+  PROCESS_WATCH_LEASE_MS,
   type ProcessDto,
   type ProcessEndRequest,
   type ProcessEndResultDto,
@@ -36,7 +39,9 @@ export interface ProcessesServiceOptions {
   readonly canEnd: boolean;
   /** Stands in for the machine in tests. */
   readonly source?: ProcessSource;
+  /** The pace while watched, and while not (PRD 014, §4.1). */
   readonly intervalMs?: number;
+  readonly idleIntervalMs?: number;
   /** Ends a process; `process.kill` but in tests. */
   readonly kill?: (pid: number, signal: NodeJS.Signals | 0) => void;
 }
@@ -75,9 +80,11 @@ const sum = (values: readonly (number | null)[]): number | null =>
 const keyOf = (raw: RawProcess): string => `${raw.pid}:${raw.started === null ? 0 : Math.round(raw.started)}`;
 
 /**
- * The backend machine's processes (PRD 014, §1): measured every
- * `PROCESS_SAMPLE_MS` from the moment the backend starts, whether anyone is
- * looking or not, and the last ten minutes kept — the machine's CPU, memory
+ * The backend machine's processes (PRD 014, §1): measured from the moment the
+ * backend starts, whether anyone is looking or not — every `PROCESS_SAMPLE_MS`
+ * while a client asks (Task Manager shown in a visible window), every
+ * `PROCESS_IDLE_SAMPLE_MS` while none does (§4.1) — and the last ten minutes
+ * kept — the machine's CPU, memory
  * and disk, and each running process's — so whoever opens Task Manager sees
  * where things have been, not only where they are.
  *
@@ -94,8 +101,16 @@ const keyOf = (raw: RawProcess): string => `${raw.pid}:${raw.started === null ? 
 export class ProcessesService {
   private readonly source: ProcessSource | null;
   private readonly intervalMs: number;
+  private readonly idleIntervalMs: number;
+  /** When a client last asked: a client asking is one watching (PRD 014, §4.1). */
+  private watchedAt = Number.NEGATIVE_INFINITY;
+  /** When the next sample is due, while the timer runs. */
+  private dueAt: number | null = null;
+  /** When each kept sample was taken. */
+  private readonly times = new ValueRing(PROCESS_HISTORY_SAMPLES);
   private readonly kill: (pid: number, signal: NodeJS.Signals | 0) => void;
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private started = false;
   private busy = false;
 
   private sequence = 0;
@@ -137,6 +152,7 @@ export class ProcessesService {
   ) {
     this.source = options.enabled ? (options.source ?? ProcessesService.sourceFor(process.platform, logger)) : null;
     this.intervalMs = options.intervalMs ?? PROCESS_SAMPLE_MS;
+    this.idleIntervalMs = options.idleIntervalMs ?? PROCESS_IDLE_SAMPLE_MS;
     this.kill = options.kill ?? ((pid, signal) => process.kill(pid, signal));
   }
 
@@ -152,23 +168,69 @@ export class ProcessesService {
     }
   }
 
-  /** Starts measuring, now and every interval after; nothing when switched off. */
+  /**
+   * Starts measuring, now and then at the pace of the moment (PRD 014,
+   * §4.1): every `intervalMs` while someone watches, every `idleIntervalMs`
+   * while no one does. Nothing when switched off.
+   */
   start(): void {
-    if (this.source === null || this.timer !== null) {
+    if (this.source === null || this.started) {
       return;
     }
-    void this.sample();
-    this.timer = setInterval(() => void this.sample(), this.intervalMs);
+    this.started = true;
+    this.schedule(0);
+  }
+
+  close(): void {
+    this.started = false;
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.dueAt = null;
+    this.source?.close();
+  }
+
+  /** Whether a client asked within the lease: Task Manager is shown, in a window that is not hidden. */
+  get watched(): boolean {
+    return Date.now() - this.watchedAt < PROCESS_WATCH_LEASE_MS;
+  }
+
+  /** How often the processes are measured now. */
+  get currentIntervalMs(): number {
+    return this.watched ? this.intervalMs : this.idleIntervalMs;
+  }
+
+  /**
+   * A client asked: someone is watching. Coming from the idle pace, the next
+   * sample is taken at once rather than up to ten seconds later, and the
+   * fast pace follows.
+   */
+  private watch(): void {
+    const wasWatched = this.watched;
+    this.watchedAt = Date.now();
+    if (!wasWatched && this.started && this.dueAt !== null && this.dueAt - Date.now() > this.intervalMs) {
+      this.schedule(0);
+    }
+  }
+
+  private schedule(delay: number): void {
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+    }
+    this.dueAt = Date.now() + delay;
+    this.timer = setTimeout(() => void this.tick(), delay);
     // Measuring never keeps the backend alive on its own.
     this.timer.unref();
   }
 
-  close(): void {
-    if (this.timer !== null) {
-      clearInterval(this.timer);
-      this.timer = null;
+  private async tick(): Promise<void> {
+    this.timer = null;
+    this.dueAt = null;
+    await this.sample();
+    if (this.started && this.timer === null) {
+      this.schedule(this.currentIntervalMs);
     }
-    this.source?.close();
   }
 
   info(): ProcessesInfoDto {
@@ -186,13 +248,14 @@ export class ProcessesService {
     };
   }
 
-  /** The latest sample. */
+  /** The latest sample; asking is watching (§4.1). */
   snapshot(): ProcessesSnapshotDto {
+    this.watch();
     return {
       ...this.info(),
       sequence: this.sequence,
       at: this.at === null ? null : new Date(this.at).toISOString(),
-      intervalMs: this.intervalMs,
+      intervalMs: this.currentIntervalMs,
       platform: process.platform,
       cpuCount: Math.max(1, cpus().length),
       totals: this.totals,
@@ -203,29 +266,35 @@ export class ProcessesService {
 
   /** The machine's last ten minutes, and those of each process named that is still running. */
   historyOf(keys: readonly string[]): ProcessesHistoryDto {
+    this.watch();
+    // Ten minutes, by the clock: at the idle pace the rings hold longer than that.
+    const since = (this.at ?? Date.now()) - PROCESS_HISTORY_MS;
+    const times = this.times.numbers().filter((time) => time > since);
+    const last = times.length;
     const processes: Record<string, ReturnType<SampleRing['series']>> = {};
     for (const key of keys) {
       const ring = this.history.get(key);
       if (ring !== undefined) {
-        processes[key] = ring.series();
+        processes[key] = ring.series(last);
       }
     }
     const machine = this.machine;
     const network: Record<string, { send: number[]; receive: number[] }> = {};
     for (const [name, rings] of machine.network) {
-      network[name] = { send: rings.send.numbers(), receive: rings.receive.numbers() };
+      network[name] = { send: rings.send.numbers(0, last), receive: rings.receive.numbers(0, last) };
     }
     return {
-      intervalMs: this.intervalMs,
+      intervalMs: this.currentIntervalMs,
       at: this.at === null ? null : new Date(this.at).toISOString(),
+      times,
       totals: {
-        cpu: machine.cpu.numbers(1),
-        memory: machine.memory.numbers(),
-        disk: machine.disk.series(),
-        diskRead: machine.diskRead.series(),
-        diskWrite: machine.diskWrite.series(),
+        cpu: machine.cpu.numbers(1, last),
+        memory: machine.memory.numbers(0, last),
+        disk: machine.disk.series(0, last),
+        diskRead: machine.diskRead.series(0, last),
+        diskWrite: machine.diskWrite.series(0, last),
         memoryTotal: this.totals.memoryTotal,
-        cores: machine.cores.map((ring) => ring.numbers(1)),
+        cores: machine.cores.map((ring) => ring.numbers(1, last)),
         network,
       },
       processes,
@@ -416,6 +485,7 @@ export class ProcessesService {
     };
 
     const machine = this.machine;
+    this.times.push(now);
     machine.cpu.push(overall);
     machine.memory.push(used);
     machine.disk.push(disk);
