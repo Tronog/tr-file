@@ -9,6 +9,7 @@ const SHORT_LABELS: Readonly<Record<string, (parent: WorkbenchService) => string
   'file.rename': () => 'Rename',
   'file.open': () => 'View',
   'file.openExternal': (p) => (p.fileSystem.systemFt.opensInApps ? 'Edit' : 'Open'),
+  'file.edit': () => 'Edit',
   'file.copyTo': () => 'Copy',
   'file.moveTo': () => 'Move',
   'file.newFolder': () => 'MkDir',
@@ -35,7 +36,7 @@ const FUNCTION_KEYS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F1
  * | `F1` | help — the cheatsheet (PRD 001, §16) | Help |
  * | `F2` | rename (VS Code's `F2`) | the user menu |
  * | `F3` | view — open read-only | View |
- * | `F4` | edit — the default app (a browser tab in a browser) | Edit |
+ * | `F4` | edit — the built-in editor (PRD 005, §4); what it cannot edit, the default app | Edit |
  * | `F5` | copy, to the other panel's folder | Copy |
  * | `F6` | move, to the other panel's folder | RenMov |
  * | `F7` | new folder | Mkdir |

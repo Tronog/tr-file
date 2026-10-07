@@ -8,6 +8,7 @@ import { after, before, describe, it } from 'node:test';
 import { App } from '../../app.js';
 import { AppConfig } from '../../config/index.js';
 import { Logger } from '../../core/index.js';
+import { contentTag } from './content-tag.js';
 
 /** Small enough that a single short string trips the limit. */
 const UPLOAD_LIMIT = 32;
@@ -289,6 +290,33 @@ describe('GET /api/fs/download?inline=true', () => {
       await response.arrayBuffer();
       assert.match(response.headers.get('content-disposition') ?? '', /^attachment;/, inline);
     }
+  });
+});
+
+/** PRD 005, §4 — the editor's Save: the raw body over the file. */
+describe('POST /api/fs/write', () => {
+  const write = (query: string, body: string, csrf = true): Promise<Response> =>
+    fetch(`${base}/write?${query}`, {
+      method: 'POST',
+      body,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', ...(csrf ? { 'X-TR-File-Request': '1' } : {}) },
+    });
+
+  it('writes the bytes, and refuses with 409 CHANGED once the file is not what was read', async () => {
+    await writeFile(join(root, 'edited.txt'), 'old');
+    const response = await write(`path=edited.txt&expected=${encodeURIComponent(contentTag(new TextEncoder().encode('old')))}`, 'nëw');
+    assert.equal(response.status, 200);
+    assert.equal(((await response.json()) as { data: { size: number } }).data.size, 4);
+    assert.equal(await readFile(join(root, 'edited.txt'), 'utf8'), 'nëw');
+
+    const stale = await write(`path=edited.txt&expected=${encodeURIComponent(contentTag(new TextEncoder().encode('old')))}`, 'again');
+    assert.equal(stale.status, 409);
+    assert.equal(await errorCodeOf(stale), 'CHANGED');
+  });
+
+  it('needs the CSRF header', async () => {
+    assert.equal((await write('path=edited.txt', 'sneaky', false)).status, 403);
+    assert.equal(await readFile(join(root, 'edited.txt'), 'utf8'), 'nëw');
   });
 });
 

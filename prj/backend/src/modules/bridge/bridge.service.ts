@@ -333,6 +333,8 @@ export class FileSystemBridge {
         return (await this.files.createFolder(request.path, request.name)).toJSON();
       case 'create-file':
         return (await this.files.createFile(request.path, request.name)).toJSON();
+      case 'write':
+        return (await this.files.writeFile(request.path, request.content, request.expected)).toJSON();
       case 'search':
         return (await this.files.search(request.path, request.query, request.limit)).toJSON();
       case 'watch':
@@ -749,6 +751,18 @@ export class FileSystemBridge {
           path: FileSystemBridge.readString(value, 'path'),
           name: FileSystemBridge.readString(value, 'name'),
         };
+      case 'write': {
+        const expected = (value as { expected?: unknown }).expected;
+        if (expected !== undefined && typeof expected !== 'string') {
+          throw HttpError.badRequest('Bridge request field "expected" must be a string');
+        }
+        return {
+          command,
+          path: FileSystemBridge.readString(value, 'path'),
+          content: FileSystemBridge.readContent(value),
+          ...(expected === undefined ? {} : { expected }),
+        };
+      }
       case 'search': {
         const limit = FileSystemBridge.readOptionalCount(value, 'limit');
         return {

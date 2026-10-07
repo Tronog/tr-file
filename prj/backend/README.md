@@ -97,6 +97,7 @@ const response = await app.bridge.dispatch({ command: 'list', path: 'docs' });
 | `logout` | — | signs this connection out |
 | `rename` | `path`, `to` | the entry at `to` — as `POST /api/fs/rename` |
 | `mkdir`, `create-file` | `path`, `name` | the new folder / empty file — as `POST /api/fs/mkdir` / `create` |
+| `write` | `path`, `content` (`Uint8Array`), `expected?` | the file's details — as `POST /api/fs/write` |
 | `search` | `path`, `query`, `limit?` | `GET /api/fs/search`'s answer |
 | `host-paths` | `paths` | `GET /api/fs/host-paths`'s answer |
 | `watch` | `watchId` (string or `null`), `paths` | `{ watchId, changed }` — as `POST /api/fs/watch` |
@@ -165,6 +166,7 @@ path reaches the file system.
 | POST | `/api/fs/rename` | JSON `{ path, to }`; `to` is the full new path. `200`, the entry's details |
 | POST | `/api/fs/mkdir` | JSON `{ path, name }`: an empty folder in `path`. `201`, its details |
 | POST | `/api/fs/create` | JSON `{ path, name }`: an empty file in `path`. `201`, its details |
+| POST | `/api/fs/write?path=&expected=` | The raw body (at most 16 MiB) as the whole content of an existing regular file — the editor's *Save* (PRD 005, §4). Written through a link to what it leads to; atomically by a sibling temporary file renamed over it, with the file's mode, except for a file with other hard links, one owned by another user, or where that cannot be done — then in place. `expected` is the `contentTag` (`files/content-tag.ts`) of what was read: a file that holds something else now is not written, `409` `CHANGED`. `200`, its details |
 | GET | `/api/fs/host-paths?path=a&path=b` | `{ paths }`: each entry's full path on the server's disk, in the host's own form — what *Copy Path* copies (PRD 004, §1.3.2). Worked out from the path, so an entry that is not there has one too; outside the root is `403` |
 | GET | `/api/fs/search?path=&query=&limit=` | `{ path, query, entries, truncated, scanned }`: entries named like `query` beneath `path` |
 | POST | `/api/fs/watch` | JSON `{ watchId, paths }` → `{ watchId, changed }`: which of those folders changed since the last call |
@@ -180,6 +182,7 @@ Successful JSON responses are `{ "data": … }`; errors are
 | 429 | `TOO_MANY_REQUESTS` | Too many failed sign-ins |
 | 403 | `FORBIDDEN` | Path escapes `FILES_ROOT`, reaches into the server's trash, or the OS denies access |
 | 404 | `NOT_FOUND` | No such path |
+| 409 | `CHANGED` | `POST /api/fs/write` whose `expected` is not what the file holds now — it was changed since it was read |
 | 409 | `CONFLICT` | Upload target exists and `overwrite` is not `true`; a rename, new folder or new file onto a taken name; a copy or move with `conflict: 'fail'` onto taken names (`details.conflicts`) |
 | 413 | `PAYLOAD_TOO_LARGE` | Upload exceeds `UPLOAD_MAX_BYTES` |
 | 500 | `INTERNAL_ERROR` | Anything else |

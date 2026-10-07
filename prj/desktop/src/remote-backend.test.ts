@@ -277,6 +277,20 @@ describe('RemoteBackend commands', () => {
     assert.equal(errorOf(await remote.dispatch({ command: 'rename', path: 'made/old.txt' })).code, 'BAD_REQUEST');
   });
 
+  it('writes a file over /api/fs/write, refusing one changed since it was read (PRD 005, §4)', async () => {
+    const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
+    // `contentTag` of an empty file — what `made/old.txt` holds.
+    const empty = '0:488bdcb81aee8d83';
+    const written = dataOf<{ size: number }>(
+      await remote.dispatch({ command: 'write', path: 'made/old.txt', content: encode('remote ëdit'), expected: empty }),
+    );
+    assert.equal(written.size, 12);
+    assert.equal(await readFile(join(root, 'made', 'old.txt'), 'utf8'), 'remote ëdit');
+
+    const stale = errorOf(await remote.dispatch({ command: 'write', path: 'made/old.txt', content: encode('lost'), expected: empty }));
+    assert.deepEqual([stale.code, stale.status], ['CHANGED', 409]);
+  });
+
   it('searches, passing the limit through', async () => {
     const found = dataOf<{ query: string; entries: { path: string }[]; truncated: boolean }>(
       await remote.dispatch({ command: 'search', path: '', query: 'old*' }),

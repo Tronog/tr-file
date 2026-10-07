@@ -202,6 +202,30 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
         enabled: one,
         run: (t) => p.systemOpenFt.open(t.paths[0] as string),
       },
+      // The editor (PRD 005, §4–5): the active panel's file, or the one the cursor is on (`F4`).
+      {
+        id: 'file.edit',
+        category: 'File',
+        label: () => (this.editedFile() !== null ? 'Stop Editing' : 'Edit'),
+        enabled: (t) => this.editedFile() !== null || this.fileTabPath(t.groupId) !== null || this.isFilePath(t.paths),
+        run: (t) => p.fileEditorFt.toggle(t.groupId, this.fileTabPath(t.groupId) === null ? t.paths[0] : undefined),
+      },
+      {
+        id: 'file.save',
+        category: 'File',
+        label: 'Save',
+        enabled: () => this.editedFile() !== null,
+        run: async () => {
+          await p.fileEditorFt.save(this.editedFile() as string);
+        },
+      },
+      {
+        id: 'edit.formatDocument',
+        category: 'Edit',
+        label: 'Format Document',
+        enabled: () => this.editedFile() !== null && p.fileEditorFt.languageOf(this.editedFile() as string) === 'json',
+        run: () => p.fileEditorFt.format(this.editedFile() as string),
+      },
       {
         id: 'file.reveal',
         category: 'File',
@@ -575,7 +599,30 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
   }
 
   /** `F10`: the window closes, once the user has said so — as Midnight Commander asks before it quits. */
+  /** One entry, and a file. */
+  private isFilePath(paths: readonly string[]): boolean {
+    const entry = paths.length === 1 ? this.parent.fsDataFt.entryAt(paths[0] as string) : undefined;
+    return entry !== undefined && isFile(entry);
+  }
+
+  /** The file the active panel shows, if it shows one. */
+  private fileTabPath(groupId: string): string | null {
+    const group = this.parent.editorGroupsFt.stateOf(groupId);
+    const tab = group === undefined ? undefined : this.parent.editorGroupsFt.activeTabOf(group);
+    return tab?.kind === 'file' && this.parent.subAppsFt.fileManager() ? tab.path : null;
+  }
+
+  /** The file the active panel shows open for editing (PRD 005, §4), if it does. */
+  private editedFile(): string | null {
+    const path = this.fileTabPath(this.parent.activeGroupId());
+    return path !== null && this.parent.fileEditorFt.isEditing(path) ? path : null;
+  }
+
   private async quit(): Promise<void> {
+    // Unsaved edits are asked about first (PRD 005, §4); then whether to quit at all.
+    if (!(await this.parent.fileEditorFt.whenSaved())) {
+      return;
+    }
     const sure = await this.parent.modal.confirm({ message: 'Quit tr-file?', confirmLabel: 'Quit' });
     if (sure) {
       this.parent.desktopWindow.close();

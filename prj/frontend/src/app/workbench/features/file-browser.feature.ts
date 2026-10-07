@@ -1,6 +1,7 @@
 import { computed, effect, signal, untracked } from '@angular/core';
 import type {
   UiBreadcrumb,
+  UiDocumentModel,
   UiFilesDrop,
   UiIconAction,
   UiPathSuggestion,
@@ -210,6 +211,16 @@ export class FileBrowserFeature implements PanelContentFeature {
   /** Files dropped on a panel land in its directory. */
   acceptsFiles(): boolean {
     return true;
+  }
+
+  /** A file with unsaved changes (PRD 005, §4): its tab shows a dot. */
+  isDirty(tab: PanelTabState): boolean {
+    return tab.kind === 'file' && this.parent.fileEditorFt.isDirty(tab.path);
+  }
+
+  /** The last tab of a file with unsaved changes asks before it closes (PRD 005, §4). */
+  canClose(tab: PanelTabState): boolean | Promise<boolean> {
+    return tab.kind === 'file' ? this.parent.fileEditorFt.canClose(tab.id, tab.path) : true;
   }
 
   /* -- navigation -------------------------------------------------------- */
@@ -798,7 +809,9 @@ export class FileBrowserFeature implements PanelContentFeature {
         break;
       }
       case 'refresh':
-        if (active.kind === 'file') {
+        if (active.kind === 'file' && this.parent.fileEditorFt.isEditing(active.path)) {
+          void this.parent.fileEditorFt.reload(active.path);
+        } else if (active.kind === 'file') {
           this.parent.filePreviewFt.reload(active.path);
         } else {
           // Everything on screen is re-read: in the tree, that includes the
@@ -818,6 +831,19 @@ export class FileBrowserFeature implements PanelContentFeature {
       case 'upload':
         this.parent.requestUpload(groupId);
         break;
+      // The editor (PRD 005, §4–5).
+      case 'edit':
+        void this.parent.fileEditorFt.toggle(groupId);
+        break;
+      case 'save':
+        void this.parent.fileEditorFt.save(active.path);
+        break;
+      case 'format':
+        this.parent.fileEditorFt.format(active.path);
+        break;
+      case 'text-view':
+        this.parent.filePreviewFt.toggleTextView(active.path);
+        break;
       case 'download':
         this.parent.transfersFt.download(active.path, active.label);
         break;
@@ -826,6 +852,15 @@ export class FileBrowserFeature implements PanelContentFeature {
         break;
       default:
         break;
+    }
+  }
+
+  /** The editor's text, after each change (PRD 005, §4): the draft of the file the tab shows. */
+  setDocumentText(groupId: string, text: string): void {
+    const group = this.groups.stateOf(groupId);
+    const active = group ? this.groups.activeTabOf(group) : undefined;
+    if (active?.kind === 'file') {
+      this.parent.fileEditorFt.setText(active.path, text);
     }
   }
 
@@ -1155,15 +1190,25 @@ export class FileBrowserFeature implements PanelContentFeature {
    */
   private fileViewModel(group: PanelGroupState, tab: PanelTabState): UiFileBrowserModel {
     const preview = this.parent.filePreviewFt;
-    const document = preview.documentFor(tab.path);
-    const notice = preview.noticeFor(tab.path);
+    // Open for editing (PRD 005, §4): the editor, whatever the viewer would have shown.
+    const edit = this.parent.fileEditorFt.editModelFor(tab.path);
+    const viewed = preview.documentFor(tab.path);
+    // A CSV file shown as a table is edited as one (PRD 015, §1); anything else in the code editor.
+    const delimiter = preview.delimiterOf(tab.path);
+    const document =
+      edit === undefined
+        ? viewed
+        : delimiter !== undefined
+          ? { ...(viewed as UiDocumentModel), path: tab.path, kind: 'table' as const, table: this.parent.fileEditorFt.tableOf(tab.path, delimiter), edit: { ...edit, languageLabel: delimiter === '\t' ? 'TSV' : 'CSV' } }
+          : { ...(viewed ?? { kind: 'text' as const }), path: tab.path, edit };
+    const notice = edit === undefined ? preview.noticeFor(tab.path) : undefined;
 
     return {
       breadcrumbs: this.breadcrumbsOf(tab.path),
       location: shownPath(tab.path),
       ...this.focusTokens(group.id),
       view: group.view,
-      toolbarActions: this.fileToolbar(),
+      toolbarActions: this.fileToolbar(tab.path),
       columns: COLUMNS,
       rows: [],
       items: [],
@@ -1184,11 +1229,31 @@ export class FileBrowserFeature implements PanelContentFeature {
     return requests === undefined ? {} : { filterFocus: requests.filter, locationEdit: requests.location };
   }
 
-  /** A file tab's toolbar: back to its folder, re-read, save, and open it outside the app. */
-  private fileToolbar(): readonly UiIconAction[] {
+  /**
+   * A file tab's toolbar: back to its folder, re-read, download, and open it
+   * outside the app — then *Edit* (pressed while editing, PRD 005, §4) and,
+   * editing, *Save* and JSON's *Format Document*; viewing JSON or CSV, its
+   * tree or table, or its text (§5; PRD 015, §1).
+   */
+  private fileToolbar(path: string): readonly UiIconAction[] {
+    const editor = this.parent.fileEditorFt;
+    const editing = editor.isEditing(path);
+    const structured = this.parent.filePreviewFt.structuredViewOf(path);
     return [
       ...FILE_TOOLBAR,
       { id: 'open-external', label: this.parent.systemOpenFt.openLabel(), icon: 'external' },
+      ...(editor.canEdit(path) ? [{ id: 'edit', label: editing ? 'Stop Editing' : 'Edit', icon: 'pencil' as const, active: editing }] : []),
+      ...(editing ? [{ id: 'save', label: 'Save', icon: 'device-floppy' as const, disabled: !editor.isDirty(path) }] : []),
+      ...(editing && editor.languageOf(path) === 'json' ? [{ id: 'format', label: 'Format Document', icon: 'braces' as const }] : []),
+      ...(!editing && structured !== null
+        ? [
+            {
+              id: 'text-view',
+              label: !structured.asText ? 'Show as Text' : structured.kind === 'json' ? 'Show as Tree' : 'Show as Table',
+              icon: !structured.asText ? ('file-text' as const) : structured.kind === 'json' ? ('list-tree' as const) : ('table' as const),
+            },
+          ]
+        : []),
     ];
   }
 

@@ -88,7 +88,9 @@ export type UiIconName =
   | 'table'
   | 'player-stop'
   | 'activity'
-  | 'player-pause';
+  | 'player-pause'
+  | 'device-floppy'
+  | 'braces';
 
 /** Icon sizes used across the workbench (16px is VS Code's list/tab size). */
 export type UiIconSize = 'sm' | 'md' | 'lg' | 'xl';

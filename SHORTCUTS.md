@@ -37,6 +37,7 @@ the configurable keys as they are bound now, the user's changes included.
 | `Ctrl`+`D` | Show or hide Details | Anywhere |
 | `Ctrl`+`/` | Show or hide both sidebars — either shown, both are hidden; both hidden, both come back | Anywhere |
 | `Ctrl`+`U` | Check for updates (desktop) | Anywhere |
+| `Ctrl`+`S` | Save the file being edited | Anywhere, while a file is being edited |
 | `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` | Focus next / previous part: Explorer → each panel → bottom panel (while open) → Details, and round | Anywhere |
 | `Ctrl`+`1` … `Ctrl`+`9` | Go to the first … ninth bookmark, in the active panel (desktop; a browser keeps them for its tabs) | Anywhere |
 
@@ -51,7 +52,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `F1` | Help — the cheatsheet of every key (PRD 001, §16) | Anywhere |
 | `F2` | Rename… | Anywhere |
 | `F3` | View — open read-only in a tab | Anywhere |
-| `F4` | Open with the system's app | Anywhere |
+| `F4` | Edit — in the built-in editor; again, back to viewing. What it cannot edit opens in the system's app | Anywhere |
 | `F5` | Copy to… | Anywhere |
 | `F6` | Move to… | Anywhere |
 | `F7` | New folder… | Anywhere |
@@ -186,6 +187,46 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `Ctrl`+`A` | Select all of the file's text (and nothing else in the window) |
 | `Shift`+arrows, the mouse | Select text |
 | `Ctrl`+`C` | Copy the text selected |
+
+### File editor
+
+The editor's own keys; everything else in it is a text field's (undo, the clipboard, selecting).
+
+| Key | Action |
+| --- | --- |
+| `Tab` / `Shift`+`Tab` | Indent / outdent — every selected line when the selection spans lines |
+| `Enter` | New line, indented as this one — one step more after `{`, `[` or `(` |
+
+### CSV table
+
+Over a `.csv` / `.tsv` file, viewed or edited (`F4`). Excel's keys, fixed as a text field's are.
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓` `←` `→` | Move the active cell; with `Shift`, extend the selection |
+| `Ctrl`+arrows | To the edge of the data (in the table, not maximize) |
+| `Home` / `End`, `Ctrl`+`Home` / `Ctrl`+`End` | First / last column of the row; the first / last cell |
+| `PageUp` / `PageDown` | A page up / down |
+| `Ctrl`+`A` | Select all |
+| `Ctrl`+`C` | Copy the selected cells, tab-separated |
+| `Escape` | A range back to its active cell; a single cell, close the file |
+| Editing: a key | Replace the cell with what is typed |
+| Editing: `F2`, double click | Edit the cell in place |
+| Editing: `Enter` / `Tab` (`Shift` back) | Put the value in, and move down / right |
+| Editing: `Escape` (in a cell) | Drop what was typed |
+| Editing: `Delete`, `Backspace` | Empty the selected cells |
+| Editing: `Ctrl`+`X` / `Ctrl`+`V` | Cut / paste — one value pasted fills the selection |
+| Editing: `Ctrl`+`Z` / `Ctrl`+`Y` | Undo / redo |
+
+Press a column letter or a row number to select it (`Shift` extends); drag across cells for a range.
+
+### JSON tree
+
+| Key | Action |
+| --- | --- |
+| `↑` / `↓`, `Home` / `End`, `PageUp` / `PageDown` | Move between values |
+| `→` / `←` | Open an object or array, or step into it / close it, or step out to its parent |
+| `Enter`, `Space` | Open or close |
 
 ### Image viewer
 

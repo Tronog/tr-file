@@ -1,6 +1,6 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { Marked } from 'marked';
-import type { UiDocumentModel, UiEmptyStateModel } from '@tr-file/ui';
+import { detectDelimiter, parseDelimited, type UiDocumentModel, type UiEmptyStateModel } from '@tr-file/ui';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import { FsError } from '../../file-system/fs-error';
 import { sniffText, type SniffResult, type TextEncoding } from '../../file-system/text-sniff';
@@ -8,10 +8,16 @@ import type { WorkbenchService } from '../workbench.service';
 import { isFile } from '../../file-system/fs-entry-kind';
 
 /** Files past this size are not previewed; the user downloads them instead. */
-const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
+export const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
 
 /** Extensions rendered as markdown rather than as plain text. */
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mkd']);
+
+/** Extensions shown as a tree of their values (PRD 005, §5) — when they parse. */
+const JSON_EXTENSIONS = new Set(['json', 'webmanifest', 'jsonc']);
+
+/** Extensions shown as a spreadsheet (PRD 015, §1). */
+const TABLE_EXTENSIONS = new Set(['csv', 'tsv', 'tab']);
 
 /**
  * Extensions that are certainly not text, refused without reading a byte.
@@ -55,8 +61,10 @@ interface PreviewState {
  * details sidebar draws the same picture from the same cache (§7.3.1, §9).
  * This feature only asks for it and reports what came back.
  *
- * Nothing about a preview is editable — the PRD asks for read-only, and there
- * is no write endpoint to be tempted by.
+ * Nothing about a preview is editable: editing is `FileEditorFeature`'s
+ * (PRD 005, §4), which reads the file afresh and draws over the preview. A
+ * JSON file is parsed here into a tree of its values (§5), a CSV file into
+ * cells (PRD 015, §1), each with its text kept beside it for *Show as Text*.
  */
 export class FilePreviewFeature {
   private readonly previews: WritableSignal<ReadonlyMap<string, PreviewState>>;
@@ -65,6 +73,9 @@ export class FilePreviewFeature {
 
   /** Per group, the image a `PgUp`/`PgDown` is loading to show next — where the next press counts from. */
   private readonly stepping = new Map<string, string>();
+
+  /** JSON and CSV files shown as their text rather than as a tree or a table (PRD 005, §5; PRD 015), by path. */
+  private readonly asText = signal<ReadonlySet<string>>(new Set());
 
   /** Configured once: GitHub-flavoured line breaks, no deprecated options. */
   private readonly markdown = new Marked({ gfm: true, breaks: false });
@@ -83,6 +94,10 @@ export class FilePreviewFeature {
    */
   documentFor(path: string): UiDocumentModel | undefined {
     const document = this.previews().get(path)?.document;
+    if ((document?.kind === 'json' || document?.kind === 'table') && this.asText().has(path)) {
+      const { json: _json, table: _table, ...text } = document;
+      return { ...text, kind: 'text' };
+    }
     if (document?.kind !== 'image') {
       return document;
     }
@@ -103,6 +118,31 @@ export class FilePreviewFeature {
       const next = new Map(cache);
       for (const path of stale) {
         next.delete(path);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * How a JSON or CSV file is shown — its tree or table, or its text
+   * (PRD 005, §5; PRD 015, §1); `null` for anything else.
+   */
+  structuredViewOf(path: string): { readonly kind: 'json' | 'table'; readonly asText: boolean } | null {
+    const kind = this.previews().get(path)?.document?.kind;
+    return kind === 'json' || kind === 'table' ? { kind, asText: this.asText().has(path) } : null;
+  }
+
+  /** The delimiter a CSV file was read with, while it is shown as a table. */
+  delimiterOf(path: string): string | undefined {
+    return this.asText().has(path) ? undefined : this.previews().get(path)?.document?.table?.delimiter;
+  }
+
+  /** A JSON file's tree or a CSV file's table, or its text. */
+  toggleTextView(path: string): void {
+    this.asText.update((paths) => {
+      const next = new Set(paths);
+      if (!next.delete(path)) {
+        next.add(path);
       }
       return next;
     });
@@ -334,6 +374,22 @@ export class FilePreviewFeature {
           ...(meta ? { meta } : {}),
         },
       };
+    }
+
+    if (TABLE_EXTENSIONS.has(this.extension(path))) {
+      // A spreadsheet of its cells (PRD 015, §1); its text kept for *Show as Text*.
+      const table = parseDelimited(text, detectDelimiter(text, this.extension(path)));
+      return { status: 'ready', document: { path, kind: 'table', table, text, ...(meta ? { meta } : {}) } };
+    }
+
+    if (JSON_EXTENSIONS.has(this.extension(path))) {
+      // A tree of its values (PRD 005, §5); one that does not parse is shown as its text, and says so.
+      try {
+        const json: unknown = JSON.parse(text);
+        return { status: 'ready', document: { path, kind: 'json', json, text, ...(meta ? { meta } : {}) } };
+      } catch {
+        return { status: 'ready', document: { path, kind: 'text', text, meta: [meta, 'Not valid JSON'].filter(Boolean).join(' · ') } };
+      }
     }
 
     return {

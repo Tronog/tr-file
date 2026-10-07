@@ -183,6 +183,8 @@ export const HELP: UiHelpConfig = {
         'file.copyPath',
         'file.trash',
         'file.delete',
+        'file.edit',
+        'file.save',
       ],
     },
     {
@@ -266,6 +268,20 @@ export const HELP: UiHelpConfig = {
         [[['Ctrl', 'A']], 'Select all of the text'],
         [[['Shift', '↑'], ['Shift', '↓']], 'Extend the selection of text'],
         [[['Ctrl', 'C']], 'Copy the text selected'],
+      ],
+    },
+    {
+      id: 'sheet-fixed',
+      title: 'CSV table',
+      hue: 'teal',
+      rows: [
+        [[['↑'], ['↓'], ['←'], ['→']], 'Move the active cell; with Shift, extend the selection'],
+        [[['Ctrl', '↓'], ['Ctrl', '→']], 'To the edge of the data'],
+        [[['Ctrl', 'A']], 'Select all'],
+        [[['Ctrl', 'C'], ['Ctrl', 'X'], ['Ctrl', 'V']], 'Copy, cut, paste cells (tab-separated, as spreadsheets do)'],
+        [[['F2'], ['Enter'], ['Tab']], 'Editing: edit the cell; put the value in and move down / right'],
+        [[['Delete']], 'Editing: empty the selected cells'],
+        [[['Ctrl', 'Z'], ['Ctrl', 'Y']], 'Editing: undo / redo'],
       ],
     },
     {

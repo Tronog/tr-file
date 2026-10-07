@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { createWriteStream, type Stats } from 'node:fs';
-import { lstat, mkdir, open, opendir, readdir, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
+import { chmod, lstat, mkdir, open, opendir, readFile, readdir, readlink, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { basename, dirname, isAbsolute, join, posix, resolve as resolvePath, sep } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { HttpError, type Logger } from '../../core/index.js';
+import { contentTag } from './content-tag.js';
 import { FilePathResolver, ResolvedPath } from './file-path.resolver.js';
 import { LargeListings, type ListingProgressDto } from './large-listing.service.js';
 import {
@@ -361,6 +362,77 @@ export class FilesService {
       throw FilesService.toHttpError(error, target);
     }
     return this.describe(target);
+  }
+
+  /**
+   * Writes a file's whole content (PRD 005, §4: the editor's *Save*) — over
+   * what a link leads to, never over the link, and only a regular file that
+   * is already there.
+   *
+   * `expected` is the `contentTag` of what the editor read. When the file
+   * holds something else now — changed on disk since — nothing is written and
+   * the answer is a `409` `CHANGED`, for the editor to ask before it
+   * overwrites; without `expected` it is written regardless.
+   *
+   * Atomic where it can be: the bytes go to a sibling temporary file, given
+   * the file's permissions, and are renamed over it, so a failure halfway
+   * leaves the old content whole. Where that would change more than the
+   * content it writes in place instead: a file with other hard links (they
+   * would keep the old content), one owned by another user (the new file
+   * would be ours), or a folder it cannot make the temporary file in — or
+   * rename over the file, as Windows refuses while it is open elsewhere.
+   */
+  async writeFile(requestedPath: string | undefined, content: Uint8Array, expected?: string): Promise<FileDetails> {
+    const target = await this.resolver.resolveReal(requestedPath);
+    if (content.length > this.uploadMaxBytes) {
+      throw HttpError.payloadTooLarge(`Content exceeds the limit of ${this.uploadMaxBytes} bytes`);
+    }
+    const stats = await this.statOrFail(target);
+    if (!stats.isFile()) {
+      throw HttpError.badRequest(`Not a regular file: ${target.relative || '/'}`);
+    }
+    let real: string;
+    try {
+      // `resolveReal` proved where it leads is inside the root.
+      real = await realpath(target.absolute);
+      if (expected !== undefined && contentTag(await readFile(real)) !== expected) {
+        throw new HttpError(409, 'CHANGED', `${posix.basename(target.relative)} was changed on disk since it was opened`);
+      }
+      const owner = typeof process.getuid === 'function' ? process.getuid() : stats.uid;
+      if (stats.nlink > 1 || stats.uid !== owner || !(await this.replaceAtomically(real, content, stats.mode))) {
+        await writeFile(real, content);
+      }
+    } catch (error) {
+      throw FilesService.toHttpError(error, target);
+    }
+    this.logger.debug('written', { path: target.relative, bytes: content.length });
+    return this.describe(target);
+  }
+
+  /** The atomic way of `writeFile`; `false` when it cannot be done so, and nothing was changed. */
+  private async replaceAtomically(real: string, content: Uint8Array, mode: number): Promise<boolean> {
+    const temporary = join(dirname(real), `.${basename(real)}.${randomBytes(8).toString('hex')}.part`);
+    try {
+      await writeFile(temporary, content, { flag: 'wx', mode: mode & 0o7777 });
+      // The mode asked for above is cut by the umask; the file's own is put back whole.
+      await chmod(temporary, mode & 0o7777);
+    } catch (error) {
+      await this.discard(temporary);
+      if (FilePathResolver.isErrnoException(error) && ['EACCES', 'EPERM', 'EROFS'].includes(error.code ?? '')) {
+        return false;
+      }
+      throw error;
+    }
+    try {
+      await rename(temporary, real);
+      return true;
+    } catch (error) {
+      await this.discard(temporary);
+      if (FilePathResolver.isErrnoException(error) && ['EACCES', 'EPERM', 'EBUSY'].includes(error.code ?? '')) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**

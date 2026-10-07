@@ -186,7 +186,39 @@ that is `none`, and `Ctrl`+`A` there selects the document alone. `Escape` over a
 (§3.1; keymap `viewer.close`, `when: 'panel'`, claimed by `UiFileBrowser` only while it shows a
 document — the `close` panel key, `EditorGroupsFeature.closeTab`, so the listing it was opened from
 comes back with the keyboard). It shares the key with `view.stopLoading`: `UiKeymap.commandsFor` gives
-every command a key is bound to, and the first that applies has it. An image is read by
+every command a key is bound to, and the first that applies has it.
+**The file editor (PRD 005, §4).** *Edit* — the file tab's pencil, `F4` (`file.edit`, Midnight Commander's;
+what cannot be edited still goes to the system's app), *File › Edit* — turns the tab into the library's
+`UiCodeEditor` (`UiDocumentModel.edit`): a `<textarea>` whose text is transparent, under an overlay
+that draws only the lines near the view, coloured by `UiSyntaxHighlighter` (markdown — a fenced block in
+the language it names —, bash, JSON; a line-state tokenizer each, `code-editor/syntax/`) and moved by the
+textarea's scroll in its handler; undo, selection, the clipboard are the browser's. `FileEditorFeature`
+keeps one session per file — draft, what was saved, line ends and BOM to write back, UTF-8 only —
+reading the file afresh on *Edit*; `Ctrl`+`S` (`file.save`, a window key, so it reaches the page from
+the textarea) writes it with `POST /api/fs/write` (bridge `write`, `RemoteBackend` maps it), whose
+`expected` is the `contentTag` of what was read (`file-system/content-tag.ts`, the backend's twin):
+a file changed on disk meanwhile is `409 CHANGED`, asked about (overwrite, or take the disk's). A
+modified file's tab has the dot (`UiPanelContentDriver.isDirty`), and closing its last tab asks
+(`canClose`, which `UiEditorGroupsFeature.closeTab` awaits), as *Quit* and the window's close button do
+(`whenSaved`; in a browser, `beforeunload`). Inside the textarea the panel's keys stand back
+(`Alt`+arrows included — `UiFileBrowser.onBodyKeydown` skips text fields).
+**JSON (§5)** opens as a tree of its values (`kind: 'json'`, parsed by `FilePreviewFeature`; one that does
+not parse is its text, and says so) — the library's `UiJsonTree`, drawn near the view only, the ARIA
+tree's keys on one tab stop, `$.path` of the cursor and *Expand* / *Collapse all* in its header; the
+toolbar switches it to its text (`toggleJsonView`). Edited, its first error is marked as typed
+(`jsonProblemOf`), saving it anyway is asked, and *Format Document* (`edit.formatDocument`) lays it out
+again.
+**CSV (PRD 015, §1)** — `.csv`, `.tsv` — opens as a spreadsheet (`kind: 'table'`, `UiDelimitedText` from the
+library's `parseDelimited`, its delimiter found by `detectDelimiter`): the library's `UiSheet` and its
+`UiSheetService`, rows drawn near the view, column letters and row numbers sticky, Excel's selection
+(active cell and corner; a column letter, a row number, a drag) and keys, copy as tab-separated text
+through the document's `copy` event (no clipboard permission). *Edit* makes the same sheet editable:
+typing, `F2`, `Enter` / `Tab`, `Delete`, paste (one value fills the selection), undo; every change
+is the file's text again (`serializeDelimited`, as it was written) into `FileEditorFeature`'s session,
+so saving, the dot and the questions are the editor's, and the draft is read back into cells by
+`FileEditorFeature.tableOf`. *Show as Text* (`toggleTextView`, JSON's too) shows — and edits, in
+`UiCodeEditor` — its text. In the sheet `Ctrl`+arrows are Excel's, not *maximize*; `Alt` chords and
+`Ctrl`+page keys go on to the panel. An image is read by
 `ImageSourceService` (`prj/frontend/src/app/file-system/`), one cache of object URLs keyed
 by path that owns their lifetime — `PreviewRetentionFeature` tells it (and the text previews)
 what is on screen, and everything else is freed but for a few recent ones — and drawn by `UiImageView` — contain by default, five
@@ -640,7 +672,7 @@ a production server refuses to start without one. Every write needs the
 `X-TR-File-Request: 1` header (CSRF) — the frontend's `csrfInterceptor` adds it — and the
 frontend shows `auth/login` until `AuthService` says there is a session (PRD 003, §2).
 The file-system API lives at `/api/fs`
-(listing, details, download — `inline` for a browser tab —, upload, rename, mkdir, create,
+(listing, details, download — `inline` for a browser tab —, upload, write (the editor's Save), rename, mkdir, create,
 search, watch) — see `prj/backend/README.md` for the
 endpoint reference, the error codes and the `FILES_ROOT` confinement rules. File operations are the `operations` module at `/api/ops`: background jobs (copy, move,
 trash, empty-trash, delete, restore), polled by id and cancellable, each reporting an

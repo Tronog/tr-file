@@ -71,6 +71,8 @@ export class MockDataWorkbenchService {
       items: [
         { id: 'file.newFile', label: 'New File…' },
         { id: 'file.newFolder', label: 'New Folder…' },
+        { id: 'file.edit', label: 'Edit', separatorBefore: true },
+        { id: 'file.save', label: 'Save' },
         { id: 'file.openExternal', label: 'Open with Default App', separatorBefore: true },
         { id: 'file.reveal', label: 'Reveal' },
         { id: 'file.rename', label: 'Rename…', separatorBefore: true },
@@ -96,6 +98,7 @@ export class MockDataWorkbenchService {
         { id: 'edit.cut', label: 'Cut', separatorBefore: true },
         { id: 'edit.copy', label: 'Copy' },
         { id: 'edit.paste', label: 'Paste' },
+        { id: 'edit.formatDocument', label: 'Format Document', separatorBefore: true },
         { id: 'file.copyPath', label: 'Copy Path', separatorBefore: true },
         { id: 'edit.filter', label: 'Filter Folder', separatorBefore: true },
         { id: 'edit.search', label: 'Search Files…' },

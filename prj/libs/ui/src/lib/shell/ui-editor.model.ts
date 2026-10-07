@@ -60,4 +60,11 @@ export interface UiPanelContentDriver<TTab extends UiTabState = UiTabState, TGro
   acceptsFiles?(tab: TTab): boolean;
   /** The tab's icon, when it is not the content's. */
   tabIcon?(tab: TTab): { readonly icon: UiIconName; readonly tint?: UiIconTint };
+  /** The tab holds unsaved changes (PRD 005, §4): its close button is a dot. */
+  isDirty?(tab: TTab): boolean;
+  /**
+   * Asked before the tab is closed: `false` — or a promise of it, once the
+   * user has been asked — keeps it open. Unsaved changes ask so (PRD 005, §4).
+   */
+  canClose?(tab: TTab): boolean | Promise<boolean>;
 }

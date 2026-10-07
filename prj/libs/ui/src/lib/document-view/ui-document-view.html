@@ -1,10 +1,32 @@
 <!-- The one scroll container, and the only focusable thing in the viewer: a
      scrollable region has to be keyboard reachable, and an `<article>` with
      `tabindex="0"` is reachable without being a control or a text field. -->
-@if (isImage()) {
+@if (document().table; as table) {
+  <!-- A spreadsheet (PRD 015, §1), to look through or — being edited — to edit. -->
+  <ui-sheet
+    [rows]="table.rows"
+    [editable]="!!document().edit"
+    [label]="label()"
+    (rowsChange)="onRows(table, $event)"
+    (selectionChange)="cell.set($event)"
+  />
+} @else if (document().edit; as edit) {
+  <!-- Editing (PRD 005, §4): the editor has its own scroll and its own keys. -->
+  <ui-code-editor
+    [text]="edit.text"
+    [language]="edit.language"
+    [label]="label()"
+    [problem]="edit.problem ?? null"
+    (textChange)="textChange.emit($event)"
+    (caretChange)="caret.set($event)"
+  />
+} @else if (isImage()) {
   <!-- Its own viewport rather than a scroll container: the picture is zoomed
        and panned by transform, so nothing here scrolls (PRD 001, §7.3.1). -->
   <ui-image-view [src]="src()" [label]="label()" />
+} @else if (isJson()) {
+  <!-- A tree of its own, scrolled and keyed by itself (PRD 005, §5). -->
+  <ui-json-tree [value]="document().json" [label]="label()" />
 } @else {
   <article #doc class="doc" tabindex="0" [attr.aria-label]="label()" (keydown)="onKeydown($event)">
     @if (isMarkdown()) {
@@ -23,7 +45,25 @@
 <div class="status">
   <span class="path">{{ document().path }}</span>
   <span class="flags">
-    <span class="readonly">Read-only</span>
+    @if (document().edit; as edit) {
+      @if (edit.problem; as problem) {
+        <span class="problem" [attr.title]="problem.message">Ln {{ problem.line }}: {{ problem.message }}</span>
+      }
+      @if (edit.state; as state) {
+        <span class="state">{{ state }}</span>
+      }
+      @if (document().table) {
+        <span class="caret">{{ cell() }}</span>
+      } @else {
+        <span class="caret">Ln {{ caret().line }}, Col {{ caret().column }}</span>
+      }
+      <span class="language">{{ edit.languageLabel }}</span>
+    } @else {
+      @if (document().table) {
+        <span class="caret">{{ cell() }}</span>
+      }
+      <span class="readonly">Read-only</span>
+    }
     @if (document().meta; as meta) {
       <span class="meta">{{ meta }}</span>
     }

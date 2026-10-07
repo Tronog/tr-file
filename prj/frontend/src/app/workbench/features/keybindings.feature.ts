@@ -25,6 +25,8 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'view.toggleSidebars', key: 'Ctrl+/', when: 'window' },
   // PRD 001, §8.6.1 — the desktop's; in a browser the command is disabled and the key does nothing.
   { command: 'file.checkForUpdates', key: 'Ctrl+U', when: 'window' },
+  // The editor's Save (PRD 005, §4) — a window key, so it reaches the page from the editor's text.
+  { command: 'file.save', key: 'Ctrl+S', when: 'window' },
   // Task Manager (PRD 014, §3). A browser keeps the chord for reopening a tab: it reaches the page on the desktop.
   { command: 'view.app.task-manager', key: 'Ctrl+Shift+T', when: 'window' },
   // The bookmarks, in their order, from any panel (PRD 002, §6.1).
@@ -42,7 +44,8 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'help.show', key: 'F1', when: 'window' },
   { command: 'file.rename', key: 'F2', when: 'window' },
   { command: 'file.open', key: 'F3', when: 'window' },
-  { command: 'file.openExternal', key: 'F4', when: 'window' },
+  // Midnight Commander's Edit (PRD 005, §4): the built-in editor; what it cannot edit, the system's application.
+  { command: 'file.edit', key: 'F4', when: 'window' },
   { command: 'file.copyTo', key: 'F5', when: 'window' },
   { command: 'file.moveTo', key: 'F6', when: 'window' },
   { command: 'file.newFolder', key: 'F7', when: 'window' },
@@ -66,7 +69,7 @@ export const FOCUS_COMMANDS = UI_FOCUS_COMMANDS;
  * Window keys that act on the entry the cursor is on rather than on the
  * selection — as Midnight Commander's `F2`–`F4` do (PRD 004, §2).
  */
-const CURSOR_COMMANDS = new Set(['file.rename', 'file.open', 'file.openExternal']);
+const CURSOR_COMMANDS = new Set(['file.rename', 'file.open', 'file.openExternal', 'file.edit']);
 
 /**
  * Every key the workbench answers, in one table the user can change

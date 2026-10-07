@@ -70,6 +70,15 @@ export type { UiMenuDismissReason } from './lib/context-menu/ui-context-menu';
 /* editor area ------------------------------------------------------------- */
 export { UiTabBar } from './lib/tabs/ui-tab-bar';
 export { UiDocumentView } from './lib/document-view/ui-document-view';
+export { UiCodeEditor, type UiCodeProblem } from './lib/code-editor/ui-code-editor';
+export { UiCodeEditorService, type UiCodeLine, type UiCodePosition } from './lib/code-editor/ui-code-editor.service';
+export { UiSyntaxHighlighter, tokenizerFor } from './lib/code-editor/syntax/syntax-highlighter';
+export type { UiLineTokenizer, UiSyntaxKind, UiSyntaxLanguage, UiSyntaxToken, UiTokenizedLine } from './lib/code-editor/syntax/syntax.model';
+export { UiJsonTree } from './lib/json-tree/ui-json-tree';
+export { UiSheet } from './lib/sheet/ui-sheet';
+export { UiSheetService, type UiCell, type UiCellRange, type UiSheetEdit, type UiSheetSelectionKind } from './lib/sheet/ui-sheet.service';
+export { columnName, detectDelimiter, parseDelimited, serializeDelimited, type UiDelimitedText } from './lib/sheet/delimited-text';
+export { UiJsonTreeService, type UiJsonKind, type UiJsonRow } from './lib/json-tree/ui-json-tree.service';
 export { UiImageView } from './lib/image-view/ui-image-view';
 export { UiImageViewService } from './lib/image-view/ui-image-view.service';
 export type { UiImagePoint, UiImageZoom } from './lib/image-view/ui-image-view.service';

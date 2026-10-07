@@ -17,6 +17,7 @@ import {
 } from './bridge.model.js';
 import type { DirectoryListingDto, FileDetailsDto } from '../files/models/index.js';
 import type { ListingProgressDto } from '../files/large-listing.service.js';
+import { contentTag } from '../files/content-tag.js';
 
 /** Small enough that one short string trips the limit, as in the routes test. */
 const UPLOAD_LIMIT = 32;
@@ -366,6 +367,20 @@ describe('things every file manager has (PRD 003, §5)', () => {
     assert.equal(taken.code, 'CONFLICT');
     assert.equal(taken.status, 409);
     assert.equal(errorOf(await bridge.dispatch({ command: 'rename', path: 'box', to: 'box/in' })).status, 400);
+  });
+
+  it('writes a file as POST /api/fs/write does, refusing one changed since it was read (PRD 005, §4)', async () => {
+    const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
+    const written = dataOf<FileDetailsDto>(await bridge.dispatch({ command: 'write', path: 'box/m.txt', content: encode('saved') }));
+    assert.equal(written.size, 5);
+
+    const again = dataOf<FileDetailsDto>(
+      await bridge.dispatch({ command: 'write', path: 'box/m.txt', content: encode('again'), expected: contentTag(encode('saved')) }),
+    );
+    assert.equal(again.size, 5);
+    const stale = errorOf(await bridge.dispatch({ command: 'write', path: 'box/m.txt', content: encode('lost'), expected: contentTag(encode('saved')) }));
+    assert.equal(stale.code, 'CHANGED');
+    assert.equal(errorOf(await bridge.dispatch({ command: 'write', path: 'box/m.txt', content: 'text' } as never)).status, 400);
   });
 
   it('searches, with or without a limit', async () => {

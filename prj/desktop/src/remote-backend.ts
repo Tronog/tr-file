@@ -302,6 +302,18 @@ export class RemoteBackend {
           body: { path: request.path, name: request.name },
           accept: [201],
         });
+      // The editor's Save (PRD 005, §4): the bytes as the body, as `/api/fs/write` takes them.
+      case 'write': {
+        const content = request.content;
+        const response = await this.request('POST', '/fs/write', {
+          query: { path: request.path, ...(request.expected === undefined ? {} : { expected: request.expected }) },
+          headers: { 'Content-Type': 'application/octet-stream' },
+          rawBody: (async function* () {
+            yield content;
+          })(),
+        });
+        return ((await response.json()) as { data: unknown }).data;
+      }
       case 'search':
         return this.json('GET', '/fs/search', {
           query: {

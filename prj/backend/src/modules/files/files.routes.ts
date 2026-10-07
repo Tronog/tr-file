@@ -1,5 +1,5 @@
 import busboy from 'busboy';
-import { Router, type Request, type Response } from 'express';
+import express, { Router, type Request, type Response } from 'express';
 import type { Readable } from 'node:stream';
 
 import { HttpError, asyncHandler, type Logger, type RouteModule } from '../../core/index.js';
@@ -23,6 +23,12 @@ const ACTIVE_TYPES: ReadonlySet<string> = new Set([
   'application/xml',
   'text/xml',
 ]);
+
+/**
+ * The most a `POST /write` body may hold: an editor's file (PRD 005, §4),
+ * which the frontend opens only up to its preview limit — far below this.
+ */
+export const WRITE_MAX_BYTES = 16 * 1024 * 1024;
 
 /** Listener for events that must be observed but carry no useful action. */
 const ignore = (): void => {};
@@ -151,6 +157,22 @@ export class FilesRoutes implements RouteModule {
           FilesRoutes.readBodyString(req, 'name'),
         );
         res.status(201).json({ data: details.toJSON() });
+      }),
+    );
+
+    // POST /api/fs/write?path=&expected= — a file's whole new content, as the raw body (PRD 005, §4).
+    this.router.post(
+      '/write',
+      express.raw({ type: () => true, limit: WRITE_MAX_BYTES }),
+      asyncHandler(async (req, res) => {
+        const content: unknown = req.body;
+        const expected = FilesRoutes.readQueryString(req, 'expected');
+        const details = await this.filesService.writeFile(
+          FilesRoutes.readPath(req),
+          Buffer.isBuffer(content) ? content : new Uint8Array(),
+          expected === undefined || expected === '' ? undefined : expected,
+        );
+        res.json({ data: details.toJSON() });
       }),
     );
 

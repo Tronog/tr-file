@@ -31,6 +31,7 @@
       <ui-file-browser
         [browser]="browser"
         (toolbarAction)="files.runToolbarAction(groupId, $event)"
+        (documentText)="files.setDocumentText(groupId, $event)"
         (breadcrumbSelect)="files.openBreadcrumb(groupId, $event)"
         (viewChange)="files.setView(groupId, $event)"
         (selectionChange)="files.setSelection(groupId, $event)"

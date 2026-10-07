@@ -113,6 +113,13 @@ export interface FsTransport {
   /** Makes an empty file `name` in `parent`; `CONFLICT` when the name is taken. */
   createFile(parent: string, name: string): Promise<FsDetails>;
 
+  /**
+   * Writes a file's whole content (PRD 005, §4: the editor's *Save*). With
+   * `expected` — the `contentTag` of what was read — a file that holds
+   * something else now is left alone, refused as `CHANGED`.
+   */
+  writeFile(path: string, content: Uint8Array, expected?: string): Promise<FsDetails>;
+
   /** Entries under `path` whose names match `query` — a substring, or a glob with `*` / `?`. */
   search(path: string, query: string, limit?: number): Promise<FsSearchResult>;
 

@@ -1,0 +1,133 @@
+@use 'mixins' as *;
+
+:host {
+  --ui-sheet-row: 22px;
+  --ui-sheet-grid: var(--vsc-border);
+
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-editor-bg);
+}
+
+.viewport {
+  @include scrollable;
+
+  flex: 1;
+  outline: 0;
+  user-select: none;
+
+  &:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--vsc-focus-border);
+  }
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: var(--vsc-font-size-sm);
+}
+
+th,
+td {
+  box-sizing: border-box;
+  height: var(--ui-sheet-row);
+  padding: 0 6px;
+  overflow: hidden;
+  border-right: 1px solid var(--ui-sheet-grid);
+  border-bottom: 1px solid var(--ui-sheet-grid);
+  line-height: calc(var(--ui-sheet-row) - 1px);
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+td {
+  position: relative;
+  color: var(--vsc-fg);
+  cursor: cell;
+
+  &.is-extra {
+    background: color-mix(in srgb, var(--vsc-editor-bg) 85%, var(--vsc-panel-bg));
+  }
+
+  &.is-selected {
+    background: color-mix(in srgb, var(--vsc-list-active) 55%, transparent);
+  }
+
+  &.is-active {
+    outline: 2px solid var(--vsc-accent);
+    outline-offset: -2px;
+    background: var(--vsc-editor-bg);
+  }
+}
+
+/* The headers stay put as the cells scroll: the letters at the top, the numbers at the left. */
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.row-head,
+.corner {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.corner {
+  z-index: 3;
+}
+
+.column-head,
+.row-head,
+.corner {
+  background: var(--vsc-panel-bg);
+  color: var(--vsc-fg-muted);
+  font-weight: 400;
+  text-align: center;
+  cursor: default;
+
+  &.is-selected {
+    background: color-mix(in srgb, var(--vsc-accent) 22%, var(--vsc-panel-bg));
+    color: var(--vsc-fg-bright);
+  }
+
+  &.is-whole {
+    background: var(--vsc-accent);
+    color: var(--vsc-accent-fg);
+  }
+}
+
+.column-head {
+  cursor: s-resize;
+}
+
+.row-head {
+  font-variant-numeric: tabular-nums;
+  cursor: e-resize;
+}
+
+.spacer td {
+  height: auto;
+  padding: 0;
+  border: 0;
+}
+
+.cell-input {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 5px;
+  border: 2px solid var(--vsc-accent);
+  outline: 0;
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg-bright);
+  font: inherit;
+  user-select: text;
+}

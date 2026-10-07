@@ -56,6 +56,7 @@ export type FsBridgeCommand =
   | 'rename'
   | 'mkdir'
   | 'create-file'
+  | 'write'
   | 'search'
   | 'watch'
   | 'op-delete'
@@ -240,6 +241,18 @@ export interface FsCreateRequest {
   readonly name: string;
 }
 
+/**
+ * A file's whole new content (PRD 005, §4) — `POST /api/fs/write`. `expected`
+ * is the `contentTag` of what was read: when the file holds something else
+ * now, nothing is written (`CHANGED`).
+ */
+export interface FsWriteRequest {
+  readonly command: 'write';
+  readonly path: string;
+  readonly content: Uint8Array;
+  readonly expected?: string;
+}
+
 /** Find entries by name beneath the folder `path`. */
 export interface FsSearchRequest {
   readonly command: 'search';
@@ -395,6 +408,7 @@ export type FsBridgeRequest =
   | FsOpJobRequest
   | FsRenameRequest
   | FsCreateRequest
+  | FsWriteRequest
   | FsSearchRequest
   | FsWatchRequest
   | FsOpDeleteRequest
@@ -457,6 +471,7 @@ export interface FsBridgeResults {
   readonly rename: FileDetailsDto;
   readonly mkdir: FileDetailsDto;
   readonly 'create-file': FileDetailsDto;
+  readonly write: FileDetailsDto;
   readonly search: SearchResultDto;
   readonly watch: WatchResultDto;
   readonly 'op-delete': OperationJobDto;

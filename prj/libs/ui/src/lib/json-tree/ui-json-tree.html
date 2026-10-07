@@ -1,0 +1,49 @@
+<div class="header">
+  <span class="where" title="Where the cursor is">{{ view.focusedPath() }}</span>
+  <ui-icon-button icon="chevrons-down" label="Expand all" (action)="view.expandAll()" />
+  <ui-icon-button icon="chevrons-up" label="Collapse all" (action)="view.collapseAll()" />
+</div>
+
+<div
+  #viewport
+  class="viewport"
+  role="tree"
+  tabindex="0"
+  [attr.aria-label]="label()"
+  [attr.aria-activedescendant]="activeId()"
+  (keydown)="onKeydown($event)"
+  (scroll)="onScroll()"
+>
+  <div class="spacer" [style.height.px]="view.rows().length * rowHeight">
+    <div class="rows" [style.top.px]="window().start * rowHeight">
+      @for (row of window().rows; track row.id; let offset = $index) {
+        <div
+          class="row"
+          role="treeitem"
+          [id]="rowId(window().start + offset)"
+          [attr.aria-level]="row.depth + 1"
+          [attr.aria-expanded]="row.size > 0 ? row.expanded : null"
+          [attr.aria-selected]="row.id === view.focusedId()"
+          [class.is-focused]="row.id === view.focusedId()"
+          [style.padding-left.px]="row.depth * 16 + 4"
+          (click)="onRowPress(row.id)"
+          (dblclick)="onRowDouble($event, row.id, row.size)"
+        >
+          <span class="twisty" (click)="row.size > 0 && onTwisty($event, row.id)">
+            @if (row.size > 0) {
+              <ui-icon [name]="row.expanded ? 'chevron-down' : 'chevron-right'" />
+            }
+          </span>
+          @if (row.key !== null) {
+            <span class="key" [class.is-index]="row.inArray">{{ row.inArray ? row.key : '"' + row.key + '"' }}</span>
+            <span class="colon">:&nbsp;</span>
+          }
+          <span class="value" [class]="'value is-' + row.kind">{{ row.preview }}</span>
+          @if (row.kind === 'object' || row.kind === 'array') {
+            <span class="size">{{ row.size }} {{ row.kind === 'array' ? (row.size === 1 ? 'item' : 'items') : row.size === 1 ? 'key' : 'keys' }}</span>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

@@ -344,6 +344,15 @@ export class FsHttpService implements FsTransport {
     return this.request(this.http.post<FsEnvelope<FsDetails>>(`${this.baseUrl}/create`, { path: parent, name }));
   }
 
+  async writeFile(path: string, content: Uint8Array, expected?: string): Promise<FsDetails> {
+    let params = new HttpParams().set('path', path);
+    if (expected !== undefined) {
+      params = params.set('expected', expected);
+    }
+    const body = new Blob([content as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' });
+    return this.request(this.http.post<FsEnvelope<FsDetails>>(`${this.baseUrl}/write?${params.toString()}`, body));
+  }
+
   async search(path: string, query: string, limit?: number): Promise<FsSearchResult> {
     let params = new HttpParams().set('path', path).set('query', query);
     if (limit !== undefined) {

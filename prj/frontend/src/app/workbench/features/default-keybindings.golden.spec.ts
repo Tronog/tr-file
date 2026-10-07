@@ -63,6 +63,8 @@ const GOLDEN = [
   'window Ctrl+D view.toggleDetails',
   'window Ctrl+/ view.toggleSidebars',
   'window Ctrl+U file.checkForUpdates',
+  // PRD 005, §4: the editor's Save.
+  'window Ctrl+S file.save',
   'window Ctrl+Shift+T view.app.task-manager',
   ...Array.from({ length: 9 }, (_, index) => `window Ctrl+${index + 1} places.openBookmark${index + 1}`),
   'window Ctrl+Tab workbench.focusNextPart',
@@ -72,7 +74,8 @@ const GOLDEN = [
   'window F1 help.show',
   'window F2 file.rename',
   'window F3 file.open',
-  'window F4 file.openExternal',
+  // PRD 005, §4: Midnight Commander's Edit is the built-in editor now.
+  'window F4 file.edit',
   'window F5 file.copyTo',
   'window F6 file.moveTo',
   'window F7 file.newFolder',

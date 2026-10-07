@@ -99,6 +99,17 @@
   align-items: center;
 }
 
+.problem {
+  max-width: 40ch;
+  overflow: hidden;
+  color: var(--vsc-severity-error);
+  text-overflow: ellipsis;
+}
+
+.state {
+  color: var(--vsc-fg);
+}
+
 /* ── markdown typography ────────────────────────────────────────────────── */
 
 /* The rendered HTML is inserted at runtime, so it carries none of this

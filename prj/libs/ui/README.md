@@ -34,7 +34,7 @@ the file browser, its listings, disk usage, the git pane — are the separate
   features holding the rest). `<ui-workbench-shell>` draws it. An application
   configures it with data and extends it by subclassing (below). A handful of
   root services stand beside it: `UiKeymap`, `UiModalService`,
-  `UiThemeService`, `UiImageViewService` (per viewer).
+  `UiThemeService`, `UiImageViewService` (per viewer), `UiCodeEditorService` (per editor), `UiJsonTreeService` (per tree).
 - **Zoneless and signal-based.** `input()` / `input.required()` / `output()` /
   `model()` / `computed()`, native control flow, no `@Input`/`@Output`, no
   `@HostBinding`/`@HostListener`, no `NgModule`, no zone.js.
@@ -93,7 +93,7 @@ literal. The light palette's text colours clear WCAG AA on its surfaces.
 | Shell components | `UiWorkbench` (`leftAt` / `rightAt` put each sidebar at either edge, both at one if need be — PRD 010, §3), `UiTitleBar` (menus, command centre, buttons, zoom, *Upgrade*, window controls), `UiZoomMenu`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
 | Sidebars | `UiSidebar`, `UiPane` (movable by its header or `Ctrl`+`↑`/`↓` — `UiPaneMove`, PRD 002, §5.1; resizable by its sash — `UiPaneResize`, §5.2), `UiTree` (`reorderable` — `UiTreeMove`, PRD 002, §6.1) |
 | Details widgets | `UiPreviewCard`, `UiPropertyList` (a value with an `action` is a button — `action`), `UiChipList`, `UiActionList` |
-| Panels | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar`; viewers any content may use: `UiDocumentView` (markdown, text, image, diff), `UiImageView` and `UiImageViewService`, `UiBreadcrumbs` (a path bar that edits and suggests) |
+| Panels | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar`; viewers any content may use: `UiDocumentView` (markdown, text, image, diff, a JSON tree, and the editor), `UiImageView` and `UiImageViewService`, `UiCodeEditor` and `UiCodeEditorService` (a textarea under a coloured overlay; `UiSyntaxHighlighter` — markdown, bash, JSON), `UiJsonTree` and `UiJsonTreeService`, `UiSheet` and `UiSheetService` (a spreadsheet of delimited text; `parseDelimited` / `serializeDelimited`), `UiBreadcrumbs` (a path bar that edits and suggests) |
 | Bottom panel | `UiBottomPanel` (`bodyFocus` puts the keyboard in the active tab's content), `UiNotes` (a plain text box: `textChange`, `commit` on blur, `error`) |
 | Controls | `UiIconButton`, `UiButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
 | Modal windows | `UiModalService` (`confirm`, `prompt`, `message`, `show`, `open`), `UiModalHost`, `UI_MODAL_REF`; `UiModal` (`size: 'large'` for a window to work in), `UiDialog`, `UiProgressDialog`; `UiSettingsModal`, `UiHelpModal` |
@@ -173,7 +173,7 @@ that reason). What each feature lets an application vary:
 | Feature | Hooks |
 | --- | --- |
 | `UiCommandsFeature` | `define()` lists the table — the library's commands placed among the application's with `builtin(id)` / `builtinsOf(prefix)`; `activeTarget()`, `tabTarget()` say what commands act on; `ran()` follows a command run |
-| `UiEditorGroupsFeature` | `registerContent(type, driver)` — what loads a tab, says it is loading, takes dropped files; `remember` / `recall` / `follow` keep a group's own fields as tabs change; `blankGroup`, `newTabFrom`, `groupAdded`, `groupRemoved`, `tabChosen`, `tabIcon` |
+| `UiEditorGroupsFeature` | `registerContent(type, driver)` — what loads a tab, says it is loading, takes dropped files, has unsaved changes (`isDirty`, the tab's dot) and may be closed (`canClose`, which may ask); `remember` / `recall` / `follow` keep a group's own fields as tabs change; `blankGroup`, `newTabFrom`, `groupAdded`, `groupRemoved`, `tabChosen`, `tabIcon` |
 | `UiChromeFeature` | `activityItems`, `activityBottomItems`, `statusLeadingItems`, `statusTrailingItems` (computeds to override); `menuRow`, `runMenuRow`, `runActivity`, `runStatusAction`, `selectActivity` |
 | `UiBottomPanelFeature` | `countOf`, `tabActions`, `runTabAction` |
 | `UiCommandPaletteFeature` | `leadingCommands`, `trailingCommands`; `prompt(step)` asks in the box (`UiInputStep`, `UiPickStep`) |

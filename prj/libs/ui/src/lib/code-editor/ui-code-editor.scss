@@ -1,0 +1,140 @@
+@use 'mixins' as *;
+
+/*
+ * The textarea and the overlay must lay text out identically, or the colours
+ * drift from the caret: one font, one size, one line height, no ligatures,
+ * no wrapping, the same padding. Change one, change both.
+ */
+:host {
+  --ui-code-line-height: 19px;
+  --ui-code-pad-y: 4px;
+  --ui-code-pad-x: 12px;
+
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-editor-bg);
+  font-family: var(--vsc-font-mono);
+  font-size: 13px;
+  font-variant-ligatures: none;
+  line-height: var(--ui-code-line-height);
+  tab-size: 4;
+}
+
+.gutter {
+  position: relative;
+  flex: none;
+  width: calc(var(--ui-code-digits, 2) * 1ch + 28px);
+  overflow: hidden;
+  color: var(--vsc-editor-line-number);
+  text-align: right;
+  user-select: none;
+}
+
+.gutter-canvas {
+  position: absolute;
+  inset: var(--ui-code-pad-y) 0 auto;
+}
+
+.gutter-lines {
+  position: absolute;
+  right: 0;
+  left: 0;
+}
+
+.number {
+  height: var(--ui-code-line-height);
+  padding-right: 12px;
+  padding-left: 8px;
+
+  &.is-current {
+    color: var(--vsc-editor-line-number-active);
+  }
+
+  &.is-problem {
+    box-shadow: inset 3px 0 var(--vsc-severity-error);
+    color: var(--vsc-severity-error);
+  }
+}
+
+.surface {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.input,
+.overlay {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--ui-code-pad-y) var(--ui-code-pad-x);
+  font: inherit;
+  font-variant-ligatures: none;
+  line-height: inherit;
+  letter-spacing: 0;
+  white-space: pre;
+}
+
+.input {
+  overflow: auto;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--vsc-fg-bright);
+  user-select: text;
+
+  &::selection {
+    background: var(--vsc-editor-selection-bg);
+    color: transparent;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+/* Above the textarea, so the selection it draws is under the coloured text; it takes no pointer. */
+.overlay {
+  z-index: 1;
+  overflow: hidden;
+  color: var(--vsc-fg);
+  pointer-events: none;
+}
+
+.canvas {
+  position: relative;
+  will-change: transform;
+}
+
+.lines {
+  position: absolute;
+  left: 0;
+}
+
+.line {
+  height: var(--ui-code-line-height);
+}
+
+.tok-comment { color: var(--vsc-syntax-comment); }
+.tok-string { color: var(--vsc-syntax-string); }
+.tok-number { color: var(--vsc-syntax-number); }
+.tok-keyword { color: var(--vsc-syntax-keyword); }
+.tok-literal { color: var(--vsc-syntax-literal); }
+.tok-property { color: var(--vsc-syntax-property); }
+.tok-variable { color: var(--vsc-syntax-variable); }
+.tok-function { color: var(--vsc-syntax-function); }
+.tok-operator { color: var(--vsc-syntax-operator); }
+.tok-punctuation { color: var(--vsc-syntax-punctuation); }
+.tok-heading { color: var(--vsc-syntax-heading); font-weight: 600; }
+.tok-strong { font-weight: 600; }
+.tok-emphasis { font-style: italic; }
+.tok-link { color: var(--vsc-syntax-link); text-decoration: underline; }
+.tok-code { color: var(--vsc-syntax-code); }
+.tok-quote { color: var(--vsc-syntax-quote); font-style: italic; }
+.tok-meta { color: var(--vsc-syntax-meta); }
+.tok-invalid { color: var(--vsc-syntax-invalid); text-decoration: wavy underline var(--vsc-syntax-invalid); }

@@ -50,7 +50,7 @@ describe('Function keys (PRD 004, §2)', () => {
         '1 Help',
         '2 Rename',
         '3 View',
-        '4 Open',
+        '4 Edit',
         '5 Copy',
         '6 Move',
         '7 MkDir',
@@ -101,7 +101,7 @@ describe('Function keys (PRD 004, §2)', () => {
       ]);
     });
 
-    it('F3 views, F4 opens with the system, F7 makes a folder, F8 deletes for good', () => {
+    it('F3 views, F4 opens what the editor cannot edit with the system, F7 makes a folder, F8 deletes for good', () => {
       const open = vi.spyOn(workbench.fileBrowserFt, 'openPath').mockImplementation(() => undefined);
       const external = vi.spyOn(workbench.systemOpenFt, 'open').mockResolvedValue();
       const folder = vi.spyOn(workbench.fileEditFt, 'createFolder').mockResolvedValue();

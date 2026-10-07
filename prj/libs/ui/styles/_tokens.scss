@@ -115,6 +115,27 @@
   --vsc-diff-removed-bg: rgb(255 0 0 / 20%);
   --vsc-diff-hunk: #3794ff;
 
+  /* the editor (PRD 005, §4): Dark Modern's syntax colours, its selection and gutter */
+  --vsc-syntax-comment: #6a9955;
+  --vsc-syntax-string: #ce9178;
+  --vsc-syntax-number: #b5cea8;
+  --vsc-syntax-keyword: #c586c0;
+  --vsc-syntax-literal: #569cd6;
+  --vsc-syntax-property: #9cdcfe;
+  --vsc-syntax-variable: #9cdcfe;
+  --vsc-syntax-function: #dcdcaa;
+  --vsc-syntax-operator: #d4d4d4;
+  --vsc-syntax-punctuation: #808080;
+  --vsc-syntax-heading: #569cd6;
+  --vsc-syntax-link: #3794ff;
+  --vsc-syntax-code: #ce9178;
+  --vsc-syntax-quote: #6a9955;
+  --vsc-syntax-meta: #808080;
+  --vsc-syntax-invalid: #f14c4c;
+  --vsc-editor-selection-bg: #264f78;
+  --vsc-editor-line-number: #6e7681;
+  --vsc-editor-line-number-active: #cccccc;
+
   /* file type accents */
   --vsc-ic-folder: #dcb67a;
   --vsc-ic-ts: #3178c6;
@@ -242,6 +263,27 @@
   --vsc-diff-inserted-bg: rgb(156 204 44 / 25%);
   --vsc-diff-removed-bg: rgb(255 0 0 / 15%);
   --vsc-diff-hunk: #005fb8;
+
+  /* the editor: Light Modern's syntax colours */
+  --vsc-syntax-comment: #008000;
+  --vsc-syntax-string: #a31515;
+  --vsc-syntax-number: #098658;
+  --vsc-syntax-keyword: #af00db;
+  --vsc-syntax-literal: #0000ff;
+  --vsc-syntax-property: #0451a5;
+  --vsc-syntax-variable: #001080;
+  --vsc-syntax-function: #795e26;
+  --vsc-syntax-operator: #3b3b3b;
+  --vsc-syntax-punctuation: #6e6e6e;
+  --vsc-syntax-heading: #800000;
+  --vsc-syntax-link: #005fb8;
+  --vsc-syntax-code: #a31515;
+  --vsc-syntax-quote: #008000;
+  --vsc-syntax-meta: #6e6e6e;
+  --vsc-syntax-invalid: #c11a0a;
+  --vsc-editor-selection-bg: #add6ff;
+  --vsc-editor-line-number: #6e7681;
+  --vsc-editor-line-number-active: #171184;
 
   /* file type accents */
   --vsc-ic-folder: #b8862f;

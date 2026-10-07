@@ -1,0 +1,93 @@
+<div
+  #viewport
+  class="viewport"
+  role="grid"
+  tabindex="0"
+  aria-multiselectable="true"
+  [attr.aria-label]="label()"
+  [attr.aria-readonly]="!editable()"
+  [attr.aria-rowcount]="view.rowCount() + 1"
+  [attr.aria-colcount]="view.columnCount() + 1"
+  [attr.aria-activedescendant]="activeId()"
+  (keydown)="onKeydown($event)"
+  (scroll)="onScroll()"
+>
+  <table [style.width.px]="totalWidth()">
+    <colgroup>
+      <col [style.width.px]="rowHeadWidth" />
+      @for (width of widths(); track $index) {
+        <col [style.width.px]="width" />
+      }
+    </colgroup>
+    <thead>
+      <tr role="row" aria-rowindex="1">
+        <th class="corner" role="columnheader" aria-label="Select all" (pointerdown)="onCornerPress($event)"></th>
+        @for (column of columns(); track column) {
+          <th
+            class="column-head"
+            role="columnheader"
+            [attr.aria-colindex]="column + 2"
+            [class.is-selected]="view.range().left <= column && column <= view.range().right"
+            [class.is-whole]="(view.selectionKind() === 'columns' || view.selectionKind() === 'all') && view.range().left <= column && column <= view.range().right"
+            (pointerdown)="onColumnPress($event, column)"
+          >
+            {{ columnName(column) }}
+          </th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @if (window().above > 0) {
+        <tr class="spacer" aria-hidden="true" [style.height.px]="window().above"><td [attr.colspan]="columns().length + 1"></td></tr>
+      }
+      @for (row of window().rows; track row) {
+        <tr role="row" [attr.aria-rowindex]="row + 2">
+          <th
+            class="row-head"
+            role="rowheader"
+            [class.is-selected]="view.range().top <= row && row <= view.range().bottom"
+            [class.is-whole]="(view.selectionKind() === 'rows' || view.selectionKind() === 'all') && view.range().top <= row && row <= view.range().bottom"
+            (pointerdown)="onRowPress($event, row)"
+          >
+            {{ row + 1 }}
+          </th>
+          @for (column of columns(); track column) {
+            <td
+              role="gridcell"
+              [id]="cellId(row, column)"
+              [attr.aria-colindex]="column + 2"
+              [attr.aria-selected]="view.inRange(row, column)"
+              [class.is-selected]="view.inRange(row, column)"
+              [class.is-active]="view.active().row === row && view.active().column === column"
+              [class.is-extra]="row >= view.dataRows() || column >= view.dataColumns()"
+              (pointerdown)="onCellPress($event, row, column)"
+              (pointerenter)="onCellEnter($event, row, column)"
+              (dblclick)="onCellDouble(row, column)"
+            >
+              @if (view.editing(); as editing) {
+                @if (editing.row === row && editing.column === column) {
+                  <input
+                    #cellInput
+                    class="cell-input"
+                    [attr.aria-label]="columnName(column) + (row + 1)"
+                    [value]="editing.value"
+                    (input)="onInput($event)"
+                    (keydown)="onInputKeydown($event)"
+                    (blur)="onInputBlur()"
+                  />
+                } @else {
+                  {{ view.cell(row, column) }}
+                }
+              } @else {
+                {{ view.cell(row, column) }}
+              }
+            </td>
+          }
+        </tr>
+      }
+      @if (window().below > 0) {
+        <tr class="spacer" aria-hidden="true" [style.height.px]="window().below"><td [attr.colspan]="columns().length + 1"></td></tr>
+      }
+    </tbody>
+  </table>
+</div>

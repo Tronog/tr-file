@@ -90,6 +90,8 @@ export class UiFileBrowser {
 
   readonly breadcrumbSelect = output<string>();
   readonly toolbarAction = output<string>();
+  /** The text of a file being edited (PRD 005, §4), after each change. */
+  readonly documentText = output<string>();
   readonly viewChange = output<UiPanelView>();
   /**
    * A new selection in whichever view is showing — one entry or many
@@ -368,6 +370,10 @@ export class UiFileBrowser {
    * the view that owns it.
    */
   protected onBodyKeydown(event: KeyboardEvent): void {
+    // The editor's text (PRD 005, §4) keeps its keys: `Alt`+arrows are a text field's.
+    if (UiFileBrowser.isTextField(event.target)) {
+      return;
+    }
     const walk = this.keymap.commandFor(event, 'panel', WALK_COMMANDS);
     const up = event.target === this.bodyElement().nativeElement && this.keymap.commandFor(event, 'list', ['go.up']) !== null;
     if (walk === null && !up) {

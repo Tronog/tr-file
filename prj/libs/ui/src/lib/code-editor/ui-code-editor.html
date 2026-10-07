@@ -1,0 +1,49 @@
+<!-- Line numbers: drawn for the lines on screen only, moved with the text's scroll. -->
+<div class="gutter" aria-hidden="true">
+  <div #gutter class="gutter-canvas">
+    <div class="gutter-lines" [style.top.px]="view.visible().start * lineHeight">
+      @for (line of view.visible().rows; track line.index) {
+        <div
+          class="number"
+          [class.is-current]="line.index + 1 === view.caret().line"
+          [class.is-problem]="line.index + 1 === problem()?.line"
+          [attr.title]="line.index + 1 === problem()?.line ? problem()?.message : null"
+        >
+          {{ line.index + 1 }}
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<div class="surface">
+  <!-- The editor itself; its text is transparent, the overlay above draws it coloured. -->
+  <textarea
+    #area
+    class="input"
+    tabindex="0"
+    wrap="off"
+    spellcheck="false"
+    autocapitalize="off"
+    autocomplete="off"
+    [attr.autocorrect]="'off'"
+    [attr.aria-label]="label()"
+    [readOnly]="readonly()"
+    (input)="onInput()"
+    (scroll)="onScroll()"
+    (keydown)="onKeydown($event)"
+    (keyup)="onCaret()"
+    (click)="onCaret()"
+    (select)="onCaret()"
+    (focus)="onCaret()"
+  ></textarea>
+  <div class="overlay" aria-hidden="true">
+    <div #canvas class="canvas">
+      <div class="lines" [style.top.px]="view.visible().start * lineHeight">
+        @for (line of view.visible().rows; track line.index) {
+          <div class="line">@for (token of line.tokens; track $index) {<span [class]="token.kind ? 'tok-' + token.kind : ''">{{ token.text }}</span>}</div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

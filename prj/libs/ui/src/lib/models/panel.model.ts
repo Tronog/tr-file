@@ -1,3 +1,5 @@
+import type { UiSyntaxLanguage } from '../code-editor/syntax/syntax.model';
+import type { UiDelimitedText } from '../sheet/delimited-text';
 import type { UiIconAction, UiIconName, UiIconTint } from './icon.model';
 
 /** A tab in an editor group's tab bar. */
@@ -20,18 +22,43 @@ export interface UiDiffLine {
   readonly text: string;
 }
 
-/** A file rendered read-only in a panel, instead of a directory listing. */
+/**
+ * A file open for editing (PRD 005, §4): `UiCodeEditor` draws it in place of
+ * the viewer. The text is the application's draft; the editor reports every
+ * change, and is handed the text back.
+ */
+export interface UiDocumentEditModel {
+  readonly text: string;
+  readonly language: UiSyntaxLanguage;
+  /** The language as the status line names it, e.g. `'Markdown'`. */
+  readonly languageLabel: string;
+  /** What the status line says of the draft: `'Modified'`, `'Saving…'`. */
+  readonly state?: string;
+  /** A line to mark, and why — a JSON syntax error (§5). */
+  readonly problem?: { readonly line: number; readonly message: string };
+}
+
+/** A file rendered in a panel, instead of a directory listing — read-only unless `edit`. */
 export interface UiDocumentModel {
   /** Path shown in the viewer's status line, e.g. `docs/prd/001.md`. */
   readonly path: string;
   /**
    * `markdown` renders `html`, `text` renders `text`, `image` renders `src`,
-   * and `diff` renders `lines`, coloured by kind (PRD 011, §1).
+   * `diff` renders `lines`, coloured by kind (PRD 011, §1), `json` renders
+   * `json` as a tree (PRD 005, §5), and `table` renders `table` as a
+   * spreadsheet (PRD 015, §1) — editable while `edit` is set, its changes
+   * reported as the text of the file.
    */
-  readonly kind: 'markdown' | 'text' | 'image' | 'diff';
+  readonly kind: 'markdown' | 'text' | 'image' | 'diff' | 'json' | 'table';
+  /** The cells of a delimited file. Only for `kind: 'table'`. */
+  readonly table?: UiDelimitedText;
+  /** The parsed document. Only for `kind: 'json'`. */
+  readonly json?: unknown;
+  /** The file open for editing (PRD 005, §4), drawn instead of whatever `kind` says — but a `table`, which is edited as one. */
+  readonly edit?: UiDocumentEditModel;
   /** Sanitised HTML, already rendered by the app. Only for `kind: 'markdown'`. */
   readonly html?: string;
-  /** Raw file text. Only for `kind: 'text'`. */
+  /** Raw file text. For `kind: 'text'`, and kept with a `json` document for its text view. */
   readonly text?: string;
   /** A unified diff, split into lines by the application. Only for `kind: 'diff'`. */
   readonly lines?: readonly UiDiffLine[];

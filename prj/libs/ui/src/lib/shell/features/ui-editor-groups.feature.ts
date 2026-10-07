@@ -244,7 +244,21 @@ export class UiEditorGroupsFeature<TTab extends UiTabState = UiTabState, TGroup 
     this.focus(groupId);
   }
 
+  /**
+   * Closes a tab — once its content agrees (`canClose`): a tab with unsaved
+   * changes asks first (PRD 005, §4), and stays open if the answer is no.
+   */
   closeTab(groupId: string, tabId: string): void {
+    const tab = this.stateOf(groupId)?.tabs.find((candidate) => candidate.id === tabId);
+    const verdict = tab === undefined ? true : (this.contentOf(tab)?.canClose?.(tab) ?? true);
+    if (verdict === true) {
+      this.removeTab(groupId, tabId);
+    } else if (verdict !== false) {
+      void verdict.then((close) => close && this.removeTab(groupId, tabId));
+    }
+  }
+
+  private removeTab(groupId: string, tabId: string): void {
     const group = this.stateOf(groupId);
     if (!group) {
       return;
@@ -569,7 +583,13 @@ export class UiEditorGroupsFeature<TTab extends UiTabState = UiTabState, TGroup 
   }
 
   private tabOf(tab: TTab): UiTab {
-    return { id: tab.id, label: tab.label, ...this.tabIcon(tab), ...(tab.active ? { active: true } : {}) };
+    return {
+      id: tab.id,
+      label: tab.label,
+      ...this.tabIcon(tab),
+      ...(tab.active ? { active: true } : {}),
+      ...(this.contentOf(tab)?.isDirty?.(tab) ? { dirty: true } : {}),
+    };
   }
 
   /** A tab's icon: its driver's (`tabIcon`), else its content's. */

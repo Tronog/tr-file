@@ -367,6 +367,10 @@ export class FsBridgeService implements FsTransport {
     return this.invoke<FsDetails>({ command: 'create-file', path: parent, name });
   }
 
+  async writeFile(path: string, content: Uint8Array, expected?: string): Promise<FsDetails> {
+    return this.invoke<FsDetails>({ command: 'write', path, content, ...(expected === undefined ? {} : { expected }) });
+  }
+
   async search(path: string, query: string, limit?: number): Promise<FsSearchResult> {
     return this.invoke<FsSearchResult>({ command: 'search', path, query, ...(limit === undefined ? {} : { limit }) });
   }

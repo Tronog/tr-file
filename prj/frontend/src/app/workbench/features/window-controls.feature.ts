@@ -68,9 +68,16 @@ export class WindowControlsFeature {
       case 'toggleMaximize':
         this.parent.desktopWindow.toggleMaximize();
         break;
-      case 'close':
-        this.parent.desktopWindow.close();
+      case 'close': {
+        // Unsaved edits are asked about first (PRD 005, §4).
+        const saved = this.parent.fileEditorFt.whenSaved();
+        if (saved === true) {
+          this.parent.desktopWindow.close();
+        } else if (saved !== false) {
+          void saved.then((close) => close && this.parent.desktopWindow.close());
+        }
         break;
+      }
       default:
         break;
     }

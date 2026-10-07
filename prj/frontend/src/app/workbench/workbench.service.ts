@@ -42,6 +42,7 @@ import { TrashFeature } from './features/trash.feature';
 import { ServerClockFeature } from './features/server-clock.feature';
 import { ContextMenuFeature } from './features/context-menu.feature';
 import { FileEditFeature } from './features/file-edit.feature';
+import { FileEditorFeature } from './features/file-editor.feature';
 import { SearchFeature } from './features/search.feature';
 import { SystemOpenFeature } from './features/system-open.feature';
 import { UndoFeature } from './features/undo.feature';
@@ -235,6 +236,8 @@ export class WorkbenchService extends UiWorkbenchService<PanelTabState, PanelGro
   readonly savedServersFt = new SavedServersFeature(undefined, this.settings);
   /** Rename, new folder, new file (PRD 003, §5). */
   readonly fileEditFt = new FileEditFeature(this);
+  /** The file editor: a file tab's draft, and saving it (PRD 005, §4–5). */
+  readonly fileEditorFt = new FileEditorFeature(this);
   /** `Ctrl`+`Z`: the last change to the file system, taken back (PRD 003, §5). */
   readonly undoFt = new UndoFeature(this);
   /** Open with the system's application; reveal in its file manager (PRD 003, §5). */

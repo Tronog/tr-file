@@ -1,4 +1,9 @@
-import { Component, computed, input, viewChild, type ElementRef } from '@angular/core';
+import { Component, computed, input, output, signal, viewChild, type ElementRef } from '@angular/core';
+import { UiCodeEditor } from '../code-editor/ui-code-editor';
+import type { UiCodePosition } from '../code-editor/ui-code-editor.service';
+import { UiJsonTree } from '../json-tree/ui-json-tree';
+import { serializeDelimited, type UiDelimitedText } from '../sheet/delimited-text';
+import { UiSheet } from '../sheet/ui-sheet';
 import { UiImageView } from '../image-view/ui-image-view';
 import type { UiDocumentModel } from '../models';
 
@@ -18,15 +23,35 @@ import type { UiDocumentModel } from '../models';
  * Its text can be selected and copied, though (PRD 005, §3): by the mouse,
  * `Shift` with the arrows as anywhere, and `Ctrl`+`A`, which selects the
  * document alone; `Ctrl`+`C` and the right-click menu are the browser's.
+ *
+ * A `table` document is a spreadsheet (PRD 015, §1, `UiSheet`), edited in
+ * place while it has `edit`. A `json` document is a tree of its values (PRD 005, §5, `UiJsonTree`). A
+ * document with `edit` is open for editing (§4): `UiCodeEditor` draws it in
+ * place of all of that, every change is reported (`textChange`) for the
+ * application to keep, and the status line says where the caret is.
  */
 @Component({
   selector: 'ui-document-view',
-  imports: [UiImageView],
+  imports: [UiImageView, UiCodeEditor, UiJsonTree, UiSheet],
   templateUrl: './ui-document-view.html',
   styleUrl: './ui-document-view.scss',
 })
 export class UiDocumentView {
   readonly document = input.required<UiDocumentModel>();
+
+  /** The text of a document being edited, after each change. */
+  readonly textChange = output<string>();
+
+  /** Where the editor's caret is, for the status line. */
+  protected readonly caret = signal<UiCodePosition>({ line: 1, column: 1 });
+
+  /** Where a spreadsheet's selection is: `B4`, `B4:C9`. */
+  protected readonly cell = signal('A1');
+
+  /** A spreadsheet's cells changed (PRD 015, §1): reported as the file's text, written as it was read. */
+  protected onRows(table: UiDelimitedText, rows: readonly (readonly string[])[]): void {
+    this.textChange.emit(serializeDelimited({ ...table, rows }));
+  }
 
   /**
    * Accessible name of the rendered region. The path is what distinguishes one
@@ -37,6 +62,8 @@ export class UiDocumentView {
   protected readonly isMarkdown = computed(() => this.document().kind === 'markdown');
 
   protected readonly isImage = computed(() => this.document().kind === 'image');
+
+  protected readonly isJson = computed(() => this.document().kind === 'json');
 
   /** Where the image bytes are; `''` for anything that is not an image. */
   protected readonly src = computed(() => this.document().src ?? '');

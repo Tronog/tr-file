@@ -461,6 +461,19 @@ describe('FsBridgeService — what every file manager has', () => {
     ]);
   });
 
+  it('writes a file as its bytes, with the tag of what was read (PRD 005, §4)', async () => {
+    fake.answer = { data: DETAILS };
+    const content = new TextEncoder().encode('saved');
+
+    await fs.editFt.writeFile('docs/a.txt', content, '3:abc');
+    await fs.editFt.writeFile('docs/a.txt', content);
+
+    expect(fake.sent).toEqual([
+      { command: 'write', path: 'docs/a.txt', content, expected: '3:abc' },
+      { command: 'write', path: 'docs/a.txt', content },
+    ]);
+  });
+
   it('searches and watches', async () => {
     fake.answer = { data: { path: '', query: 'a', entries: [], truncated: false, scanned: 3 } };
     await fs.readFt.search('', 'a', 50);

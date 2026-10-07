@@ -26,4 +26,9 @@ export class FsEditFeature {
   createFile(parent: string, name: string): Promise<FsDetails> {
     return this.parent.transport.createFile(parent, name);
   }
+
+  /** A file's whole new content (PRD 005, §4); `CHANGED` when it is no longer what `expected` says was read. */
+  writeFile(path: string, content: Uint8Array, expected?: string): Promise<FsDetails> {
+    return this.parent.transport.writeFile(path, content, expected);
+  }
 }

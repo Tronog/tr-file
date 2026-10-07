@@ -11,3 +11,5 @@
 011 - GIT integration
 012 - image viewer
 013 - disk usage
+014
+015 - CSV editor
