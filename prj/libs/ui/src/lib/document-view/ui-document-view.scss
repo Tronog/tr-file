@@ -12,12 +12,17 @@
 /* Scrolls both ways: the text view keeps long lines intact rather than
    wrapping them, so the horizontal scroll lives here too. Keeping it on one
    element avoids nesting scroll containers, each of which would need its own
-   keyboard entry point. */
+   keyboard entry point.
+
+   The workbench is `user-select: none`, an application rather than a page;
+   what a file says is the exception — it can be selected and copied
+   (PRD 005, §3). */
 .doc {
   @include scrollable;
 
   flex: 1;
   overflow-x: auto;
+  user-select: text;
 
   &:focus-visible {
     @include focus-ring;

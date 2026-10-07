@@ -28,6 +28,7 @@ const PANEL_COMMANDS = [
   'panel.contextMenu',
   'image.previous',
   'image.next',
+  'viewer.close',
   'view.stopLoading',
 ] as const;
 
@@ -242,7 +243,9 @@ export class UiFileBrowser {
    * - `PageUp` / `PageDown` over an image: the previous or next image of its
    *   folder (PRD 012, §1.1);
    * - `Escape` while a large folder is being read: stop reading it (PRD 004,
-   *   §3.1.4) — only then; otherwise the key is left alone.
+   *   §3.1.4); over a file — text, markdown, a diff, an image: close its
+   *   tab (PRD 005, §3.1; PRD 012, §1.3) — only then; otherwise the key is
+   *   left alone.
    *
    * None is claimed inside a text field. Handled before the key reaches the
    * group around it, which claims the tab chords. The browser knows which
@@ -253,11 +256,10 @@ export class UiFileBrowser {
     if (UiFileBrowser.isTextField(event.target)) {
       return;
     }
-    const command = this.keymap.commandFor(event, 'panel', PANEL_COMMANDS);
-    if (command === null || !this.runPanelCommand(command)) {
-      return;
+    // One key may be bound to several commands that each apply only sometimes (`Escape`).
+    if (this.keymap.commandsFor(event, 'panel', PANEL_COMMANDS).some((command) => this.runPanelCommand(command))) {
+      event.preventDefault();
     }
-    event.preventDefault();
   }
 
   /** Carries out a panel command; `false` when it does not apply here, so the key is left alone. */
@@ -337,6 +339,13 @@ export class UiFileBrowser {
           return false;
         }
         this.command.emit({ command: command === 'image.next' ? 'next-image' : 'previous-image', entryId: null });
+        return true;
+      case 'viewer.close':
+        // Over a file only (PRD 005, §3.1; PRD 012, §1.3): its tab closes, back to the listing it came from.
+        if (!this.document()) {
+          return false;
+        }
+        this.command.emit({ command: 'close', entryId: null });
         return true;
       default:
         return false;

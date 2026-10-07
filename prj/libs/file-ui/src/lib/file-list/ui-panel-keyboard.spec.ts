@@ -586,6 +586,23 @@ describe('panel keys', () => {
       expect(escape().defaultPrevented).toBe(true);
       expect(commands).toEqual([{ command: 'stop-loading', entryId: null }]);
     });
+
+    /** PRD 005, §3.1 and PRD 012, §1.3 — over a file, text or image, the key closes its tab. */
+    it('closes a file', () => {
+      show({ rows: [], document: { path: 'docs/README.md', kind: 'text', text: 'hello' } });
+      expect(escape().defaultPrevented).toBe(true);
+
+      show({ rows: [], document: { path: 'pics/a.png', kind: 'image', src: 'blob:a' } });
+      const viewport = fixture.nativeElement.querySelector('ui-image-view .viewport') as HTMLElement;
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      viewport.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(commands).toEqual([
+        { command: 'close', entryId: null },
+        { command: 'close', entryId: null },
+      ]);
+    });
   });
 
   describe('PgUp and PgDown', () => {

@@ -46,6 +46,9 @@ export const FILE_UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   // Over an image a file browser shows (PRD 012, §1.1).
   { command: 'image.previous', key: 'PageUp', when: 'panel' },
   { command: 'image.next', key: 'PageDown', when: 'panel' },
+  // Over any file a file browser shows: its tab closed (PRD 005, §3.1; PRD 012, §1.3). The same key
+  // stops a large folder's reading, over a listing only.
+  { command: 'viewer.close', key: 'Escape', when: 'panel' },
   // On a row of Task Manager's processes (PRD 014, §2).
   { command: 'process.endTask', key: 'Delete', when: 'list' },
   { command: 'process.endTree', key: 'Shift+Delete', when: 'list' },

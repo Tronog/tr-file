@@ -154,6 +154,7 @@ export const HELP: UiHelpConfig = {
         'view.splitRight',
         'tab.new',
         'tab.close',
+        'viewer.close',
         'tab.previous',
         'tab.next',
         'view.toggleMaximize',
@@ -258,6 +259,16 @@ export const HELP: UiHelpConfig = {
       ],
     },
     {
+      id: 'viewer-fixed',
+      title: 'File viewer',
+      hue: 'pink',
+      rows: [
+        [[['Ctrl', 'A']], 'Select all of the text'],
+        [[['Shift', '↑'], ['Shift', '↓']], 'Extend the selection of text'],
+        [[['Ctrl', 'C']], 'Copy the text selected'],
+      ],
+    },
+    {
       id: 'image-fixed',
       title: 'Image viewer (zoomed)',
       hue: 'pink',
@@ -336,6 +347,7 @@ const KEY_COMMANDS: Readonly<Record<string, { readonly category: string; readonl
   'view.stopLoading': { category: 'View', label: 'Stop Reading the Folder' },
   'image.previous': { category: 'Image', label: 'Previous Image in Folder' },
   'image.next': { category: 'Image', label: 'Next Image in Folder' },
+  'viewer.close': { category: 'View', label: 'Close the File Viewer' },
 };
 
 const VIEWS: ReadonlySet<string> = new Set<UiPanelView>(['list', 'grid', 'tree']);

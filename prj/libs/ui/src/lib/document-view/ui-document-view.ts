@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, viewChild, type ElementRef } from '@angular/core';
 import { UiImageView } from '../image-view/ui-image-view';
 import type { UiDocumentModel } from '../models';
 
@@ -15,6 +15,9 @@ import type { UiDocumentModel } from '../models';
  *
  * Nothing in the view is editable and nothing but the scroll container takes
  * focus, so the "read-only" promise made by the status line holds literally.
+ * Its text can be selected and copied, though (PRD 005, §3): by the mouse,
+ * `Shift` with the arrows as anywhere, and `Ctrl`+`A`, which selects the
+ * document alone; `Ctrl`+`C` and the right-click menu are the browser's.
  */
 @Component({
   selector: 'ui-document-view',
@@ -51,4 +54,24 @@ export class UiDocumentView {
   protected readonly isDiff = computed(() => this.document().kind === 'diff');
 
   protected readonly lines = computed(() => this.document().lines ?? []);
+
+  private readonly docRef = viewChild<ElementRef<HTMLElement>>('doc');
+
+  /**
+   * `Ctrl`+`A` selects the document's text and nothing else — left to the
+   * browser it would take every bit of selectable text in the window. A text
+   * field's own key, so fixed rather than a keymap command (PRD 010, §2).
+   */
+  protected onKeydown(event: KeyboardEvent): void {
+    const doc = this.docRef()?.nativeElement;
+    if (doc === undefined || (!event.ctrlKey && !event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'a') {
+      return;
+    }
+    const selection = doc.ownerDocument.getSelection();
+    if (selection === null) {
+      return;
+    }
+    selection.selectAllChildren(doc);
+    event.preventDefault();
+  }
 }

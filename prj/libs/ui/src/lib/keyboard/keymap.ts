@@ -192,6 +192,22 @@ export class UiKeymap {
     return this.current().find((binding) => binding.when === when && binding.key === chord && commands.includes(binding.command))?.command ?? null;
   }
 
+  /**
+   * Every command `event` is bound to in `when`, among `commands`, in table
+   * order — for an asker whose commands share a key and take it only in some
+   * states (`Escape` stops a large folder's reading or closes an image), so
+   * the first that applies can have it.
+   */
+  commandsFor(event: KeyboardEvent, when: UiKeyContext, commands: readonly string[]): readonly string[] {
+    const chord = chordOf(event);
+    if (chord === null) {
+      return [];
+    }
+    return this.current()
+      .filter((binding) => binding.when === when && binding.key === chord && commands.includes(binding.command))
+      .map((binding) => binding.command);
+  }
+
   /** The keys `command` is bound to, in table order — in `when` only, if given. */
   keysFor(command: string, when?: UiKeyContext): readonly string[] {
     return this.current()

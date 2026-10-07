@@ -162,6 +162,19 @@ describe('Stepping through the images of a folder', () => {
     expect(shown()).toEqual(['pics*']);
   });
 
+  /** PRD 012, §1.3 — `Escape` closes the viewer, back to the listing with its cursor on the picture. */
+  it('closes the image on Escape', async () => {
+    await openPicture('pics/a.png');
+    await step(1);
+
+    workbench.panelKeyboardFt.run(groupId, { command: 'close', entryId: null });
+    answer();
+    await settled();
+
+    expect(shown()).toEqual(['pics*']);
+    expect(workbench.editorGroupsFt.stateOf(groupId)?.focusedEntryId).toBe('pics/b.jpg');
+  });
+
   /** PRD 012, §1.1.1 — the listing the picture was opened from follows it. */
   describe('the listing it was opened from', () => {
     const selectionOf = (id: string) => {

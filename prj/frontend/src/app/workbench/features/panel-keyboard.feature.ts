@@ -80,6 +80,19 @@ export class PanelKeyboardFeature {
         void this.parent.filePreviewFt.stepImage(groupId, key.command === 'next-image' ? 1 : -1);
         break;
 
+      case 'close': {
+        // `Escape` over a file (PRD 005, §3.1; PRD 012, §1.3). `closeTab` goes back to the
+        // tab it was opened from (PRD 002, §2.5.1) and gives the keyboard to
+        // whatever is left showing.
+        const groups = this.parent.editorGroupsFt;
+        const group = groups.stateOf(groupId);
+        const tab = group === undefined ? undefined : groups.activeTabOf(group);
+        if (tab !== undefined) {
+          groups.closeTab(groupId, tab.id);
+        }
+        break;
+      }
+
       case 'select':
         if (key.entryId !== null) {
           files.selectEntry(groupId, key.entryId);

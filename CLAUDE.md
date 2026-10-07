@@ -180,7 +180,13 @@ that request and `UiPanelGroup` answers it. The workbench asks for it once on st
 when the app opens rather than needing a click first. Row clicks only ever
 open — collapsing is the twisty's job (or `←` on the focused row). Double-clicking a file opens
 it read-only in a new tab (`FilePreviewFeature`), markdown rendered: that feature turns bytes
-into a `UiDocumentModel`, and the library only renders what it is handed. An image is read by
+into a `UiDocumentModel`, and the library only renders what it is handed. Its text can be selected
+and copied (PRD 005, §3): `UiDocumentView`'s scroll container is `user-select: text` in a workbench
+that is `none`, and `Ctrl`+`A` there selects the document alone. `Escape` over any file closes its tab
+(§3.1; keymap `viewer.close`, `when: 'panel'`, claimed by `UiFileBrowser` only while it shows a
+document — the `close` panel key, `EditorGroupsFeature.closeTab`, so the listing it was opened from
+comes back with the keyboard). It shares the key with `view.stopLoading`: `UiKeymap.commandsFor` gives
+every command a key is bound to, and the first that applies has it. An image is read by
 `ImageSourceService` (`prj/frontend/src/app/file-system/`), one cache of object URLs keyed
 by path that owns their lifetime — `PreviewRetentionFeature` tells it (and the text previews)
 what is on screen, and everything else is freed but for a few recent ones — and drawn by `UiImageView` — contain by default, five
@@ -197,6 +203,7 @@ elsewhere into view (`FilePreviewFeature.reflect`).
 In the viewer itself (§1.2) `+` / `-` zoom, `1` is 100 % and `0` the default fit — keymap commands
 in their own context, `when: 'image'`, so a digit is never taken from type-to-find in a listing —
 and the arrows pan an image larger than the view (`UiImageViewService.panBy`; navigation, so fixed).
+`Escape` closes it, as it does any file (§1.3, `viewer.close` above).
 Selecting an image also shows it on the details card, fitted `contain` and non-interactive
 (§9); the panel and the sidebar read from the same cache, so a file is fetched once.
 

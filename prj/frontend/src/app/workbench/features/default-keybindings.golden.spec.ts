@@ -35,9 +35,11 @@ const GOLDEN = [
   'panel Ctrl+Shift+C file.copyPath',
   'panel Shift+F10 panel.contextMenu',
   'panel ContextMenu panel.contextMenu',
-  // The file browser's last two; before §17.1 they followed the tab keys, which share no key with them.
+  // The file browser's image keys; before §17.1 they followed the tab keys, which share no key with them.
   'panel PageUp image.previous',
   'panel PageDown image.next',
+  // PRD 005, §3.1 / PRD 012, §1.3: after `view.stopLoading`, which has the key first wherever there is a folder to stop.
+  'panel Escape viewer.close',
   // Task Manager's list (PRD 014, §2): after the file browser's, sharing no command with them.
   'list Delete process.endTask',
   'list Shift+Delete process.endTree',

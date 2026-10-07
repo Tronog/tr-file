@@ -67,6 +67,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `/` | Split the panel to the right | In a panel |
 | `Ctrl`+`T` | New tab on the same folder | In a panel |
 | `Ctrl`+`W` | Close the focused tab | In a panel |
+| `Escape` | Close the file viewer's tab — text, markdown, a diff or an image — back to the listing it was opened from | Over a file in a panel |
 | `Ctrl`+`PageUp` / `Ctrl`+`PageDown` | Previous / next tab | In a panel |
 | `Ctrl`+`↑` | Maximize or restore the panel | In a panel |
 | `Ctrl`+`Enter` | Open the entry in a new tab of the other panel | In a panel |
@@ -177,6 +178,14 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `↓` / `↑` (path bar) | Choose among the places suggested for what is typed |
 | `Tab` (path bar) | Complete to the suggestion chosen (or the first) — a folder with `/`, to go on inside it |
 | `Escape` (path bar) | Close the suggestions; again, cancel the edit |
+
+### File viewer
+
+| Key | Action |
+| --- | --- |
+| `Ctrl`+`A` | Select all of the file's text (and nothing else in the window) |
+| `Shift`+arrows, the mouse | Select text |
+| `Ctrl`+`C` | Copy the text selected |
 
 ### Image viewer
 

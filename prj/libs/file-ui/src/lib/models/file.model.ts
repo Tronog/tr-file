@@ -197,6 +197,7 @@ export type UiPanelCommand =
   | 'unselect-pattern'
   | 'previous-image'
   | 'next-image'
+  | 'close'
   | 'stop-loading';
 
 /**
@@ -210,6 +211,7 @@ export type UiPanelCommand =
  * none — whatever the panel shows.
  * `select-pattern` / `unselect-pattern` are `+` / `-` (PRD 004, §2): the
  * application asks for the pattern.
+ * `close` is `Escape` over a file (PRD 005, §3.1; PRD 012, §1.3): the tab showing it closes.
  *
  * The function keys are not panel keys: `F1`–`F10` mean the same wherever
  * focus is (PRD 004, §2), so the application binds them for the whole window.

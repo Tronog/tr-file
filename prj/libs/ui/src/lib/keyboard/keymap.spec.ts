@@ -35,5 +35,7 @@ describe('UiKeymap', () => {
     expect(keymap.commandFor(key({ key: 'F5' }), 'panel', ['b'])).toBe('b');
     expect(keymap.commandFor(key({ key: 'F5' }), 'window', ['a', 'b'])).toBeNull();
     expect(keymap.keysFor('b')).toEqual(['F5']);
+    expect(keymap.commandsFor(key({ key: 'F5' }), 'panel', ['b', 'a'])).toEqual(['a', 'b']);
+    expect(keymap.commandsFor(key({ key: 'F5' }), 'window', ['a', 'b'])).toEqual([]);
   });
 });

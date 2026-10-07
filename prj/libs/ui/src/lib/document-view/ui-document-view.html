@@ -6,7 +6,7 @@
        and panned by transform, so nothing here scrolls (PRD 001, §7.3.1). -->
   <ui-image-view [src]="src()" [label]="label()" />
 } @else {
-  <article class="doc" tabindex="0" [attr.aria-label]="label()">
+  <article #doc class="doc" tabindex="0" [attr.aria-label]="label()" (keydown)="onKeydown($event)">
     @if (isMarkdown()) {
       <!-- Sanitised by Angular's default sanitiser on binding; the HTML itself
            was rendered from markdown by the application, never by this library. -->
