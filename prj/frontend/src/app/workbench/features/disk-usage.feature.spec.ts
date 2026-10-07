@@ -71,7 +71,7 @@ describe('DiskUsageFeature', () => {
       ['a.txt', false],
     ]);
     expect(model?.summary).toBe('Scanning… 3 files · 2.0 KB · 0:05');
-    expect(model?.toolbarActions.map((action) => action.id)).toEqual(['up', 'refresh', 'stop']);
+    expect(model?.toolbarActions.map((action) => action.id)).toEqual(['up', 'refresh', 'stop', 'export']);
 
     // Not asked again sooner than every 3 s.
     await vi.advanceTimersByTimeAsync(DISK_USAGE_POLL_MS - 1);
@@ -82,6 +82,49 @@ describe('DiskUsageFeature', () => {
     // Done: no more asking.
     await vi.advanceTimersByTimeAsync(DISK_USAGE_POLL_MS * 3);
     expect(status).toHaveBeenCalledTimes(1);
+  });
+
+  /** PRD 013, §2.2. */
+  it('exports what the tab draws as CSV, Excel-ready, the export disabled while there is nothing', async () => {
+    const tree = folder('docs', 2048, [
+      folder('docs/big, old', 2000, undefined, 'unreadable'),
+      { kind: 'file', name: 'a.txt', path: 'docs/a.txt', size: 40, onDisk: 4096, files: 1, folders: 0 },
+      { kind: 'rest', name: '', path: null, size: 8, onDisk: 8, files: 0, folders: 0, count: 3 },
+    ]);
+    let pending: (scan: FsDiskUsageScan) => void = () => undefined;
+    vi.spyOn(fs(), 'start').mockReturnValue(new Promise((resolve) => (pending = resolve)));
+    du().open('docs');
+    await flush();
+    expect(du().content(group())?.toolbarActions.find((action) => action.id === 'export')?.disabled).toBe(true);
+
+    pending(scanOf('s1', 'docs', 'done', { depth: DISK_USAGE_DEFAULT_DEPTH }, tree));
+    await flush();
+    expect(du().content(group())?.toolbarActions.find((action) => action.id === 'export')?.disabled).toBeUndefined();
+
+    let saved: Blob | undefined;
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+      saved = blob as Blob;
+      return 'blob:export';
+    });
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const names: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      names.push(this.download);
+    });
+    du().runToolbarAction(group(), 'export');
+
+    expect(names).toEqual([expect.stringMatching(/^disk-usage-docs-\d{4}-\d{2}-\d{2}\.csv$/)]);
+    expect(saved?.type).toBe('text/csv;charset=utf-8');
+    // The bytes as they are, the byte-order mark kept.
+    const text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(await (saved as Blob).arrayBuffer());
+    expect(text.split('\r\n')).toEqual([
+      '\uFEFFPath,Name,Type,Level,Size (bytes),Size,On disk (bytes),Files,Folders,% of folder,% of total,Note',
+      '/docs,docs,folder,0,2048,2.0 KB,2048,1,3,100.0,100.0,',
+      '"/docs/big, old","big, old",folder,1,2000,2.0 KB,2000,1,0,97.7,97.7,unreadable',
+      '/docs/a.txt,a.txt,file,1,40,40 B,4096,1,,2.0,2.0,',
+      ',(3 smaller entries),other,1,8,8 B,8,,,0.4,0.4,',
+      '',
+    ]);
   });
 
   it('goes into a folder and back up on the same scan, and rescans outside it', async () => {

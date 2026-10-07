@@ -132,7 +132,9 @@ export class UiFocusCycleFeature {
     if (!region.startsWith('group:')) {
       return false;
     }
-    this.parent.panelFocusFt.focusBody(region.slice('group:'.length));
+    const groupId = region.slice('group:'.length);
+    this.parent.panelFocusFt.focusBody(groupId);
+    this.parent.editorGroupsFt.entered(groupId);
     return true;
   }
 }

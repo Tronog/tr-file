@@ -112,6 +112,23 @@ export class EditorGroupsFeature extends UiEditorGroupsFeature<PanelTabState, Pa
     }
   }
 
+  /**
+   * The keyboard walked into a panel — `Tab` / `Ctrl`+`Tab` (PRD 002, §2.6):
+   * the details sidebar describes what its cursor is on — else the first
+   * entry selected there, else the folder (or the file) it shows — as
+   * choosing in it would. A trash, a zip, a diff describe themselves.
+   */
+  protected override groupEntered(group: PanelGroupState): void {
+    const tab = this.activeTabOf(group);
+    if (tab === undefined || (tab.kind !== 'folder' && tab.kind !== 'file')) {
+      return;
+    }
+    const described = group.selection.length === 0 ? group.path : (group.focusedEntryId ?? group.selection[0] ?? group.path);
+    if (described !== this.parent.selectedEntryId()) {
+      this.parent.select(described);
+    }
+  }
+
   protected override tabIcon(tab: PanelTabState): { readonly icon: UiIconName; readonly tint?: UiIconTint } {
     if (tab.kind === 'trash') {
       // The trash is not a folder of the root (PRD 001, §14.1): its own icon, untinted.

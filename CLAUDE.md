@@ -149,7 +149,10 @@ else its first tab stop that takes focus).
 Plain `Tab` / `Shift`+`Tab` in a panel's *body* (`data-panel-body`, set by `UiPanelBody`; never
 in a text field or the chrome above it) walk the panels only, in layout order and round
 (`UiFocusCycleFeature.panelDirectionOf` / `nextPanel`) — Midnight Commander's `Tab`; with one
-panel (or one maximized) `Tab` keeps its usual meaning.
+panel (or one maximized) `Tab` keeps its usual meaning. Either key entering a panel has the details sidebar
+follow it (`UiFocusCycleFeature.enter` → `UiEditorGroupsFeature.entered` → the app's `groupEntered`):
+what its cursor is on, else the first entry selected there, else its folder or file — a press says what
+it pressed on itself, so a mere activation (a split, a command) asks for nothing.
 A browser keeps those chords for its own tabs, so they reach the page on the desktop only; the desktop shell installs its own accelerator
 table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
@@ -532,7 +535,11 @@ scan. A folder outside every scan of the window, one the scan did not go into (`
 `too-deep`), *Scan again*, or a scan the backend forgot starts a new one. A scan no tab shows any
 more is stopped. One running is aborted from its tab (§2.1.1) by the toolbar's *Stop scanning*, or
 `Escape` in the panel (`view.stopLoading`, as for a large folder), and what it found stays,
-its unfinished folders marked *not all scanned*. Shown with nothing open, it starts on the file manager's active folder. Its
+its unfinished folders marked *not all scanned*. *Export as CSV* (§2.2, the toolbar's download button, while
+there is something drawn) saves what the tab draws — its folder to the depth shown, depth first, largest first:
+path, name, type, level, size and on-disk bytes, files, folders, share of the folder and of the total, the
+note — comma-separated, CRLF, with a UTF-8 BOM for Excel (`disk-usage-export.ts`), handed over as a
+download by `file-system/save-text.ts` (a browser's download; on the desktop Electron's own save dialog). Shown with nothing open, it starts on the file manager's active folder. Its
 panels are not in the `Ctrl`+`Tab` ring, and its tabs are not kept in the session.
 **Task Manager (PRD 014).** Windows 10 Task Manager's *Processes* tab for the backend machine, shown by
 `Ctrl`+`Shift`+`T` (§3; window key `view.app.task-manager` — a browser keeps the chord, so the desktop's). The

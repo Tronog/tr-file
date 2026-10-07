@@ -9,6 +9,8 @@ import type { UiDiskUsageItem, UiDiskUsageModel, UiDiskUsageView } from '@tr-fil
 import type { FsDiskUsageNode, FsDiskUsageScan } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import { shownPath } from '../../file-system/fs-path';
+import { saveText } from '../../file-system/save-text';
+import { diskUsageCsv, diskUsageFileName } from './disk-usage-export';
 import type { WorkbenchService } from '../workbench.service';
 import { UiPanelLayout } from '@tr-file/ui';
 
@@ -413,6 +415,9 @@ export class DiskUsageFeature {
       case 'stop':
         void this.stop(tab.id);
         break;
+      case 'export':
+        this.exportCsv(tab.id);
+        break;
       default:
         break;
     }
@@ -513,6 +518,8 @@ export class DiskUsageFeature {
       { id: 'refresh', label: 'Scan again', icon: 'refresh' },
       // Stops the scan where it is (PRD 013, §2.1.1); its key is the panel's `view.stopLoading`, `Escape`.
       ...(running ? [{ id: 'stop', label: this.stopLabel(), icon: 'player-stop' } as const] : []),
+      // What is drawn, as CSV (PRD 013, §2.2).
+      { id: 'export', label: 'Export as CSV', icon: 'download', ...(tree === null ? { disabled: true } : {}) },
     ];
     return {
       breadcrumbs: files.breadcrumbsOf(tab.path),
@@ -536,6 +543,21 @@ export class DiskUsageFeature {
             }
           : {}),
     };
+  }
+
+  /**
+   * *Export as CSV* (PRD 013, §2.2): what the tab draws — its folder, to the
+   * depth shown — saved as a file the user names (`diskUsageCsv`).
+   */
+  exportCsv(tabId: string): void {
+    const tab = this.tabState(tabId);
+    const report = this.reports()[tabId];
+    if (tab === undefined || report === undefined || report.tree === null) {
+      return;
+    }
+    const name = this.parent.fileBrowserFt.labelFor(report.path);
+    const csv = diskUsageCsv(report.tree, name, shownPath, (bytes) => this.parent.fileViewModel.formatBytes(bytes));
+    saveText(diskUsageFileName(name, new Date()), csv, 'text/csv;charset=utf-8');
   }
 
   private summary(scan: FsDiskUsageScan | undefined): string | undefined {

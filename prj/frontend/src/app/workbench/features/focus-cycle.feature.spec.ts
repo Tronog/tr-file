@@ -1,5 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { WorkbenchService } from '../workbench.service';
 import { provideOnePanel } from '../testing/one-panel';
@@ -95,6 +95,23 @@ describe('FocusCycleFeature', () => {
       expect(cycle().nextPanel(a, 1)).toBe(b);
       expect(cycle().nextPanel(c, 1)).toBe(a);
       expect(cycle().nextPanel(a, -1)).toBe(c);
+    });
+
+    /** The details sidebar follows the keyboard into the panel (PRD 002, §2.6). */
+    it('has the details describe what the panel entered has its cursor on — else its folder', () => {
+      const [a, b] = splitThree() as [string, string];
+      workbench.editorGroupsFt.update(a, (state) => ({ ...state, path: 'docs', selection: ['docs/a.txt', 'docs/b.txt'], focusedEntryId: 'docs/b.txt' }));
+      workbench.editorGroupsFt.update(b, (state) => ({ ...state, path: 'pics', selection: [] }));
+      const http = TestBed.inject(HttpTestingController);
+
+      cycle().enter(`group:${a}`);
+      expect(workbench.selectedEntryId()).toBe('docs/b.txt');
+      cycle().enter(`group:${b}`);
+      expect(workbench.selectedEntryId()).toBe('pics');
+
+      // The same entry again asks nothing more.
+      cycle().enter(`group:${b}`);
+      expect(http.match((request) => request.url.includes('/details')).map((request) => new URL(request.request.urlWithParams, 'http://x').searchParams.get('path'))).toEqual(['docs/b.txt', 'pics']);
     });
 
     it('stays put while a panel is maximized, and while a window has the keyboard', () => {

@@ -64,7 +64,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 
 | Key | Command | Where |
 | --- | --- | --- |
-| `Tab` / `Shift`+`Tab` | Focus next / previous panel, in layout order (only with more than one panel shown) | In a panel |
+| `Tab` / `Shift`+`Tab` | Focus next / previous panel, in layout order (only with more than one panel shown); Details describes what its cursor is on | In a panel |
 | `/` | Split the panel to the right | In a panel |
 | `Ctrl`+`T` | New tab on the same folder | In a panel |
 | `Ctrl`+`W` | Close the focused tab | In a panel |

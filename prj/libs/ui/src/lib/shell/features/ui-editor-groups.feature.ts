@@ -111,6 +111,18 @@ export class UiEditorGroupsFeature<TTab extends UiTabState = UiTabState, TGroup 
     this.parent.activeGroupId.set(id);
   }
 
+  /**
+   * The keyboard walked into group `id` — `Tab` / `Ctrl`+`Tab` (PRD 002,
+   * §2.6) — and made it the active one: what describes the active panel's
+   * content follows it (`groupEntered`).
+   */
+  entered(id: string): void {
+    const group = this.stateOf(id);
+    if (group !== undefined) {
+      this.groupEntered(group);
+    }
+  }
+
   /* -- operations for content features ----------------------------------- */
 
   stateOf(id: string): TGroup | undefined {
@@ -558,6 +570,15 @@ export class UiEditorGroupsFeature<TTab extends UiTabState = UiTabState, TGroup 
 
   /** A tab other than the one it showed was chosen in `group`. */
   protected tabChosen(_group: TGroup): void {
+    // The application's.
+  }
+
+  /**
+   * The keyboard walked into `group` with `Tab` / `Ctrl`+`Tab` (PRD 002,
+   * §2.6). What describes the active panel's content follows it here — a
+   * press in a panel says what it pressed on itself.
+   */
+  protected groupEntered(_group: TGroup): void {
     // The application's.
   }
 
