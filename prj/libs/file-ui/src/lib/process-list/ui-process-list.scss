@@ -1,0 +1,227 @@
+@use 'mixins' as *;
+
+/*
+ * Windows 10 Task Manager's Processes tab (PRD 014, §2), in the workbench's
+ * colours: a header whose measured columns put the machine's load over their
+ * names, headings in the accent colour, and every number shaded by its load —
+ * `--heat`, 0 to 1, mixes `--vsc-heat` in, turning to `--vsc-heat-hot` as it
+ * nears 1. A cell always has a little of it, as Task Manager's do.
+ */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg);
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vsc-border);
+}
+
+.filter {
+  flex: 0 1 280px;
+}
+
+.summary {
+  margin-left: auto;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+  white-space: nowrap;
+}
+
+.table {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: auto;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: var(--process-columns);
+  min-width: min-content;
+}
+
+.head {
+  flex: none;
+  border-bottom: 1px solid var(--vsc-border);
+}
+
+.head-cell {
+  --heat-mix: calc(var(--heat, 0) * 70%);
+
+  display: grid;
+  grid-template-rows: 10px auto auto;
+  align-content: end;
+  padding: 2px 8px 4px;
+  border: 0;
+  border-right: 1px solid var(--vsc-border);
+  background: transparent;
+  color: var(--vsc-fg-muted);
+  font: inherit;
+  font-size: var(--vsc-font-size-sm);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--vsc-hover-bg);
+  }
+
+  &.num {
+    text-align: right;
+    background: color-mix(in srgb, var(--vsc-heat) var(--heat-mix), transparent);
+  }
+
+  &.is-sorted .label {
+    color: var(--vsc-fg-bright);
+  }
+}
+
+.sort-mark {
+  display: flex;
+  justify-content: center;
+  height: 10px;
+  overflow: hidden;
+  color: var(--vsc-fg-muted);
+
+  ui-icon {
+    margin-top: -3px;
+  }
+}
+
+.total {
+  min-height: 1.4em;
+  color: var(--vsc-fg-bright);
+  font-size: 1.25em;
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.body,
+.empty {
+  @include scrollable;
+
+  flex: 1;
+  min-height: 0;
+  outline: none;
+}
+
+.empty {
+  display: flex;
+}
+
+.body:focus-visible .row.is-selected {
+  outline: 1px solid var(--vsc-focus-border);
+  outline-offset: -1px;
+}
+
+.row {
+  height: var(--vsc-row-height);
+  line-height: var(--vsc-row-height);
+  cursor: default;
+
+  &:not(.is-section):hover {
+    background: var(--vsc-list-hover);
+  }
+
+  &.is-selected,
+  &.is-selected:hover {
+    background: var(--vsc-list-active);
+  }
+
+  &.is-section {
+    margin-top: 6px;
+    height: calc(var(--vsc-row-height) + 4px);
+    line-height: calc(var(--vsc-row-height) + 4px);
+  }
+}
+
+.section-label {
+  grid-column: 1 / -1;
+  padding-left: 8px;
+  color: var(--vsc-link);
+  font-weight: 600;
+}
+
+.cell {
+  overflow: hidden;
+  padding: 0 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.is-heated {
+    --heat-mix: calc(10% + var(--heat, 0) * 75%);
+
+    background: color-mix(
+      in srgb,
+      color-mix(in srgb, var(--vsc-heat-hot) calc(max(var(--heat, 0) - 0.6, 0) * 250%), var(--vsc-heat)) var(--heat-mix),
+      transparent
+    );
+    border-left: 1px solid var(--vsc-editor-bg);
+  }
+}
+
+.name {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.twisty {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  justify-content: center;
+  color: var(--vsc-fg-muted);
+  cursor: pointer;
+}
+
+.row-icon {
+  flex: none;
+  color: var(--vsc-fg-muted);
+}
+
+.is-group .row-icon {
+  color: var(--vsc-hue-blue);
+}
+
+.name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail {
+  overflow: hidden;
+  color: var(--vsc-fg-muted);
+  text-overflow: ellipsis;
+}
+
+.is-warning .cell {
+  color: var(--vsc-severity-warning);
+}
+
+.footer {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  border-top: 1px solid var(--vsc-border);
+}

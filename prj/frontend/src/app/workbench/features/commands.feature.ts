@@ -1,3 +1,4 @@
+import { PROCESS_COLUMNS } from '../task-manager/process-rows';
 import { UiCommandsFeature, type UiCommand, type UiCommandSpec, type UiCommandTarget } from '@tr-file/ui';
 import type { UiPanelView } from '@tr-file/file-ui';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
@@ -164,6 +165,9 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
       return target.paths.length === 0 && target.folder !== '' ? target.folder : null;
     };
     const listing = (target: CommandTarget): boolean => target.folder !== null && group(target) !== undefined;
+    /* Task Manager (PRD 014, §2): about the row selected in its list, whatever the target. */
+    const tm = p.taskManagerFt;
+    const taskManager = (): boolean => p.subAppsFt.isActive('task-manager');
     /* Git (PRD 011, §1): about the repository the Git pane shows, whatever the target. */
     const git = p.gitFt;
     const repo = (): boolean => git.repository() !== null && !git.busy();
@@ -507,6 +511,37 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
       { id: 'git.stashPop', category: 'Git', label: 'Pop Latest Stash', enabled: () => repo() && (git.repository()?.stashes ?? 0) > 0, run: () => void git.popStash() },
       { id: 'git.init', category: 'Git', label: 'Initialize Repository', enabled: () => git.canInit(), run: () => void git.init() },
       { id: 'git.refresh', category: 'Git', label: 'Refresh', enabled: () => git.available() && !git.busy(), run: () => void git.refresh() },
+
+      /* Task Manager (PRD 014, §2): the row selected in its list */
+      { id: 'process.endTask', category: 'Task Manager', label: 'End Task', enabled: () => tm.canEnd(), run: () => tm.endSelected(false) },
+      { id: 'process.endTree', category: 'Task Manager', label: 'End Process Tree', enabled: () => tm.canEnd(), run: () => tm.endSelected(true) },
+      {
+        id: 'process.toggleExpand',
+        category: 'Task Manager',
+        label: () => (tm.selectedGroup() !== null && tm.isExpanded(tm.selectedGroup()?.id ?? '') ? 'Collapse' : 'Expand'),
+        palette: false,
+        enabled: () => tm.selectedGroup() !== null,
+        run: () => tm.toggle(tm.selectedGroup()?.id ?? ''),
+      },
+      { id: 'process.openLocation', category: 'Task Manager', label: 'Open File Location', enabled: () => tm.canOpenLocation(), run: () => tm.openLocation() },
+      { id: 'process.copyDetails', category: 'Task Manager', label: 'Copy Details', enabled: () => tm.hasSelection(), run: () => tm.copyDetails() },
+      {
+        id: 'process.togglePause',
+        category: 'Task Manager',
+        label: () => (tm.paused() ? 'Resume Updates' : 'Pause Updates'),
+        enabled: taskManager,
+        run: () => tm.togglePause(),
+      },
+      { id: 'process.refresh', category: 'Task Manager', label: 'Update Now', enabled: taskManager, run: () => tm.refresh() },
+      // The header's menu: which columns are shown.
+      ...PROCESS_COLUMNS.filter((column) => column.id !== 'name').map((column) => ({
+        id: `process.column.${column.id}`,
+        category: 'Task Manager',
+        label: column.label,
+        palette: false,
+        checked: () => tm.isShown(column.id),
+        run: () => tm.toggleColumn(column.id),
+      })),
 
       /* Tabs; all but the first two from a tab's context menu only */
       this.builtin('tab.new'),

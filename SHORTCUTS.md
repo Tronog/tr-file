@@ -113,7 +113,28 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | `1` | Actual size (100%) | In the image viewer |
 | `0` | Fit the whole image (the default) | In the image viewer |
 
+### Task Manager
+
+| Key | Command | Where |
+| --- | --- | --- |
+| `Ctrl`+`Shift`+`T` | Show Task Manager (desktop; a browser keeps it for reopening a tab) | Anywhere |
+| `Delete` | End task (the system's own processes ask first) | On a row |
+| `Shift`+`Delete` | End process tree (asks first) | On a row |
+| `Shift`+`F10`, `ContextMenu` | The row's menu | In the list |
+| `Ctrl`+`F` | Filter the processes | In Task Manager |
+| `Ctrl`+`R` | Update now | In Task Manager |
+
 ## Fixed
+
+### Task Manager's list
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓`, `Home` / `End`, `PageUp` / `PageDown` | Move between the rows (headings are passed over) |
+| `→` / `←` | Open / close a group, or step into it / out to it |
+| `Enter` | Open / close a group |
+| Typing letters | Type-to-find: jump to the next name starting with them |
+| `↓` (in the filter box) | Back to the list |
 
 ### Listing (list, tree and icon views)
 

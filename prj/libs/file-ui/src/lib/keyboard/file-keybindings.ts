@@ -3,8 +3,9 @@ import { UI_KEYBINDING_DEFAULTS, type UiKeybinding } from '@tr-file/ui';
 
 /**
  * The file manager's keys, as they are until the application says otherwise:
- * a listing's (`UiFileList`, `UiIconView` — `when: 'list'`) and a file
- * browser's (`UiFileBrowser` — `when: 'panel'`).
+ * a listing's (`UiFileList`, `UiIconView` — `when: 'list'`), a file
+ * browser's (`UiFileBrowser` — `when: 'panel'`) and Task Manager's list of
+ * processes' (`UiProcessList`).
  *
  * Where a key does what a command of the application's table does, it is
  * bound to that command's id — `file.open`, `edit.copy` — so one binding
@@ -45,6 +46,9 @@ export const FILE_UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   // Over an image a file browser shows (PRD 012, §1.1).
   { command: 'image.previous', key: 'PageUp', when: 'panel' },
   { command: 'image.next', key: 'PageDown', when: 'panel' },
+  // On a row of Task Manager's processes (PRD 014, §2).
+  { command: 'process.endTask', key: 'Delete', when: 'list' },
+  { command: 'process.endTree', key: 'Shift+Delete', when: 'list' },
 ];
 
 /**

@@ -571,3 +571,75 @@ export interface FsDiskUsageReport {
   readonly path?: string;
   readonly depth?: number;
 }
+
+/* -- processes (PRD 014, §1) ------------------------------------------------ */
+
+/** Task Manager's headings: apps, background processes, the system's. */
+export type FsProcessCategory = 'app' | 'background' | 'system';
+
+export type FsProcessStatus = 'running' | 'sleeping' | 'waiting' | 'suspended' | 'not-responding' | 'zombie' | 'idle';
+
+/** One process of the backend machine, as last measured. */
+export interface FsProcess {
+  readonly pid: number;
+  readonly ppid: number;
+  /** Its pid and start: what *End task* names, so a pid handed out again is never ended by mistake. */
+  readonly key: string;
+  readonly name: string;
+  readonly path: string | null;
+  readonly command: string | null;
+  readonly user: string | null;
+  readonly title: string | null;
+  readonly status: FsProcessStatus;
+  readonly category: FsProcessCategory;
+  /** Share of the whole machine's CPU, 0–100. */
+  readonly cpu: number;
+  readonly memory: number;
+  /** Bytes a second; `null` when the backend may not see it. */
+  readonly disk: number | null;
+  readonly threads: number | null;
+  readonly startedAt: string | null;
+}
+
+export interface FsProcessTotals {
+  readonly cpu: number;
+  readonly memoryUsed: number;
+  readonly memoryTotal: number;
+  readonly disk: number | null;
+  readonly processes: number;
+  readonly threads: number | null;
+}
+
+/** The latest sample of the backend machine — `GET /api/processes`, bridge `proc-list`. */
+export interface FsProcessesSnapshot {
+  readonly available: boolean;
+  readonly reason: string | null;
+  readonly canEnd: boolean;
+  readonly endReason: string | null;
+  readonly sequence: number;
+  readonly at: string | null;
+  readonly intervalMs: number;
+  readonly platform: string;
+  readonly cpuCount: number;
+  readonly totals: FsProcessTotals;
+  readonly processes: readonly FsProcess[];
+}
+
+export interface FsProcessSeries {
+  readonly cpu: readonly number[];
+  readonly memory: readonly number[];
+  readonly disk: readonly (number | null)[];
+}
+
+/** The last ten minutes, one sample every `intervalMs` — `GET /api/processes/history`. */
+export interface FsProcessesHistory {
+  readonly intervalMs: number;
+  readonly at: string | null;
+  readonly totals: FsProcessSeries & { readonly memoryTotal: number };
+  readonly processes: Readonly<Record<string, FsProcessSeries>>;
+}
+
+export interface FsProcessEndResult {
+  readonly ended: readonly number[];
+  readonly failed: readonly { readonly pid: number; readonly message: string }[];
+}

@@ -426,6 +426,7 @@ describe('ChromeFeature', () => {
       'file-manager',
       'search',
       'disk-usage',
+      'task-manager',
       'transfers',
       'bookmarks',
     ]);

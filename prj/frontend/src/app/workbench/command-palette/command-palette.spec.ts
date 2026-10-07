@@ -273,6 +273,7 @@ describe('CommandPaletteFeature', () => {
       'View: Show File Manager',
       'View: Show Search',
       'View: Show Disk Usage',
+      'View: Show Task Manager',
       'View: Toggle Panel',
       'View: Toggle Explorer',
       'View: Toggle Details',

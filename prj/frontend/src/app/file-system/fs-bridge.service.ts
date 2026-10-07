@@ -24,6 +24,9 @@ import type {
   FsWatchResult,
   FsDiskUsageReport,
   FsDiskUsageScan,
+  FsProcessEndResult,
+  FsProcessesHistory,
+  FsProcessesSnapshot,
 } from './file-system.model';
 import { FS_ABORTED, FsError } from './fs-error';
 import type { FsDetailsOptions, FsTransport, FsUploadOptions } from './fs-transport';
@@ -530,6 +533,18 @@ export class FsBridgeService implements FsTransport {
 
   async cancelDiskUsage(id: string): Promise<FsDiskUsageScan> {
     return this.invoke<FsDiskUsageScan>({ command: 'du-cancel', scanId: id });
+  }
+
+  async processes(): Promise<FsProcessesSnapshot> {
+    return this.invoke<FsProcessesSnapshot>({ command: 'proc-list' });
+  }
+
+  async processHistory(keys: readonly string[]): Promise<FsProcessesHistory> {
+    return this.invoke<FsProcessesHistory>({ command: 'proc-history', keys: [...keys] });
+  }
+
+  async endProcess(key: string, tree = false): Promise<FsProcessEndResult> {
+    return this.invoke<FsProcessEndResult>({ command: 'proc-end', key, ...(tree ? { tree } : {}) });
   }
 
   private abandon(uploadId: string | undefined): void {

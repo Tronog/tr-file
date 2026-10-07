@@ -24,6 +24,7 @@ import {
 import { DiskUsageRoutes, DiskUsageService } from './modules/disk-usage/index.js';
 import { GitRoutes, GitService } from './modules/git/index.js';
 import { HealthRoutes, HealthService } from './modules/health/index.js';
+import { ProcessesRoutes, ProcessesService, type ProcessSource } from './modules/processes/index.js';
 import {
   OperationsRoutes,
   OperationsService,
@@ -46,6 +47,8 @@ export interface AppOptions {
    * the whole file system, hands in the system's.
    */
   readonly places?: PlacesProvider;
+  /** Reads the machine's processes (PRD 014, §1); the operating system's own unless a test hands one in. */
+  readonly processes?: ProcessSource;
 }
 
 /**
@@ -88,6 +91,8 @@ export class App {
   private readonly git: GitService;
   /** Disk usage scans (PRD 013, §1); shared by the routes and the bridge. */
   private readonly diskUsage: DiskUsageService;
+  /** The machine's processes, measured from start (PRD 014, §1); shared by the routes and the bridge. */
+  private readonly processes: ProcessesService;
   private readonly filesLogger: Logger;
 
   constructor(
@@ -110,6 +115,12 @@ export class App {
     this.operations = new OperationsService(resolver, trash, this.logger.child({ module: 'operations' }), this.archives);
     this.diskUsage = new DiskUsageService(resolver, this.logger.child({ module: 'disk-usage' }));
     this.git = new GitService(resolver, this.logger.child({ module: 'git' }), { enabled: this.config.gitEnabled });
+    this.processes = new ProcessesService(this.logger.child({ module: 'processes' }), {
+      enabled: this.config.processesEnabled,
+      canEnd: this.config.processesKillEnabled,
+      ...(options.processes === undefined ? {} : { source: options.processes }),
+    });
+    this.processes.start();
     this.auth = new AuthService(
       this.config.auth,
       this.config.sessionIdleMs,
@@ -128,6 +139,7 @@ export class App {
       this.archives,
       this.git,
       this.diskUsage,
+      this.processes,
     );
 
     this.instance = express();
@@ -138,13 +150,14 @@ export class App {
 
   /**
    * Releases what outlives a request: the folder watchers, the large
-   * listings' workers and the disk usage scans. None of it keeps
+   * listings' workers, the disk usage scans and the process sampler. None of it keeps
    * the process alive, but a host that stops serving should let go of it.
    */
   close(): void {
     this.watches.close();
     this.filesService.largeListings.close();
     this.diskUsage.close();
+    this.processes.close();
   }
 
   private configure(): void {
@@ -171,6 +184,7 @@ export class App {
       new ArchiveRoutes(this.archives, this.filesLogger),
       new GitRoutes(this.git),
       new DiskUsageRoutes(this.diskUsage),
+      new ProcessesRoutes(this.processes),
     ];
   }
 

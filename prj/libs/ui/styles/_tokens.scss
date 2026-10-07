@@ -80,6 +80,9 @@
   --vsc-shadow: 0 4px 14px rgb(0 0 0 / 55%);
   /* Alternate rows, and a setting under the pointer (PRD 010). */
   --vsc-row-alt: rgb(255 255 255 / 2%);
+  /* Task Manager's load shading (PRD 014, §2): a cell is this colour, as strong as its load. */
+  --vsc-heat: #d18616;
+  --vsc-heat-hot: #e05252;
   --vsc-setting-hover: rgb(255 255 255 / 3%);
   /* VS Code's keybinding label: one boxed key per part. */
   --vsc-kbd-bg: rgb(128 128 128 / 17%);
@@ -208,6 +211,8 @@
   --vsc-hover-bg: #e8e8e8;
   --vsc-shadow: 0 4px 14px rgb(0 0 0 / 16%);
   --vsc-row-alt: rgb(0 0 0 / 2%);
+  --vsc-heat: #ffc83d;
+  --vsc-heat-hot: #f28b52;
   --vsc-setting-hover: rgb(0 0 0 / 3%);
   --vsc-kbd-bg: rgb(221 221 221 / 40%);
   --vsc-kbd-border: rgb(204 204 204 / 40%);

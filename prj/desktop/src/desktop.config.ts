@@ -121,6 +121,9 @@ export class DesktopConfig {
       LOG_LEVEL: this.development ? 'debug' : 'info',
       // The user's own computer and repositories (PRD 011, §1): git is theirs to run.
       GIT_ENABLED: 'true',
+      // Task Manager (PRD 014, §1): the user's own computer's processes, theirs to see and to end.
+      PROCESSES_ENABLED: 'true',
+      PROCESSES_KILL_ENABLED: 'true',
       ...this.authEnv(),
     };
   }

@@ -2,6 +2,7 @@ import { Service, inject } from '@angular/core';
 import { FsEditFeature } from './features/fs-edit.feature';
 import { FsDiskUsageFeature } from './features/fs-disk-usage.feature';
 import { FsGitFeature } from './features/fs-git.feature';
+import { FsProcessesFeature } from './features/fs-processes.feature';
 import { FsOperationsFeature } from './features/fs-operations.feature';
 import { FsReadFeature } from './features/fs-read.feature';
 import { FsSystemFeature } from './features/fs-system.feature';
@@ -56,4 +57,7 @@ export class FileSystemService {
 
   /** What takes up the space under a folder, scanned on the backend (PRD 013, §1). */
   readonly diskUsageFt = new FsDiskUsageFeature(this);
+
+  /** The backend machine's processes, for Task Manager (PRD 014, §1). */
+  readonly processesFt = new FsProcessesFeature(this);
 }

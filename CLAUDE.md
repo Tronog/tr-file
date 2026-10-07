@@ -51,7 +51,7 @@ focus, sidebar panes, bottom panel, chrome, command table, keys, palette, contex
 the settings and Help windows, the session), driven by a `UiWorkbenchConfig` and drawn by
 `<ui-workbench-shell>` with the application's templates — plus `UiModalService`, `UiThemeService`
 and the settings store (`UI_SETTINGS_STORE`, `UI_STORAGE_PREFIX`). The file manager's components —
-`UiFileBrowser`, `UiFileList`, `UiIconView`, `UiDiskUsage`, `UiSourceControl`, `UiTransferList`,
+`UiFileBrowser`, `UiFileList`, `UiIconView`, `UiDiskUsage`, `UiProcessList`, `UiSourceControl`, `UiTransferList`,
 `UiPermissionGrid`, their models and keys (`provideFileUi`) — are `prj/libs/file-ui`
 (`@tr-file/file-ui`, `prj/libs/file-ui/README.md`). Both are ng-packagr libraries with their own
 tests (`pnpm build:libs`, `pnpm test:libs`, after `scripts/check-library-boundaries.mjs`); the
@@ -72,14 +72,14 @@ the app's; `provideTrFileWorkbench()` (`provideFileUi`, `provideUiWorkbench`) is
 route's, and both are every spec's (`test-setup.ts`).
 
 **Sub-applications (PRD 001, §1.1).** The file manager is one of the window's sub-applications,
-beside *Search* (still a placeholder) and *Disk Usage* (PRD 013). They share the title bar with its
+beside *Search* (still a placeholder), *Disk Usage* (PRD 013) and *Task Manager* (PRD 014). They share the title bar with its
 menus, the activity bar and the status bar — `<ui-workbench-shell>`, in the `Workbench` component
 (`workbench.html`) — and the one shown fills the rest. `SubAppsFeature` keeps which (`active`,
 `show`, `fileManager`; the config's `subApps`). The file manager is the main one: its sidebars are
 `FileManagerExplorer` and `FileManagerDetails` (`workbench/sub-apps/`, given to the shell as
 `uiSidebar` templates), its centre is the shell's panels and bottom panel, with tr-file's
 `uiPanelContent` and `uiBottomTab` templates; the others are one centre component each
-(`SearchApp`, `DiskUsageApp`, `uiSubApp` templates). A sub-application is drawn the first time it is shown and is kept, hidden
+(`SearchApp`, `DiskUsageApp`, `TaskManagerApp`, `uiSubApp` templates). A sub-application is drawn the first time it is shown and is kept, hidden
 (`is-inactive`), while another one is shown, so the file manager comes back with its panels as they
 were. The sidebars are the file manager's, so another sub-application hides them. The activity
 bar's first group is the sub-applications (*File Manager* also brings back its Explorer, as the
@@ -482,6 +482,22 @@ more is stopped. One running is aborted from its tab (§2.1.1) by the toolbar's 
 `Escape` in the panel (`view.stopLoading`, as for a large folder), and what it found stays,
 its unfinished folders marked *not all scanned*. Shown with nothing open, it starts on the file manager's active folder. Its
 panels are not in the `Ctrl`+`Tab` ring, and its tabs are not kept in the session.
+**Task Manager (PRD 014).** Windows 10 Task Manager's *Processes* tab for the backend machine, shown by
+`Ctrl`+`Shift`+`T` (§3; window key `view.app.task-manager` — a browser keeps the chord, so the desktop's). The
+backend's `processes` module (`/api/processes`, bridge `proc-*`, mapped by `RemoteBackend`;
+`PROCESSES_ENABLED` / `PROCESSES_KILL_ENABLED`, off in production, on on the desktop) measures every 2 s
+from start whether anyone looks or not, and keeps 10 minutes: `/proc` on Linux, one long-lived hidden
+PowerShell with a compiled C# helper on Windows (`windows-sampler.ps1.ts`), `ps` elsewhere. A process is
+named by `key` (`pid:start`), so *End task* never ends a pid handed out again. On the frontend
+`TaskManagerFeature` asks for the latest sample every 2 s while the sub-application is shown and not
+paused (started by the `Workbench` component, like Git), and `task-manager/process-rows.ts` builds the
+rows: an executable's processes in one group under *Apps* / *Background processes* / the system's,
+sorted by a column, filtered, shaded by load (`--vsc-heat`). The library's `UiProcessList` draws them
+(keyboard on the list through `aria-activedescendant`, so rows can change under it). *End task*
+(`Delete`), *End process tree* (`Shift`+`Delete`), *Open File Location*, *Copy Details*, pause and the
+header's column choices are commands of the table (`process.*`); the status bar shows the machine's
+load and the pause while it is shown; the columns and the order are kept under `tr-file.task-manager.v1`.
+
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`
 polls `/api/fs/watch` every 2 s with the folders on screen and re-reads what

@@ -21,6 +21,9 @@ import type {
   FsSearchResult,
   FsUpload,
   FsWatchResult,
+  FsProcessEndResult,
+  FsProcessesHistory,
+  FsProcessesSnapshot,
 } from './file-system.model';
 
 /**
@@ -239,4 +242,15 @@ export interface FsTransport {
 
   /** Stops a scan; answers with how it stands. */
   cancelDiskUsage(id: string): Promise<FsDiskUsageScan>;
+
+  /* -- processes (PRD 014, §1) ----------------------------------------------- */
+
+  /** The backend machine's processes, as last measured there. */
+  processes(): Promise<FsProcessesSnapshot>;
+
+  /** The last ten minutes of the machine, and of the processes named by key. */
+  processHistory(keys: readonly string[]): Promise<FsProcessesHistory>;
+
+  /** Ends a process — and with `tree`, all it started. Rejects with `FORBIDDEN` where that is not allowed. */
+  endProcess(key: string, tree?: boolean): Promise<FsProcessEndResult>;
 }

@@ -2,7 +2,8 @@
  * @tr-file/file-ui — the file manager's components, built on `@tr-file/ui`.
  *
  * Presentational like the rest: a file browser and its listings (list, grid,
- * tree), disk usage, a git pane, transfers and a permission grid. They know
+ * tree), disk usage, a git pane, transfers, a permission grid — and Task
+ * Manager's list of processes (PRD 014). They know
  * what a folder, an entry and a path are — which is why they are not in the
  * generic library — but nothing about where files come from: no service, no
  * HTTP. Add `provideFileUi()` to the providers.
@@ -23,6 +24,8 @@ export { UiIconView } from './lib/icon-view/ui-icon-view';
 export { UiDiskUsage } from './lib/disk-usage/ui-disk-usage';
 export { DISK_USAGE_HUES, sunburst, squarify, tableRows, treemap } from './lib/disk-usage/disk-usage-layout';
 export type { DiskUsageCell, DiskUsageHue, DiskUsageRow, DiskUsageSlice } from './lib/disk-usage/disk-usage-layout';
+
+export { UiProcessList } from './lib/process-list/ui-process-list';
 
 /* details sidebar --------------------------------------------------------- */
 export { UiPermissionGrid } from './lib/permission-grid/ui-permission-grid';

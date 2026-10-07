@@ -5,6 +5,7 @@ import { DiskUsageApp } from './sub-apps/disk-usage/disk-usage-app';
 import { FileManagerDetails } from './sub-apps/file-manager/file-manager-details';
 import { FileManagerExplorer } from './sub-apps/file-manager/file-manager-explorer';
 import { SearchApp } from './sub-apps/search/search-app';
+import { TaskManagerApp } from './sub-apps/task-manager/task-manager-app';
 import { WorkbenchService } from './workbench.service';
 
 /**
@@ -12,8 +13,8 @@ import { WorkbenchService } from './workbench.service';
  * bar, the activity bar and the status bar every sub-application shares, the
  * panels, the bottom panel — with what the file manager draws in it: the
  * content of each kind of tab, the bottom panel's tabs, the Explorer and
- * Details sidebars, and the other sub-applications (§1.1), Search and Disk
- * Usage.
+ * Details sidebars, and the other sub-applications (§1.1), Search, Disk
+ * Usage and Task Manager.
  *
  * Render-only by design — it hands templates to the shell, wires the file
  * manager's components to the signals the feature classes expose and
@@ -27,6 +28,7 @@ import { WorkbenchService } from './workbench.service';
     FileManagerDetails,
     FileManagerExplorer,
     SearchApp,
+    TaskManagerApp,
     UiBottomTabTemplate,
     UiFileBrowser,
     UiNotes,
@@ -57,6 +59,8 @@ export class Workbench {
     this.workbench.serverClockFt.start();
     // The title bar's *Upgrade* button (PRD 001, §8.6) follows the desktop shell from here too.
     this.workbench.appUpdateFt.start();
+    // Task Manager (PRD 014) asks for the processes while it is shown — from here too.
+    this.workbench.taskManagerFt.start();
 
     // A feature asked for files — or a folder (PRD 003, §6); only the component may open the picker.
     effect(() => {

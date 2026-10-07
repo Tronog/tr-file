@@ -22,6 +22,10 @@ services:
       # Git (PRD 011, §1) runs a repository's own hooks and config: off unless asked for,
       # and it needs a `git` binary in the image as well.
       GIT_ENABLED: ${GIT_ENABLED:-false}
+      # Task Manager (PRD 014, §1): the server's processes, and ending them — off unless asked for.
+      # The container sees only its own processes unless the service has `pid: host`.
+      PROCESSES_ENABLED: ${PROCESSES_ENABLED:-false}
+      PROCESSES_KILL_ENABLED: ${PROCESSES_KILL_ENABLED:-false}
     expose:
       - "4310"
     volumes:

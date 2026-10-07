@@ -197,6 +197,12 @@ export const HELP: UiHelpConfig = {
       commands: ['image.previous', 'image.next', 'image.zoomIn', 'image.zoomOut', 'image.actualSize', 'image.fit'],
     },
     {
+      id: 'task-manager',
+      title: 'Task Manager',
+      hue: 'red',
+      commands: ['view.app.task-manager', 'process.endTask', 'process.endTree'],
+    },
+    {
       id: 'bookmarks',
       title: 'Bookmarks',
       hue: 'yellow',
@@ -270,6 +276,20 @@ export const HELP: UiHelpConfig = {
       ],
     },
     {
+      id: 'processes',
+      title: 'Task Manager’s list',
+      hue: 'red',
+      rows: [
+        [[['↑'], ['↓']], 'Move between the rows'],
+        [[['→'], ['←']], 'Open / close a group, or step into / out of it'],
+        [[['Enter']], 'Open / close a group'],
+        [[['a…z']], 'Type-to-find: jump to the next name starting with it'],
+        [[['Shift', 'F10'], ['ContextMenu']], 'Context menu'],
+        [[['Ctrl', 'F']], 'Filter the processes'],
+        [[['Ctrl', 'R']], 'Update now'],
+      ],
+    },
+    {
       id: 'zoom',
       title: 'Zoom (desktop)',
       hue: 'teal',
@@ -340,6 +360,7 @@ export function trFileWorkbenchConfig(seed: MockDataWorkbenchService, systemShel
       { id: 'file-manager', label: 'File Manager', icon: 'copy', main: true },
       { id: 'search', label: 'Search', icon: 'search' },
       { id: 'disk-usage', label: 'Disk Usage', icon: 'database' },
+      { id: 'task-manager', label: 'Task Manager', icon: 'activity' },
     ],
     // Places are the desktop's (PRD 003, §6): a server names its root and no
     // more, so in a browser the pane starts closed — and asks when opened.

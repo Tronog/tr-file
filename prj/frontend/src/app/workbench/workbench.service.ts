@@ -24,6 +24,7 @@ import { TransfersFeature } from './features/transfers.feature';
 import { WindowControlsFeature } from './features/window-controls.feature';
 import { AppUpdateFeature } from './features/app-update.feature';
 import { DiskUsageFeature } from './features/disk-usage.feature';
+import { TaskManagerFeature } from './features/task-manager.feature';
 import { SubAppsFeature } from './features/sub-apps.feature';
 import { OperationsFeature } from './features/operations.feature';
 import { FileClipboardFeature } from './features/file-clipboard.feature';
@@ -252,6 +253,8 @@ export class WorkbenchService extends UiWorkbenchService<PanelTabState, PanelGro
   readonly serverClockFt = new ServerClockFeature(this);
   /** What takes up a folder's space, opened from its Size in Details (PRD 001, §9.3.2). */
   readonly diskUsageFt = new DiskUsageFeature(this);
+  /** The backend machine's processes, as Windows 10's Task Manager shows them (PRD 014). */
+  readonly taskManagerFt = new TaskManagerFeature(this);
 
   constructor() {
     super();

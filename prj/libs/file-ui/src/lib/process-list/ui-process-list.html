@@ -1,0 +1,110 @@
+@let m = model();
+<div class="toolbar" (keydown)="onKeydown($event)">
+  <ui-search-field
+    class="filter"
+    placeholder="Filter processes…"
+    label="Filter processes"
+    [value]="m.filter"
+    [focusToken]="filterFocus()"
+    (valueChange)="onFilter($event)"
+  />
+  <ui-icon-button
+    [icon]="m.paused ? 'play' : 'player-pause'"
+    [label]="m.paused ? 'Resume updates' : 'Pause updates'"
+    [active]="m.paused"
+    (action)="pauseToggle.emit()"
+  />
+  @if (m.summary; as summary) {
+    <span class="summary">{{ summary }}</span>
+  }
+</div>
+
+<div class="table" role="treegrid" aria-label="Processes" [attr.aria-rowcount]="m.rows.length + 1" (keydown)="onKeydown($event)">
+  <div class="head" role="row" (contextmenu)="onHeaderMenu($event)">
+    @for (column of m.columns; track column.id) {
+      <button
+        type="button"
+        role="columnheader"
+        class="head-cell"
+        tabindex="-1"
+        [class.num]="column.numeric"
+        [class.is-sorted]="column.sort !== undefined"
+        [attr.aria-sort]="ariaSort(column.sort)"
+        [attr.title]="column.title ?? null"
+        [style.--heat]="heatOf(column.totalHeat)"
+        (click)="sort.emit(column.id)"
+      >
+        <span class="sort-mark">
+          @if (sortIcon(column.sort); as icon) {
+            <ui-icon [name]="icon" size="sm" />
+          }
+        </span>
+        <span class="total">{{ column.total ?? '' }}</span>
+        <span class="label">{{ column.label }}</span>
+      </button>
+    }
+  </div>
+
+  @if (m.empty; as empty) {
+    <div class="empty" #body tabindex="0"><ui-empty-state [state]="empty" /></div>
+  } @else {
+    <div class="body" #body tabindex="0" role="rowgroup" [attr.aria-activedescendant]="activeDescendant()">
+      @for (row of m.rows; track row.id) {
+        <div
+          role="row"
+          [attr.id]="domId(row.id)"
+          [attr.data-row]="row.kind === 'section' ? null : ''"
+          [attr.aria-level]="row.level + 1"
+          [attr.aria-expanded]="row.expandable ? !!row.expanded : null"
+          [attr.aria-selected]="row.kind === 'section' ? null : row.id === m.selectedId"
+          [attr.title]="row.title ?? null"
+          [class]="'row is-' + row.kind"
+          [class.is-selected]="row.id === m.selectedId"
+          [class.is-warning]="row.warning"
+          (click)="onRowClick(row)"
+          (dblclick)="onRowDoubleClick(row)"
+          (contextmenu)="onRowMenu($event, row)"
+        >
+          @if (row.kind === 'section') {
+            <span class="section-label" role="rowheader">{{ row.label }}</span>
+          } @else {
+            @for (column of m.columns; track column.id) {
+              @if (column.id === 'name') {
+                <span role="gridcell" class="cell name" [style.padding-left.px]="4 + (row.level - 1) * 20">
+                  @if (row.expandable) {
+                    <span class="twisty" aria-hidden="true" (click)="onTwisty($event, row)">
+                      <ui-icon [name]="row.expanded ? 'chevron-down' : 'chevron-right'" size="sm" />
+                    </span>
+                  } @else {
+                    <span class="twisty"></span>
+                  }
+                  <ui-icon class="row-icon" [name]="row.icon ?? 'terminal'" size="sm" />
+                  <span class="name-text">{{ row.label }}</span>
+                  @if (row.detail; as detail) {
+                    <span class="detail">{{ detail }}</span>
+                  }
+                </span>
+              } @else {
+                @let cell = row.cells[column.id];
+                <span
+                  role="gridcell"
+                  class="cell"
+                  [class.num]="column.numeric"
+                  [class.is-heated]="cell?.heat !== undefined"
+                  [style.--heat]="heatOf(cell?.heat)"
+                  >{{ cell?.text }}</span
+                >
+              }
+            }
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<div class="footer">
+  <button uiButton variant="secondary" type="button" [disabled]="!m.canEnd" [attr.title]="m.endTitle ?? 'End task (Delete)'" (click)="endTask.emit()">
+    End task
+  </button>
+</div>

@@ -16,13 +16,14 @@ describe('SubAppsFeature', () => {
 
   it('starts in the file manager, the sub-applications first in the activity bar', () => {
     expect(workbench.subAppsFt.active()).toBe('file-manager');
-    expect(activity().slice(0, 3)).toEqual([
+    expect(activity().slice(0, 4)).toEqual([
       { id: 'file-manager', label: 'File Manager', icon: 'copy', active: true },
       { id: 'search', label: 'Search', icon: 'search' },
       { id: 'disk-usage', label: 'Disk Usage', icon: 'database' },
+      { id: 'task-manager', label: 'Task Manager', icon: 'activity' },
     ]);
     // The file manager's own buttons follow, set apart.
-    expect(activity()[3]).toMatchObject({ id: 'transfers', separatorBefore: true });
+    expect(activity()[4]).toMatchObject({ id: 'transfers', separatorBefore: true });
     expect(workbench.subAppsFt.isOpened('disk-usage')).toBe(false);
   });
 

@@ -477,3 +477,28 @@ describe('RemoteBackend disk usage (PRD 013, §1)', () => {
     await rm(join(root, 'du'), { recursive: true, force: true });
   });
 });
+
+describe('RemoteBackend processes (PRD 014, §1)', () => {
+  it('lists the server machine’s processes, their history, and refuses to end one that is gone', async () => {
+    const remote = await connected();
+    interface Snapshot {
+      sequence: number;
+      available: boolean;
+      processes: { pid: number; key: string }[];
+    }
+    let snapshot: Snapshot;
+    for (;;) {
+      snapshot = dataOf<Snapshot>(await remote.dispatch({ command: 'proc-list' }));
+      if (snapshot.sequence > 0) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(snapshot.available, true);
+    const self = snapshot.processes.find((entry) => entry.pid === process.pid);
+    assert.ok(self !== undefined);
+    const history = dataOf<{ processes: Record<string, unknown> }>(await remote.dispatch({ command: 'proc-history', keys: [self.key] }));
+    assert.deepEqual(Object.keys(history.processes), [self.key]);
+    assert.equal(errorOf(await remote.dispatch({ command: 'proc-end', key: '1:1' })).code, 'NOT_FOUND');
+  });
+});

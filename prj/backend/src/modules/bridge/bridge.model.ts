@@ -19,6 +19,7 @@ import type { DiskUsageScanDto } from '../disk-usage/disk-usage.model.js';
 import type { DirectoryListingDto, FileDetailsDto, FileEntryType, PlacesDto, SearchResultDto } from '../files/models/index.js';
 import type { WatchResultDto } from '../files/watch.service.js';
 import type { GitRequest } from '../git/git-request.js';
+import type { ProcessEndResultDto, ProcessesHistoryDto, ProcessesSnapshotDto } from '../processes/processes.model.js';
 import type { ServerTimeDto } from '../health/server-time.js';
 import type {
   ConflictPolicy,
@@ -68,7 +69,10 @@ export type FsBridgeCommand =
   | 'time'
   | 'du-start'
   | 'du-status'
-  | 'du-cancel';
+  | 'du-cancel'
+  | 'proc-list'
+  | 'proc-history'
+  | 'proc-end';
 
 /**
  * Who is signed in on one bridge connection (PRD 003, §2) — for the desktop,
@@ -333,12 +337,33 @@ export interface FsDuCancelRequest {
   readonly scanId: string;
 }
 
+/** The machine's processes, as last measured (PRD 014, §1) — `GET /api/processes`. */
+export interface FsProcListRequest {
+  readonly command: 'proc-list';
+}
+
+/** The last ten minutes, of the machine and of the processes named — `GET /api/processes/history`. */
+export interface FsProcHistoryRequest {
+  readonly command: 'proc-history';
+  readonly keys: readonly string[];
+}
+
+/** A process ended, or its tree — `POST /api/processes/end`. */
+export interface FsProcEndRequest {
+  readonly command: 'proc-end';
+  readonly key: string;
+  readonly tree?: boolean;
+}
+
 /** What is in the trash (PRD 001, §14.1) — `GET /api/ops/trash-items`. */
 export interface FsOpTrashListRequest {
   readonly command: 'op-trash-list';
 }
 
 export type FsBridgeRequest =
+  | FsProcListRequest
+  | FsProcHistoryRequest
+  | FsProcEndRequest
   | FsDuStartRequest
   | FsDuStatusRequest
   | FsDuCancelRequest
@@ -447,6 +472,9 @@ export interface FsBridgeResults {
   readonly 'du-start': DiskUsageScanDto;
   readonly 'du-status': DiskUsageScanDto;
   readonly 'du-cancel': DiskUsageScanDto;
+  readonly 'proc-list': ProcessesSnapshotDto;
+  readonly 'proc-history': ProcessesHistoryDto;
+  readonly 'proc-end': ProcessEndResultDto;
 }
 
 export interface FsBridgeSuccess<T> {

@@ -12,6 +12,7 @@ import type { AuthService } from '../auth/index.js';
 import { WATCH_MAX_PATHS, type FileDetails, type FilesService, type PlacesService, type WatchService } from '../files/index.js';
 import { isGitAction, parseGitRequest, type GitService } from '../git/index.js';
 import { serverTime } from '../health/server-time.js';
+import { ProcessesRoutes, type ProcessesService } from '../processes/index.js';
 import { parseDecision, parseOperationRequest, type OperationsService } from '../operations/index.js';
 import {
   FS_BRIDGE_CHUNK_BYTES,
@@ -88,6 +89,7 @@ export class FileSystemBridge {
     private readonly archives: ArchiveService,
     private readonly git: GitService,
     private readonly diskUsage: DiskUsageService,
+    private readonly processes: ProcessesService,
   ) {}
 
   /** A connection that has not signed in; the channel keeps one per window. */
@@ -369,6 +371,12 @@ export class FileSystemBridge {
         });
       case 'du-cancel':
         return this.diskUsage.cancel(request.scanId);
+      case 'proc-list':
+        return this.processes.snapshot();
+      case 'proc-history':
+        return this.processes.historyOf(request.keys);
+      case 'proc-end':
+        return this.processes.end({ key: request.key, ...(request.tree === true ? { tree: true } : {}) });
     }
   }
 
@@ -650,7 +658,14 @@ export class FileSystemBridge {
       case 'places':
       case 'time':
       case 'op-trash-list':
+      case 'proc-list':
         return { command };
+      case 'proc-history':
+        return { command, keys: FileSystemBridge.readStrings(value, 'keys') };
+      case 'proc-end': {
+        const parsed = ProcessesRoutes.endRequest(value);
+        return { command, key: parsed.key, ...(parsed.tree === true ? { tree: true } : {}) };
+      }
       case 'du-start': {
         const depth = FileSystemBridge.readOptionalCount(value, 'depth');
         return { command, path: FileSystemBridge.readString(value, 'path'), ...(depth === undefined ? {} : { depth }) };

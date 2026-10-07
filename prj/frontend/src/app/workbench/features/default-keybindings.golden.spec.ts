@@ -38,6 +38,9 @@ const GOLDEN = [
   // The file browser's last two; before §17.1 they followed the tab keys, which share no key with them.
   'panel PageUp image.previous',
   'panel PageDown image.next',
+  // Task Manager's list (PRD 014, §2): after the file browser's, sharing no command with them.
+  'list Delete process.endTask',
+  'list Shift+Delete process.endTree',
   'panel / view.splitRight',
   'panel Ctrl+T tab.new',
   'panel Ctrl+Up view.toggleMaximize',
@@ -58,6 +61,7 @@ const GOLDEN = [
   'window Ctrl+D view.toggleDetails',
   'window Ctrl+/ view.toggleSidebars',
   'window Ctrl+U file.checkForUpdates',
+  'window Ctrl+Shift+T view.app.task-manager',
   ...Array.from({ length: 9 }, (_, index) => `window Ctrl+${index + 1} places.openBookmark${index + 1}`),
   'window Ctrl+Tab workbench.focusNextPart',
   'window Ctrl+Shift+Tab workbench.focusPreviousPart',

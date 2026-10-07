@@ -25,6 +25,8 @@ export const WORKBENCH_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
   { command: 'view.toggleSidebars', key: 'Ctrl+/', when: 'window' },
   // PRD 001, §8.6.1 — the desktop's; in a browser the command is disabled and the key does nothing.
   { command: 'file.checkForUpdates', key: 'Ctrl+U', when: 'window' },
+  // Task Manager (PRD 014, §3). A browser keeps the chord for reopening a tab: it reaches the page on the desktop.
+  { command: 'view.app.task-manager', key: 'Ctrl+Shift+T', when: 'window' },
   // The bookmarks, in their order, from any panel (PRD 002, §6.1).
   ...Array.from({ length: BOOKMARK_KEYS }, (_, index): UiKeybinding => ({
     command: openBookmarkCommand(index + 1),

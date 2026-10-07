@@ -185,6 +185,11 @@ export class ChromeFeature extends UiChromeFeature {
   override readonly statusTrailingItems = computed<readonly UiStatusItem[]>(() => {
     const clock = this.parent.serverClockFt;
     const time = clock.label();
+    const now = time === null ? [] : [{ id: 'clock', label: time, icon: 'clock' as const, ...(clock.title() === null ? {} : { title: clock.title() as string }) }];
+    // Task Manager says how the machine is (PRD 014, §2): it has no folder, selection or order of files to speak of.
+    if (this.parent.subAppsFt.isActive('task-manager')) {
+      return [...this.parent.taskManagerFt.statusItems(), ...now];
+    }
     return [
       { id: 'selection', label: this.selectionSummary() },
       {
@@ -194,7 +199,7 @@ export class ChromeFeature extends UiChromeFeature {
       },
       { id: 'sort', label: this.sortSummary(), title: 'Turn the order round' },
       // The server's date and time, last, at the far right (PRD 001, §13.1) — once it has said.
-      ...(time === null ? [] : [{ id: 'clock', label: time, icon: 'clock' as const, ...(clock.title() === null ? {} : { title: clock.title() as string }) }]),
+      ...now,
     ];
   });
 
@@ -219,6 +224,9 @@ export class ChromeFeature extends UiChromeFeature {
         break;
       case 'sort':
         this.parent.commandsFt.run('view.sortDescending');
+        break;
+      case 'tm-pause':
+        this.parent.taskManagerFt.togglePause();
         break;
       default:
         break;

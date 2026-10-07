@@ -3,7 +3,7 @@ import type { WorkbenchService } from '../workbench.service';
 
 /**
  * Which sub-application fills the window (PRD 001, §1.1): the file manager,
- * Search or Disk Usage — the library's `UiSubAppsFeature`, with the file
+ * Search, Disk Usage or Task Manager — the library's `UiSubAppsFeature`, with the file
  * manager as the main one. Disk Usage starts on the file manager's folder when
  * it has nothing open (PRD 013).
  */
@@ -19,6 +19,9 @@ export class SubAppsFeature extends UiSubAppsFeature {
     super.onShown(id);
     if (id === 'disk-usage') {
       this.parent.diskUsageFt.shown();
+    }
+    if (id === 'task-manager') {
+      this.parent.taskManagerFt.shown();
     }
   }
 }
