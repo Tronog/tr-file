@@ -13,6 +13,10 @@
  * which are *Apps* (a visible, unowned, uncloaked top-level window with a
  * title, as Task Manager counts them) and which have stopped responding.
  *
+ * Beside the processes (`p`) it writes each network adapter that is up —
+ * not the loopback, not a tunnel — with its bytes received and sent so far
+ * (`n`), for the Graph tab's Network pages (PRD 014, §2.1).
+ *
  * Every string goes out with anything past ASCII escaped, so the pipe's code
  * page never matters.
  */
@@ -21,6 +25,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
@@ -77,7 +82,7 @@ public static class TrFileProcesses {
         bufferSize = Math.Max(bufferSize * 2, needed + 65536);
       }
       StringBuilder json = new StringBuilder(256 * 1024);
-      json.Append('[');
+      json.Append("{\"p\":[");
       HashSet<string> seen = new HashSet<string>();
       bool first = true;
       int offset = 0;
@@ -133,7 +138,8 @@ public static class TrFileProcesses {
           Str(json, category); json.Append(',');
           json.Append((userTime + kernelTime) / 10000).Append(',');
           json.Append(privateWorkingSet).Append(',');
-          json.Append(readBytes + writeBytes).Append(',');
+          json.Append(readBytes).Append(',');
+          json.Append(writeBytes).Append(',');
           json.Append(threads).Append(',');
           json.Append(createTime == 0 ? 0 : createTime / 10000 - 11644473600000L);
           json.Append(']');
@@ -141,7 +147,9 @@ public static class TrFileProcesses {
         if (next == 0) { break; }
         offset += next;
       }
-      json.Append(']');
+      json.Append("],\"n\":");
+      Adapters(json);
+      json.Append('}');
       List<string> gone = new List<string>();
       foreach (string key in fixedByKey.Keys) { if (!seen.Contains(key)) { gone.Add(key); } }
       foreach (string key in gone) { fixedByKey.Remove(key); }
@@ -149,6 +157,28 @@ public static class TrFileProcesses {
     } finally {
       if (buffer != IntPtr.Zero) { Marshal.FreeHGlobal(buffer); }
     }
+  }
+
+  /** Each adapter that is up, as [name, received, sent]; nothing when the system will not say. */
+  static void Adapters(StringBuilder json) {
+    json.Append('[');
+    bool first = true;
+    try {
+      foreach (NetworkInterface adapter in NetworkInterface.GetAllNetworkInterfaces()) {
+        if (adapter.OperationalStatus != OperationalStatus.Up
+          || adapter.NetworkInterfaceType == NetworkInterfaceType.Loopback
+          || adapter.NetworkInterfaceType == NetworkInterfaceType.Tunnel) { continue; }
+        IPInterfaceStatistics statistics = adapter.GetIPStatistics();
+        if (!first) { json.Append(','); }
+        first = false;
+        json.Append('[');
+        Str(json, adapter.Name);
+        json.Append(',').Append(statistics.BytesReceived).Append(',').Append(statistics.BytesSent).Append(']');
+      }
+    } catch {
+      // No adapters is a machine without a network to show, not a failed sample.
+    }
+    json.Append(']');
   }
 
   /** The windows Task Manager would call an app's: the first title of each process, and whether any has hung. */

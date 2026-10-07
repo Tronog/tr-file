@@ -1,7 +1,7 @@
 import { DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
-import type { UiProcessListModel, UiProcessMenuRequest } from '@tr-file/file-ui';
+import type { UiPerfSpan, UiPerformanceModel, UiProcessListModel, UiProcessMenuRequest } from '@tr-file/file-ui';
 import type { UiStatusItem } from '@tr-file/ui';
-import type { FsProcess, FsProcessesSnapshot } from '../../file-system/file-system.model';
+import type { FsProcess, FsProcessesHistory, FsProcessesSnapshot } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import {
   PROCESS_COLUMNS,
@@ -11,7 +11,11 @@ import {
   type ProcessGroup,
   type ProcessSort,
 } from '../task-manager/process-rows';
+import { buildPerformance, type CpuView } from '../task-manager/performance';
 import type { WorkbenchService } from '../workbench.service';
+
+/** Task Manager's tabs: the processes, and the machine's graphs (PRD 014, §2.1). */
+export type TaskManagerView = 'processes' | 'graph';
 
 /** Where the columns and the order are remembered. */
 export const TASK_MANAGER_KEY = 'tr-file.task-manager.v1';
@@ -25,6 +29,9 @@ const RETRY_MS = 5000;
 interface Remembered {
   readonly columns?: readonly ProcessColumnId[];
   readonly sort?: ProcessSort;
+  readonly view?: TaskManagerView;
+  readonly span?: UiPerfSpan;
+  readonly cpuView?: CpuView;
 }
 
 /** What a row of the list stands for: one process, or an executable's group of them. */
@@ -43,7 +50,9 @@ const ROW_MENU = ['process.toggleExpand', '-', 'process.endTask', 'process.endTr
  * The backend measures every two seconds whether anyone looks or not
  * (§1); this asks for its latest sample every two seconds while the
  * sub-application is shown and not paused — never two asks at once — and
- * builds the list from it (`buildProcessRows`). Paused, the list stands still,
+ * builds the list from it (`buildProcessRows`) — and, while the Graph tab is
+ * shown (§2.1), the machine's last ten minutes too (`buildPerformance`).
+ * Paused, the list stands still,
  * as Task Manager's *Update speed › Paused* keeps it.
  *
  * What the user chose — the columns, the order — is kept in the settings; a
@@ -60,6 +69,15 @@ export class TaskManagerFeature {
   readonly filter = signal('');
   private readonly columns = signal<readonly ProcessColumnId[]>(PROCESS_COLUMNS.filter((column) => column.shown).map((column) => column.id));
   private readonly sortBy = signal<ProcessSort>({ column: 'name', direction: 'asc' });
+
+  /** Which tab is shown. */
+  readonly view = signal<TaskManagerView>('processes');
+  /** The Graph's resource chosen, its span, and how the CPU is drawn. */
+  private readonly perfSelected = signal<string | null>('cpu');
+  private readonly span = signal<UiPerfSpan>('60s');
+  private readonly cpuView = signal<CpuView>('overall');
+  /** The machine's last ten minutes, asked for while the Graph is shown. */
+  private readonly history = signal<FsProcessesHistory | null>(null);
 
   /** Bumped to put the keyboard on the list, and in the filter box. */
   readonly focusToken = signal(0);
@@ -79,6 +97,15 @@ export class TaskManagerFeature {
     }
     if (remembered?.sort !== undefined && known.has(remembered.sort.column)) {
       this.sortBy.set(remembered.sort);
+    }
+    if (remembered?.view === 'graph' || remembered?.view === 'processes') {
+      this.view.set(remembered.view);
+    }
+    if (remembered?.span === '60s' || remembered?.span === '10m') {
+      this.span.set(remembered.span);
+    }
+    if (remembered?.cpuView === 'overall' || remembered?.cpuView === 'logical') {
+      this.cpuView.set(remembered.cpuView);
     }
 
     // Asked while shown and not paused; nothing otherwise — the backend keeps measuring either way.
@@ -103,6 +130,54 @@ export class TaskManagerFeature {
   shown(): void {
     this.focusToken.update((token) => token + 1);
   }
+
+  /** Shows a tab; the Graph asks for its history at once rather than at the next interval. */
+  setView(view: TaskManagerView): void {
+    if (this.view() === view) {
+      return;
+    }
+    this.view.set(view);
+    this.remember();
+    this.focusToken.update((token) => token + 1);
+    if (view === 'graph') {
+      this.refresh();
+    }
+  }
+
+  selectResource(id: string): void {
+    this.perfSelected.set(id);
+  }
+
+  setSpan(span: UiPerfSpan): void {
+    this.span.set(span);
+    this.remember();
+  }
+
+  setCpuView(view: string): void {
+    if (view === 'overall' || view === 'logical') {
+      this.cpuView.set(view);
+      this.remember();
+    }
+  }
+
+  /** The Graph tab (PRD 014, §2.1). */
+  readonly performance = computed<UiPerformanceModel>(() => {
+    const snapshot = this.snapshot();
+    const failure = this.failure();
+    const empty = { resources: [], selectedId: null, page: null, span: this.span(), spanLabel: '' };
+    if (snapshot === null || !snapshot.available) {
+      return {
+        ...empty,
+        empty:
+          snapshot !== null
+            ? { icon: 'lock', title: 'Task Manager is not available here', ...(snapshot.reason === null ? {} : { hint: snapshot.reason }) }
+            : failure !== null
+              ? { icon: 'alert-triangle', title: 'Could not read the processes', hint: failure }
+              : { icon: 'activity', title: 'Measuring the machine…' },
+      };
+    }
+    return buildPerformance({ snapshot, history: this.history(), selectedId: this.perfSelected(), span: this.span(), cpuView: this.cpuView() });
+  });
 
   /* -- what is drawn --------------------------------------------------------- */
 
@@ -408,10 +483,17 @@ export class TaskManagerFeature {
     this.asking = true;
     let delay = TASK_MANAGER_POLL_MS;
     try {
-      const snapshot = await this.parent.fileSystem.processesFt.list();
-      // An answer that lands after a pause is not drawn: the list stands still once paused.
+      const graph = this.view() === 'graph';
+      const [snapshot, history] = await Promise.all([
+        this.parent.fileSystem.processesFt.list(),
+        graph ? this.parent.fileSystem.processesFt.history([]) : Promise.resolve(null),
+      ]);
+      // An answer that lands after a pause is not drawn: the list and the graphs stand still once paused.
       if (!this.paused()) {
         this.snapshot.set(snapshot);
+        if (history !== null) {
+          this.history.set(history);
+        }
       }
       this.failure.set(null);
       delay = snapshot.intervalMs > 0 ? snapshot.intervalMs : TASK_MANAGER_POLL_MS;
@@ -434,6 +516,12 @@ export class TaskManagerFeature {
   }
 
   private remember(): void {
-    this.parent.settings.set(TASK_MANAGER_KEY, { columns: this.columns(), sort: this.sortBy() } satisfies Remembered);
+    this.parent.settings.set(TASK_MANAGER_KEY, {
+      columns: this.columns(),
+      sort: this.sortBy(),
+      view: this.view(),
+      span: this.span(),
+      cpuView: this.cpuView(),
+    } satisfies Remembered);
   }
 }

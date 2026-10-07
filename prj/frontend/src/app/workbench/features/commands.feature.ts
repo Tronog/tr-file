@@ -1,4 +1,5 @@
 import { PROCESS_COLUMNS } from '../task-manager/process-rows';
+import type { TaskManagerView } from './task-manager.feature';
 import { UiCommandsFeature, type UiCommand, type UiCommandSpec, type UiCommandTarget } from '@tr-file/ui';
 import type { UiPanelView } from '@tr-file/file-ui';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
@@ -533,6 +534,9 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
         run: () => tm.togglePause(),
       },
       { id: 'process.refresh', category: 'Task Manager', label: 'Update Now', enabled: taskManager, run: () => tm.refresh() },
+      // Its tabs (PRD 014, §2.1), from anywhere: Task Manager comes forward on the one asked for.
+      { id: 'process.showProcesses', category: 'Task Manager', label: 'Show Processes', run: () => this.showTaskManager('processes') },
+      { id: 'process.showGraph', category: 'Task Manager', label: 'Show Graph', run: () => this.showTaskManager('graph') },
       // The header's menu: which columns are shown.
       ...PROCESS_COLUMNS.filter((column) => column.id !== 'name').map((column) => ({
         id: `process.column.${column.id}`,
@@ -550,6 +554,11 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
       this.builtin('tab.closeOthers'),
       this.builtin('tab.closeRight'),
     ];
+  }
+
+  private showTaskManager(view: TaskManagerView): void {
+    this.parent.subAppsFt.show('task-manager');
+    this.parent.taskManagerFt.setView(view);
   }
 
   /** The folder a panel lists, or `null` when it shows a file. */

@@ -286,6 +286,8 @@ describe('CommandPaletteFeature', () => {
       'Help: Show Help',
       'Help: Keyboard Shortcuts Cheatsheet',
       'Go: Go to Location…',
+      'Task Manager: Show Processes',
+      'Task Manager: Show Graph',
       'Tab: New Tab',
       'View: Toggle Maximized Panel',
       'Remote: Connect to Remote Server…',

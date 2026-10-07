@@ -3,7 +3,7 @@
  *
  * Presentational like the rest: a file browser and its listings (list, grid,
  * tree), disk usage, a git pane, transfers, a permission grid — and Task
- * Manager's list of processes (PRD 014). They know
+ * Manager's list of processes and its graphs (PRD 014). They know
  * what a folder, an entry and a path are — which is why they are not in the
  * generic library — but nothing about where files come from: no service, no
  * HTTP. Add `provideFileUi()` to the providers.
@@ -26,6 +26,8 @@ export { DISK_USAGE_HUES, sunburst, squarify, tableRows, treemap } from './lib/d
 export type { DiskUsageCell, DiskUsageHue, DiskUsageRow, DiskUsageSlice } from './lib/disk-usage/disk-usage-layout';
 
 export { UiProcessList } from './lib/process-list/ui-process-list';
+export { UiPerformance } from './lib/performance/ui-performance';
+export { areaPath, linePath } from './lib/performance/perf-paths';
 
 /* details sidebar --------------------------------------------------------- */
 export { UiPermissionGrid } from './lib/permission-grid/ui-permission-grid';

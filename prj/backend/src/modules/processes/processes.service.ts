@@ -1,7 +1,7 @@
-import { cpus, freemem, totalmem } from 'node:os';
+import { cpus, freemem, hostname, totalmem, uptime } from 'node:os';
 
 import { HttpError, type Logger } from '../../core/index.js';
-import { SampleRing } from './process-history.js';
+import { SampleRing, ValueRing } from './process-history.js';
 import {
   PROCESS_HISTORY_SAMPLES,
   PROCESS_SAMPLE_MS,
@@ -13,6 +13,9 @@ import {
   type ProcessesSnapshotDto,
   type ProcessSource,
   type ProcessTotalsDto,
+  type MachineInfoDto,
+  type NetworkAdapterDto,
+  type RawAdapter,
   type RawProcess,
 } from './processes.model.js';
 import { LinuxProcessSource } from './sources/linux-process-source.js';
@@ -41,14 +44,33 @@ export interface ProcessesServiceOptions {
 /** What one sample keeps of a process, to measure the next against. */
 interface Seen {
   readonly cpuMs: number;
-  readonly ioBytes: number | null;
+  readonly ioRead: number | null;
+  readonly ioWrite: number | null;
 }
 
-/** The whole machine's CPU counters, all cores together. */
+/** One logical processor's counters. */
 interface CpuTimes {
   readonly idle: number;
   readonly total: number;
 }
+
+/** What the machine's graphs keep (PRD 014, §2.1): ten minutes of each. */
+interface MachineRings {
+  readonly cpu: ValueRing;
+  readonly memory: ValueRing;
+  readonly disk: ValueRing;
+  readonly diskRead: ValueRing;
+  readonly diskWrite: ValueRing;
+  readonly cores: ValueRing[];
+  readonly network: Map<string, { readonly send: ValueRing; readonly receive: ValueRing }>;
+}
+
+/** The rate of a counter that only grows, per second; `null` with nothing to compare. */
+const rate = (now: number | null, before: number | null | undefined, elapsedMs: number): number | null =>
+  now === null ? null : before === undefined || before === null || elapsedMs === 0 ? 0 : (Math.max(0, now - before) * 1000) / elapsedMs;
+
+const sum = (values: readonly (number | null)[]): number | null =>
+  values.reduce<number | null>((total, value) => (value === null ? total : (total ?? 0) + value), null);
 
 const keyOf = (raw: RawProcess): string => `${raw.pid}:${raw.started === null ? 0 : Math.round(raw.started)}`;
 
@@ -79,13 +101,34 @@ export class ProcessesService {
   private sequence = 0;
   private at: number | null = null;
   private processes: readonly ProcessDto[] = [];
-  private totals: ProcessTotalsDto = { cpu: 0, memoryUsed: 0, memoryTotal: totalmem(), disk: null, processes: 0, threads: null };
+  private totals: ProcessTotalsDto = {
+    cpu: 0,
+    memoryUsed: 0,
+    memoryTotal: totalmem(),
+    disk: null,
+    diskRead: null,
+    diskWrite: null,
+    processes: 0,
+    threads: null,
+    cores: [],
+    network: [],
+  };
   private failure: string | null = null;
 
   private seen = new Map<string, Seen>();
   private seenAt: number | null = null;
-  private cpuTimes: CpuTimes | null = null;
-  private readonly machine = new SampleRing(PROCESS_HISTORY_SAMPLES);
+  /** Each logical processor's counters at the last sample. */
+  private cpuTimes: CpuTimes[] | null = null;
+  private adaptersSeen = new Map<string, RawAdapter>();
+  private readonly machine: MachineRings = {
+    cpu: new ValueRing(PROCESS_HISTORY_SAMPLES),
+    memory: new ValueRing(PROCESS_HISTORY_SAMPLES),
+    disk: new ValueRing(PROCESS_HISTORY_SAMPLES),
+    diskRead: new ValueRing(PROCESS_HISTORY_SAMPLES),
+    diskWrite: new ValueRing(PROCESS_HISTORY_SAMPLES),
+    cores: [],
+    network: new Map(),
+  };
   private readonly history = new Map<string, SampleRing>();
 
   constructor(
@@ -153,6 +196,7 @@ export class ProcessesService {
       platform: process.platform,
       cpuCount: Math.max(1, cpus().length),
       totals: this.totals,
+      machine: ProcessesService.machineInfo(),
       processes: this.processes,
     };
   }
@@ -166,10 +210,24 @@ export class ProcessesService {
         processes[key] = ring.series();
       }
     }
+    const machine = this.machine;
+    const network: Record<string, { send: number[]; receive: number[] }> = {};
+    for (const [name, rings] of machine.network) {
+      network[name] = { send: rings.send.numbers(), receive: rings.receive.numbers() };
+    }
     return {
       intervalMs: this.intervalMs,
       at: this.at === null ? null : new Date(this.at).toISOString(),
-      totals: { ...this.machine.series(), memoryTotal: this.totals.memoryTotal },
+      totals: {
+        cpu: machine.cpu.numbers(1),
+        memory: machine.memory.numbers(),
+        disk: machine.disk.series(),
+        diskRead: machine.diskRead.series(),
+        diskWrite: machine.diskWrite.series(),
+        memoryTotal: this.totals.memoryTotal,
+        cores: machine.cores.map((ring) => ring.numbers(1)),
+        network,
+      },
       processes,
     };
   }
@@ -267,7 +325,8 @@ export class ProcessesService {
     this.busy = true;
     try {
       const raw = await this.source.sample();
-      this.record(raw, Date.now());
+      const adapters = (await this.source.adapters?.().catch(() => [])) ?? [];
+      this.record(raw, adapters, Date.now());
       if (this.failure !== null) {
         this.logger.info('processes measured again');
       }
@@ -283,28 +342,25 @@ export class ProcessesService {
     }
   }
 
-  private record(raw: readonly RawProcess[], now: number): void {
+  private record(raw: readonly RawProcess[], adapters: readonly RawAdapter[], now: number): void {
     const elapsed = this.seenAt === null ? 0 : Math.max(1, now - this.seenAt);
     const cores = Math.max(1, cpus().length);
     const seen = new Map<string, Seen>();
     const processes: ProcessDto[] = [];
-    let disk: number | null = null;
+    let diskRead: number | null = null;
+    let diskWrite: number | null = null;
     let threads: number | null = null;
 
     for (const entry of raw) {
       const key = keyOf(entry);
       const before = this.seen.get(key);
-      seen.set(key, { cpuMs: entry.cpuMs, ioBytes: entry.ioBytes });
+      seen.set(key, { cpuMs: entry.cpuMs, ioRead: entry.ioRead, ioWrite: entry.ioWrite });
       const cpu = before === undefined || elapsed === 0 ? 0 : Math.min(100, (Math.max(0, entry.cpuMs - before.cpuMs) / (elapsed * cores)) * 100);
-      const rate =
-        entry.ioBytes === null
-          ? null
-          : before === undefined || before.ioBytes === null || elapsed === 0
-            ? 0
-            : (Math.max(0, entry.ioBytes - before.ioBytes) * 1000) / elapsed;
-      if (rate !== null) {
-        disk = (disk ?? 0) + rate;
-      }
+      const read = rate(entry.ioRead, before?.ioRead, elapsed);
+      const write = rate(entry.ioWrite, before?.ioWrite, elapsed);
+      const disk = sum([read, write]);
+      diskRead = sum([diskRead, read]);
+      diskWrite = sum([diskWrite, write]);
       if (entry.threads !== null) {
         threads = (threads ?? 0) + entry.threads;
       }
@@ -321,7 +377,7 @@ export class ProcessesService {
         category: entry.category,
         cpu: Math.round(cpu * 10) / 10,
         memory: entry.memory,
-        disk: rate === null ? null : Math.round(rate),
+        disk: disk === null ? null : Math.round(disk),
         threads: entry.threads,
         startedAt: entry.started === null ? null : new Date(entry.started).toISOString(),
       });
@@ -331,7 +387,7 @@ export class ProcessesService {
         ring = new SampleRing(PROCESS_HISTORY_SAMPLES);
         this.history.set(key, ring);
       }
-      ring.push(cpu, entry.memory, rate);
+      ring.push(cpu, entry.memory, disk);
     }
     // A process that has ended takes its history with it.
     for (const key of this.history.keys()) {
@@ -342,16 +398,56 @@ export class ProcessesService {
 
     const total = totalmem();
     const used = total - freemem();
-    const machineCpu = this.machineCpu();
+    const { overall, perCore } = this.machineCpu();
+    const network = this.networkRates(adapters, elapsed);
+    const disk = sum([diskRead, diskWrite]);
+    const round = (value: number | null) => (value === null ? null : Math.round(value));
     this.totals = {
-      cpu: Math.round(machineCpu * 10) / 10,
+      cpu: Math.round(overall * 10) / 10,
       memoryUsed: used,
       memoryTotal: total,
-      disk: disk === null ? null : Math.round(disk),
+      disk: round(disk),
+      diskRead: round(diskRead),
+      diskWrite: round(diskWrite),
       processes: processes.length,
       threads,
+      cores: perCore.map((load) => Math.round(load * 10) / 10),
+      network,
     };
-    this.machine.push(machineCpu, used, disk);
+
+    const machine = this.machine;
+    machine.cpu.push(overall);
+    machine.memory.push(used);
+    machine.disk.push(disk);
+    machine.diskRead.push(diskRead);
+    machine.diskWrite.push(diskWrite);
+    perCore.forEach((load, index) => {
+      // A processor seen for the first time starts as long a history as the others, at nothing.
+      if (machine.cores[index] === undefined) {
+        const ring = new ValueRing(PROCESS_HISTORY_SAMPLES);
+        for (let filled = 0; filled < machine.cpu.numbers().length - 1; filled += 1) {
+          ring.push(0);
+        }
+        machine.cores[index] = ring;
+      }
+      machine.cores[index]?.push(load);
+    });
+    for (const adapter of network) {
+      let rings = machine.network.get(adapter.name);
+      if (rings === undefined) {
+        rings = { send: new ValueRing(PROCESS_HISTORY_SAMPLES), receive: new ValueRing(PROCESS_HISTORY_SAMPLES) };
+        machine.network.set(adapter.name, rings);
+      }
+      rings.send.push(adapter.send);
+      rings.receive.push(adapter.receive);
+    }
+    // An adapter gone takes its graph with it.
+    for (const name of machine.network.keys()) {
+      if (!network.some((adapter) => adapter.name === name)) {
+        machine.network.delete(name);
+      }
+    }
+
     this.processes = processes;
     this.seen = seen;
     this.seenAt = now;
@@ -359,19 +455,53 @@ export class ProcessesService {
     this.sequence += 1;
   }
 
-  /** The whole machine's CPU since the last sample, 0–100, from the operating system's own counters. */
-  private machineCpu(): number {
-    let idle = 0;
-    let total = 0;
-    for (const cpu of cpus()) {
-      idle += cpu.times.idle;
-      total += cpu.times.user + cpu.times.nice + cpu.times.sys + cpu.times.irq + cpu.times.idle;
-    }
+  /** Each adapter's bytes a second since the last sample. */
+  private networkRates(adapters: readonly RawAdapter[], elapsed: number): NetworkAdapterDto[] {
+    const rates = adapters.map((adapter) => {
+      const before = this.adaptersSeen.get(adapter.name);
+      return {
+        name: adapter.name,
+        send: Math.round(rate(adapter.sent, before?.sent, elapsed) ?? 0),
+        receive: Math.round(rate(adapter.received, before?.received, elapsed) ?? 0),
+      };
+    });
+    this.adaptersSeen = new Map(adapters.map((adapter) => [adapter.name, adapter]));
+    return rates;
+  }
+
+  /**
+   * The machine's CPU since the last sample, 0–100 — all of it, and each
+   * logical processor — from the operating system's own counters.
+   */
+  private machineCpu(): { readonly overall: number; readonly perCore: number[] } {
+    const now = cpus().map((cpu) => ({
+      idle: cpu.times.idle,
+      total: cpu.times.user + cpu.times.nice + cpu.times.sys + cpu.times.irq + cpu.times.idle,
+    }));
     const before = this.cpuTimes;
-    this.cpuTimes = { idle, total };
-    if (before === null || total <= before.total) {
-      return 0;
-    }
-    return Math.min(100, Math.max(0, (1 - (idle - before.idle) / (total - before.total)) * 100));
+    this.cpuTimes = now;
+    const load = (current: CpuTimes, previous: CpuTimes | undefined): number =>
+      previous === undefined || current.total <= previous.total
+        ? 0
+        : Math.min(100, Math.max(0, (1 - (current.idle - previous.idle) / (current.total - previous.total)) * 100));
+    const perCore = now.map((times, index) => load(times, before?.[index]));
+    const idle = now.reduce((total, times) => total + times.idle, 0);
+    const total = now.reduce((all, times) => all + times.total, 0);
+    const overall =
+      before === null
+        ? 0
+        : load({ idle, total }, { idle: before.reduce((all, times) => all + times.idle, 0), total: before.reduce((all, times) => all + times.total, 0) });
+    return { overall, perCore };
+  }
+
+  /** What the CPU is, how fast it runs now, and how long the machine has been up. */
+  private static machineInfo(): MachineInfoDto {
+    const first = cpus()[0];
+    return {
+      cpuModel: first?.model.trim() ?? '',
+      cpuSpeedMhz: first?.speed ?? 0,
+      uptimeSeconds: Math.round(uptime()),
+      hostname: hostname(),
+    };
   }
 }

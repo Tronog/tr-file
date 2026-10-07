@@ -130,6 +130,8 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 
 | Key | Action |
 | --- | --- |
+| `←` / `→` (on the tabs) | Processes / Graph |
+| `↑` `↓`, `Home` / `End` (Graph, on the resources) | CPU, Memory, Disk, each network adapter |
 | `↑` `↓`, `Home` / `End`, `PageUp` / `PageDown` | Move between the rows (headings are passed over) |
 | `→` / `←` | Open / close a group, or step into it / out to it |
 | `Enter` | Open / close a group |

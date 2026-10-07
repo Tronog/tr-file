@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { Logger } from '../../../core/index.js';
-import type { ProcessCategory, ProcessSource, ProcessStatus, RawProcess } from '../processes.model.js';
+import type { ProcessCategory, ProcessSource, ProcessStatus, RawAdapter, RawProcess } from '../processes.model.js';
 import { WINDOWS_SAMPLER_SCRIPT } from './windows-sampler.ps1.js';
 
 /** Compiling the C# takes a few seconds the first time; a sample, well under one. */
@@ -25,7 +25,8 @@ type Row = [
   category: ProcessCategory,
   cpuMs: number,
   memory: number,
-  ioBytes: number,
+  ioRead: number,
+  ioWrite: number,
   threads: number,
   started: number,
 ];
@@ -51,6 +52,8 @@ export class WindowsProcessSource implements ProcessSource {
   private ready: Promise<void> | null = null;
   private readonly waiting: Pending[] = [];
   private closed = false;
+  /** The adapters the last sample read, given out by `adapters`. */
+  private lastAdapters: readonly RawAdapter[] = [];
   /** The script, written to the temp folder once. */
   private script: Promise<string> | null = null;
 
@@ -62,12 +65,13 @@ export class WindowsProcessSource implements ProcessSource {
     }
     await this.start();
     const line = await this.ask();
-    const parsed = JSON.parse(line) as Row[] | { error: string };
-    if (!Array.isArray(parsed)) {
+    const parsed = JSON.parse(line) as { p: Row[]; n: [string, number, number][] } | { error: string };
+    if ('error' in parsed) {
       throw new Error(parsed.error);
     }
-    return parsed.map(
-      ([pid, ppid, name, path, command, user, title, status, category, cpuMs, memory, ioBytes, threads, started]): RawProcess => ({
+    this.lastAdapters = parsed.n.map(([name, received, sent]) => ({ name, received, sent }));
+    return parsed.p.map(
+      ([pid, ppid, name, path, command, user, title, status, category, cpuMs, memory, ioRead, ioWrite, threads, started]): RawProcess => ({
         pid,
         ppid,
         name,
@@ -79,11 +83,16 @@ export class WindowsProcessSource implements ProcessSource {
         category,
         cpuMs,
         memory,
-        ioBytes,
+        ioRead,
+        ioWrite,
         threads,
         started: started === 0 ? null : started,
       }),
     );
+  }
+
+  async adapters(): Promise<readonly RawAdapter[]> {
+    return this.lastAdapters;
   }
 
   close(): void {

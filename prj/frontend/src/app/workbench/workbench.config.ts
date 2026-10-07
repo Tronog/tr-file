@@ -287,6 +287,8 @@ export const HELP: UiHelpConfig = {
         [[['Shift', 'F10'], ['ContextMenu']], 'Context menu'],
         [[['Ctrl', 'F']], 'Filter the processes'],
         [[['Ctrl', 'R']], 'Update now'],
+        [[['←'], ['→']], 'On the tabs: Processes / Graph'],
+        [[['↑'], ['↓']], 'Graph: CPU, memory, disk, each network adapter'],
       ],
     },
     {

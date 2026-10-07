@@ -606,8 +606,28 @@ export interface FsProcessTotals {
   readonly memoryUsed: number;
   readonly memoryTotal: number;
   readonly disk: number | null;
+  readonly diskRead: number | null;
+  readonly diskWrite: number | null;
   readonly processes: number;
   readonly threads: number | null;
+  /** Each logical processor's load, 0–100. */
+  readonly cores: readonly number[];
+  /** Each network adapter's throughput, bytes a second. */
+  readonly network: readonly FsNetworkAdapter[];
+}
+
+export interface FsNetworkAdapter {
+  readonly name: string;
+  readonly send: number;
+  readonly receive: number;
+}
+
+/** What the backend machine is (PRD 014, §2.1). */
+export interface FsMachineInfo {
+  readonly cpuModel: string;
+  readonly cpuSpeedMhz: number;
+  readonly uptimeSeconds: number;
+  readonly hostname: string;
 }
 
 /** The latest sample of the backend machine — `GET /api/processes`, bridge `proc-list`. */
@@ -622,6 +642,7 @@ export interface FsProcessesSnapshot {
   readonly platform: string;
   readonly cpuCount: number;
   readonly totals: FsProcessTotals;
+  readonly machine: FsMachineInfo;
   readonly processes: readonly FsProcess[];
 }
 
@@ -635,7 +656,13 @@ export interface FsProcessSeries {
 export interface FsProcessesHistory {
   readonly intervalMs: number;
   readonly at: string | null;
-  readonly totals: FsProcessSeries & { readonly memoryTotal: number };
+  readonly totals: FsProcessSeries & {
+    readonly memoryTotal: number;
+    readonly diskRead: readonly (number | null)[];
+    readonly diskWrite: readonly (number | null)[];
+    readonly cores: readonly (readonly number[])[];
+    readonly network: Readonly<Record<string, { readonly send: readonly number[]; readonly receive: readonly number[] }>>;
+  };
   readonly processes: Readonly<Record<string, FsProcessSeries>>;
 }
 

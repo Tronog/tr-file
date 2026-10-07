@@ -9,7 +9,7 @@ import { after, describe, it } from 'node:test';
 import { App } from '../../app.js';
 import { AppConfig } from '../../config/index.js';
 import { Logger } from '../../core/index.js';
-import { PROCESS_HISTORY_SAMPLES, type ProcessSource, type RawProcess } from './processes.model.js';
+import { PROCESS_HISTORY_SAMPLES, type ProcessSource, type RawAdapter, type RawProcess } from './processes.model.js';
 import { ProcessesService } from './processes.service.js';
 import { LinuxProcessSource } from './sources/linux-process-source.js';
 
@@ -27,7 +27,8 @@ const raw = (pid: number, patch: Partial<RawProcess> = {}): RawProcess => ({
   category: 'background',
   cpuMs: 0,
   memory: 1024,
-  ioBytes: 0,
+  ioRead: 0,
+  ioWrite: 0,
   threads: 1,
   started: 1_000_000 + pid,
   ...patch,
@@ -36,9 +37,13 @@ const raw = (pid: number, patch: Partial<RawProcess> = {}): RawProcess => ({
 /** A machine that says whatever the test last told it. */
 class FakeSource implements ProcessSource {
   processes: RawProcess[] = [];
+  network: RawAdapter[] = [];
   closed = false;
   async sample(): Promise<readonly RawProcess[]> {
     return this.processes;
+  }
+  async adapters(): Promise<readonly RawAdapter[]> {
+    return this.network;
   }
   close(): void {
     this.closed = true;
@@ -48,15 +53,24 @@ class FakeSource implements ProcessSource {
 const logger = Logger.create('error');
 
 /** Two samples `ms` apart, by moving the clock rather than waiting. */
-async function twoSamples(service: ProcessesService, source: FakeSource, first: RawProcess[], second: RawProcess[], ms = 2000): Promise<void> {
+async function twoSamples(
+  service: ProcessesService,
+  source: FakeSource,
+  first: RawProcess[],
+  second: RawProcess[],
+  ms = 2000,
+  network: [RawAdapter[], RawAdapter[]] = [[], []],
+): Promise<void> {
   const realNow = Date.now;
   const start = realNow();
   try {
     Date.now = () => start;
     source.processes = first;
+    source.network = network[0];
     await service.sample();
     Date.now = () => start + ms;
     source.processes = second;
+    source.network = network[1];
     await service.sample();
   } finally {
     Date.now = realNow;
@@ -69,7 +83,7 @@ describe('ProcessesService', () => {
     const service = new ProcessesService(logger, { enabled: true, canEnd: false, source });
     const cores = service.snapshot().cpuCount;
     // 1000 ms of CPU in 2000 ms on every core is 50 % of one core: 50 / cores of the machine.
-    await twoSamples(service, source, [raw(10, { cpuMs: 5000, ioBytes: 100 })], [raw(10, { cpuMs: 6000, ioBytes: 4100 })]);
+    await twoSamples(service, source, [raw(10, { cpuMs: 5000, ioRead: 100 })], [raw(10, { cpuMs: 6000, ioRead: 3100, ioWrite: 1000 })]);
     const snapshot = service.snapshot();
     assert.equal(snapshot.available, true);
     assert.equal(snapshot.sequence, 2);
@@ -79,13 +93,15 @@ describe('ProcessesService', () => {
     assert.equal(process?.disk, 2000);
     assert.equal(snapshot.totals.processes, 1);
     assert.equal(snapshot.totals.disk, 2000);
+    assert.equal(snapshot.totals.diskRead, 1500);
+    assert.equal(snapshot.totals.diskWrite, 500);
     assert.ok(snapshot.totals.memoryTotal > 0);
   });
 
   it('shows a process new to it as idle, and a disk it may not see as unknown', async () => {
     const source = new FakeSource();
     const service = new ProcessesService(logger, { enabled: true, canEnd: false, source });
-    await twoSamples(service, source, [], [raw(11, { cpuMs: 99_999, ioBytes: null })]);
+    await twoSamples(service, source, [], [raw(11, { cpuMs: 99_999, ioRead: null, ioWrite: null })]);
     const process = service.snapshot().processes[0];
     assert.equal(process?.cpu, 0);
     assert.equal(process?.disk, null);
@@ -115,6 +131,39 @@ describe('ProcessesService', () => {
     assert.equal(history.processes['13:1000013']?.memory.length, PROCESS_HISTORY_SAMPLES);
     assert.equal(history.processes['13:1000013']?.memory.at(-1), 7);
     assert.equal(history.processes['999:1'], undefined);
+  });
+
+  it('measures each network adapter, and keeps the machine’s graphs: CPU per processor, disk read and written (§2.1)', async () => {
+    const source = new FakeSource();
+    const service = new ProcessesService(logger, { enabled: true, canEnd: false, source });
+    await twoSamples(service, source, [], [], 2000, [
+      [{ name: 'eth0', received: 1000, sent: 0 }],
+      [
+        { name: 'eth0', received: 5000, sent: 2000 },
+        { name: 'wlan0', received: 10, sent: 10 },
+      ],
+    ]);
+    const snapshot = service.snapshot();
+    assert.deepEqual(snapshot.totals.network, [
+      { name: 'eth0', send: 1000, receive: 2000 },
+      // Seen for the first time: nothing to compare with yet.
+      { name: 'wlan0', send: 0, receive: 0 },
+    ]);
+    assert.equal(snapshot.totals.cores.length, snapshot.cpuCount);
+    assert.ok(snapshot.machine.uptimeSeconds > 0);
+
+    const history = service.historyOf([]).totals;
+    assert.equal(history.cpu.length, 2);
+    assert.equal(history.cores.length, snapshot.cpuCount);
+    assert.ok(history.cores.every((series) => series.length === 2));
+    assert.deepEqual(history.network['eth0'], { send: [0, 1000], receive: [0, 2000] });
+    assert.deepEqual(history.network['wlan0'], { send: [0], receive: [0] });
+    assert.equal(history.diskRead.length, 2);
+
+    // An adapter gone takes its graph with it.
+    source.network = [{ name: 'eth0', received: 5000, sent: 2000 }];
+    await service.sample();
+    assert.deepEqual(Object.keys(service.historyOf([]).totals.network), ['eth0']);
   });
 
   it('ends a process by its key, and a tree youngest first — asking first, then making it', async () => {
@@ -216,7 +265,8 @@ describe('LinuxProcessSource', { skip: process.platform !== 'linux' }, () => {
     assert.ok((self.threads ?? 0) >= 1);
     assert.ok(self.started !== null && self.started <= Date.now());
     // Our own process's bytes are ours to see.
-    assert.notEqual(self.ioBytes, null);
+    assert.notEqual(self.ioRead, null);
+    assert.notEqual(self.ioWrite, null);
     assert.match(self.command ?? '', /node|tsx/);
   });
 
@@ -237,10 +287,21 @@ describe('LinuxProcessSource', { skip: process.platform !== 'linux' }, () => {
       assert.equal(entry?.cpuMs, 2000);
       assert.equal(entry?.threads, 3);
       assert.equal(entry?.memory, 1024 * 1024);
-      assert.equal(entry?.ioBytes, 5120);
+      assert.equal(entry?.ioRead, 4096);
+      assert.equal(entry?.ioWrite, 1024);
       assert.equal(entry?.command, 'weird --now');
       assert.equal(entry?.started, 1_700_000_000_000 + 5000);
       assert.equal(entry?.category, 'system');
+
+      await mkdir(join(proc, 'net'));
+      await writeFile(
+        join(proc, 'net', 'dev'),
+        'Inter-|   Receive |  Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets\n' +
+          '    lo: 900 1 0 0 0 0 0 0 900 1 0 0 0 0 0 0\n' +
+          'veth9z: 100 1 0 0 0 0 0 0 200 1 0 0 0 0 0 0\n',
+      );
+      // No device among them (a container's): all but the loopback.
+      assert.deepEqual(await new LinuxProcessSource(proc, 1000).adapters(), [{ name: 'veth9z', received: 100, sent: 200 }]);
     } finally {
       await rm(proc, { recursive: true, force: true });
     }

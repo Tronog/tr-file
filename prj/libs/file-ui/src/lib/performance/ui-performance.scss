@@ -1,0 +1,285 @@
+@use 'mixins' as *;
+
+/*
+ * Task Manager's Performance tab (PRD 014, §2.1) in the workbench's colours:
+ * each resource ruled and filled in its own hue (`--perf-hue`), the grid a
+ * faint wash of it, as Windows 10 draws them.
+ */
+:host {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-editor-bg);
+  color: var(--vsc-fg);
+}
+
+.hue-blue { --perf-hue: var(--vsc-hue-blue); }
+.hue-purple { --perf-hue: var(--vsc-hue-purple); }
+.hue-green { --perf-hue: var(--vsc-hue-green); }
+.hue-orange { --perf-hue: var(--vsc-hue-orange); }
+
+.empty {
+  display: flex;
+  flex: 1;
+}
+
+.resources {
+  @include scrollable;
+
+  flex: none;
+  width: 240px;
+  padding: 6px 0;
+  border-right: 1px solid var(--vsc-border);
+  outline: none;
+
+  &:focus-visible .resource.is-selected {
+    outline: 1px solid var(--vsc-focus-border);
+    outline-offset: -1px;
+  }
+}
+
+.resource {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  cursor: default;
+
+  &:hover {
+    background: var(--vsc-list-hover);
+  }
+
+  &.is-selected {
+    background: var(--vsc-list-active);
+  }
+}
+
+.thumbnail {
+  flex: none;
+  width: 72px;
+  height: 44px;
+  border: 1px solid var(--perf-hue);
+}
+
+.resource-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.resource-label {
+  color: var(--vsc-fg-bright);
+  font-size: 1.1em;
+}
+
+.resource-detail {
+  overflow: hidden;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page {
+  @include scrollable;
+
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 20px 16px;
+}
+
+.page-head {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--vsc-fg-bright);
+  font-size: 2em;
+  font-weight: 300;
+}
+
+.page-subtitle {
+  overflow: hidden;
+  color: var(--vsc-fg-bright);
+  font-size: 1.15em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-head,
+.graph-foot {
+  display: flex;
+  justify-content: space-between;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+}
+
+.graphs {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-height: 160px;
+}
+
+.graph {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+
+  svg {
+    flex: 1;
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid var(--perf-hue);
+    background: color-mix(in srgb, var(--perf-hue) 4%, transparent);
+  }
+}
+
+.graph-label {
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-xs);
+}
+
+.thumbnail,
+.graph svg {
+  overflow: hidden;
+}
+
+.grid {
+  stroke: color-mix(in srgb, var(--perf-hue) 22%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.area {
+  fill: color-mix(in srgb, var(--perf-hue) 18%, transparent);
+}
+
+.line {
+  fill: none;
+  stroke: var(--perf-hue);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+
+  &.is-dashed {
+    stroke-dasharray: 4 3;
+  }
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.choice {
+  display: inline-flex;
+  border: 1px solid var(--vsc-border);
+  border-radius: var(--vsc-radius);
+
+  button {
+    padding: 2px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--vsc-fg-muted);
+    font: inherit;
+    font-size: var(--vsc-font-size-sm);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--vsc-hover-bg);
+    }
+
+    &.is-on {
+      background: var(--vsc-list-active);
+      color: var(--vsc-fg-bright);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--vsc-focus-border);
+      outline-offset: -1px;
+    }
+  }
+}
+
+.legend {
+  display: inline-flex;
+  gap: 14px;
+  margin-left: auto;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+}
+
+.legend-item {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.swatch {
+  width: 18px;
+  border-top: 2px solid var(--perf-hue);
+
+  &.is-dashed {
+    border-top-style: dashed;
+  }
+}
+
+.numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 48px;
+  margin-top: 10px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 10px 32px;
+  margin: 0;
+
+  dt {
+    color: var(--vsc-fg-muted);
+    font-size: var(--vsc-font-size-sm);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--vsc-fg-bright);
+    font-size: 1.5em;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.details {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  margin: 0;
+  font-size: var(--vsc-font-size-sm);
+}
+
+.detail {
+  display: flex;
+  gap: 10px;
+
+  dt {
+    min-width: 130px;
+    color: var(--vsc-fg-muted);
+  }
+
+  dd {
+    margin: 0;
+  }
+}

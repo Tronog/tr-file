@@ -1,0 +1,132 @@
+@let m = model();
+@if (m.empty; as empty) {
+  <div class="empty"><ui-empty-state [state]="empty" /></div>
+} @else {
+  <div
+    #list
+    class="resources"
+    role="listbox"
+    tabindex="0"
+    aria-label="Resources"
+    [attr.aria-activedescendant]="m.selectedId === null ? null : optionId(m.selectedId)"
+    (keydown)="onListKeydown($event)"
+  >
+    @for (resource of m.resources; track resource.id) {
+      <div
+        role="option"
+        [id]="optionId(resource.id)"
+        [class]="'resource hue-' + resource.hue"
+        [class.is-selected]="resource.id === m.selectedId"
+        [attr.aria-selected]="resource.id === m.selectedId"
+        (click)="resourceSelect.emit(resource.id)"
+      >
+        <svg class="thumbnail" [attr.viewBox]="'0 0 ' + box + ' ' + box" preserveAspectRatio="none" aria-hidden="true">
+          @for (series of resource.thumbnail; track series.label; let first = $first) {
+            @if (first) {
+              <path class="area" [attr.d]="area(series)" />
+            }
+            <path class="line" [class.is-dashed]="series.dashed" [attr.d]="line(series)" />
+          }
+        </svg>
+        <span class="resource-text">
+          <span class="resource-label">{{ resource.label }}</span>
+          <span class="resource-detail">{{ resource.detail }}</span>
+        </span>
+      </div>
+    }
+  </div>
+
+  @if (m.page; as page) {
+    <section [class]="'page hue-' + page.hue" [attr.aria-label]="page.title">
+      <header class="page-head">
+        <h2 class="page-title">{{ page.title }}</h2>
+        @if (page.subtitle; as subtitle) {
+          <span class="page-subtitle">{{ subtitle }}</span>
+        }
+      </header>
+
+      <div class="graph-head">
+        <span>{{ page.graphLabel }}</span>
+        <span>{{ page.maxLabel }}</span>
+      </div>
+
+      <div class="graphs" [style.grid-template-columns]="'repeat(' + gridColumns() + ', minmax(0, 1fr))'">
+        @for (graph of page.graphs; track graph.id) {
+          <figure class="graph" [attr.aria-label]="graph.label ?? page.graphLabel">
+            @if (graph.label; as label) {
+              <figcaption class="graph-label">{{ label }}</figcaption>
+            }
+            <svg [attr.viewBox]="'0 0 ' + box + ' ' + box" preserveAspectRatio="none" role="img" [attr.aria-label]="(graph.label ?? page.title) + ' graph'">
+              @if (page.graphs.length === 1) {
+                @for (y of rows; track y) {
+                  <line class="grid" x1="0" [attr.y1]="y" [attr.x2]="box" [attr.y2]="y" />
+                }
+                @for (x of columns; track x) {
+                  <line class="grid" [attr.x1]="x" y1="0" [attr.x2]="x" [attr.y2]="box" />
+                }
+              }
+              @for (series of graph.series; track series.label; let first = $first) {
+                @if (first) {
+                  <path class="area" [attr.d]="area(series)" />
+                }
+                <path class="line" [class.is-dashed]="series.dashed" [attr.d]="line(series)" />
+              }
+            </svg>
+          </figure>
+        }
+      </div>
+
+      <div class="graph-foot">
+        <span>{{ m.spanLabel }}</span>
+        <span>0</span>
+      </div>
+
+      <div class="controls">
+        <div class="choice" role="radiogroup" aria-label="Span">
+          @for (span of spans; track span.id) {
+            <button type="button" role="radio" [attr.aria-checked]="span.id === m.span" [class.is-on]="span.id === m.span" (click)="spanChange.emit(span.id)">
+              {{ span.label }}
+            </button>
+          }
+        </div>
+        @if (page.views; as views) {
+          <div class="choice" role="radiogroup" aria-label="Show">
+            @for (view of views.options; track view.id) {
+              <button type="button" role="radio" [attr.aria-checked]="view.id === views.selected" [class.is-on]="view.id === views.selected" (click)="viewChange.emit(view.id)">
+                {{ view.label }}
+              </button>
+            }
+          </div>
+        }
+        <span class="legend">
+          @for (series of page.graphs[0]?.series ?? []; track series.label) {
+            @if (page.graphs[0]!.series.length > 1) {
+              <span class="legend-item"><span class="swatch" [class.is-dashed]="series.dashed"></span>{{ series.label }}</span>
+            }
+          }
+        </span>
+      </div>
+
+      <div class="numbers">
+        <dl class="stats">
+          @for (stat of page.stats; track stat.label) {
+            <div class="stat">
+              <dt>{{ stat.label }}</dt>
+              <dd>{{ stat.value }}</dd>
+            </div>
+          }
+        </dl>
+        @if (page.details; as details) {
+          <dl class="details">
+            @for (detail of details; track detail.label) {
+              <div class="detail">
+                <dt>{{ detail.label }}:</dt>
+                <dd>{{ detail.value }}</dd>
+              </div>
+            }
+          </dl>
+        }
+      </div>
+    </section>
+  }
+}

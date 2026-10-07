@@ -385,8 +385,10 @@ a drive. Bridge commands: `du-start`, `du-status` (`scanId`), `du-cancel`;
 
 The machine's processes, measured every 2 seconds from the moment the backend
 starts (`modules/processes`, `ProcessesService`), whether anyone asks or not;
-the last 10 minutes (300 samples) are kept — the machine's CPU, memory and disk,
-and each running process's, dropped when it ends. **Off in production unless
+the last 10 minutes (300 samples) are kept — the machine's CPU (as a whole and
+per logical processor), memory, disk (read and written apart) and each network
+adapter's send and receive (PRD 014, §2.1), and each running process's CPU,
+memory and disk, dropped when it ends. **Off in production unless
 `PROCESSES_ENABLED=true`**, and ending one unless `PROCESSES_KILL_ENABLED=true`:
 what runs on a server, as whom and with which command line is not every
 signed-in user's business. The desktop turns both on.
@@ -397,7 +399,10 @@ read and written per second. Linux reads `/proc` (memory is `RssAnon`; another
 account's disk is `null` — `/proc/<pid>/io` is its owner's); Windows runs one
 hidden PowerShell for the backend's life, which compiles a small C# helper once
 (`NtQuerySystemInformation`: private working set, IO counters, suspended threads,
-no process opened) and answers a JSON line per sample; elsewhere `ps`. *Apps* are a
+no process opened) and answers a JSON line per sample, with the adapters' counters
+beside the processes; elsewhere `ps`, without disk or network. Network adapters on
+Linux are `/proc/net/dev`'s devices (`/sys/class/net/<name>/device`) — or, where
+none is one (a container), all but the loopback. *Apps* are a
 Windows process with a visible window, or on Linux what the backend's account
 launched from its desktop (systemd's `app-*.scope`) — else the session leaders
 of that account; root's, the kernel's and `%windir%`'s are the system's.
@@ -408,8 +413,8 @@ unless the service runs with `pid: host`.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/processes` | The latest sample: `processes`, `totals`, `sequence`, `available` / `reason`, `canEnd` / `endReason` |
-| GET | `/api/processes/history?keys=a,b` | The last 10 minutes of the machine, and of the processes named |
+| GET | `/api/processes` | The latest sample: `processes`, `totals` (with `cores`, `network`, `diskRead` / `diskWrite`), `machine` (CPU model and speed, up time, host), `sequence`, `available` / `reason`, `canEnd` / `endReason` |
+| GET | `/api/processes/history?keys=a,b` | The last 10 minutes of the machine (`cpu`, `cores`, `memory`, `disk`, `diskRead`, `diskWrite`, `network` by adapter), and of the processes named |
 | POST | `/api/processes/end` | `{ key, tree? }` — `SIGTERM`, then `SIGKILL` 5 s later if still there (Windows: ended at once); with `tree`, all it started, youngest first. `404` once it has ended, `403` where not allowed or denied, `409` for tr-file itself |
 
 Bridge commands: `proc-list`, `proc-history` (`keys`), `proc-end` (`key`, `tree`);

@@ -47,3 +47,37 @@ export class SampleRing {
     return { cpu, memory, disk };
   }
 }
+
+/** The last `capacity` values of one number, written round; `null` is kept as `NaN` and given back as `null`. */
+export class ValueRing {
+  private readonly values: Float64Array;
+  private next = 0;
+  private length = 0;
+
+  constructor(private readonly capacity: number) {
+    this.values = new Float64Array(capacity);
+  }
+
+  push(value: number | null): void {
+    this.values[this.next] = value ?? Number.NaN;
+    this.next = (this.next + 1) % this.capacity;
+    this.length = Math.min(this.length + 1, this.capacity);
+  }
+
+  /** Oldest first, rounded to `decimals`. */
+  series(decimals = 0): (number | null)[] {
+    const scale = 10 ** decimals;
+    const out: (number | null)[] = [];
+    const start = (this.next - this.length + this.capacity) % this.capacity;
+    for (let index = 0; index < this.length; index += 1) {
+      const value = this.values[(start + index) % this.capacity] ?? Number.NaN;
+      out.push(Number.isNaN(value) ? null : Math.round(value * scale) / scale);
+    }
+    return out;
+  }
+
+  /** Oldest first, a value never seen as `0`. */
+  numbers(decimals = 0): number[] {
+    return this.series(decimals).map((value) => value ?? 0);
+  }
+}

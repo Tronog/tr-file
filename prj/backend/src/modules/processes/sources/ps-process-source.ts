@@ -67,7 +67,8 @@ export class PsProcessSource implements ProcessSource {
       category: owner === this.self && leader ? 'app' : owner === 0 ? 'system' : 'background',
       cpuMs: PsProcessSource.cpuMs(time ?? '0'),
       memory: Number(rss) * 1024,
-      ioBytes: null,
+      ioRead: null,
+      ioWrite: null,
       threads: null,
       started: Number.isNaN(started) ? null : started,
     };

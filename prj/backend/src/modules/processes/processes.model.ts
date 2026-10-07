@@ -71,8 +71,31 @@ export interface ProcessTotalsDto {
   readonly memoryTotal: number;
   /** Bytes per second, the processes' disk added up; `null` when none could be seen. */
   readonly disk: number | null;
+  /** The same, read and written apart (PRD 014, §2.1: the Disk graph's two lines). */
+  readonly diskRead: number | null;
+  readonly diskWrite: number | null;
   readonly processes: number;
   readonly threads: number | null;
+  /** Each logical processor's load, 0–100, in the order the system numbers them. */
+  readonly cores: readonly number[];
+  /** Each network adapter's throughput, bytes a second. */
+  readonly network: readonly NetworkAdapterDto[];
+}
+
+/** One network adapter, as Task Manager's Performance tab shows it. */
+export interface NetworkAdapterDto {
+  readonly name: string;
+  readonly send: number;
+  readonly receive: number;
+}
+
+/** What the CPU and the machine are (PRD 014, §2.1: the numbers under the CPU graph). */
+export interface MachineInfoDto {
+  readonly cpuModel: string;
+  /** Current speed of the first processor, MHz; `0` when the system does not say. */
+  readonly cpuSpeedMhz: number;
+  readonly uptimeSeconds: number;
+  readonly hostname: string;
 }
 
 /** What may be done here: listing, and ending a process. */
@@ -95,6 +118,7 @@ export interface ProcessesSnapshotDto extends ProcessesInfoDto {
   readonly platform: NodeJS.Platform;
   readonly cpuCount: number;
   readonly totals: ProcessTotalsDto;
+  readonly machine: MachineInfoDto;
   readonly processes: readonly ProcessDto[];
 }
 
@@ -113,7 +137,15 @@ export interface ProcessesHistoryDto {
   readonly intervalMs: number;
   /** When the last of them was taken. */
   readonly at: string | null;
-  readonly totals: ProcessSeriesDto & { readonly memoryTotal: number };
+  readonly totals: ProcessSeriesDto & {
+    readonly memoryTotal: number;
+    readonly diskRead: readonly (number | null)[];
+    readonly diskWrite: readonly (number | null)[];
+    /** One series per logical processor. */
+    readonly cores: readonly (readonly number[])[];
+    /** By adapter name; an adapter seen later than the rest has a shorter series. */
+    readonly network: Readonly<Record<string, { readonly send: readonly number[]; readonly receive: readonly number[] }>>;
+  };
   readonly processes: Readonly<Record<string, ProcessSeriesDto>>;
 }
 
@@ -149,16 +181,26 @@ export interface RawProcess {
   /** User and kernel CPU time so far, in milliseconds. */
   readonly cpuMs: number;
   readonly memory: number;
-  /** Bytes read and written so far; `null` when it cannot be read. */
-  readonly ioBytes: number | null;
+  /** Bytes read from and written to storage so far; `null` when they cannot be read. */
+  readonly ioRead: number | null;
+  readonly ioWrite: number | null;
   readonly threads: number | null;
   /** Start time, ms since the epoch — or any number that stays the same for the process's life. */
   readonly started: number | null;
 }
 
+/** One network adapter's counters: bytes so far. */
+export interface RawAdapter {
+  readonly name: string;
+  readonly received: number;
+  readonly sent: number;
+}
+
 /** Reads every process of the machine. */
 export interface ProcessSource {
   sample(): Promise<readonly RawProcess[]>;
+  /** The network adapters' counters, read with (or just after) the last sample; none where not known. */
+  adapters?(): Promise<readonly RawAdapter[]>;
   /** Lets go of anything kept running between samples. */
   close(): void;
 }

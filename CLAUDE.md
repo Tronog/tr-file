@@ -497,6 +497,13 @@ sorted by a column, filtered, shaded by load (`--vsc-heat`). The library's `UiPr
 (`Delete`), *End process tree* (`Shift`+`Delete`), *Open File Location*, *Copy Details*, pause and the
 header's column choices are commands of the table (`process.*`); the status bar shows the machine's
 load and the pause while it is shown; the columns and the order are kept under `tr-file.task-manager.v1`.
+Its second tab, *Graph* (§2.1, Win10's *Performance*), is the library's `UiPerformance`: CPU (overall,
+or a graph per logical processor), Memory, Disk (read / write) and each network adapter (receive /
+send) in a list with thumbnails, the one chosen drawn large over 60 s or 10 min, numbers below.
+`TaskManagerFeature` asks for `/api/processes/history` with each poll only while that tab is shown;
+`task-manager/performance.ts` fits the series to the span and scales transfer graphs to a round top.
+The tab, the span and the CPU view are kept with the columns; *Task Manager: Show Processes / Graph*
+are commands of the table.
 
 The activity bar's Search (`Ctrl`+`Shift`+`F`) is `SearchFeature`, a name search
 under the workspace or the active folder (`/api/fs/search`). `AutoRefreshFeature`

@@ -37,7 +37,19 @@ const snapshot = (processes: FsProcess[], patch: Partial<FsProcessesSnapshot> = 
   intervalMs: TASK_MANAGER_POLL_MS,
   platform: 'linux',
   cpuCount: 4,
-  totals: { cpu: 12.4, memoryUsed: 4 * 2 ** 30, memoryTotal: 8 * 2 ** 30, disk: 0, processes: processes.length, threads: processes.length },
+  totals: {
+    cpu: 12.4,
+    memoryUsed: 4 * 2 ** 30,
+    memoryTotal: 8 * 2 ** 30,
+    disk: 0,
+    diskRead: 0,
+    diskWrite: 0,
+    processes: processes.length,
+    threads: processes.length,
+    cores: [10, 15],
+    network: [{ name: 'eth0', send: 1000, receive: 125_000 }],
+  },
+  machine: { cpuModel: 'Test CPU', cpuSpeedMhz: 2300, uptimeSeconds: 90_061, hostname: 'box' },
   processes,
   ...patch,
 });
@@ -131,6 +143,9 @@ describe('TaskManagerFeature', () => {
     expect(JSON.parse(localStorage.getItem(TASK_MANAGER_KEY) ?? 'null')).toEqual({
       columns: ['name', 'status', 'cpu', 'memory', 'disk', 'pid'],
       sort: { column: 'cpu', direction: 'asc' },
+      view: 'processes',
+      span: '60s',
+      cpuView: 'overall',
     });
   });
 
@@ -214,6 +229,65 @@ describe('TaskManagerFeature', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(tm().focusToken()).toBe(before + 1);
     expect(workbench.keybindingsFt.label('view.app.task-manager')).toBe('Ctrl+Shift+T');
+  });
+
+  it('asks for the machine’s history only while the Graph tab is shown, and draws its pages from it (§2.1)', async () => {
+    answer(snapshot([process(1)]));
+    const history = vi.spyOn(workbench.fileSystem.processesFt, 'history').mockResolvedValue({
+      intervalMs: TASK_MANAGER_POLL_MS,
+      at: null,
+      totals: {
+        cpu: [10, 50],
+        memory: [2 ** 30, 2 * 2 ** 30],
+        disk: [0, 0],
+        memoryTotal: 8 * 2 ** 30,
+        diskRead: [0, 0],
+        diskWrite: [0, 0],
+        cores: [
+          [5, 40],
+          [15, 60],
+        ],
+        network: { eth0: { send: [0, 1000], receive: [0, 125_000] } },
+      },
+      processes: {},
+    });
+    await open();
+    expect(history).not.toHaveBeenCalled();
+
+    workbench.commandsFt.run('process.showGraph');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(tm().view()).toBe('graph');
+    expect(history).toHaveBeenCalledWith([]);
+    const graph = tm().performance();
+    expect(graph.resources.map((resource) => [resource.id, resource.label, resource.detail])).toEqual([
+      ['cpu', 'CPU', '12%  2.30 GHz'],
+      ['memory', 'Memory', '4.0/8.0 GB (50%)'],
+      ['disk', 'Disk', 'R: 0 KB/s  W: 0 KB/s'],
+      ['net:eth0', 'Ethernet', 'S: 8 Kbps  R: 1.0 Mbps'],
+    ]);
+    // Sixty seconds of two-second samples, the two measured at the right.
+    const cpu = graph.page?.graphs[0]?.series[0]?.values ?? [];
+    expect(cpu).toHaveLength(30);
+    expect(cpu.slice(-3)).toEqual([null, 0.1, 0.5]);
+    expect(graph.page?.stats.find((stat) => stat.label === 'Up time')?.value).toBe('1:01:01:01');
+
+    tm().setCpuView('logical');
+    expect(tm().performance().page?.graphs.map((one) => one.label)).toEqual(['CPU 0', 'CPU 1']);
+    tm().setSpan('10m');
+    expect(tm().performance().page?.graphs[0]?.series[0]?.values).toHaveLength(300);
+
+    tm().selectResource('net:eth0');
+    const network = tm().performance().page;
+    expect(network).toMatchObject({ title: 'Ethernet', subtitle: 'eth0', graphLabel: 'Throughput', maxLabel: '1 Mbps' });
+    expect(network?.graphs[0]?.series.map((series) => [series.label, series.values.at(-1), series.dashed ?? false])).toEqual([
+      ['Receive', 1, false],
+      ['Send', 0.008, true],
+    ]);
+
+    workbench.commandsFt.run('process.showProcesses');
+    await vi.advanceTimersByTimeAsync(TASK_MANAGER_POLL_MS);
+    expect(history).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem(TASK_MANAGER_KEY) ?? 'null')).toMatchObject({ view: 'processes', span: '10m', cpuView: 'logical' });
   });
 
   it('keeps the group selected when it is closed over the process selected in it', async () => {

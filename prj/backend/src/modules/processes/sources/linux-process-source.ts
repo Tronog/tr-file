@@ -1,7 +1,7 @@
-import { readFile, readdir, readlink } from 'node:fs/promises';
+import { access, readFile, readdir, readlink } from 'node:fs/promises';
 import { basename } from 'node:path';
 
-import type { ProcessCategory, ProcessSource, ProcessStatus, RawProcess } from '../processes.model.js';
+import type { ProcessCategory, ProcessSource, ProcessStatus, RawAdapter, RawProcess } from '../processes.model.js';
 
 /** Clock ticks per second of `/proc/<pid>/stat`'s times: 100 on every Linux there is. */
 const CLOCK_TICKS = 100;
@@ -54,6 +54,8 @@ export class LinuxProcessSource implements ProcessSource {
   private readonly fixed = new Map<string, Fixed>();
   private users: { readonly names: Map<number, string>; readonly at: number } | null = null;
   private bootMs: number | null = null;
+  /** Whether an adapter is a device's (`/sys/class/net/<name>/device`), not a bridge or a container's end. */
+  private readonly physical = new Map<string, boolean>();
 
   constructor(
     private readonly proc = '/proc',
@@ -83,6 +85,45 @@ export class LinuxProcessSource implements ProcessSource {
 
   close(): void {
     this.fixed.clear();
+  }
+
+  /**
+   * The network adapters' bytes so far, from `/proc/net/dev` — the devices'
+   * own when there are any, as Task Manager lists the adapters; a
+   * container's (none of them a device) all but the loopback.
+   */
+  async adapters(): Promise<readonly RawAdapter[]> {
+    const dev = await readFile(`${this.proc}/net/dev`, 'utf8').catch(() => '');
+    const all: RawAdapter[] = [];
+    for (const line of dev.split('\n').slice(2)) {
+      const colon = line.indexOf(':');
+      if (colon < 0) {
+        continue;
+      }
+      const name = line.slice(0, colon).trim();
+      const fields = line.slice(colon + 1).trim().split(/\s+/).map(Number);
+      // receive: bytes packets errs drop fifo frame compressed multicast; then transmit: bytes …
+      const received = fields[0];
+      const sent = fields[8];
+      if (name !== 'lo' && received !== undefined && sent !== undefined && Number.isFinite(received) && Number.isFinite(sent)) {
+        all.push({ name, received, sent });
+      }
+    }
+    const devices = await Promise.all(all.map((adapter) => this.isDevice(adapter.name)));
+    const physical = all.filter((_, index) => devices[index]);
+    return physical.length > 0 ? physical : all;
+  }
+
+  private async isDevice(name: string): Promise<boolean> {
+    let known = this.physical.get(name);
+    if (known === undefined) {
+      known = await access(`/sys/class/net/${name}/device`).then(
+        () => true,
+        () => false,
+      );
+      this.physical.set(name, known);
+    }
+    return known;
   }
 
   private category(entry: Read, desktop: boolean): ProcessCategory {
@@ -135,7 +176,7 @@ export class LinuxProcessSource implements ProcessSource {
       this.fixed.set(fixedKey, fixed);
     }
 
-    const ioBytes = kernel ? null : await LinuxProcessSource.io(dir);
+    const io = kernel ? null : await LinuxProcessSource.io(dir);
     const name = fixed.path === null ? comm : basename(fixed.path);
     return {
       fixedKey,
@@ -155,7 +196,8 @@ export class LinuxProcessSource implements ProcessSource {
         category: 'background',
         cpuMs: Number.isFinite(cpuTicks) ? (cpuTicks * 1000) / CLOCK_TICKS : 0,
         memory: anon,
-        ioBytes,
+        ioRead: io?.read ?? null,
+        ioWrite: io?.write ?? null,
         threads: Number.isFinite(threads) ? threads : null,
         started,
       },
@@ -181,12 +223,12 @@ export class LinuxProcessSource implements ProcessSource {
   }
 
   /** Bytes the process has had read from and written to storage; `null` when it is not ours to see. */
-  private static async io(dir: string): Promise<number | null> {
+  private static async io(dir: string): Promise<{ readonly read: number; readonly write: number } | null> {
     try {
       const io = await readFile(`${dir}/io`, 'utf8');
       const read = /^read_bytes:\s*(\d+)/m.exec(io);
       const write = /^write_bytes:\s*(\d+)/m.exec(io);
-      return read === null || write === null ? null : Number(read[1]) + Number(write[1]);
+      return read === null || write === null ? null : { read: Number(read[1]), write: Number(write[1]) };
     } catch {
       return null;
     }

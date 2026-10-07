@@ -3,6 +3,9 @@ export type { ProcessesServiceOptions } from './processes.service.js';
 export { ProcessesRoutes } from './processes.routes.js';
 export { PROCESS_HISTORY_SAMPLES, PROCESS_SAMPLE_MS } from './processes.model.js';
 export type {
+  MachineInfoDto,
+  NetworkAdapterDto,
+  RawAdapter,
   ProcessCategory,
   ProcessDto,
   ProcessEndRequest,
