@@ -32,6 +32,9 @@ interface UiSheetPatch {
 /** How many changes undo goes back. */
 const UNDO_DEPTH = 100;
 
+/** Search stops counting here. */
+const MAX_MATCHES = 10_000;
+
 /**
  * The spreadsheet's model (PRD 015, §1): the cells, the selection, the cell
  * being edited and what undo takes back.
@@ -52,6 +55,33 @@ export class UiSheetService {
   private readonly corner = signal<UiCell>({ row: 0, column: 0 });
   readonly selectionKind = signal<UiSheetSelectionKind>('cells');
   readonly editing = signal<UiSheetEdit | null>(null);
+
+  /** What the find bar looks for (PRD 015, §2.1); `''` while it is closed. */
+  readonly query = signal('');
+  /** Which match the active cell was taken to; `-1` before any. */
+  readonly matchIndex = signal(-1);
+
+  /** Every cell holding the query, case ignored, row by row. */
+  readonly matches = computed<readonly UiCell[]>(() => {
+    const query = this.query().toLowerCase();
+    if (query === '') {
+      return [];
+    }
+    const found: UiCell[] = [];
+    const rows = this.data();
+    for (let row = 0; row < rows.length && found.length < MAX_MATCHES; row++) {
+      const cells = rows[row] as readonly string[];
+      for (let column = 0; column < cells.length && found.length < MAX_MATCHES; column++) {
+        if ((cells[column] as string).toLowerCase().includes(query)) {
+          found.push({ row, column });
+        }
+      }
+    }
+    return found;
+  });
+
+  /** The matches, by `row:column`, for the cells on screen to ask. */
+  readonly matchSet = computed(() => new Set(this.matches().map((cell) => `${cell.row}:${cell.column}`)));
 
   private readonly undoStack: UiSheetPatch[] = [];
   private readonly redoStack: UiSheetPatch[] = [];
@@ -180,6 +210,44 @@ export class UiSheetService {
       rows.push(cells);
     }
     return serializeDelimited({ rows, delimiter: '\t', trailingNewline: false });
+  }
+
+  /* -- search (PRD 015, §2.1) --------------------------------------------- */
+
+  setQuery(query: string): void {
+    this.query.set(query);
+    this.matchIndex.set(-1);
+  }
+
+  isMatch(row: number, column: number): boolean {
+    return this.matchSet().has(`${row}:${column}`);
+  }
+
+  /**
+   * The active cell to the next match — the first after it, the first time —
+   * or the one before, round at either end. `false` when nothing matches.
+   */
+  step(direction: 1 | -1): boolean {
+    const matches = this.matches();
+    if (matches.length === 0) {
+      return false;
+    }
+    let index = this.matchIndex();
+    const at = matches[index];
+    const active = this.active();
+    if (at === undefined || at.row !== active.row || at.column !== active.column) {
+      // From the active cell: the first match past it in reading order — or before it, going back.
+      const order = (cell: UiCell): number => cell.row * 1_000_000 + cell.column;
+      const here = order(active);
+      const after = matches.findIndex((cell) => (direction === 1 ? order(cell) > here : order(cell) >= here));
+      index = direction === 1 ? (after === -1 ? 0 : after) : (after === -1 ? matches.length : after) - 1;
+    } else {
+      index += direction;
+    }
+    index = (index + matches.length) % matches.length;
+    this.matchIndex.set(index);
+    this.select(matches[index] as UiCell);
+    return true;
   }
 
   /* -- editing ------------------------------------------------------------- */

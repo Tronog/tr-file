@@ -1,4 +1,7 @@
 import { Component, afterRenderEffect, computed, effect, inject, input, output, signal, untracked, viewChild, type ElementRef } from '@angular/core';
+import { UiIconButton } from '../controls/ui-icon-button';
+import { UiSearchField } from '../controls/ui-search-field';
+import { matchParts } from '../json-tree/ui-json-tree.service';
 import { visibleRange } from '../virtual/ui-virtual-viewport';
 import { columnName } from './delimited-text';
 import { UiSheetService, type UiCell } from './ui-sheet.service';
@@ -40,11 +43,18 @@ let sheets = 0;
  * cuts, `Ctrl`+`Z` / `Ctrl`+`Y` undo and redo. Every change reports the
  * cells (`rowsChange`).
  *
+ * Search (§2.1): `Ctrl`+`F` opens a find bar over the sheet; every cell
+ * holding what is typed (case ignored) is marked, and `Enter` /
+ * `Shift`+`Enter` — `F3` / `Shift`+`F3` on the sheet — take the active cell to
+ * the next or previous one, row by row, round at either end. `Escape` closes
+ * it, the sheet keeping the keyboard on the match.
+ *
  * Copy and paste go through the browser's own `copy` / `paste` events, so
  * they need no permission and work in a page that is not a secure context.
  */
 @Component({
   selector: 'ui-sheet',
+  imports: [UiIconButton, UiSearchField],
   templateUrl: './ui-sheet.html',
   styleUrl: './ui-sheet.scss',
   providers: [UiSheetService],
@@ -74,6 +84,25 @@ export class UiSheet {
   protected readonly rowHeight = ROW_HEIGHT;
   protected readonly rowHeadWidth = ROW_HEAD_WIDTH;
   protected readonly columnName = columnName;
+  protected readonly parts = matchParts;
+
+  /** The find bar is open; bump `findFocus` to put the keyboard in it. */
+  protected readonly finding = signal(false);
+  protected readonly findFocus = signal(0);
+
+  /** `3 of 12`, `No results`, or nothing while nothing is looked for. */
+  protected readonly findLabel = computed(() => {
+    const total = this.view.matches().length;
+    if (this.view.query() === '') {
+      return '';
+    }
+    if (total === 0) {
+      return 'No results';
+    }
+    const shown = total >= 10_000 ? '10000+' : String(total);
+    const index = this.view.matchIndex();
+    return index < 0 ? `${shown} found` : `${index + 1} of ${shown}`;
+  });
   private readonly uid = `ui-sheet-${++sheets}`;
 
   private readonly viewportRef = viewChild.required<ElementRef<HTMLElement>>('viewport');
@@ -256,8 +285,17 @@ export class UiSheet {
           event.shiftKey,
         );
         break;
+      case 'F3':
+        if (!this.findStep(event.shiftKey ? -1 : 1, false)) {
+          return;
+        }
+        break;
       case 'Escape': {
-        // A range back to its active cell; a single cell leaves the key to the panel (it closes the file).
+        // The find bar closed; a range back to its active cell; a single cell leaves the key to the panel (it closes the file).
+        if (this.finding()) {
+          this.closeFind();
+          break;
+        }
         const range = this.view.range();
         if (range.top === range.bottom && range.left === range.right) {
           return;
@@ -280,6 +318,10 @@ export class UiSheet {
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if (ctrl && !event.altKey && key === 'a') {
       this.view.selectAll();
+      return true;
+    }
+    if (ctrl && !event.altKey && !event.shiftKey && key === 'f') {
+      this.openFind();
       return true;
     }
     if (!editable) {
@@ -359,6 +401,61 @@ export class UiSheet {
     if (this.view.editing() !== null) {
       this.commit(0, 0, false);
     }
+  }
+
+  /* -- search (PRD 015, §2.1) --------------------------------------------- */
+
+  /** Opens the find bar — with the active cell's text as the query, the first time — and puts the keyboard in it. */
+  protected openFind(): void {
+    if (!this.finding() && this.view.query() === '') {
+      const active = this.view.active();
+      const text = this.view.cell(active.row, active.column);
+      if (text !== '' && !text.includes('\n')) {
+        this.view.setQuery(text);
+      }
+    }
+    this.finding.set(true);
+    this.findFocus.update((token) => token + 1);
+  }
+
+  protected closeFind(): void {
+    this.finding.set(false);
+    this.view.setQuery('');
+    this.focusGrid();
+  }
+
+  protected onFindQuery(query: string): void {
+    this.view.setQuery(query);
+  }
+
+  /** In the bar: `Enter` / `Shift`+`Enter` (and `F3`) to the next or previous match, `Escape` back to the sheet. */
+  protected onFindKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === 'F3') {
+      this.findStep(event.shiftKey ? -1 : 1, false);
+    } else if (event.key === 'Escape') {
+      this.closeFind();
+    } else {
+      // The box's own keys: the sheet and the window keep theirs to themselves.
+      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.stopPropagation();
+      }
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /** The active cell to the next or previous match, scrolled into view. `false` when nothing matches. */
+  protected findStep(direction: 1 | -1, refocus = true): boolean {
+    this.commitIfEditing();
+    if (!this.view.step(direction)) {
+      return false;
+    }
+    this.reveal(this.view.active());
+    if (refocus) {
+      this.focusGrid();
+    }
+    return true;
   }
 
   /* -- the clipboard ------------------------------------------------------- */

@@ -227,7 +227,10 @@ typing, `F2`, `Enter` / `Tab`, `Delete`, paste (one value fills the selection), 
 is the file's text again (`serializeDelimited`, as it was written) into `FileEditorFeature`'s session,
 so saving, the dot and the questions are the editor's, and the draft is read back into cells by
 `FileEditorFeature.tableOf`. *Show as Text* (`toggleTextView`, JSON's too) shows — and edits, in
-`UiCodeEditor` — its text. In the sheet `Ctrl`+arrows are Excel's, not *maximize*; `Alt` chords and
+`UiCodeEditor` — its text. **Search (§2.1):** `Ctrl`+`F` on the sheet opens a find bar over it
+(`UiSheetService.query` / `matches`, every cell, case ignored, marked with `matchParts`); `Enter` /
+`Shift`+`Enter`, `F3` on the sheet, take the active cell to the next or previous match in reading order,
+from where it is, round at the ends (`step`). In the sheet `Ctrl`+arrows are Excel's, not *maximize*; `Alt` chords and
 `Ctrl`+page keys go on to the panel. An image is read by
 `ImageSourceService` (`prj/frontend/src/app/file-system/`), one cache of object URLs keyed
 by path that owns their lifetime — `PreviewRetentionFeature` tells it (and the text previews)

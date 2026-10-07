@@ -201,4 +201,78 @@ describe('UiSheet', () => {
       expect(changes.at(-1)?.[1]).toEqual(['', '3', '1.5']);
     });
   });
+
+  /** PRD 015, §2.1. */
+  describe('search', () => {
+    const field = (): HTMLInputElement => fixture.nativeElement.querySelector('.find input') as HTMLInputElement;
+    const count = (): string => (fixture.nativeElement.querySelector('.find-count') as HTMLElement).textContent?.trim() ?? '';
+    const query = (text: string): void => {
+      field().value = text;
+      field().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    };
+    const inField = (key: string, shiftKey = false): void => {
+      field().dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+    };
+
+    it('opens on Ctrl+F with the active cell as its query, and marks every cell holding it, case ignored', () => {
+      press('ArrowDown');
+      expect(press('f', { ctrlKey: true }).defaultPrevented).toBe(true);
+      expect(field().value).toBe('apple');
+      expect(count()).toBe('1 found');
+
+      query('P');
+      expect(count()).toBe('4 found');
+      expect(Array.from(fixture.nativeElement.querySelectorAll('td.is-match')).map((td) => (td as HTMLElement).textContent?.trim())).toEqual([
+        'price',
+        'apple',
+        'pear',
+        'plum',
+      ]);
+      expect(fixture.nativeElement.querySelector('td.is-match mark')?.textContent).toBe('p');
+    });
+
+    it('takes the active cell to the next and previous match, row by row, from where it is, round at the ends', () => {
+      press('f', { ctrlKey: true });
+      query('p');
+      inField('Enter');
+      // From A1: the next match past it is C1 ("price").
+      expect(last()).toBe('C1');
+      expect(count()).toBe('1 of 4');
+      inField('Enter');
+      inField('Enter');
+      inField('Enter');
+      expect(last()).toBe('A4');
+      inField('Enter');
+      expect(last()).toBe('C1');
+      inField('Enter', true);
+      expect(last()).toBe('A4');
+    });
+
+    it('steps with F3 on the sheet, and closes on Escape, the sheet keeping the keyboard', () => {
+      press('f', { ctrlKey: true });
+      query('plum');
+      inField('Escape');
+      expect(fixture.nativeElement.querySelector('.find')).toBeNull();
+      expect(document.activeElement).toBe(grid());
+      expect(fixture.nativeElement.querySelector('td.is-match')).toBeNull();
+
+      press('f', { ctrlKey: true });
+      query('pear');
+      grid().focus();
+      press('F3');
+      expect(last()).toBe('A3');
+      expect(press('Escape').defaultPrevented).toBe(true);
+      expect(fixture.nativeElement.querySelector('.find')).toBeNull();
+    });
+
+    it('says when nothing matches', () => {
+      press('f', { ctrlKey: true });
+      query('zzz');
+      expect(count()).toBe('No results');
+      inField('Enter');
+      expect(last()).toBe('A1');
+    });
+  });
 });

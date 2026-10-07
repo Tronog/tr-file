@@ -288,6 +288,7 @@ export const HELP: UiHelpConfig = {
         [[['↑'], ['↓'], ['←'], ['→']], 'Move the active cell; with Shift, extend the selection'],
         [[['Ctrl', '↓'], ['Ctrl', '→']], 'To the edge of the data'],
         [[['Ctrl', 'A']], 'Select all'],
+        [[['Ctrl', 'F'], ['F3']], 'Find in the cells; the next match'],
         [[['Ctrl', 'C'], ['Ctrl', 'X'], ['Ctrl', 'V']], 'Copy, cut, paste cells (tab-separated, as spreadsheets do)'],
         [[['F2'], ['Enter'], ['Tab']], 'Editing: edit the cell; put the value in and move down / right'],
         [[['Delete']], 'Editing: empty the selected cells'],

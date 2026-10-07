@@ -1,3 +1,14 @@
+<!-- Search (PRD 015, §2.1): Ctrl+F on the sheet. -->
+@if (finding()) {
+  <div class="find" role="search" (keydown)="onFindKeydown($event)">
+    <ui-search-field placeholder="Find in cells" label="Find in cells" [value]="view.query()" [focusToken]="findFocus()" (valueChange)="onFindQuery($event)" />
+    <span class="find-count" aria-live="polite">{{ findLabel() }}</span>
+    <ui-icon-button icon="arrow-up" label="Previous match (Shift+Enter)" [disabled]="view.matches().length === 0" (action)="findStep(-1)" />
+    <ui-icon-button icon="arrow-down" label="Next match (Enter)" [disabled]="view.matches().length === 0" (action)="findStep(1)" />
+    <ui-icon-button icon="x" label="Close (Escape)" (action)="closeFind()" />
+  </div>
+}
+
 <div
   #viewport
   class="viewport"
@@ -60,6 +71,7 @@
               [class.is-selected]="view.inRange(row, column)"
               [class.is-active]="view.active().row === row && view.active().column === column"
               [class.is-extra]="row >= view.dataRows() || column >= view.dataColumns()"
+              [class.is-match]="view.query() !== '' && view.isMatch(row, column)"
               (pointerdown)="onCellPress($event, row, column)"
               (pointerenter)="onCellEnter($event, row, column)"
               (dblclick)="onCellDouble(row, column)"
@@ -78,6 +90,8 @@
                 } @else {
                   {{ view.cell(row, column) }}
                 }
+              } @else if (view.query() !== '' && view.isMatch(row, column)) {
+                @for (part of parts(view.cell(row, column), view.query()); track $index) {@if (part.match) {<mark>{{ part.text }}</mark>} @else {<span>{{ part.text }}</span>}}
               } @else {
                 {{ view.cell(row, column) }}
               }

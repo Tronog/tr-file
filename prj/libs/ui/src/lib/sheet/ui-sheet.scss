@@ -2,6 +2,8 @@
 
 :host {
   --ui-sheet-row: 22px;
+
+  position: relative;
   --ui-sheet-grid: var(--vsc-border);
 
   display: flex;
@@ -114,6 +116,49 @@ thead th {
   height: auto;
   padding: 0;
   border: 0;
+}
+
+/* Search (PRD 015, §2.1): its bar over the sheet's top right, and the matches marked. */
+.find {
+  position: absolute;
+  top: 28px;
+  right: 18px;
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  padding: 4px 6px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: var(--vsc-radius);
+  background: var(--vsc-panel-bg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 36%);
+  font-size: var(--vsc-font-size-sm);
+
+  ui-search-field {
+    width: 200px;
+  }
+}
+
+.find-count {
+  min-width: 72px;
+  padding: 0 6px;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-xs);
+  text-align: center;
+}
+
+td.is-match {
+  background: color-mix(in srgb, var(--vsc-find-match-bg) 45%, transparent);
+}
+
+td.is-match.is-active mark {
+  background: var(--vsc-find-current-bg);
+}
+
+mark {
+  border-radius: 2px;
+  background: var(--vsc-find-match-bg);
+  color: inherit;
 }
 
 .cell-input {

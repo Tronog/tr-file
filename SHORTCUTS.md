@@ -212,7 +212,9 @@ Over a `.csv` / `.tsv` file, viewed or edited (`F4`). Excel's keys, fixed as a t
 | `PageUp` / `PageDown` | A page up / down |
 | `Ctrl`+`A` | Select all |
 | `Ctrl`+`C` | Copy the selected cells, tab-separated |
-| `Escape` | A range back to its active cell; a single cell, close the file |
+| `Ctrl`+`F` | Find in the cells (PRD 015, §2.1) — the active cell's text, the first time |
+| `Enter` / `Shift`+`Enter` (find box), `F3` / `Shift`+`F3` | Next / previous matching cell, row by row |
+| `Escape` | The find box closed; a range back to its active cell; a single cell, close the file |
 | Editing: a key | Replace the cell with what is typed |
 | Editing: `F2`, double click | Edit the cell in place |
 | Editing: `Enter` / `Tab` (`Shift` back) | Put the value in, and move down / right |
