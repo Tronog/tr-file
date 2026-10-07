@@ -205,9 +205,19 @@ modified file's tab has the dot (`UiPanelContentDriver.isDirty`), and closing it
 **JSON (§5)** opens as a tree of its values (`kind: 'json'`, parsed by `FilePreviewFeature`; one that does
 not parse is its text, and says so) — the library's `UiJsonTree`, drawn near the view only, the ARIA
 tree's keys on one tab stop, `$.path` of the cursor and *Expand* / *Collapse all* in its header; the
-toolbar switches it to its text (`toggleJsonView`). Edited, its first error is marked as typed
+toolbar switches it to its text (`toggleTextView`). Edited, its first error is marked as typed
 (`jsonProblemOf`), saving it anyway is asked, and *Format Document* (`edit.formatDocument`) lays it out
-again.
+again. **Search (§5.1):** the tree's header box (`Ctrl`+`F` in the tree) looks through every key and value,
+open or not (`UiJsonTreeService.matches`), `Enter` / `Shift`+`Enter` / `F3` step through them opening what each
+is in, the text marked (`matchParts`); the code editor has a find bar of its own (`Ctrl`+`F`, matches
+marked in the overlay, `UiCodeEditorService.matches`) — the browser's find cannot see its transparent,
+windowed text. **Editing in the tree (§5.2):** a double click on a key or a value, `F2`, `Enter` on a value
+(`editable`, `UiDocumentModel.editable`) types into it in place; a string stays a string, anything else is
+read as JSON; a key another key of its object has is refused. The tree reports a `UiJsonEdit`, and
+`FileEditorFeature.editJson` writes it into the draft *where it stands* (`json-source.ts`: a strict JSON
+reader that notes each value's and key's offsets, then a splice), so the file keeps its layout. The first
+edit opens a session in `tree` mode (`modeOf`) — the tab stays a tree, with the dot and `Ctrl`+`S`;
+*Edit as Text* (`F4`) goes on in the code editor with the draft.
 **CSV (PRD 015, §1)** — `.csv`, `.tsv` — opens as a spreadsheet (`kind: 'table'`, `UiDelimitedText` from the
 library's `parseDelimited`, its delimiter found by `detectDelimiter`): the library's `UiSheet` and its
 `UiSheetService`, rows drawn near the view, column letters and row numbers sticky, Excel's selection

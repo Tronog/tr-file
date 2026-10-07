@@ -2,6 +2,7 @@ import { Component, computed, input, output, signal, viewChild, type ElementRef 
 import { UiCodeEditor } from '../code-editor/ui-code-editor';
 import type { UiCodePosition } from '../code-editor/ui-code-editor.service';
 import { UiJsonTree } from '../json-tree/ui-json-tree';
+import type { UiJsonEdit } from '../json-tree/ui-json-tree.service';
 import { serializeDelimited, type UiDelimitedText } from '../sheet/delimited-text';
 import { UiSheet } from '../sheet/ui-sheet';
 import { UiImageView } from '../image-view/ui-image-view';
@@ -41,6 +42,9 @@ export class UiDocumentView {
 
   /** The text of a document being edited, after each change. */
   readonly textChange = output<string>();
+
+  /** A key or a value changed in a JSON document's tree (PRD 005, §5.2). */
+  readonly jsonEdit = output<UiJsonEdit>();
 
   /** Where the editor's caret is, for the status line. */
   protected readonly caret = signal<UiCodePosition>({ line: 1, column: 1 });

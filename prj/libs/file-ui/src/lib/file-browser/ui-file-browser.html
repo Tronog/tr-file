@@ -53,7 +53,7 @@
   @if (document(); as doc) {
     <!-- A file is open: the viewer owns its own scrolling, because its status
          line is pinned under the document rather than scrolling with it. -->
-    <ui-document-view [document]="doc" (textChange)="documentText.emit($event)" />
+    <ui-document-view [document]="doc" (textChange)="documentText.emit($event)" (jsonEdit)="documentJsonEdit.emit($event)" />
   } @else {
     <div class="browser-scroll">
       @if (browser().empty; as empty) {

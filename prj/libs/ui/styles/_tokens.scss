@@ -135,6 +135,10 @@
   --vsc-editor-selection-bg: #264f78;
   --vsc-editor-line-number: #6e7681;
   --vsc-editor-line-number-active: #cccccc;
+  /* find (PRD 005, §5.1): every match, and the one the cursor is on */
+  --vsc-find-match-bg: rgb(234 92 0 / 33%);
+  --vsc-find-current-bg: #9e6a03;
+  --vsc-find-match-border: #f2cc60;
 
   /* file type accents */
   --vsc-ic-folder: #dcb67a;
@@ -284,6 +288,9 @@
   --vsc-editor-selection-bg: #add6ff;
   --vsc-editor-line-number: #6e7681;
   --vsc-editor-line-number-active: #171184;
+  --vsc-find-match-bg: rgb(234 92 0 / 33%);
+  --vsc-find-current-bg: #a8ac94;
+  --vsc-find-match-border: #b58900;
 
   /* file type accents */
   --vsc-ic-folder: #b8862f;

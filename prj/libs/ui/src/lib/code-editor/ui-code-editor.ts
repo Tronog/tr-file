@@ -1,6 +1,14 @@
-import { Component, computed, effect, inject, input, output, untracked, viewChild, type ElementRef } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked, viewChild, type ElementRef } from '@angular/core';
+import { UiIconButton } from '../controls/ui-icon-button';
+import { UiSearchField } from '../controls/ui-search-field';
 import type { UiSyntaxLanguage } from './syntax/syntax.model';
-import { UI_CODE_LINE_HEIGHT, UiCodeEditorService, type UiCodePosition } from './ui-code-editor.service';
+import { UI_CODE_LINE_HEIGHT, UiCodeEditorService, type UiCodeMatch, type UiCodePosition } from './ui-code-editor.service';
+
+/** A character's width in the editor's font, when the font cannot be measured (a test). */
+const FALLBACK_CHAR_WIDTH = 7.8;
+
+/** How many columns a tab takes — the editor's `tab-size`. */
+const TAB_SIZE = 4;
 
 /** A place in the text the editor marks — a JSON syntax error (PRD 005, §5). */
 export interface UiCodeProblem {
@@ -29,9 +37,16 @@ const OPENS_BLOCK = /[{[(]\s*$/;
  * several), `Enter` keeps the line's indentation — one step more after an
  * opening bracket. `Ctrl`+`S` is the application's (a window key), and every
  * other chord passes.
+ *
+ * Find (PRD 005, §5.1) — the browser's own cannot see text drawn this way:
+ * `Ctrl`+`F` opens a bar over the text with the selection as its query; every
+ * match is marked, `Enter` / `Shift`+`Enter` (`F3` / `Shift`+`F3` in the text)
+ * select the next or previous one, `Escape` closes it and gives the text the
+ * keyboard with the match selected.
  */
 @Component({
   selector: 'ui-code-editor',
+  imports: [UiIconButton, UiSearchField],
   templateUrl: './ui-code-editor.html',
   styleUrl: './ui-code-editor.scss',
   providers: [UiCodeEditorService],
@@ -66,6 +81,25 @@ export class UiCodeEditor {
   private readonly areaRef = viewChild.required<ElementRef<HTMLTextAreaElement>>('area');
   private readonly canvasRef = viewChild.required<ElementRef<HTMLElement>>('canvas');
   private readonly gutterRef = viewChild.required<ElementRef<HTMLElement>>('gutter');
+
+  /** The find bar is open; bump `findFocus` to put the keyboard in it. */
+  protected readonly finding = signal(false);
+  protected readonly findFocus = signal(0);
+
+  /** `3 of 12`, `No results`, or nothing while nothing is looked for. */
+  protected readonly findLabel = computed(() => {
+    const total = this.view.matches().length;
+    if (this.view.findQuery() === '') {
+      return '';
+    }
+    if (total === 0) {
+      return 'No results';
+    }
+    const index = this.view.findIndex();
+    return index < 0 ? `${total >= 10_000 ? '10000+' : total} found` : `${index + 1} of ${total >= 10_000 ? '10000+' : total}`;
+  });
+
+  private charWidth: number | null = null;
 
   protected readonly digits = computed(() => String(Math.max(2, String(this.view.lineCount()).length)));
 
@@ -139,6 +173,11 @@ export class UiCodeEditor {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
+    if (this.onFindKey(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (this.readonly() || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
       return;
     }
@@ -151,6 +190,127 @@ export class UiCodeEditor {
     }
     event.preventDefault();
     event.stopPropagation();
+  }
+
+  /* -- find (PRD 005, §5.1) ------------------------------------------------ */
+
+  /** The find keys in the text: `Ctrl`+`F`, `F3` / `Shift`+`F3`, `Escape` while the bar is open. */
+  private onFindKey(event: KeyboardEvent): boolean {
+    const ctrl = event.ctrlKey || event.metaKey;
+    if (ctrl && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'f') {
+      this.openFind();
+      return true;
+    }
+    if (event.key === 'F3' && !ctrl && !event.altKey && this.view.findQuery() !== '') {
+      this.findStep(event.shiftKey ? -1 : 1, false);
+      return true;
+    }
+    if (event.key === 'Escape' && this.finding()) {
+      this.closeFind();
+      return true;
+    }
+    return false;
+  }
+
+  /** Opens the bar — with the selected text as the query, when it is one line — and puts the keyboard in it. */
+  protected openFind(): void {
+    const area = this.areaRef().nativeElement;
+    const selected = area.value.slice(area.selectionStart, area.selectionEnd);
+    if (selected !== '' && !selected.includes('\n')) {
+      this.view.findQuery.set(selected);
+      this.view.findIndex.set(-1);
+    }
+    this.finding.set(true);
+    this.findFocus.update((token) => token + 1);
+  }
+
+  protected closeFind(): void {
+    this.finding.set(false);
+    this.view.findQuery.set('');
+    this.view.findIndex.set(-1);
+    this.focus();
+  }
+
+  protected onFindQuery(query: string): void {
+    this.view.findQuery.set(query);
+    this.view.findIndex.set(-1);
+  }
+
+  /** In the bar: `Enter` / `Shift`+`Enter` (and `F3`) to the next or previous match, `Escape` back to the text. */
+  protected onFindKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === 'F3') {
+      this.findStep(event.shiftKey ? -1 : 1, false);
+    } else if (event.key === 'Escape') {
+      this.closeFind();
+    } else {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /**
+   * Selects the next match — after the caret, the first time — or the one
+   * before, round at either end, and scrolls it into view. The text keeps
+   * the keyboard where it had it; `refocus` gives it the text.
+   */
+  protected findStep(direction: 1 | -1, refocus = false): void {
+    const matches = this.view.matches();
+    if (matches.length === 0) {
+      return;
+    }
+    const area = this.areaRef().nativeElement;
+    let index = this.view.findIndex();
+    if (index < 0) {
+      const caret = direction === 1 ? area.selectionEnd : area.selectionStart;
+      const after = matches.findIndex((match) => this.view.offsetOf(match.line, match.start) >= caret);
+      index = direction === 1 ? (after === -1 ? 0 : after) : (after === -1 ? matches.length : after) - 1;
+    } else {
+      index += direction;
+    }
+    index = (index + matches.length) % matches.length;
+    this.view.findIndex.set(index);
+    this.select(matches[index] as UiCodeMatch);
+    if (refocus) {
+      this.focus();
+    }
+  }
+
+  /** A match selected in the text, and in view: its line near the middle, its columns on screen. */
+  private select(match: UiCodeMatch): void {
+    const area = this.areaRef().nativeElement;
+    const start = this.view.offsetOf(match.line, match.start);
+    area.setSelectionRange(start, start + (match.end - match.start));
+    const top = match.line * UI_CODE_LINE_HEIGHT;
+    if (top < area.scrollTop || top + UI_CODE_LINE_HEIGHT > area.scrollTop + area.clientHeight) {
+      area.scrollTop = Math.max(0, top - area.clientHeight / 2);
+    }
+    const text = this.view.lineText(match.line);
+    const columns = (to: number): number => [...text.slice(0, to)].reduce((column, char) => (char === '\t' ? column + TAB_SIZE - (column % TAB_SIZE) : column + 1), 0);
+    const width = this.measureChar();
+    const left = columns(match.start) * width;
+    const right = columns(match.end) * width;
+    if (left < area.scrollLeft) {
+      area.scrollLeft = Math.max(0, left - 40);
+    } else if (area.clientWidth > 0 && right > area.scrollLeft + area.clientWidth - 40) {
+      area.scrollLeft = right - area.clientWidth + 80;
+    }
+    this.onScroll();
+    this.view.moveCaret(area.value, start);
+  }
+
+  /** One character's width in the editor's monospace font, measured once. */
+  private measureChar(): number {
+    if (this.charWidth === null) {
+      const context = typeof document === 'undefined' ? null : document.createElement('canvas').getContext?.('2d');
+      if (context) {
+        context.font = getComputedStyle(this.areaRef().nativeElement).font;
+        this.charWidth = context.measureText('0'.repeat(100)).width / 100 || FALLBACK_CHAR_WIDTH;
+      } else {
+        this.charWidth = FALLBACK_CHAR_WIDTH;
+      }
+    }
+    return this.charWidth;
   }
 
   /** `Enter`: a new line indented as this one is, one step more after an opening bracket. */

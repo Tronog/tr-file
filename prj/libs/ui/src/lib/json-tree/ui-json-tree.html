@@ -1,5 +1,17 @@
 <div class="header">
   <span class="where" title="Where the cursor is">{{ view.focusedPath() }}</span>
+  <!-- Search (PRD 005, §5.1): every key and value, open or not. -->
+  <ui-search-field
+    class="search"
+    placeholder="Search keys and values"
+    label="Search keys and values"
+    [value]="view.query()"
+    (valueChange)="onQuery($event)"
+    (keydown)="onSearchKeydown($event)"
+  />
+  <span class="matches" aria-live="polite">{{ matchLabel() }}</span>
+  <ui-icon-button icon="arrow-up" label="Previous match (Shift+Enter)" [disabled]="view.matches().length === 0" (action)="find(-1)" />
+  <ui-icon-button icon="arrow-down" label="Next match (Enter)" [disabled]="view.matches().length === 0" (action)="find(1)" />
   <ui-icon-button icon="chevrons-down" label="Expand all" (action)="view.expandAll()" />
   <ui-icon-button icon="chevrons-up" label="Collapse all" (action)="view.collapseAll()" />
 </div>
@@ -25,6 +37,7 @@
           [attr.aria-expanded]="row.size > 0 ? row.expanded : null"
           [attr.aria-selected]="row.id === view.focusedId()"
           [class.is-focused]="row.id === view.focusedId()"
+          [class.is-match]="view.matchSet().has(row.id)"
           [style.padding-left.px]="row.depth * 16 + 4"
           (click)="onRowPress(row.id)"
           (dblclick)="onRowDouble($event, row.id, row.size)"
@@ -35,10 +48,42 @@
             }
           </span>
           @if (row.key !== null) {
-            <span class="key" [class.is-index]="row.inArray">{{ row.inArray ? row.key : '"' + row.key + '"' }}</span>
+            @if (isEditing(row.id, 'key')) {
+              <input
+                #editInput
+                class="edit"
+                [class.is-invalid]="view.editing()?.error"
+                [attr.aria-label]="'Key ' + row.key"
+                [attr.title]="view.editing()?.error ?? null"
+                [value]="view.editing()?.draft ?? ''"
+                (input)="onEditInput($event)"
+                (keydown)="onEditKeydown($event)"
+                (blur)="onEditBlur()"
+              />
+            } @else {
+              <span class="key" [class.is-index]="row.inArray"
+                >@if (!row.inArray) {"}@for (part of parts(row.key, view.query()); track $index) {@if (part.match) {<mark>{{ part.text }}</mark>} @else {<span>{{ part.text }}</span>}}@if (!row.inArray) {"}</span
+              >
+            }
             <span class="colon">:&nbsp;</span>
           }
-          <span class="value" [class]="'value is-' + row.kind">{{ row.preview }}</span>
+          @if (isEditing(row.id, 'value')) {
+            <input
+              #editInput
+              class="edit"
+              [class.is-invalid]="view.editing()?.error"
+              [attr.aria-label]="'Value of ' + (row.key ?? 'the document')"
+              [attr.title]="view.editing()?.error ?? null"
+              [value]="view.editing()?.draft ?? ''"
+              (input)="onEditInput($event)"
+              (keydown)="onEditKeydown($event)"
+              (blur)="onEditBlur()"
+            />
+          } @else {
+            <span class="value" [class]="'value is-' + row.kind"
+              >@for (part of parts(row.preview, row.size > 0 ? '' : view.query()); track $index) {@if (part.match) {<mark>{{ part.text }}</mark>} @else {<span>{{ part.text }}</span>}}</span
+            >
+          }
           @if (row.kind === 'object' || row.kind === 'array') {
             <span class="size">{{ row.size }} {{ row.kind === 'array' ? (row.size === 1 ? 'item' : 'items') : row.size === 1 ? 'key' : 'keys' }}</span>
           }

@@ -1,10 +1,11 @@
 import { computed, signal } from '@angular/core';
-import { parseDelimited, type UiDelimitedText, type UiDocumentEditModel, type UiSyntaxLanguage } from '@tr-file/ui';
+import { parseDelimited, type UiDelimitedText, type UiDocumentEditModel, type UiJsonEdit, type UiSyntaxLanguage } from '@tr-file/ui';
 import { contentTag } from '../../file-system/content-tag';
 import { FsError } from '../../file-system/fs-error';
 import { sniffText } from '../../file-system/text-sniff';
 import type { WorkbenchService } from '../workbench.service';
 import { LANGUAGE_LABELS, jsonProblemOf, languageOf } from './editor-language';
+import { applyJsonEdit } from './json-source';
 import { MAX_PREVIEW_BYTES } from './file-preview.feature';
 
 /** The UTF-8 byte-order mark, kept on a file that had one. */
@@ -23,6 +24,11 @@ interface EditSession {
   readonly bom: boolean;
   readonly language: UiSyntaxLanguage;
   readonly saving: boolean;
+  /**
+   * How it is edited: as text in the code editor, or — a JSON file changed
+   * in its tree (PRD 005, §5.2) — still as the tree.
+   */
+  readonly mode: 'text' | 'tree';
 }
 
 /** What a question about unsaved changes can be answered with. */
@@ -49,6 +55,9 @@ type UnsavedAnswer = 'save' | 'discard' | 'cancel';
 export class FileEditorFeature {
   private readonly sessions = signal<ReadonlyMap<string, EditSession>>(new Map());
 
+  /** The last JSON value read from each draft edited in its tree (PRD 005, §5.2). */
+  private readonly trees = new Map<string, { readonly text: string; readonly value: unknown }>();
+
   /** The last table read from each draft — a CSV file edited as one is read again only when it changed. */
   private readonly tables = new Map<string, { readonly text: string; readonly table: UiDelimitedText }>();
 
@@ -69,6 +78,11 @@ export class FileEditorFeature {
 
   isEditing(path: string): boolean {
     return this.sessions().has(path);
+  }
+
+  /** `text` while the file is in the code editor, `tree` while a JSON file is edited in its tree; `null` when it is not being edited. */
+  modeOf(path: string): 'text' | 'tree' | null {
+    return this.sessions().get(path)?.mode ?? null;
   }
 
   isDirty(path: string): boolean {
@@ -133,7 +147,14 @@ export class FileEditorFeature {
       return;
     }
     if (active?.kind === 'file' && active.path === target && this.isEditing(target)) {
-      await this.stopEditing(groupId, target);
+      const session = this.sessions().get(target) as EditSession;
+      if (session.mode === 'tree') {
+        // Changed in its tree: on in the code editor, the draft and all (PRD 005, §5.2).
+        this.patch(target, { ...session, mode: 'text' });
+        this.parent.panelFocusFt.focusBody(groupId);
+      } else {
+        await this.stopEditing(groupId, target);
+      }
       return;
     }
     if (!this.canEdit(target)) {
@@ -148,6 +169,42 @@ export class FileEditorFeature {
       return;
     }
     this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
+  }
+
+  /**
+   * A key renamed or a value changed in a JSON file's tree (PRD 005, §5.2):
+   * written into the draft's text where it stands, the rest of the file as
+   * it was. The first edit reads the file afresh, as *Edit* does, and keeps
+   * the tree.
+   */
+  async editJson(path: string, edit: UiJsonEdit): Promise<void> {
+    if (!this.isEditing(path) && !(await this.begin(path, 'tree'))) {
+      return;
+    }
+    const session = this.sessions().get(path) as EditSession;
+    const result = applyJsonEdit(session.text, edit);
+    if ('problem' in result) {
+      await this.parent.modal.message({ message: `Could not change ${this.nameOf(path)}.`, detail: result.problem, severity: 'warning' });
+      return;
+    }
+    this.patch(path, { ...session, text: result.text });
+  }
+
+  /** The draft of a JSON file edited in its tree, read; `undefined` when it does not parse. */
+  jsonOf(path: string): unknown {
+    const text = this.sessions().get(path)?.text ?? '';
+    const cached = this.trees.get(path);
+    if (cached !== undefined && cached.text === text) {
+      return cached.value;
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      value = undefined;
+    }
+    this.trees.set(path, { text, value });
+    return value;
   }
 
   /** The draft, as the editor reports it after each change. */
@@ -299,7 +356,7 @@ export class FileEditorFeature {
    * what was read, so not the preview's copy, which may be older. `false`
    * when it cannot be edited, after saying why.
    */
-  private async begin(path: string): Promise<boolean> {
+  private async begin(path: string, mode: 'text' | 'tree' = 'text'): Promise<boolean> {
     let bytes: Uint8Array;
     try {
       const blob = await this.parent.fileSystem.transferFt.download(path, MAX_PREVIEW_BYTES);
@@ -329,6 +386,7 @@ export class FileEditorFeature {
       bom: bytes[0] === BOM[0] && bytes[1] === BOM[1] && bytes[2] === BOM[2],
       language: languageOf(path, text),
       saving: false,
+      mode: this.sessions().get(path)?.mode ?? mode,
     });
     return true;
   }
@@ -383,6 +441,7 @@ export class FileEditorFeature {
 
   private drop(path: string): void {
     this.tables.delete(path);
+    this.trees.delete(path);
     if (!this.sessions().has(path)) {
       return;
     }

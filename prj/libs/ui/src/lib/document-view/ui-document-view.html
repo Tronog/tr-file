@@ -10,6 +10,9 @@
     (rowsChange)="onRows(table, $event)"
     (selectionChange)="cell.set($event)"
   />
+} @else if (isJson()) {
+  <!-- A tree of its own, scrolled and keyed by itself (PRD 005, §5); its keys and values edited in place (§5.2). -->
+  <ui-json-tree [value]="document().json" [label]="label()" [editable]="!!document().editable" (edit)="jsonEdit.emit($event)" />
 } @else if (document().edit; as edit) {
   <!-- Editing (PRD 005, §4): the editor has its own scroll and its own keys. -->
   <ui-code-editor
@@ -24,9 +27,6 @@
   <!-- Its own viewport rather than a scroll container: the picture is zoomed
        and panned by transform, so nothing here scrolls (PRD 001, §7.3.1). -->
   <ui-image-view [src]="src()" [label]="label()" />
-} @else if (isJson()) {
-  <!-- A tree of its own, scrolled and keyed by itself (PRD 005, §5). -->
-  <ui-json-tree [value]="document().json" [label]="label()" />
 } @else {
   <article #doc class="doc" tabindex="0" [attr.aria-label]="label()" (keydown)="onKeydown($event)">
     @if (isMarkdown()) {
@@ -54,7 +54,7 @@
       }
       @if (document().table) {
         <span class="caret">{{ cell() }}</span>
-      } @else {
+      } @else if (!isJson()) {
         <span class="caret">Ln {{ caret().line }}, Col {{ caret().column }}</span>
       }
       <span class="language">{{ edit.languageLabel }}</span>

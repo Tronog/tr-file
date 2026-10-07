@@ -71,4 +71,58 @@ describe('UiCodeEditor', () => {
     expect(marked.textContent?.trim()).toBe('2');
     expect(marked.title).toBe('Expected ","');
   });
+
+  /** PRD 005, §5.1 — find in the text, which the browser's own cannot see. */
+  describe('find', () => {
+    beforeEach(() => {
+      fixture.componentRef.setInput('text', '{\n  "alpha": 1,\n  "beta": "Alpha"\n}');
+      fixture.detectChanges();
+    });
+
+    const field = (): HTMLInputElement => fixture.nativeElement.querySelector('.find input') as HTMLInputElement;
+    const query = (text: string): void => {
+      field().value = text;
+      field().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    };
+    const count = (): string => (fixture.nativeElement.querySelector('.find-count') as HTMLElement).textContent?.trim() ?? '';
+
+    it('opens on Ctrl+F with the selection as its query, and marks every match, case ignored', () => {
+      area().setSelectionRange(5, 10); // alpha
+      expect(press('f', { ctrlKey: true }).defaultPrevented).toBe(true);
+      fixture.detectChanges();
+
+      expect(field().value).toBe('alpha');
+      expect(count()).toBe('2 found');
+      expect(Array.from(fixture.nativeElement.querySelectorAll('.is-match')).map((mark) => (mark as HTMLElement).textContent)).toEqual(['alpha', 'Alpha']);
+    });
+
+    it('selects the next and the previous match on Enter / Shift+Enter, round at either end', () => {
+      press('f', { ctrlKey: true });
+      query('ALPHA');
+      const enter = (shiftKey = false): void => {
+        field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey, bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+      };
+      enter();
+      expect(count()).toBe('1 of 2');
+      expect(area().value.slice(area().selectionStart, area().selectionEnd)).toBe('alpha');
+      enter();
+      expect(area().value.slice(area().selectionStart, area().selectionEnd)).toBe('Alpha');
+      expect(fixture.nativeElement.querySelector('.line .is-current')?.textContent).toBe('Alpha');
+      enter(true);
+      expect(count()).toBe('1 of 2');
+    });
+
+    it('closes on Escape, the text taking the keyboard and its marks gone', () => {
+      press('f', { ctrlKey: true });
+      query('beta');
+      field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.find')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.is-match')).toBeNull();
+      expect(document.activeElement).toBe(area());
+    });
+  });
 });

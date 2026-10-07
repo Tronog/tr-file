@@ -120,6 +120,46 @@
   height: var(--ui-code-line-height);
 }
 
+/* Find (PRD 005, §5.1): its bar over the text's top right, and the matches marked in the text. */
+.find {
+  position: absolute;
+  top: 4px;
+  right: 18px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  padding: 4px 6px;
+  border: 1px solid var(--vsc-border-strong);
+  border-radius: var(--vsc-radius);
+  background: var(--vsc-panel-bg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 36%);
+  font-family: var(--vsc-font);
+  font-size: var(--vsc-font-size-sm);
+
+  ui-search-field {
+    width: 200px;
+  }
+}
+
+.find-count {
+  min-width: 72px;
+  padding: 0 6px;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-xs);
+  text-align: center;
+}
+
+.is-match {
+  border-radius: 2px;
+  background: var(--vsc-find-match-bg);
+}
+
+.is-current {
+  border-radius: 2px;
+  background: var(--vsc-find-current-bg);
+}
+
 .tok-comment { color: var(--vsc-syntax-comment); }
 .tok-string { color: var(--vsc-syntax-string); }
 .tok-number { color: var(--vsc-syntax-number); }

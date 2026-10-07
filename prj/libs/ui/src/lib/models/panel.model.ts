@@ -54,6 +54,8 @@ export interface UiDocumentModel {
   readonly table?: UiDelimitedText;
   /** The parsed document. Only for `kind: 'json'`. */
   readonly json?: unknown;
+  /** A `json` document's keys and values may be edited in its tree (PRD 005, §5.2). */
+  readonly editable?: boolean;
   /** The file open for editing (PRD 005, §4), drawn instead of whatever `kind` says — but a `table`, which is edited as one. */
   readonly edit?: UiDocumentEditModel;
   /** Sanitised HTML, already rendered by the app. Only for `kind: 'markdown'`. */

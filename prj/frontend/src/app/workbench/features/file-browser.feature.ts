@@ -3,6 +3,7 @@ import type {
   UiBreadcrumb,
   UiDocumentModel,
   UiFilesDrop,
+  UiJsonEdit,
   UiIconAction,
   UiPathSuggestion,
   UiSelectionChange,
@@ -855,6 +856,15 @@ export class FileBrowserFeature implements PanelContentFeature {
     }
   }
 
+  /** A key or a value changed in a JSON file's tree (PRD 005, §5.2). */
+  editJson(groupId: string, edit: UiJsonEdit): void {
+    const group = this.groups.stateOf(groupId);
+    const active = group ? this.groups.activeTabOf(group) : undefined;
+    if (active?.kind === 'file') {
+      void this.parent.fileEditorFt.editJson(active.path, edit);
+    }
+  }
+
   /** The editor's text, after each change (PRD 005, §4): the draft of the file the tab shows. */
   setDocumentText(groupId: string, text: string): void {
     const group = this.groups.stateOf(groupId);
@@ -1190,17 +1200,25 @@ export class FileBrowserFeature implements PanelContentFeature {
    */
   private fileViewModel(group: PanelGroupState, tab: PanelTabState): UiFileBrowserModel {
     const preview = this.parent.filePreviewFt;
+    const editor = this.parent.fileEditorFt;
     // Open for editing (PRD 005, §4): the editor, whatever the viewer would have shown.
-    const edit = this.parent.fileEditorFt.editModelFor(tab.path);
+    const edit = editor.editModelFor(tab.path);
     const viewed = preview.documentFor(tab.path);
     // A CSV file shown as a table is edited as one (PRD 015, §1); anything else in the code editor.
     const delimiter = preview.delimiterOf(tab.path);
-    const document =
-      edit === undefined
-        ? viewed
-        : delimiter !== undefined
-          ? { ...(viewed as UiDocumentModel), path: tab.path, kind: 'table' as const, table: this.parent.fileEditorFt.tableOf(tab.path, delimiter), edit: { ...edit, languageLabel: delimiter === '\t' ? 'TSV' : 'CSV' } }
-          : { ...(viewed ?? { kind: 'text' as const }), path: tab.path, edit };
+    // A JSON tree is edited in place (PRD 005, §5.2) — until *Edit* takes it to the code editor.
+    const tree = viewed?.kind === 'json' && (edit === undefined || editor.modeOf(tab.path) === 'tree') ? (edit === undefined ? viewed.json : editor.jsonOf(tab.path)) : undefined;
+    let document: UiDocumentModel | undefined;
+    if (viewed?.kind === 'json' && tree !== undefined) {
+      document = { ...viewed, json: tree, editable: editor.canEdit(tab.path), ...(edit === undefined ? {} : { edit }) };
+    } else if (edit === undefined) {
+      document = viewed;
+    } else if (delimiter !== undefined) {
+      document = { ...(viewed as UiDocumentModel), path: tab.path, kind: 'table', table: editor.tableOf(tab.path, delimiter), edit: { ...edit, languageLabel: delimiter === '\t' ? 'TSV' : 'CSV' } };
+    } else {
+      const { json: _json, table: _table, ...rest } = viewed ?? { path: tab.path, kind: 'text' as const };
+      document = { ...rest, path: tab.path, kind: 'text', edit };
+    }
     const notice = edit === undefined ? preview.noticeFor(tab.path) : undefined;
 
     return {
@@ -1238,13 +1256,16 @@ export class FileBrowserFeature implements PanelContentFeature {
   private fileToolbar(path: string): readonly UiIconAction[] {
     const editor = this.parent.fileEditorFt;
     const editing = editor.isEditing(path);
+    const asText = editor.modeOf(path) === 'text';
     const structured = this.parent.filePreviewFt.structuredViewOf(path);
     return [
       ...FILE_TOOLBAR,
       { id: 'open-external', label: this.parent.systemOpenFt.openLabel(), icon: 'external' },
-      ...(editor.canEdit(path) ? [{ id: 'edit', label: editing ? 'Stop Editing' : 'Edit', icon: 'pencil' as const, active: editing }] : []),
+      ...(editor.canEdit(path)
+        ? [{ id: 'edit', label: asText ? 'Stop Editing' : structured?.kind === 'json' && !structured.asText ? 'Edit as Text' : 'Edit', icon: 'pencil' as const, active: asText }]
+        : []),
       ...(editing ? [{ id: 'save', label: 'Save', icon: 'device-floppy' as const, disabled: !editor.isDirty(path) }] : []),
-      ...(editing && editor.languageOf(path) === 'json' ? [{ id: 'format', label: 'Format Document', icon: 'braces' as const }] : []),
+      ...(asText && editor.languageOf(path) === 'json' ? [{ id: 'format', label: 'Format Document', icon: 'braces' as const }] : []),
       ...(!editing && structured !== null
         ? [
             {

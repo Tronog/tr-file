@@ -17,6 +17,16 @@
 </div>
 
 <div class="surface">
+  <!-- Find (PRD 005, §5.1): Ctrl+F in the text. -->
+  @if (finding()) {
+    <div class="find" role="search" (keydown)="onFindKeydown($event)">
+      <ui-search-field placeholder="Find" label="Find" [value]="view.findQuery()" [focusToken]="findFocus()" (valueChange)="onFindQuery($event)" />
+      <span class="find-count" aria-live="polite">{{ findLabel() }}</span>
+      <ui-icon-button icon="arrow-up" label="Previous match (Shift+Enter)" [disabled]="view.matches().length === 0" (action)="findStep(-1)" />
+      <ui-icon-button icon="arrow-down" label="Next match (Enter)" [disabled]="view.matches().length === 0" (action)="findStep(1)" />
+      <ui-icon-button icon="x" label="Close (Escape)" (action)="closeFind()" />
+    </div>
+  }
   <!-- The editor itself; its text is transparent, the overlay above draws it coloured. -->
   <textarea
     #area
@@ -41,7 +51,7 @@
     <div #canvas class="canvas">
       <div class="lines" [style.top.px]="view.visible().start * lineHeight">
         @for (line of view.visible().rows; track line.index) {
-          <div class="line">@for (token of line.tokens; track $index) {<span [class]="token.kind ? 'tok-' + token.kind : ''">{{ token.text }}</span>}</div>
+          <div class="line">@for (token of line.tokens; track $index) {<span [class]="(token.kind ? 'tok-' + token.kind : '') + (token.mark ? ' is-' + token.mark : '')">{{ token.text }}</span>}</div>
         }
       </div>
     </div>

@@ -233,6 +233,41 @@ describe('The file editor', () => {
       expect(document()?.edit?.text).toBe('{\n  "a": 1,\n  "b": [\n    true\n  ]\n}\n');
     });
 
+    /** PRD 005, §5.2. */
+    it('is edited in its tree: the change written where it stands, the rest of the file as it was', async () => {
+      workbench.fileBrowserFt.openEntry(groupId, 'docs/data.json');
+      await answer();
+      expect(document()?.editable).toBe(true);
+      expect(document()?.edit).toBeUndefined();
+
+      workbench.fileBrowserFt.editJson(groupId, { pointer: '/a/1', value: 20 });
+      await answer();
+      expect(document()?.kind).toBe('json');
+      expect(document()?.json).toEqual({ a: [1, 20], b: { c: true } });
+      expect(workbench.fileEditorFt.modeOf('docs/data.json')).toBe('tree');
+      expect(workbench.fileEditorFt.isDirty('docs/data.json')).toBe(true);
+
+      workbench.fileBrowserFt.editJson(groupId, { pointer: '/b', key: 'bee' });
+      await answer();
+      const saving = workbench.fileEditorFt.save('docs/data.json');
+      await answer();
+      expect(await saving).toBe(true);
+      expect(writes.at(-1)?.body).toBe('{"a": [1, 20], "bee": {"c": true}}');
+    });
+
+    it('goes on from the tree to the code editor on Edit, its changes and all', async () => {
+      workbench.fileBrowserFt.openEntry(groupId, 'docs/data.json');
+      await answer();
+      workbench.fileBrowserFt.editJson(groupId, { pointer: '/b/c', value: false });
+      await answer();
+      expect(toolbar()).toEqual(expect.arrayContaining(['edit', 'save']));
+
+      await workbench.fileEditorFt.toggle(groupId);
+      expect(document()?.kind).toBe('text');
+      expect(document()?.edit?.text).toBe('{"a": [1, 2], "b": {"c": false}}');
+      expect(workbench.fileEditorFt.isDirty('docs/data.json')).toBe(true);
+    });
+
     it('asks before saving what is not JSON', async () => {
       await edit('docs/data.json');
       workbench.fileBrowserFt.setDocumentText(groupId, '{"a": ');

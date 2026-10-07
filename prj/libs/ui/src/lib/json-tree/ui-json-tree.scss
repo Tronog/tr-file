@@ -20,7 +20,7 @@
 }
 
 .where {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--vsc-fg-muted);
@@ -125,4 +125,45 @@
   font-family: var(--vsc-font);
   font-size: var(--vsc-font-size-xs);
   user-select: none;
+}
+
+/* Search (PRD 005, §5.1). */
+.search {
+  flex: 0 1 220px;
+  min-width: 120px;
+}
+
+.matches {
+  flex: none;
+  min-width: 64px;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-xs);
+  text-align: right;
+}
+
+mark {
+  border-radius: 2px;
+  background: var(--vsc-find-match-bg);
+  color: inherit;
+}
+
+.row.is-match.is-focused mark {
+  outline: 1px solid var(--vsc-find-match-border);
+}
+
+/* Editing a key or a value in place (§5.2). */
+.edit {
+  min-width: 80px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--vsc-focus-border);
+  outline: 0;
+  background: var(--vsc-input-bg, var(--vsc-editor-bg));
+  color: var(--vsc-fg-bright);
+  font: inherit;
+  field-sizing: content;
+
+  &.is-invalid {
+    border-color: var(--vsc-severity-error);
+  }
 }

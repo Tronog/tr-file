@@ -1,5 +1,5 @@
 import { Component, afterRenderEffect, computed, inject, input, output, signal, viewChild, type ElementRef } from '@angular/core';
-import { UiBreadcrumbs, UiSearchField, UiSegmented, type UiSegmentedOption, UiDocumentView, UiEmptyState, UiKeymap, UiPanelBody, UiPanelToolbar, type UiContextMenuRequest, type UiFilesDrop, type UiSelectionChange } from '@tr-file/ui';
+import { type UiJsonEdit, UiBreadcrumbs, UiSearchField, UiSegmented, type UiSegmentedOption, UiDocumentView, UiEmptyState, UiKeymap, UiPanelBody, UiPanelToolbar, type UiContextMenuRequest, type UiFilesDrop, type UiSelectionChange } from '@tr-file/ui';
 import { UiFileList } from '../file-list/ui-file-list';
 import { UiIconView } from '../icon-view/ui-icon-view';
 import { UI_ENTRY_MIME, type UiEntryDrop, type UiFileBrowserModel, type UiPanelKey, type UiPanelView } from '../models';
@@ -92,6 +92,8 @@ export class UiFileBrowser {
   readonly toolbarAction = output<string>();
   /** The text of a file being edited (PRD 005, §4), after each change. */
   readonly documentText = output<string>();
+  /** A key or a value changed in a JSON file's tree (PRD 005, §5.2). */
+  readonly documentJsonEdit = output<UiJsonEdit>();
   readonly viewChange = output<UiPanelView>();
   /**
    * A new selection in whichever view is showing — one entry or many

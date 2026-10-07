@@ -90,7 +90,8 @@ export type UiIconName =
   | 'activity'
   | 'player-pause'
   | 'device-floppy'
-  | 'braces';
+  | 'braces'
+  | 'arrow-down';
 
 /** Icon sizes used across the workbench (16px is VS Code's list/tab size). */
 export type UiIconSize = 'sm' | 'md' | 'lg' | 'xl';

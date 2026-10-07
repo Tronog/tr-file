@@ -271,6 +271,16 @@ export const HELP: UiHelpConfig = {
       ],
     },
     {
+      id: 'json-fixed',
+      title: 'JSON tree and the editor',
+      hue: 'orange',
+      rows: [
+        [[['Ctrl', 'F']], 'Search keys and values; in the editor, find in the text'],
+        [[['Enter'], ['Shift', 'Enter']], 'In the search box: next / previous match'],
+        [[['F2'], ['Enter']], 'JSON tree: edit a value, or rename a key (F2)'],
+      ],
+    },
+    {
       id: 'sheet-fixed',
       title: 'CSV table',
       hue: 'teal',

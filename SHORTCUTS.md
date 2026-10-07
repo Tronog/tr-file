@@ -196,6 +196,9 @@ The editor's own keys; everything else in it is a text field's (undo, the clipbo
 | --- | --- |
 | `Tab` / `Shift`+`Tab` | Indent / outdent — every selected line when the selection spans lines |
 | `Enter` | New line, indented as this one — one step more after `{`, `[` or `(` |
+| `Ctrl`+`F` | Find in the file — the selection, if any, is what is looked for |
+| `Enter` / `Shift`+`Enter` (find box), `F3` / `Shift`+`F3` | Next / previous match |
+| `Escape` | Close the find box |
 
 ### CSV table
 
@@ -226,7 +229,13 @@ Press a column letter or a row number to select it (`Shift` extends); drag acros
 | --- | --- |
 | `↑` / `↓`, `Home` / `End`, `PageUp` / `PageDown` | Move between values |
 | `→` / `←` | Open an object or array, or step into it / close it, or step out to its parent |
-| `Enter`, `Space` | Open or close |
+| `Space` | Open or close |
+| `Enter` | Edit a value; open or close an object or array |
+| `F2`, double click | Edit a value, or rename a key |
+| `Enter` / `Escape` (editing) | Keep / drop what was typed |
+| `Ctrl`+`F` | Search keys and values |
+| `Enter` / `Shift`+`Enter` (search box), `F3` / `Shift`+`F3` | Next / previous match |
+| `Escape` (search box) | Clear the search; again, back to the tree |
 
 ### Image viewer
 

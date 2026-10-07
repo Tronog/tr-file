@@ -78,7 +78,7 @@ export { UiJsonTree } from './lib/json-tree/ui-json-tree';
 export { UiSheet } from './lib/sheet/ui-sheet';
 export { UiSheetService, type UiCell, type UiCellRange, type UiSheetEdit, type UiSheetSelectionKind } from './lib/sheet/ui-sheet.service';
 export { columnName, detectDelimiter, parseDelimited, serializeDelimited, type UiDelimitedText } from './lib/sheet/delimited-text';
-export { UiJsonTreeService, type UiJsonKind, type UiJsonRow } from './lib/json-tree/ui-json-tree.service';
+export { UiJsonTreeService, matchParts, type UiJsonEdit, type UiJsonEditing, type UiJsonKind, type UiJsonRow } from './lib/json-tree/ui-json-tree.service';
 export { UiImageView } from './lib/image-view/ui-image-view';
 export { UiImageViewService } from './lib/image-view/ui-image-view.service';
 export type { UiImagePoint, UiImageZoom } from './lib/image-view/ui-image-view.service';
