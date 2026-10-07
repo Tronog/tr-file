@@ -388,8 +388,8 @@ The machine's processes, measured from the moment the backend starts
 2 seconds while someone watches, every 10 while no one does (PRD 014, §4.1). A
 client asking (`/api/processes`, `/history`, or the bridge's `proc-list` /
 `proc-history`) *is* watching, for 5 s (`PROCESS_WATCH_LEASE_MS`); the frontend
-asks every 2 s only while Task Manager is shown, not paused, in a window that is
-not hidden or minimised. Coming from the idle pace, an ask brings the next sample
+asks every 2 s only while Task Manager is the sub-application shown and not
+paused. Coming from the idle pace, an ask brings the next sample
 forward to at once. The last 10 minutes by the clock are kept (up to 300
 samples), each with when it was taken (`times`) — the machine's CPU (as a whole and
 per logical processor), memory, disk (read and written apart) and each network

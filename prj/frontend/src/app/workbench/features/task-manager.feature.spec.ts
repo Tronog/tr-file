@@ -290,21 +290,19 @@ describe('TaskManagerFeature', () => {
     expect(JSON.parse(localStorage.getItem(TASK_MANAGER_KEY) ?? 'null')).toMatchObject({ view: 'processes', span: '10m', cpuView: 'logical' });
   });
 
-  it('asks every two seconds while shown, and nothing while the window is hidden or minimised (§4.1)', async () => {
+  it('asks every two seconds while shown — whatever pace the backend says — and nothing once another sub-application is (§4.1)', async () => {
     const list = answer(snapshot([process(1)], { intervalMs: 10_000 }));
     await open();
-    // Whatever pace the backend says it is at, asking every two seconds is what keeps it fast.
+    // Asking every two seconds is what keeps the backend at its fast pace.
     await vi.advanceTimersByTimeAsync(TASK_MANAGER_POLL_MS * 2);
     expect(list).toHaveBeenCalledTimes(3);
 
-    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
-    document.dispatchEvent(new Event('visibilitychange'));
+    workbench.subAppsFt.show('file-manager');
     TestBed.tick();
     await vi.advanceTimersByTimeAsync(20_000);
     expect(list).toHaveBeenCalledTimes(3);
 
-    hidden.mockReturnValue('visible');
-    document.dispatchEvent(new Event('visibilitychange'));
+    workbench.subAppsFt.show('task-manager');
     TestBed.tick();
     await vi.advanceTimersByTimeAsync(0);
     expect(list).toHaveBeenCalledTimes(4);

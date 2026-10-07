@@ -491,7 +491,7 @@ whether anyone looks or not — every 2 s while a client asks within the last 5 
 PowerShell with a compiled C# helper on Windows (`windows-sampler.ps1.ts`), `ps` elsewhere. A process is
 named by `key` (`pid:start`), so *End task* never ends a pid handed out again. On the frontend
 `TaskManagerFeature` asks for the latest sample every 2 s while the sub-application is shown, not
-paused and the window visible (`visibilitychange`: minimised or hidden asks nothing, so the backend slows; started by the `Workbench` component, like Git), and `task-manager/process-rows.ts` builds the
+paused — another sub-application shown asks nothing, so the backend slows (§4.1); started by the `Workbench` component, like Git), and `task-manager/process-rows.ts` builds the
 rows: an executable's processes in one group under *Apps* / *Background processes* / the system's,
 sorted by a column, filtered, shaded by load (`--vsc-heat`). The library's `UiProcessList` draws them
 (keyboard on the list through `aria-activedescendant`, so rows can change under it). *End task*

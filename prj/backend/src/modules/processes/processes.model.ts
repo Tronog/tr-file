@@ -9,7 +9,7 @@
 /** How often the processes are measured while Task Manager is shown somewhere (PRD 014, §4.1). */
 export const PROCESS_SAMPLE_MS = 2000;
 
-/** How often while it is not: no client watching, or its window hidden or minimised. */
+/** How often while it is not: no client has Task Manager shown. */
 export const PROCESS_IDLE_SAMPLE_MS = 10_000;
 
 /**

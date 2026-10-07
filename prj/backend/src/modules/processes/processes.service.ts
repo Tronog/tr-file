@@ -82,7 +82,7 @@ const keyOf = (raw: RawProcess): string => `${raw.pid}:${raw.started === null ? 
 /**
  * The backend machine's processes (PRD 014, §1): measured from the moment the
  * backend starts, whether anyone is looking or not — every `PROCESS_SAMPLE_MS`
- * while a client asks (Task Manager shown in a visible window), every
+ * while a client asks (Task Manager is the sub-application shown), every
  * `PROCESS_IDLE_SAMPLE_MS` while none does (§4.1) — and the last ten minutes
  * kept — the machine's CPU, memory
  * and disk, and each running process's — so whoever opens Task Manager sees
@@ -191,7 +191,7 @@ export class ProcessesService {
     this.source?.close();
   }
 
-  /** Whether a client asked within the lease: Task Manager is shown, in a window that is not hidden. */
+  /** Whether a client asked within the lease: Task Manager is the sub-application shown somewhere. */
   get watched(): boolean {
     return Date.now() - this.watchedAt < PROCESS_WATCH_LEASE_MS;
   }

@@ -1,4 +1,4 @@
-import { DOCUMENT, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { UiPerfSpan, UiPerformanceModel, UiProcessListModel, UiProcessMenuRequest } from '@tr-file/file-ui';
 import type { UiStatusItem } from '@tr-file/ui';
 import type { FsProcess, FsProcessesHistory, FsProcessesSnapshot } from '../../file-system/file-system.model';
@@ -88,8 +88,6 @@ export class TaskManagerFeature {
   readonly filterFocus = signal(0);
 
   private readonly running = signal(false);
-  /** The window is on screen: not minimised, not a background tab (§4.1). */
-  private readonly visible = signal(true);
   private timer: ReturnType<typeof setTimeout> | null = null;
   private asking = false;
   /** Processes being ended, so a second press does not end them twice. */
@@ -114,25 +112,17 @@ export class TaskManagerFeature {
       this.cpuView.set(remembered.cpuView);
     }
 
-    // A hidden or minimised window asks nothing, so the backend slows to its idle pace (§4.1).
-    const document = inject(DOCUMENT);
-    const onVisibility = () => this.visible.set(document.visibilityState !== 'hidden');
-    onVisibility();
-    document.addEventListener('visibilitychange', onVisibility);
-
-    // Asked while shown, on screen and not paused; nothing otherwise — the backend keeps measuring either way.
+    // Asked while shown and not paused; nothing otherwise — the backend keeps measuring either way,
+    // every ten seconds while no one asks (§4.1).
     effect(() => {
       const wanted = this.wanted();
       untracked(() => (wanted ? this.poll() : this.stopPolling()));
     });
-    inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      this.stop();
-    });
+    inject(DestroyRef).onDestroy(() => this.stop());
   }
 
-  /** Whether to ask: started, Task Manager the sub-application shown, the window on screen, and not paused. */
-  private readonly wanted = computed(() => this.running() && this.parent.subAppsFt.isActive('task-manager') && this.visible() && !this.paused());
+  /** Whether to ask: started, Task Manager the sub-application shown, and not paused. */
+  private readonly wanted = computed(() => this.running() && this.parent.subAppsFt.isActive('task-manager') && !this.paused());
 
   /** Starts following the sub-application; the workbench component calls it, so a service built for a test asks nothing. */
   start(): void {
