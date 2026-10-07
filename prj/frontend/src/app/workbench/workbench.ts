@@ -1,52 +1,48 @@
 import { Component, ElementRef, effect, inject, viewChild } from '@angular/core';
-import { UiActivityBar, UiContextMenu, UiQuickInput, UiStatusBar, UiTitleBar, UiWorkbench } from '@tr-file/ui';
+import { UiBottomTabTemplate, UiNotes, UiPanelContentTemplate, UiSidebarTemplate, UiSubAppTemplate, UiWorkbenchShell } from '@tr-file/ui';
+import { UiFileBrowser, UiTransferList } from '@tr-file/file-ui';
 import { DiskUsageApp } from './sub-apps/disk-usage/disk-usage-app';
-import { FileManagerCenter } from './sub-apps/file-manager/file-manager-center';
 import { FileManagerDetails } from './sub-apps/file-manager/file-manager-details';
 import { FileManagerExplorer } from './sub-apps/file-manager/file-manager-explorer';
 import { SearchApp } from './sub-apps/search/search-app';
-import type { FocusRegionId } from './features/focus-cycle.feature';
+import { TaskManagerApp } from './sub-apps/task-manager/task-manager-app';
 import { WorkbenchService } from './workbench.service';
 
-/** What `Ctrl`+`Tab` can land on inside a sidebar or the bottom panel. */
-const FOCUSABLE =
-  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 /**
- * The window: the VS Code style workbench from PRD 001 Section 1 — the title
- * bar, the activity bar and the status bar every sub-application shares, and
- * the sub-application shown in the rest (§1.1): the file manager, showing the
- * real file system served by `/api/fs`, Search or Disk Usage.
+ * The window: the library's workbench shell (PRD 001, §17.1) — the title
+ * bar, the activity bar and the status bar every sub-application shares, the
+ * panels, the bottom panel — with what the file manager draws in it: the
+ * content of each kind of tab, the bottom panel's tabs, the Explorer and
+ * Details sidebars, and the other sub-applications (§1.1), Search, Disk
+ * Usage and Task Manager.
  *
- * Render-only by design — it wires library components to the signals the
- * feature classes expose and forwards events straight back to them. The two
- * exceptions are unavoidable DOM work: kicking off the first load, and opening
- * the hidden file picker, which only an element reference can do.
+ * Render-only by design — it hands templates to the shell, wires the file
+ * manager's components to the signals the feature classes expose and
+ * forwards events straight back to them. The one exception is unavoidable DOM
+ * work: opening the hidden file picker, which only an element reference can do.
  */
 @Component({
   selector: 'app-workbench',
   imports: [
     DiskUsageApp,
-    FileManagerCenter,
     FileManagerDetails,
     FileManagerExplorer,
     SearchApp,
-    UiActivityBar,
-    UiContextMenu,
-    UiQuickInput,
-    UiStatusBar,
-    UiTitleBar,
-    UiWorkbench,
+    TaskManagerApp,
+    UiBottomTabTemplate,
+    UiFileBrowser,
+    UiNotes,
+    UiPanelContentTemplate,
+    UiSidebarTemplate,
+    UiSubAppTemplate,
+    UiTransferList,
+    UiWorkbenchShell,
   ],
   templateUrl: './workbench.html',
   styleUrl: './workbench.scss',
   host: {
-    // The palette opens from anywhere in the workbench (PRD 009, §1), and
-    // `Ctrl`+`Tab` moves between its parts from anywhere (PRD 002, §2.6).
-    '(document:keydown)': 'onDocumentKeydown($event)',
-    '(focusin)': 'onFocusIn($event)',
-    // What is waiting to be remembered is written before the window goes (PRD 003, §6).
-    '(window:pagehide)': 'workbench.sessionFt.flush(); workbench.notesFt.flush()',
+    // What is waiting to be remembered is written before the window goes (PRD 001, §12.2).
+    '(window:pagehide)': 'workbench.notesFt.flush()',
   },
 })
 export class Workbench {
@@ -55,21 +51,16 @@ export class Workbench {
   private readonly filePicker = viewChild.required<ElementRef<HTMLInputElement>>('filePicker');
   private readonly folderPicker = viewChild.required<ElementRef<HTMLInputElement>>('folderPicker');
 
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-
-  /** The element that last had focus in each region, to return to it. */
-  private readonly lastFocused = new Map<FocusRegionId, HTMLElement>();
-
   constructor() {
-    // The first listings are fetched here rather than in the service, so that
-    // constructing the service in a test performs no I/O.
-    this.workbench.start();
-    // Git (PRD 011, §1) follows the active panel from here on, for the same reason.
+    // Git (PRD 011, §1) follows the active panel from here on, rather than from
+    // the service, so that constructing the service in a test performs no I/O.
     this.workbench.gitFt.start();
     // The server's clock in the status bar (PRD 001, §13.1): asked from here too, not from the service.
     this.workbench.serverClockFt.start();
     // The title bar's *Upgrade* button (PRD 001, §8.6) follows the desktop shell from here too.
     this.workbench.appUpdateFt.start();
+    // Task Manager (PRD 014) asks for the processes while it is shown — from here too.
+    this.workbench.taskManagerFt.start();
 
     // A feature asked for files — or a folder (PRD 003, §6); only the component may open the picker.
     effect(() => {
@@ -78,82 +69,6 @@ export class Workbench {
         (request.folder ? this.folderPicker() : this.filePicker()).nativeElement.click();
       }
     });
-  }
-
-  protected onDocumentKeydown(event: KeyboardEvent): void {
-    // The window's keys (PRD 010, §2): the palette, search, the function keys, …
-    this.workbench.keybindingsFt.handleShortcut(event);
-    if (this.onPanelTab(event)) {
-      return;
-    }
-    const direction = this.workbench.focusCycleFt.directionOf(event);
-    if (direction === 0 || event.defaultPrevented) {
-      return;
-    }
-    event.preventDefault();
-    const current = this.regionOf(document.activeElement);
-    for (const region of this.workbench.focusCycleFt.sequence(current, direction)) {
-      if (this.workbench.focusCycleFt.enter(region) || this.focusRegion(region)) {
-        return;
-      }
-    }
-  }
-
-  /**
-   * `Tab` / `Shift`+`Tab` from a panel's body to the next or previous panel
-   * (PRD 002, §2.6), entered as choosing its tab enters it. `true` when it was that.
-   */
-  private onPanelTab(event: KeyboardEvent): boolean {
-    const focused = document.activeElement;
-    const region = this.regionOf(focused);
-    const inBody =
-      region?.startsWith('group:') === true &&
-      focused instanceof HTMLElement &&
-      focused.closest('[data-panel-body]') !== null &&
-      !focused.matches('input, textarea, select, [contenteditable="true"]');
-    const direction = event.defaultPrevented ? 0 : this.workbench.focusCycleFt.panelDirectionOf(event, inBody);
-    const next = direction === 0 ? null : this.workbench.focusCycleFt.nextPanel((region as string).slice('group:'.length), direction);
-    if (next === null) {
-      return false;
-    }
-    event.preventDefault();
-    this.workbench.focusCycleFt.enter(`group:${next}`);
-    return true;
-  }
-
-  protected onFocusIn(event: FocusEvent): void {
-    const region = this.regionOf(event.target);
-    if (region !== null && event.target instanceof HTMLElement) {
-      this.lastFocused.set(region, event.target);
-    }
-  }
-
-  /**
-   * Focuses a sidebar or the bottom panel: where focus last was in it, else
-   * its first tab stop — a roving `tabindex="0"` first, so a tree is entered on
-   * its current row. `false` when it has nothing to focus, so the next region
-   * is tried.
-   */
-  private focusRegion(region: FocusRegionId): boolean {
-    const element = this.host.querySelector<HTMLElement>(`[data-focus-region="${region}"]`);
-    if (element === null) {
-      return false;
-    }
-    const remembered = this.lastFocused.get(region);
-    const target =
-      (remembered?.isConnected && element.contains(remembered) && remembered.matches(FOCUSABLE) ? remembered : null) ??
-      element.querySelector<HTMLElement>('[tabindex="0"]') ??
-      element.querySelector<HTMLElement>(FOCUSABLE);
-    if (target === null) {
-      return false;
-    }
-    target.focus();
-    return document.activeElement === target;
-  }
-
-  private regionOf(target: EventTarget | null): FocusRegionId | null {
-    const element = target instanceof Element ? target.closest('[data-focus-region]') : null;
-    return (element?.getAttribute('data-focus-region') as FocusRegionId | null) ?? null;
   }
 
   /** Hands the chosen files to the group that asked for them. */

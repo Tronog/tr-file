@@ -1,5 +1,6 @@
 import { computed, signal } from '@angular/core';
-import { SettingsService, type SettingsStore } from '../../settings/settings.service';
+import type { UiSettingsStore } from '@tr-file/ui';
+import { SettingsService } from '../../settings/settings.service';
 import type { RemoteTarget } from '../command-palette/remote-target';
 
 /** The settings key of the list; the suffix is its format's version. */
@@ -42,7 +43,7 @@ export class SavedServersFeature {
 
   constructor(
     private readonly now: () => number = () => Date.now(),
-    private readonly store: SettingsStore = new SettingsService(),
+    private readonly store: UiSettingsStore = new SettingsService(),
   ) {
     this.list = signal<readonly SavedServer[]>(SavedServersFeature.load(store));
   }
@@ -116,7 +117,7 @@ export class SavedServersFeature {
   }
 
   /** What storage holds, keeping only entries that are still well formed. */
-  private static load(store: SettingsStore): readonly SavedServer[] {
+  private static load(store: UiSettingsStore): readonly SavedServer[] {
     const parsed = store.get<unknown>(SAVED_SERVERS_KEY);
     return Array.isArray(parsed) ? parsed.filter(SavedServersFeature.isServer) : [];
   }

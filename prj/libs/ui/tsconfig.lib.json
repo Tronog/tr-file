@@ -1,10 +1,14 @@
-/* Type-check-only config. The library ships TypeScript source: it is compiled by
-   the consuming application's `ng build` (path-mapped in frontend/tsconfig.json),
-   so there is no separate emit step and no ng-packagr in the loop. */
+/* The library as ng-packagr builds it (`pnpm --filter @tr-file/ui build`). The
+   workspace's apps do not consume this output: they map `@tr-file/ui` to the
+   sources and compile them with their own build. */
 {
-  "extends": "../../frontend/tsconfig.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "inlineSources": true,
     "types": []
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/test-setup.ts", "src/testing/**"]
 }

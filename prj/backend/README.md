@@ -28,6 +28,8 @@ pnpm hash-password  # reads a password on stdin, prints an AUTH_PASSWORD_HASH
 | `AUTH_ENABLED` | see below | `false` runs with no login; `true` refuses to start without an account |
 | `AUTH_SESSION_IDLE_HOURS` | `12` | A session unused this long is signed out |
 | `GIT_ENABLED` | `true`, `false` in production | Whether `/api/git` may run `git` (PRD 011, §1) — see below |
+| `PROCESSES_ENABLED` | `true`, `false` in production | Whether `/api/processes` measures and lists the machine's processes (PRD 014, §1) |
+| `PROCESSES_KILL_ENABLED` | `true`, `false` in production | Whether `/api/processes/end` may end one |
 
 ## Signing in and CSRF (PRD 003, §2)
 
@@ -377,6 +379,40 @@ a scan runs. A running scan nobody asks about for 2 minutes is stopped, and a
 finished one is forgotten after 30 (`404 NOT_FOUND`, and the frontend scans again).
 At most 16 scans are kept. Over every drive the root `''` is not a folder: start on
 a drive. Bridge commands: `du-start`, `du-status` (`scanId`), `du-cancel`;
+`RemoteBackend` maps them.
+
+## `/api/processes` — Task Manager (PRD 014, §1)
+
+The machine's processes, measured every 2 seconds from the moment the backend
+starts (`modules/processes`, `ProcessesService`), whether anyone asks or not;
+the last 10 minutes (300 samples) are kept — the machine's CPU, memory and disk,
+and each running process's, dropped when it ends. **Off in production unless
+`PROCESSES_ENABLED=true`**, and ending one unless `PROCESSES_KILL_ENABLED=true`:
+what runs on a server, as whom and with which command line is not every
+signed-in user's business. The desktop turns both on.
+
+A source reads counters that only grow, and a rate is the difference from the
+sample before: CPU is a share of the *whole* machine (all cores), disk is bytes
+read and written per second. Linux reads `/proc` (memory is `RssAnon`; another
+account's disk is `null` — `/proc/<pid>/io` is its owner's); Windows runs one
+hidden PowerShell for the backend's life, which compiles a small C# helper once
+(`NtQuerySystemInformation`: private working set, IO counters, suspended threads,
+no process opened) and answers a JSON line per sample; elsewhere `ps`. *Apps* are a
+Windows process with a visible window, or on Linux what the backend's account
+launched from its desktop (systemd's `app-*.scope`) — else the session leaders
+of that account; root's, the kernel's and `%windir%`'s are the system's.
+
+A process is named by `key`, `<pid>:<start ms>`, so a pid handed out again is
+another process. In Docker the backend sees only its container's processes
+unless the service runs with `pid: host`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/processes` | The latest sample: `processes`, `totals`, `sequence`, `available` / `reason`, `canEnd` / `endReason` |
+| GET | `/api/processes/history?keys=a,b` | The last 10 minutes of the machine, and of the processes named |
+| POST | `/api/processes/end` | `{ key, tree? }` — `SIGTERM`, then `SIGKILL` 5 s later if still there (Windows: ended at once); with `tree`, all it started, youngest first. `404` once it has ended, `403` where not allowed or denied, `409` for tr-file itself |
+
+Bridge commands: `proc-list`, `proc-history` (`keys`), `proc-end` (`key`, `tree`);
 `RemoteBackend` maps them.
 
 ## `/api/ops` — file operations (PRD 005, §1)

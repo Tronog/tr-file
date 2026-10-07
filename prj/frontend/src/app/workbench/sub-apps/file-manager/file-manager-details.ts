@@ -1,6 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { UiActionList, UiPane, UiPermissionGrid, UiPreviewCard, UiPropertyList, UiSidebar, UiSourceControl } from '@tr-file/ui';
+import { UiActionList, UiPane, UiPreviewCard, UiPropertyList, UiSidebar } from '@tr-file/ui';
+import { UiPermissionGrid, UiSourceControl } from '@tr-file/file-ui';
 import { WorkbenchService } from '../../workbench.service';
 
 /**

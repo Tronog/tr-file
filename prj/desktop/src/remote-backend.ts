@@ -350,6 +350,13 @@ export class RemoteBackend {
         });
       case 'du-cancel':
         return this.json('POST', `/disk-usage/scans/${encodeURIComponent(request.scanId)}/cancel`, { body: {} });
+      // Task Manager (PRD 014, §1): the server machine's processes, measured there.
+      case 'proc-list':
+        return this.json('GET', '/processes');
+      case 'proc-history':
+        return this.json('GET', '/processes/history', { query: { keys: request.keys.join(',') } });
+      case 'proc-end':
+        return this.json('POST', '/processes/end', { body: { key: request.key, ...(request.tree === true ? { tree: true } : {}) } });
     }
   }
 

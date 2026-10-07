@@ -1,18 +1,16 @@
 import { computed, signal } from '@angular/core';
 import type {
-  UiDiskUsageItem,
-  UiDiskUsageModel,
-  UiDiskUsageView,
   UiGridNode,
   UiIconAction,
   UiPanelGroupModel,
   UiTab,
 } from '@tr-file/ui';
+import type { UiDiskUsageItem, UiDiskUsageModel, UiDiskUsageView } from '@tr-file/file-ui';
 import type { FsDiskUsageNode, FsDiskUsageScan } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import { shownPath } from '../../file-system/fs-path';
 import type { WorkbenchService } from '../workbench.service';
-import { PanelLayoutFeature } from './panel-layout.feature';
+import { UiPanelLayout } from '@tr-file/ui';
 
 /** How often a running scan is asked how far it has got (PRD 013, §1). */
 export const DISK_USAGE_POLL_MS = 3000;
@@ -64,7 +62,7 @@ export class DiskUsageFeature {
   constructor(private readonly parent: WorkbenchService) {}
 
   /** The panels' layout, apart from the file manager's. */
-  readonly layout = new PanelLayoutFeature({ kind: 'leaf', groupId: FIRST_GROUP, size: 1 } satisfies UiGridNode);
+  readonly layout = new UiPanelLayout({ kind: 'leaf', groupId: FIRST_GROUP, size: 1 } satisfies UiGridNode);
 
   private readonly groups = signal<Readonly<Record<string, DiskUsageGroup>>>({
     [FIRST_GROUP]: { id: FIRST_GROUP, tabs: [], activeTabId: null },

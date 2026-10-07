@@ -6,6 +6,8 @@ import type { FsDetails, FsDownload, FsOperationJob, FsUpload } from '../../file
 import { FsError } from '../../file-system/fs-error';
 import { fsDetails, fsDirectory, fsEntry, fsEnvelope, fsListing, listUrl, settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
+import { provideTrFile } from '../../app.providers';
+import { provideTrFileWorkbench } from '../workbench.providers';
 
 /**
  * PRD 003, §6 — files shared with the system: its clipboard, drops from it,
@@ -160,7 +162,7 @@ describe('Files shared with the system', () => {
     it('hands a drag to the system on the desktop only', () => {
       expect(workbench.fileBrowserFt.nativeDrag()).toBe(false);
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+      TestBed.configureTestingModule({ providers: [provideTrFile(), provideTrFileWorkbench(), provideHttpClient(), provideHttpClientTesting()] });
       workbench = TestBed.inject(WorkbenchService);
       const desktop = onTheDesktop();
 

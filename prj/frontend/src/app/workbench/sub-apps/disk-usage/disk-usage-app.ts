@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
-import { UiDiskUsage, UiPanelGrid, UiPanelGroup } from '@tr-file/ui';
+import { UiPanelGrid, UiPanelGroup } from '@tr-file/ui';
+import { UiDiskUsage } from '@tr-file/file-ui';
 import { WorkbenchService } from '../../workbench.service';
 
 /**

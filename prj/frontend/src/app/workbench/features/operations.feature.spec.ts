@@ -252,7 +252,7 @@ describe('OperationsFeature', () => {
 
       await ops().trash(['docs/a.txt']);
 
-      expect(workbench.bottomPanelFt.progressVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('progress')).toBe(true);
       expect(workbench.bottomPanelFt.collapsed()).toBe(false);
       expect(ops().rows()[0]).toMatchObject({ statusLabel: 'failed', detail: 'Permission denied' });
     });

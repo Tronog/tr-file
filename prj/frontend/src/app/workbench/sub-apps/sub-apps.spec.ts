@@ -29,7 +29,7 @@ describe('Sub-applications in the window', () => {
   it('draws the file manager in the sidebars and the centre, and swaps the centre for another', async () => {
     const { workbench, host, render } = await setUp();
     const center = host.querySelector('ui-workbench .center') as HTMLElement;
-    expect(center.querySelector('app-file-manager-center ui-panel-grid')).not.toBeNull();
+    expect(center.querySelector('.editor-area ui-panel-grid')).not.toBeNull();
     expect(host.querySelector('ui-workbench .sidebar app-file-manager-explorer ui-sidebar')).not.toBeNull();
     expect(host.querySelector('ui-workbench .sidebar app-file-manager-details ui-sidebar')).not.toBeNull();
     expect(center.querySelector('app-disk-usage-app')).toBeNull();
@@ -43,7 +43,7 @@ describe('Sub-applications in the window', () => {
     expect(diskUsage.querySelector('ui-panel-grid ui-panel-group ui-disk-usage')).not.toBeNull();
     expect(diskUsage.querySelector('ui-tab-bar, [role="tablist"]')?.textContent).toContain('docs');
     // The file manager is kept, out of sight; its sidebars go with it.
-    expect(center.querySelector('app-file-manager-center')?.classList.contains('is-inactive')).toBe(true);
+    expect(center.querySelector('.editor-area')?.classList.contains('is-inactive')).toBe(true);
     expect(hiddenSidebars(host)).toEqual([true, true]);
     // The shared bars stay.
     expect(host.querySelector('ui-title-bar')).not.toBeNull();
@@ -52,7 +52,7 @@ describe('Sub-applications in the window', () => {
 
     workbench.chromeFt.selectActivity('file-manager');
     await render();
-    expect(center.querySelector('app-file-manager-center')?.classList.contains('is-inactive')).toBe(false);
+    expect(center.querySelector('.editor-area')?.classList.contains('is-inactive')).toBe(false);
     expect(diskUsage.isConnected && diskUsage.classList.contains('is-inactive')).toBe(true);
     expect(hiddenSidebars(host)).toEqual([false, false]);
   });

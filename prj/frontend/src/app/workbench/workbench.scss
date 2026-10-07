@@ -2,18 +2,6 @@
   display: contents;
 }
 
-/* The workbench chrome has nowhere to show a page heading, but the document
-   still needs one — it exists for assistive tech only, inside the banner. */
-.app-heading {
-  position: absolute;
-  overflow: hidden;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 /* The upload picker is driven from code; it must never be seen or focused. */
 .file-picker {
   position: absolute;
@@ -21,4 +9,39 @@
   height: 1px;
   opacity: 0;
   pointer-events: none;
+}
+
+/* The bottom panel's tabs (PRD 001, §12): a line where a list would be, and Problems' failed listings. */
+.panel-note {
+  margin: 0;
+  padding: 6px 2px;
+  color: var(--vsc-fg-muted);
+  font-size: var(--vsc-font-size-sm);
+}
+
+/* Failed listings, as shown by the panel's Problems tab. */
+.problem-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.problem {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 3px 2px;
+  font-size: var(--vsc-font-size-sm);
+}
+
+.problem-path {
+  flex: none;
+  min-width: 140px;
+  color: var(--vsc-fg);
+  font-family: var(--vsc-font-mono);
+  font-size: var(--vsc-font-size-xs);
+}
+
+.problem-message {
+  color: var(--vsc-git-conflict);
 }

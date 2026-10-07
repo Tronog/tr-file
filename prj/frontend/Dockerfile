@@ -25,6 +25,8 @@ COPY backend/package.json ./backend/
 # resolve, even the ones this image never builds.
 COPY desktop/package.json ./desktop/
 COPY libs/ui/package.json ./libs/ui/
+COPY libs/file-ui/package.json ./libs/file-ui/
+COPY demo/package.json ./demo/
 
 # lmdb / msgpackr-extract have no musl prebuild and there is no compiler in the
 # image; pnpm demotes those optional install scripts to warnings. Expected.
@@ -36,7 +38,7 @@ RUN pnpm install --frozen-lockfile --filter "frontend..."
 # ---------------------------------------------------------------------------
 FROM deps AS development
 WORKDIR /app
-COPY tsconfig.base.json ./
+COPY tsconfig.base.json tsconfig.angular.json ./
 COPY libs ./libs
 COPY frontend ./frontend
 WORKDIR /app/frontend
@@ -48,8 +50,8 @@ CMD ["pnpm", "exec", "ng", "serve", "--host", "0.0.0.0", "--port", "4200", "--pr
 # ---------------------------------------------------------------------------
 FROM deps AS build
 WORKDIR /app
-COPY tsconfig.base.json ./
-# @tr-file/ui ships TypeScript source and is compiled by this build.
+COPY tsconfig.base.json tsconfig.angular.json ./
+# The libraries (@tr-file/ui, …) are compiled from source by this build.
 COPY libs ./libs
 COPY frontend ./frontend
 RUN pnpm --filter frontend build

@@ -21,7 +21,7 @@ describe('the title bar', () => {
 
     expect(rows.filter((id) => !commands.has(id) && !handledByMenu.has(id))).toEqual([]);
     expect(
-      workbench.mockWorkbench.titleBarActions.map((button) => button.id).filter((id) => {
+      (workbench.config.titleBarActions ?? []).map((button) => button.id).filter((id) => {
         const run = vi.spyOn(workbench.commandsFt, 'run').mockImplementation(() => undefined);
         workbench.chromeFt.runTitleBarAction(id);
         const ran = run.mock.calls[0]?.[0];

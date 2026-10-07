@@ -14,24 +14,6 @@ export type UiDropZone = 'left' | 'right' | 'top' | 'bottom' | 'center';
 export const UI_TAB_MIME = 'application/x-tr-file-tab';
 
 /**
- * MIME type carrying dragged entries of a `UiFileBrowser` — within a panel or
- * to another (PRD 005, §2). The payload is `{ "sources": string[] }`.
- */
-export const UI_ENTRY_MIME = 'application/x-tr-file-entries';
-
-/**
- * Entries dropped on a `UiFileBrowser` (PRD 005, §2): onto a folder in it
- * (`target`), or onto the listing's blank space (`target: null`, the folder
- * it lists). `copy` when `Ctrl` (or `Alt`) was held — a move otherwise, as in
- * VS Code's explorer. What happens is the application's business.
- */
-export interface UiEntryDrop {
-  readonly sources: readonly string[];
-  readonly target: string | null;
-  readonly copy: boolean;
-}
-
-/**
  * Files from outside the page dropped on a `UiFileBrowser` or a
  * `UiPanelGroup` (PRD 003, §6) — from the system's file manager, or, on the
  * desktop, entries of this app dragged as files. `entries` are the dropped
@@ -119,57 +101,6 @@ export interface UiTabMove {
   readonly tabId: string;
   /** `-1` towards the start of the bar, `1` towards the end. */
   readonly direction: -1 | 1;
-}
-
-/**
- * A key pressed inside a panel body whose meaning belongs to the application.
- *
- * Moving focus stays with the component: it is DOM work, and a roving
- * tabindex can only be rolled where the elements are. Everything that changes
- * what the workbench *shows* leaves as one of these instead, so a panel's key
- * bindings are decided in one place rather than spread across a template.
- */
-export type UiPanelCommand =
-  | 'open'
-  | 'open-aside'
-  | 'select'
-  | 'up'
-  | 'refresh'
-  | 'back'
-  | 'forward'
-  | 'delete'
-  | 'delete-permanently'
-  | 'new-folder'
-  | 'undo'
-  | 'copy'
-  | 'cut'
-  | 'paste'
-  | 'copy-path'
-  | 'select-pattern'
-  | 'unselect-pattern'
-  | 'previous-image'
-  | 'next-image'
-  | 'stop-loading';
-
-/**
- * One `UiPanelCommand`, with the entry focus sat on when the key was hit.
- *
- * `back` and `forward` carry an entry like the rest, but never use one: they
- * are about where the *panel* has been, not what is selected in it.
- * `open-aside` (`Ctrl`+`Enter`, `Ctrl`+double click) opens its entry in the
- * other panel (PRD 002, §2.5).
- * `copy-path` is `Ctrl`+`Shift`+`C` (PRD 004, §1.3.2): its entry, or — with
- * none — whatever the panel shows.
- * `select-pattern` / `unselect-pattern` are `+` / `-` (PRD 004, §2): the
- * application asks for the pattern.
- *
- * The function keys are not panel keys: `F1`–`F10` mean the same wherever
- * focus is (PRD 004, §2), so the application binds them for the whole window.
- */
-export interface UiPanelKey {
-  readonly command: UiPanelCommand;
-  /** `null` when the body lists nothing — `up` and `refresh` still apply. */
-  readonly entryId: string | null;
 }
 
 /**

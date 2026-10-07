@@ -56,6 +56,19 @@ export class AppConfig {
    * computer, and their own repositories.
    */
   readonly gitEnabled: boolean;
+  /**
+   * Whether `/api/processes` measures and lists the machine's processes
+   * (PRD 014, §1): what runs there, as whom, with which command line. A
+   * production server offers it only when `PROCESSES_ENABLED=true`; on
+   * elsewhere, and the desktop shell turns it on.
+   */
+  readonly processesEnabled: boolean;
+  /**
+   * Whether a process may be ended from it — Task Manager's *End task*. Off
+   * on a production server unless `PROCESSES_KILL_ENABLED=true`; the desktop
+   * turns it on.
+   */
+  readonly processesKillEnabled: boolean;
 
   private constructor(env: NodeJS.ProcessEnv, platform: NodeJS.Platform) {
     this.nodeEnv = AppConfig.readEnum<NodeEnv>(
@@ -78,6 +91,12 @@ export class AppConfig {
     this.auth = AppConfig.readAuth(env, this.nodeEnv);
     this.sessionIdleMs = AppConfig.readHours(env['AUTH_SESSION_IDLE_HOURS'], 12) * 60 * 60 * 1000;
     this.gitEnabled = AppConfig.readFlag(env['GIT_ENABLED'], 'GIT_ENABLED', this.nodeEnv !== 'production');
+    this.processesEnabled = AppConfig.readFlag(env['PROCESSES_ENABLED'], 'PROCESSES_ENABLED', this.nodeEnv !== 'production');
+    this.processesKillEnabled = AppConfig.readFlag(
+      env['PROCESSES_KILL_ENABLED'],
+      'PROCESSES_KILL_ENABLED',
+      this.nodeEnv !== 'production',
+    );
   }
 
   static fromEnv(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): AppConfig {

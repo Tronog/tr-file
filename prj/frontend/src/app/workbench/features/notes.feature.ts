@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
-import { SettingsService, type SettingsStore } from '../../settings/settings.service';
+import type { UiSettingsStore } from '@tr-file/ui';
+import { SettingsService } from '../../settings/settings.service';
 
 /** The settings key of the notes; the suffix is its format's version. */
 export const NOTES_KEY = 'tr-file.notes.v1';
@@ -35,7 +36,7 @@ export class NotesFeature {
   /** Why the text is not being kept, or `null`. */
   readonly error = this.problem.asReadonly();
 
-  constructor(private readonly store: SettingsStore = new SettingsService()) {
+  constructor(private readonly store: UiSettingsStore = new SettingsService()) {
     const stored = store.get<unknown>(NOTES_KEY);
     this.current.set(typeof stored === 'string' ? stored : '');
   }

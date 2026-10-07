@@ -30,22 +30,6 @@ export interface UiPropertyActivation {
   readonly shift: boolean;
 }
 
-/** read/write/execute for one principal. */
-export interface UiPermissionTriplet {
-  readonly read: boolean;
-  readonly write: boolean;
-  readonly execute: boolean;
-}
-
-/** The full POSIX permission matrix plus its octal rendering. */
-export interface UiPermissions {
-  readonly owner: UiPermissionTriplet;
-  readonly group: UiPermissionTriplet;
-  readonly others: UiPermissionTriplet;
-  /** e.g. `'0644'`. */
-  readonly mode: string;
-}
-
 /** A coloured tag chip. */
 export interface UiChip {
   readonly id: string;

@@ -1,4 +1,4 @@
-import { Service, signal } from '@angular/core';
+import { InjectionToken, Service, inject, signal } from '@angular/core';
 
 /**
  * Where a key binding applies (PRD 010, §2) — VS Code's `when`, reduced to
@@ -126,52 +126,23 @@ export function isChord(chord: string): boolean {
 }
 
 /**
- * The library's own keys, as they are until the application says otherwise.
+ * The library's own keys, as they are until the application says otherwise:
+ * a panel group's (`UiPanelGroup` — split, new tab, maximize, close, the next
+ * and previous tab) and the image viewer's (`UiImageView` — zoom and fit).
  *
- * Where a key does what a command of the application's table does, it is
- * bound to that command's id — `file.open`, `edit.copy` — so one binding
- * governs the key in the list and the key the menu shows beside the command.
- * The rest are the library's own gestures: `list.select`, `list.mark`, …
+ * A library built on this one adds its components' keys with
+ * `UI_KEYBINDING_DEFAULTS` — `@tr-file/file-ui` its listings' — and the
+ * application its own window keys on top, in its key table.
  */
 export const UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
-  // On a row or a tile.
-  { command: 'file.open', key: 'Enter', when: 'list' },
-  { command: 'list.select', key: 'Space', when: 'list' },
-  { command: 'go.up', key: 'Backspace', when: 'list' },
-  { command: 'file.trash', key: 'Delete', when: 'list' },
-  { command: 'file.delete', key: 'Shift+Delete', when: 'list' },
-  { command: 'selection.all', key: 'Ctrl+A', when: 'list' },
-  { command: 'list.toggleSelection', key: 'Ctrl+Space', when: 'list' },
-  // Midnight Commander's (PRD 004, §2).
-  { command: 'list.mark', key: 'Insert', when: 'list' },
-  { command: 'list.toggleAll', key: '*', when: 'list' },
-  { command: 'selection.byPattern', key: 'Plus', when: 'list' },
-  { command: 'selection.unselectByPattern', key: '-', when: 'list' },
-  // Anywhere in a panel.
-  { command: 'go.back', key: 'Alt+Left', when: 'panel' },
-  { command: 'go.forward', key: 'Alt+Right', when: 'panel' },
-  { command: 'go.up', key: 'Alt+Up', when: 'panel' },
-  { command: 'file.openToSide', key: 'Ctrl+Enter', when: 'panel' },
-  { command: 'edit.copy', key: 'Ctrl+C', when: 'panel' },
-  { command: 'edit.cut', key: 'Ctrl+X', when: 'panel' },
-  { command: 'edit.paste', key: 'Ctrl+V', when: 'panel' },
-  { command: 'edit.undo', key: 'Ctrl+Z', when: 'panel' },
-  { command: 'edit.filter', key: 'Ctrl+F', when: 'panel' },
-  { command: 'go.location', key: 'Ctrl+L', when: 'panel' },
-  { command: 'file.newFolder', key: 'Ctrl+Shift+N', when: 'panel' },
-  { command: 'view.refresh', key: 'Ctrl+R', when: 'panel' },
-  { command: 'view.stopLoading', key: 'Escape', when: 'panel' },
-  { command: 'file.copyPath', key: 'Ctrl+Shift+C', when: 'panel' },
-  { command: 'panel.contextMenu', key: 'Shift+F10', when: 'panel' },
-  { command: 'panel.contextMenu', key: 'ContextMenu', when: 'panel' },
+  // Anywhere in a panel (PRD 002, §2.2, §2.8).
   { command: 'view.splitRight', key: '/', when: 'panel' },
   { command: 'tab.new', key: 'Ctrl+T', when: 'panel' },
   { command: 'view.toggleMaximize', key: 'Ctrl+Up', when: 'panel' },
   { command: 'tab.close', key: 'Ctrl+W', when: 'panel' },
   { command: 'tab.previous', key: 'Ctrl+PageUp', when: 'panel' },
   { command: 'tab.next', key: 'Ctrl+PageDown', when: 'panel' },
-  { command: 'image.previous', key: 'PageUp', when: 'panel' },
-  { command: 'image.next', key: 'PageDown', when: 'panel' },
+  // In the image viewer (PRD 012, §1.2).
   { command: 'image.zoomIn', key: 'Plus', when: 'image' },
   { command: 'image.zoomOut', key: '-', when: 'image' },
   { command: 'image.actualSize', key: '1', when: 'image' },
@@ -179,18 +150,29 @@ export const UI_DEFAULT_KEYBINDINGS: readonly UiKeybinding[] = [
 ];
 
 /**
+ * Default keys of components built on this library, each provider one table
+ * (`multi: true`). They come before the library's own in `UiKeymap`'s
+ * defaults, so a component's binding of a key wins over a generic one.
+ */
+export const UI_KEYBINDING_DEFAULTS = new InjectionToken<readonly (readonly UiKeybinding[])[]>('UI_KEYBINDING_DEFAULTS');
+
+/**
  * The key bindings in force (PRD 010, §2): what every component of the
  * library asks before it acts on a key, instead of testing the key itself.
  *
- * It starts with `UI_DEFAULT_KEYBINDINGS`, so the library works as it is; the
- * application hands it the whole table — its own bindings and the user's
+ * It starts with its `defaults` — every table provided as
+ * `UI_KEYBINDING_DEFAULTS`, then `UI_DEFAULT_KEYBINDINGS` — so the components
+ * work as they are; the application hands it the whole table — its own bindings and the user's
  * changes included — with `set`. Navigation — the arrows, `Home` / `End`, the
  * page keys, type-to-find, `Escape` — is not bound here: it is what a list or
  * a menu *is*, not a command.
  */
 @Service()
 export class UiKeymap {
-  private readonly current = signal<readonly UiKeybinding[]>(UI_DEFAULT_KEYBINDINGS);
+  /** Every key of the components, before the application's table and the user's changes. */
+  readonly defaults: readonly UiKeybinding[] = [...(inject(UI_KEYBINDING_DEFAULTS, { optional: true }) ?? []).flat(), ...UI_DEFAULT_KEYBINDINGS];
+
+  private readonly current = signal<readonly UiKeybinding[]>(this.defaults);
 
   readonly bindings = this.current.asReadonly();
 

@@ -1,57 +1,27 @@
-import type { UiMenuItem, UiPanelView } from '@tr-file/ui';
+import { PROCESS_COLUMNS } from '../task-manager/process-rows';
+import { UiCommandsFeature, type UiCommand, type UiCommandSpec, type UiCommandTarget } from '@tr-file/ui';
+import type { UiPanelView } from '@tr-file/file-ui';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
 import type { PanelSortKey } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
 import { BOOKMARK_KEYS, openBookmarkCommand } from './places.feature';
-import { DEFAULT_PANE_ORDER, PANE_LABELS } from './sidebar-panes.feature';
 
 /**
  * What a command acts on. From a menu or the palette it is the active panel —
  * its selection, and the folder it lists; from a context menu, what was
  * right-clicked.
  */
-export interface CommandTarget {
-  /** The panel it concerns — for a tree row or a menu, the active one. */
-  readonly groupId: string;
+export interface CommandTarget extends UiCommandTarget {
   /** The entries it acts on; may be none. */
   readonly paths: readonly string[];
   /** Where new entries and pastes go; `null` where there is no folder, as on a file tab. */
   readonly folder: string | null;
-  /** A tab, for the commands about tabs. */
-  readonly tabId?: string;
 }
 
 /** One command of the workbench (PRD 003, §4–5). */
-export interface WorkbenchCommand {
-  readonly id: string;
-  /** Before the label in the palette, as in VS Code: `File: Rename…`. */
-  readonly category: string;
-  readonly label: (target: CommandTarget) => string;
-  /** Whether the palette lists it; context-only commands (tabs, *Open*) do not. */
-  readonly palette: boolean;
-  readonly enabled: (target: CommandTarget) => boolean;
-  /** For a choice among several — a view, a sort — whether it is the one in effect. */
-  readonly checked?: (target: CommandTarget) => boolean;
-  readonly run: (target: CommandTarget) => void | Promise<void>;
-}
+export type WorkbenchCommand = UiCommand<CommandTarget>;
 
-type CommandSpec = Omit<WorkbenchCommand, 'label' | 'palette' | 'enabled'> & {
-  readonly label: string | ((target: CommandTarget) => string);
-  readonly palette?: boolean;
-  readonly enabled?: (target: CommandTarget) => boolean;
-};
-
-const always = (): boolean => true;
-
-/**
- * Keys a menu shows that are not the keymap's: the desktop's zoom, answered by
- * the main process's accelerators before the page (PRD 001, §8.2.3).
- */
-const FIXED_KEYS: Readonly<Record<string, string>> = {
-  'view.zoomIn': 'Ctrl+=',
-  'view.zoomOut': 'Ctrl+-',
-  'view.resetZoom': 'Ctrl+0',
-};
+type CommandSpec = UiCommandSpec<CommandTarget>;
 
 /**
  * The commands that act on files and then leave the keyboard where it was
@@ -104,26 +74,13 @@ const VIEWS: readonly { readonly view: UiPanelView; readonly label: string }[] =
  * A command is a label, a key to show beside it, when it applies, and what it
  * does, each a function of a `CommandTarget`. The behaviour itself stays in
  * the feature that owns it; this table only says which feature, and for what.
+ * The library's `UiCommandsFeature` keeps the table; its own commands — the
+ * panels, the sidebars, the windows — are placed among the file manager's
+ * (`builtin`).
  */
-export class CommandsFeature {
-  private readonly table: ReadonlyMap<string, WorkbenchCommand>;
-
-  constructor(private readonly parent: WorkbenchService) {
-    this.table = new Map(this.define().map((spec) => [spec.id, CommandsFeature.complete(spec)]));
-  }
-
-  /** Every command the palette lists, in table order. */
-  paletteCommands(): readonly WorkbenchCommand[] {
-    return [...this.table.values()].filter((command) => command.palette);
-  }
-
-  /** Every command of the table, the palette's and the context menus' alike. */
-  allCommands(): readonly WorkbenchCommand[] {
-    return [...this.table.values()];
-  }
-
-  command(id: string): WorkbenchCommand | undefined {
-    return this.table.get(id);
+export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
+  constructor(protected override readonly parent: WorkbenchService) {
+    super(parent);
   }
 
   /**
@@ -133,7 +90,7 @@ export class CommandsFeature {
    * disabled in the menus, the palette and the function-key strip, and their
    * keys do nothing.
    */
-  activeTarget(): CommandTarget {
+  override activeTarget(): CommandTarget {
     const groupId = this.parent.activeGroupId();
     if (!this.parent.subAppsFt.fileManager()) {
       return { groupId, paths: [], folder: null };
@@ -164,7 +121,7 @@ export class CommandsFeature {
   }
 
   /** A tab: what it shows, and the folder it lists if it lists one. */
-  tabTarget(groupId: string, tabId: string): CommandTarget {
+  override tabTarget(groupId: string, tabId: string): CommandTarget {
     const tab = this.parent.editorGroupsFt.stateOf(groupId)?.tabs.find((candidate) => candidate.id === tabId);
     return {
       groupId,
@@ -174,49 +131,20 @@ export class CommandsFeature {
     };
   }
 
-  isEnabled(id: string, target = this.activeTarget()): boolean {
-    return this.table.get(id)?.enabled(target) ?? false;
-  }
-
   /**
-   * Runs a command, if it applies to `target`; what it does is the owning
-   * feature's. A file action — asked for from a menu, the palette or a key —
-   * hands the keyboard back to the panel it acted on once its dialogs are
-   * done (PRD 001, Fix 5); a job it starts does the same again when it ends.
+   * A file action — asked for from a menu, the palette or a key — hands the
+   * keyboard back to the panel it acted on once its dialogs are done
+   * (PRD 001, Fix 5); a job it starts does the same again when it ends.
    */
-  run(id: string, target = this.activeTarget()): void {
-    const command = this.table.get(id);
-    if (command === undefined || !command.enabled(target)) {
-      return;
-    }
-    const running = Promise.resolve(command.run(target));
+  protected override ran(id: string, target: CommandTarget, running: Promise<void>): void {
     if (FILE_ACTIONS.has(id)) {
       void running.catch(() => undefined).then(() => this.parent.panelFocusFt.returnFocus(target.groupId));
     }
   }
 
-  /** The menu row for a command: its label and key, disabled or checked as it stands for `target`. */
-  menuItem(id: string, target = this.activeTarget(), separatorBefore = false): UiMenuItem {
-    const command = this.table.get(id);
-    if (command === undefined) {
-      return { id, label: id, disabled: true };
-    }
-    const checked = command.checked?.(target);
-    // The key shown is the one in force (PRD 010, §2), whatever the user bound.
-    const keybinding = this.parent.keybindingsFt.label(id) ?? FIXED_KEYS[id];
-    return {
-      id,
-      label: command.label(target),
-      ...(keybinding === undefined ? {} : { keybinding }),
-      ...(command.enabled(target) ? {} : { disabled: true }),
-      ...(checked === undefined ? {} : { checked }),
-      ...(separatorBefore ? { separatorBefore: true } : {}),
-    };
-  }
-
   /* -- the table ---------------------------------------------------------- */
 
-  private define(): readonly CommandSpec[] {
+  protected override define(): readonly CommandSpec[] {
     const p = this.parent;
     const one = (target: CommandTarget): boolean => target.paths.length === 1;
     const some = (target: CommandTarget): boolean => target.paths.length > 0;
@@ -237,6 +165,9 @@ export class CommandsFeature {
       return target.paths.length === 0 && target.folder !== '' ? target.folder : null;
     };
     const listing = (target: CommandTarget): boolean => target.folder !== null && group(target) !== undefined;
+    /* Task Manager (PRD 014, §2): about the row selected in its list, whatever the target. */
+    const tm = p.taskManagerFt;
+    const taskManager = (): boolean => p.subAppsFt.isActive('task-manager');
     /* Git (PRD 011, §1): about the repository the Git pane shows, whatever the target. */
     const git = p.gitFt;
     const repo = (): boolean => git.repository() !== null && !git.busy();
@@ -508,73 +439,30 @@ export class CommandsFeature {
       { id: 'places.show', category: 'View', label: 'Show Bookmarks', run: () => p.chromeFt.showBookmarks() },
       /* The bottom panel's Notes (PRD 001, §12.2) */
       { id: 'view.notes', category: 'View', label: 'Show Notes', run: () => p.bottomPanelFt.showNotes() },
-      /* The sub-applications (PRD 001, §1.1), as the activity bar's first buttons. */
-      ...p.subAppsFt.apps.map(
-        (app): CommandSpec => ({
-          id: `view.app.${app.id}`,
-          category: 'View',
-          label: `Show ${app.label}`,
-          checked: () => p.subAppsFt.isActive(app.id),
-          run: () => p.chromeFt.selectActivity(app.id),
-        }),
-      ),
-      /* PRD 001, §12.3 */
-      { id: 'view.togglePanel', category: 'View', label: 'Toggle Panel', run: () => p.bottomPanelFt.toggleCollapsed() },
-      { id: 'view.toggleExplorer', category: 'View', label: 'Toggle Explorer', run: () => p.chromeFt.toggleSidebar('explorer') },
-      { id: 'view.toggleDetails', category: 'View', label: 'Toggle Details', run: () => p.chromeFt.toggleSidebar('details') },
-      { id: 'view.toggleSidebars', category: 'View', label: 'Toggle Explorer and Details', run: () => p.chromeFt.toggleSidebars() },
-      /* The sidebars' `…` menus (PRD 001, §9.2): one row per pane, checked while it is shown. */
-      ...[...DEFAULT_PANE_ORDER.explorer, ...DEFAULT_PANE_ORDER.details].map(
-        (paneId): CommandSpec => ({
-          id: `view.pane.${paneId}`,
-          category: 'View',
-          label: () => (paneId === 'explorer-tree' ? p.explorerFt.title : (PANE_LABELS[paneId] ?? paneId)),
-          palette: false,
-          checked: () => p.sidebarPanesFt.isShown(paneId),
-          // The last pane shown stays: the row that would hide it is off.
-          enabled: () => !p.sidebarPanesFt.isShown(paneId) || p.sidebarPanesFt.canHide(paneId),
-          run: () => p.sidebarPanesFt.toggleShown(paneId),
-        }),
-      ),
-
-      /* Session (PRD 003, §6) */
-      {
-        id: 'settings.restoreSession',
-        category: 'Preferences',
-        label: 'Restore Layout on Start',
-        // Through the settings (PRD 010, §1), so the window shows the switch as it stands.
-        checked: () => p.preferencesFt.value('window.restoreLayout'),
-        run: () => p.preferencesFt.set('window.restoreLayout', !p.preferencesFt.value('window.restoreLayout')),
-      },
-      // The title bar's sun / moon (PRD 001, §8.2.2).
-      {
-        id: 'view.toggleTheme',
-        category: 'Preferences',
-        label: () => (p.preferencesFt.effectiveTheme() === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'),
-        run: () => p.preferencesFt.toggleTheme(),
-      },
-      { id: 'view.resetLayout', category: 'View', label: 'Reset Layout', run: () => void p.sessionFt.confirmResetLayout() },
+      /* The sub-applications (PRD 001, §1.1), the bottom panel (§12.3) and the sidebars (§9.2.1). */
+      ...this.builtinsOf('view.app.'),
+      this.builtin('view.togglePanel'),
+      this.builtin('view.toggleExplorer'),
+      this.builtin('view.toggleDetails'),
+      this.builtin('view.toggleSidebars'),
+      /* The sidebars' `…` menus (PRD 001, §9.2); the folder tree's header is the root's name. */
+      ...this.builtinsOf('view.pane.').map((spec) => (spec.id === 'view.pane.explorer-tree' ? { ...spec, label: () => p.explorerFt.title } : spec)),
+      /* Session (PRD 003, §6), and the title bar's sun / moon (PRD 001, §8.2.2) */
+      this.builtin('settings.restoreSession'),
+      this.builtin('view.toggleTheme'),
+      this.builtin('view.resetLayout'),
       // The window's zoom (PRD 001, §8.2.3) — the desktop's; a browser zooms its own page.
       { id: 'view.zoomIn', category: 'View', label: 'Zoom In', enabled: () => p.windowControlsFt.canZoom(), run: () => p.windowControlsFt.zoomTo({ kind: 'in' }) },
       { id: 'view.zoomOut', category: 'View', label: 'Zoom Out', enabled: () => p.windowControlsFt.canZoom(), run: () => p.windowControlsFt.zoomTo({ kind: 'out' }) },
       { id: 'view.resetZoom', category: 'View', label: 'Reset Zoom', enabled: () => p.windowControlsFt.canZoom(), run: () => p.windowControlsFt.zoomTo({ kind: 'reset' }) },
 
-      /* The settings window (PRD 010) */
-      { id: 'workbench.openSettings', category: 'Preferences', label: 'Open Settings', run: () => p.settingsEditorFt.open('general') },
-      {
-        id: 'workbench.openKeybindings',
-        category: 'Preferences',
-        label: 'Open Keyboard Shortcuts',
-        run: () => p.settingsEditorFt.open('keyboard-shortcuts'),
-      },
-
-      /* Help (PRD 001, §16): `F1` */
-      { id: 'help.show', category: 'Help', label: 'Show Help', run: () => p.helpFt.open() },
-      { id: 'help.cheatsheet', category: 'Help', label: 'Keyboard Shortcuts Cheatsheet', run: () => p.helpFt.open('cheatsheet') },
-
-      /* The window, for the function keys (PRD 004, §2): `F9` */
-      { id: 'view.commandPalette', category: 'View', label: 'Show All Commands', palette: false, run: () => p.commandPaletteFt.show() },
-      { id: 'view.mainMenu', category: 'View', label: 'Open the Main Menu', palette: false, run: () => p.chromeFt.openMainMenu() },
+      /* The settings window (PRD 010), Help (PRD 001, §16: `F1`), and the window, for the function keys (PRD 004, §2: `F9`) */
+      this.builtin('workbench.openSettings'),
+      this.builtin('workbench.openKeybindings'),
+      this.builtin('help.show'),
+      this.builtin('help.cheatsheet'),
+      this.builtin('view.commandPalette'),
+      this.builtin('view.mainMenu'),
 
       /* Go */
       { id: 'go.back', category: 'Go', label: 'Back', enabled: (t) => p.panelHistoryFt.canGoBack(t.groupId), run: (t) => this.walk(t.groupId, () => p.panelHistoryFt.back(t.groupId)) },
@@ -624,37 +512,43 @@ export class CommandsFeature {
       { id: 'git.init', category: 'Git', label: 'Initialize Repository', enabled: () => git.canInit(), run: () => void git.init() },
       { id: 'git.refresh', category: 'Git', label: 'Refresh', enabled: () => git.available() && !git.busy(), run: () => void git.refresh() },
 
-      /* Tabs */
-      { id: 'tab.new', category: 'Tab', label: 'New Tab', run: (t) => p.editorGroupsFt.newTab(t.groupId) },
+      /* Task Manager (PRD 014, §2): the row selected in its list */
+      { id: 'process.endTask', category: 'Task Manager', label: 'End Task', enabled: () => tm.canEnd(), run: () => tm.endSelected(false) },
+      { id: 'process.endTree', category: 'Task Manager', label: 'End Process Tree', enabled: () => tm.canEnd(), run: () => tm.endSelected(true) },
       {
-        id: 'view.toggleMaximize',
-        category: 'View',
-        label: 'Toggle Maximized Panel',
-        checked: (t) => p.panelLayoutFt.isMaximized(t.groupId),
-        run: (t) => p.editorGroupsFt.runAction(t.groupId, 'maximize'),
-      },
-      /* … the rest from a tab's context menu only */
-      { id: 'tab.close', category: 'Tab', label: 'Close', palette: false, enabled: (t) => t.tabId !== undefined, run: (t) => p.editorGroupsFt.closeTab(t.groupId, t.tabId as string) },
-      {
-        id: 'tab.closeOthers',
-        category: 'Tab',
-        label: 'Close Others',
+        id: 'process.toggleExpand',
+        category: 'Task Manager',
+        label: () => (tm.selectedGroup() !== null && tm.isExpanded(tm.selectedGroup()?.id ?? '') ? 'Collapse' : 'Expand'),
         palette: false,
-        enabled: (t) => t.tabId !== undefined && (group(t)?.tabs.length ?? 0) > 1,
-        run: (t) => this.closeTabs(t, (index, at) => index !== at),
+        enabled: () => tm.selectedGroup() !== null,
+        run: () => tm.toggle(tm.selectedGroup()?.id ?? ''),
       },
+      { id: 'process.openLocation', category: 'Task Manager', label: 'Open File Location', enabled: () => tm.canOpenLocation(), run: () => tm.openLocation() },
+      { id: 'process.copyDetails', category: 'Task Manager', label: 'Copy Details', enabled: () => tm.hasSelection(), run: () => tm.copyDetails() },
       {
-        id: 'tab.closeRight',
-        category: 'Tab',
-        label: 'Close to the Right',
-        palette: false,
-        enabled: (t) => {
-          const tabs = group(t)?.tabs ?? [];
-          const at = tabs.findIndex((tab) => tab.id === t.tabId);
-          return at !== -1 && at < tabs.length - 1;
-        },
-        run: (t) => this.closeTabs(t, (index, at) => index > at),
+        id: 'process.togglePause',
+        category: 'Task Manager',
+        label: () => (tm.paused() ? 'Resume Updates' : 'Pause Updates'),
+        enabled: taskManager,
+        run: () => tm.togglePause(),
       },
+      { id: 'process.refresh', category: 'Task Manager', label: 'Update Now', enabled: taskManager, run: () => tm.refresh() },
+      // The header's menu: which columns are shown.
+      ...PROCESS_COLUMNS.filter((column) => column.id !== 'name').map((column) => ({
+        id: `process.column.${column.id}`,
+        category: 'Task Manager',
+        label: column.label,
+        palette: false,
+        checked: () => tm.isShown(column.id),
+        run: () => tm.toggleColumn(column.id),
+      })),
+
+      /* Tabs; all but the first two from a tab's context menu only */
+      this.builtin('tab.new'),
+      this.builtin('view.toggleMaximize'),
+      this.builtin('tab.close'),
+      this.builtin('tab.closeOthers'),
+      this.builtin('tab.closeRight'),
     ];
   }
 
@@ -679,15 +573,6 @@ export class CommandsFeature {
     }
   }
 
-  /** Closes the tabs of `target`'s group that `close` picks, by index against the target tab's. */
-  private closeTabs(target: CommandTarget, close: (index: number, at: number) => boolean): void {
-    const tabs = this.parent.editorGroupsFt.stateOf(target.groupId)?.tabs ?? [];
-    const at = tabs.findIndex((tab) => tab.id === target.tabId);
-    for (const tab of tabs.filter((_tab, index) => close(index, at))) {
-      this.parent.editorGroupsFt.closeTab(target.groupId, tab.id);
-    }
-  }
-
   /** A zip of one entry is named after it; of several, after the folder they are in. */
   private static zipName(paths: readonly string[]): string {
     const base = paths.length === 1 ? nameOf(paths[0] as string) : nameOf(CommandsFeature.parentOf(paths[0] as string)) || 'Archive';
@@ -696,15 +581,5 @@ export class CommandsFeature {
 
   private static parentOf(path: string): string {
     return path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-  }
-
-  private static complete(spec: CommandSpec): WorkbenchCommand {
-    const { label } = spec;
-    return {
-      ...spec,
-      label: typeof label === 'string' ? () => label : label,
-      palette: spec.palette ?? true,
-      enabled: spec.enabled ?? always,
-    };
   }
 }

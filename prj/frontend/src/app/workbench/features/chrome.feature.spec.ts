@@ -373,23 +373,23 @@ describe('ChromeFeature', () => {
     });
 
     it('problems and transfers switch the bottom panel tab', () => {
-      expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('notes')).toBe(true);
 
       workbench.chromeFt.runStatusAction('problems');
 
-      expect(workbench.bottomPanelFt.problemsVisible()).toBe(true);
-      expect(workbench.bottomPanelFt.transfersVisible()).toBe(false);
+      expect(workbench.bottomPanelFt.isVisible('problems')).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('transfers')).toBe(false);
 
       workbench.chromeFt.runStatusAction('transfers');
 
-      expect(workbench.bottomPanelFt.transfersVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('transfers')).toBe(true);
     });
 
     it('ignores an item that does nothing', () => {
       workbench.chromeFt.runStatusAction('sort');
 
       expect(workbench.showHidden()).toBe(false);
-      expect(workbench.bottomPanelFt.notesVisible()).toBe(true);
+      expect(workbench.bottomPanelFt.isVisible('notes')).toBe(true);
     });
   });
 
@@ -420,12 +420,13 @@ describe('ChromeFeature', () => {
   });
 
   it('passes the static chrome through from the seed data', () => {
-    expect(workbench.chromeFt.titleBarActions().map((action) => action.id)).toEqual(workbench.mockWorkbench.titleBarActions.map((action) => action.id));
+    expect(workbench.chromeFt.titleBarActions().map((action) => action.id)).toEqual((workbench.config.titleBarActions ?? []).map((action) => action.id));
     expect(workbench.chromeFt.commandLabel).toBe(workbench.mockWorkbench.commandLabel);
     expect(workbench.chromeFt.activityItems().map((item) => item.id)).toEqual([
       'file-manager',
       'search',
       'disk-usage',
+      'task-manager',
       'transfers',
       'bookmarks',
     ]);

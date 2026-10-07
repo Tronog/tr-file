@@ -1,5 +1,5 @@
 import { computed, signal, type Signal, type WritableSignal } from '@angular/core';
-import type { UiTransfer } from '@tr-file/ui';
+import type { UiTransfer } from '@tr-file/file-ui';
 import type {
   FsDownload,
   FsDownloadResult,

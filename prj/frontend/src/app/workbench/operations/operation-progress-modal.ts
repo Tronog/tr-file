@@ -1,6 +1,5 @@
 import { Component, effect, inject, input, type Signal } from '@angular/core';
-import { UiProgressDialog, type UiProgressDialogModel } from '@tr-file/ui';
-import { MODAL_REF, type ModalRef } from '../../modal/modal-ref';
+import { UiProgressDialog, type UiProgressDialogModel, UI_MODAL_REF, type UiModalRef } from '@tr-file/ui';
 
 /**
  * A file operation's progress in a modal window (PRD 005, §1), opened by
@@ -24,7 +23,7 @@ export class OperationProgressModal {
 
   readonly cancel = input.required<() => void>();
 
-  protected readonly ref = inject<ModalRef<null>>(MODAL_REF);
+  protected readonly ref = inject<UiModalRef<null>>(UI_MODAL_REF);
 
   constructor() {
     effect(() => {

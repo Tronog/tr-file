@@ -1,12 +1,12 @@
-import { MemorySettingsStore } from '../../settings/settings.service';
+import { UiMemorySettingsStore } from '@tr-file/ui';
 import { NOTES_KEY, NOTES_MAX_BYTES, NOTES_SAVE_DELAY_MS, NotesFeature } from './notes.feature';
 
 describe('NotesFeature', () => {
-  let store: MemorySettingsStore;
+  let store: UiMemorySettingsStore;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    store = new MemorySettingsStore();
+    store = new UiMemorySettingsStore();
   });
 
   afterEach(() => vi.useRealTimers());

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiQuickInput } from '@tr-file/ui';
+import { UiQuickInput, fuzzyMatch } from '@tr-file/ui';
 import type { UiQuickPickItem } from '@tr-file/ui';
 import {
   detailsUrl,
@@ -17,7 +17,6 @@ import {
 } from '../testing/fs-fixtures';
 import { SAVED_SERVERS_KEY, SavedServersFeature } from '../features/saved-servers.feature';
 import { WorkbenchService } from '../workbench.service';
-import { fuzzyMatch } from './fuzzy-match';
 import { describeRemoteTarget, parseRemoteTarget } from './remote-target';
 
 /** PRD 009, §1 — the command palette. */
@@ -274,6 +273,7 @@ describe('CommandPaletteFeature', () => {
       'View: Show File Manager',
       'View: Show Search',
       'View: Show Disk Usage',
+      'View: Show Task Manager',
       'View: Toggle Panel',
       'View: Toggle Explorer',
       'View: Toggle Details',

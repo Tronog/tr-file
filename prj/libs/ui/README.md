@@ -1,49 +1,76 @@
 # @tr-file/ui
 
-The workbench component library: a VS Code style shell built as small,
-presentational Angular components. It is the Section 6 port of the static
-mockup in `mockup/001/` (PRD 001, Section 1).
+A VS Code style workbench for Angular, as a library (PRD 001, §17.1): the
+title bar with its menus, the activity bar, two sidebars of movable,
+resizable, hideable panes, panels that split, group, move and maximize, a
+bottom panel, a status bar, a command palette, context menus, configurable
+keys, a settings window, a Help window with a cheatsheet, modal dialogs, dark
+and light themes — and the session that remembers the layout.
+
+It began as the port of the static mockup in `mockup/001/` (PRD 001,
+Section 1). tr-file's file manager is built on it, and so is `prj/demo`, a
+small notes app on this library alone. The file manager's own components —
+the file browser, its listings, disk usage, the git pane — are the separate
+`@tr-file/file-ui` (`libs/file-ui`).
 
 ## Principles
 
-- **Presentational only.** Every component takes signal inputs and emits
-  outputs. None of them injects a service, fetches anything, or keeps business
-  state. Application state lives in `frontend/src/app/workbench` (a thin
-  service plus feature classes, per `docs/ai/ANGULAR.md`).
-- **Interactions are reported, not applied.** A sash emits the pixels it
-  travelled; a tab bar emits where a tab was dropped; a group emits which edge
-  received it. None of them moves anything — the feature classes own the layout
-  tree and decide what a gesture means. The only state a component keeps to
-  itself is the transient kind a drag needs (which tab is dragging, where the
-  insertion bar sits, which drop zone is lit), which dies with the gesture.
+- **Nothing of an application's business.** No component or service here
+  talks to a backend, and none knows what the application is about. What
+  touches a backend — directly or through a feature or a service — is the
+  application's (PRD 001, §17.1). `scripts/check-library-boundaries.mjs`
+  keeps it so: no `@angular/common/http`, no `@tr-file/file-ui`, nothing of an
+  app.
+- **Components are presentational.** Every component takes signal inputs and
+  emits outputs; none fetches anything or keeps business state. **Interactions
+  are reported, not applied**: a sash emits the pixels it travelled, a tab bar
+  where a tab was dropped, a group which edge received it. The only state a
+  component keeps to itself is the transient kind a gesture needs (which tab is
+  dragging, where the insertion bar sits), which dies with the gesture.
+- **The workbench is a service and its features.** What a workbench *does* —
+  the layout tree, the groups and their tabs, the focus ring, the command
+  table, the keys, the session — lives in `UiWorkbenchService` and the feature
+  classes it owns (`docs/ai/ANGULAR.md`: a thin service holding shared state,
+  features holding the rest). `<ui-workbench-shell>` draws it. An application
+  configures it with data and extends it by subclassing (below). A handful of
+  root services stand beside it: `UiKeymap`, `UiModalService`,
+  `UiThemeService`, `UiImageViewService` (per viewer).
 - **Zoneless and signal-based.** `input()` / `input.required()` / `output()` /
   `model()` / `computed()`, native control flow, no `@Input`/`@Output`, no
   `@HostBinding`/`@HostListener`, no `NgModule`, no zone.js.
-- **Layout is data.** The editor area is a recursive `UiGridNode` tree rendered
-  by `UiPanelGrid`, not a fixed template, so moving, grouping and dividing
-  panels are transformations of that tree (`PanelLayoutFeature` in the app).
+- **Layout is data.** The panels are a recursive `UiGridNode` tree rendered
+  by `UiPanelGrid` and transformed by `UiPanelLayout`, so moving, grouping and
+  dividing panels are transformations of that tree.
 - **Accessible.** The app scores zero violations on an axe-core run across
   `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `best-practice`.
 
-## Consuming it
+## The package
 
-The library ships TypeScript source and is compiled by the app that uses it —
-no ng-packagr, one type-check across both. The frontend wires it up in three
-places:
+An Angular library built with ng-packagr (`pnpm --filter @tr-file/ui build`,
+or `pnpm build:libs` at the workspace root for both libraries) into `dist/`,
+in the Angular Package Format — what a consumer outside this workspace
+installs. Its styles ship beside it (`@use '@tr-file/ui/styles'`).
+
+Inside the workspace the apps compile the **sources** instead — one type-check
+across app and library, and an edit to the library is live in `ng serve`:
 
 | Where | What |
 | --- | --- |
-| `frontend/package.json` | `"@tr-file/ui": "workspace:*"` |
-| `frontend/tsconfig.json` | `paths` maps `@tr-file/ui` → `../libs/ui/src/public-api.ts` |
-| `frontend/angular.json` | `stylePreprocessorOptions.includePaths` → `../libs/ui/src/styles` |
+| `package.json` | `"@tr-file/ui": "workspace:*"` |
+| `tsconfig.json` | `paths` maps `@tr-file/ui` → `../libs/ui/src/public-api.ts` |
+| `angular.json` | `stylePreprocessorOptions.includePaths` → `../libs/ui/styles` (the components' `@use 'mixins'`) |
+
+`prj/demo` builds against `dist/` too (`pnpm demo:build`, its `dist`
+configuration), so the packaged library is used the way an outside consumer
+would use it. Every Angular package extends `prj/tsconfig.angular.json`.
 
 ```ts
-import { UiTree, UiPanelGrid } from '@tr-file/ui';
+import { UiWorkbenchShell, provideUiWorkbench } from '@tr-file/ui';
 ```
 
 ```scss
 // once, globally — tokens, document reset, scrollbars
-@use 'ui';
+@use '@tr-file/ui/styles'; // or `@use 'ui'` through the include path
 ```
 
 Component SCSS reads design tokens as CSS custom properties (`var(--vsc-*)`,
@@ -51,35 +78,134 @@ defined in `styles/_tokens.scss`) and may `@use 'mixins' as *;` for the shared
 structural helpers. No component hardcodes a colour.
 
 Two themes (PRD 010, §4): the tokens are VS Code's *Dark Modern* on `:root`, and
-*Light Modern* under `:root[data-theme='light']` — only colours change. Setting
-the attribute is the host's job; a component that needs a colour that differs
-between themes reads a token for it (there is one for alternate rows, key caps,
-the shade behind a widget that has taken the keyboard, and the scrollbars), and
-never a literal. The light palette's text colours clear WCAG AA on its
-surfaces; its severity colours and file-type accents are darkened from VS
-Code's to do so.
+*Light Modern* under `:root[data-theme='light']` — only colours change.
+`UiThemeService` sets the attribute — from the stored choice as the page
+starts, on each change, and with the OS while following it; a component that
+needs a colour that differs between themes reads a token for it, never a
+literal. The light palette's text colours clear WCAG AA on its surfaces.
 
 ## What is in it
 
-| Area | Components |
+| Area | |
 | --- | --- |
-| Shell | `UiWorkbench` (`leftAt` / `rightAt` put each sidebar at either edge, both at one if need be — PRD 010, §3), `UiTitleBar`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
-| Help (PRD 001, §16) | `UiHelp` (a window frame: `tabs` as a WAI-ARIA tab list, a search box, close; the page projected), `UiCheatsheet` (`UiCheatsheetSection` cards in CSS columns, each a `hue` — `--vsc-hue-*` — keys as keycaps, rows on a subgrid) |
-| Sidebars | `UiSidebar`, `UiPane` (with a `paneId`, movable among its sidebar's panes by dragging its header or `Ctrl`+`↑`/`↓` — reported as a `UiPaneMove`, PRD 002, §5.1; and resizable by the sash on its top edge, shown by `UiSidebar` on every boundary with an expanded pane above and one at or below, collapsed headers riding along — reported as a `UiPaneResize` of every expanded pane's height, given back as `size` weights, §5.2), `UiTree` (`reorderable`: rows drag onto each other or move with `Ctrl`+`↑`/`↓`, reported as a `UiTreeMove` — PRD 002, §6.1) |
-| Details | `UiPreviewCard`, `UiPropertyList` (a value with an `action` is a button reported by `action` — `1000+ items`, PRD 004, §3.1.3), `UiPermissionGrid`, `UiChipList`, `UiActionList`, `UiSourceControl` (the Git pane: branch, commit box, changes by group, commits — PRD 011, §1) |
-| Editor | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar` |
-| Panel content | `UiFileBrowser` (with `UiBreadcrumbs` — an address bar that suggests places, `suggestions` / `pathInput`, PRD 004, §4.2 — `UiFileList`, `UiIconView`, `UiDocumentView`, `UiImageView`) |
-| Bottom panel | `UiBottomPanel`, `UiTransferList` (Transfers and Progress; `cancellable` rows report `cancel`), `UiNotes` (the Notes tab's text box: `textChange`, `commit` on blur, `error`); `bodyFocus` puts the keyboard in the active tab's content |
+| The workbench | `UiWorkbenchService`, `provideUiWorkbench`, `UiWorkbenchConfig`, `<ui-workbench-shell>` and its templates (`uiPanelContent`, `uiBottomTab`, `uiPane`, `uiSidebar`, `uiSubApp`); the features: `UiSubAppsFeature`, `UiEditorGroupsFeature`, `UiPanelFocusFeature`, `UiFocusCycleFeature`, `UiSidebarPanesFeature`, `UiBottomPanelFeature`, `UiChromeFeature`, `UiCommandsFeature`, `UiKeybindingsFeature`, `UiCommandPaletteFeature`, `UiContextMenuFeature`, `UiPreferencesFeature`, `UiSettingsEditorFeature`, `UiHelpFeature`, `UiSessionFeature`, `UiResizeFeature` |
+| Layout | `UiPanelLayout` — the split tree: insert beside, remove, resize, maximize |
+| Shell components | `UiWorkbench` (`leftAt` / `rightAt` put each sidebar at either edge, both at one if need be — PRD 010, §3), `UiTitleBar` (menus, command centre, buttons, zoom, *Upgrade*, window controls), `UiZoomMenu`, `UiActivityBar` (`side`), `UiStatusBar` (with an optional function-key strip, `functionKeys`) |
+| Sidebars | `UiSidebar`, `UiPane` (movable by its header or `Ctrl`+`↑`/`↓` — `UiPaneMove`, PRD 002, §5.1; resizable by its sash — `UiPaneResize`, §5.2), `UiTree` (`reorderable` — `UiTreeMove`, PRD 002, §6.1) |
+| Details widgets | `UiPreviewCard`, `UiPropertyList` (a value with an `action` is a button — `action`), `UiChipList`, `UiActionList` |
+| Panels | `UiPanelGrid`, `UiPanelGroup`, `UiPanelBody`, `UiPanelToolbar`, `UiTabBar`; viewers any content may use: `UiDocumentView` (markdown, text, image, diff), `UiImageView` and `UiImageViewService`, `UiBreadcrumbs` (a path bar that edits and suggests) |
+| Bottom panel | `UiBottomPanel` (`bodyFocus` puts the keyboard in the active tab's content), `UiNotes` (a plain text box: `textChange`, `commit` on blur, `error`) |
 | Controls | `UiIconButton`, `UiButton`, `UiSegmented`, `UiSearchField`, `UiSash`, `UiProgress`, `UiEmptyState`, `UiContextMenu` |
-| Modal windows | `UiModal` (`size: 'large'` for a window to work in), `UiDialog`, `UiProgressDialog` |
-| Settings | `UiSettingsEditor` (the settings window: sections, settings, search — PRD 010), `UiKeybindingsTable` (Keyboard Shortcuts, with its key recorder) |
-| Keyboard | `UiKeymap` (the key bindings in force), `UI_DEFAULT_KEYBINDINGS`, `chordOf` — see *Key bindings* |
-| Quick input | `UiQuickInput` — the command palette's box |
+| Modal windows | `UiModalService` (`confirm`, `prompt`, `message`, `show`, `open`), `UiModalHost`, `UI_MODAL_REF`; `UiModal` (`size: 'large'` for a window to work in), `UiDialog`, `UiProgressDialog`; `UiSettingsModal`, `UiHelpModal` |
+| Settings and help | `UiSettingsEditor`, `UiKeybindingsTable` (with its key recorder), `UiHelp`, `UiCheatsheet` (`UiCheatsheetSection` cards, each a `hue`, keys as keycaps) |
+| Keys | `UiKeymap`, `UI_DEFAULT_KEYBINDINGS`, `UI_KEYBINDING_DEFAULTS`, `chordOf`, `displayChord` … — see *Key bindings* |
+| Lists | `UiListSelection`, `clickMode`, `moveMode`, `UiTypeahead`, `pageStep`, `UiVirtualViewport`, `visibleRange` — the building blocks of a keyboard-driven, multi-select, virtualised list (`@tr-file/file-ui`'s are built of them) |
+| Palette | `UiQuickInput` — the palette's box; `fuzzyMatch` |
+| Settings store and themes | `UiSettingsStore`, `UI_SETTINGS_STORE` (`localStorage` unless provided), `UI_STORAGE_PREFIX`, `UiMemorySettingsStore`, `UiThemeService` |
 | Icons | `UiIcon`, `UiIconSprite` |
 
 View models are exported from `lib/models`. Where a model would collide with the
 component that renders it, the model carries the `Model` suffix
 (`UiPanelGroupModel`, `UiEmptyStateModel`).
+
+## The workbench shell (PRD 001, §17.1)
+
+An application is a configuration, a service, and its templates.
+
+```ts
+// app.config.ts
+providers: [
+  { provide: UI_STORAGE_PREFIX, useValue: 'my-app' },        // its keys in the store: my-app.session.v1, …
+  { provide: UI_SETTINGS_STORE, useExisting: MySettings },    // optional: localStorage otherwise
+  provideUiWorkbench(MY_CONFIG, MyWorkbenchService),           // or provideUiWorkbench(MY_CONFIG) alone
+],
+```
+
+```html
+<!-- the root: everything but the modal windows goes inert while one is open -->
+<div [attr.inert]="modal.isOpen() ? '' : null"><my-workbench /></div>
+<ui-modal-host />
+
+<!-- my-workbench -->
+<ui-workbench-shell>
+  <ng-template uiPane="notes"><ui-tree [nodes]="…" (activate)="…" /></ng-template>
+  <ng-template uiPanelContent="note" let-groupId>
+    <div uiPanelBody>…the tab's content…</div>
+  </ng-template>
+  <ng-template uiBottomTab="output">…</ng-template>
+  <ng-template uiSubApp="about">…</ng-template>
+</ui-workbench-shell>
+```
+
+**The configuration** (`UiWorkbenchConfig`) is data: the title, the layout a
+window starts with (the grid and its groups), the sub-applications (the
+`main` one has the panels and the sidebars), the two sidebars and their panes
+(`UiSidebarDef`: id, label, side, the command that toggles it, the setting
+that moves it), the bottom panel's tabs, the main menu and the Settings
+gear's menu (rows are command ids), the activity bar's other buttons, the
+title bar's buttons (each a command, shown pressed while what it `toggles` is
+shown), the kinds of panel content (`UiPanelContentDef`: which tab kinds each
+is), the application's keys, the settings (`UiPreference` — the library has
+builders for its own: `uiColorThemePreference`, `uiSidebarLocationPreference`,
+`uiRestoreLayoutPreference`, `uiResetLayoutPreference`), the cheatsheet's
+cards, and how a session is read back (`readTab`, `readGroup`, `readSession`,
+`writeGroup`, `sessionScope`).
+
+**The service.** `UiWorkbenchService` holds the shared state — the active and
+previous panel, the regions' sizes, the restored session — and one instance
+of each feature. An application extends it with its own features as fields,
+and varies the library's by overriding the `create…` method that makes one:
+
+```ts
+@Service({ autoProvided: false })
+export class MyWorkbenchService extends UiWorkbenchService<MyTab, MyGroup, MyTarget> {
+  declare readonly commandsFt: MyCommandsFeature;
+  protected override createCommands() { return new MyCommandsFeature(this); }
+  readonly notesFt = new NotesFeature(this);
+}
+```
+
+Those are called while the base class is being constructed, before the
+subclass's own fields exist — so a feature must not read the application's
+features until it is used (`UiCommandsFeature` makes its table on first use for
+that reason). What each feature lets an application vary:
+
+| Feature | Hooks |
+| --- | --- |
+| `UiCommandsFeature` | `define()` lists the table — the library's commands placed among the application's with `builtin(id)` / `builtinsOf(prefix)`; `activeTarget()`, `tabTarget()` say what commands act on; `ran()` follows a command run |
+| `UiEditorGroupsFeature` | `registerContent(type, driver)` — what loads a tab, says it is loading, takes dropped files; `remember` / `recall` / `follow` keep a group's own fields as tabs change; `blankGroup`, `newTabFrom`, `groupAdded`, `groupRemoved`, `tabChosen`, `tabIcon` |
+| `UiChromeFeature` | `activityItems`, `activityBottomItems`, `statusLeadingItems`, `statusTrailingItems` (computeds to override); `menuRow`, `runMenuRow`, `runActivity`, `runStatusAction`, `selectActivity` |
+| `UiBottomPanelFeature` | `countOf`, `tabActions`, `runTabAction` |
+| `UiCommandPaletteFeature` | `leadingCommands`, `trailingCommands`; `prompt(step)` asks in the box (`UiInputStep`, `UiPickStep`) |
+| `UiContextMenuFeature` | `show(request, label, layout, target)` for a menu of the application's; a tab's menu and a sidebar's `…` are built in |
+| `UiKeybindingsFeature` | `targetOf(command)` — what a window key acts on |
+| `UiPreferencesFeature` | `read` / `write` for settings kept elsewhere, `applied` for what changes at once |
+| `UiSessionFeature` | `extras()` — the application's fields of the session |
+| `UiSubAppsFeature` | `onShown(id)` |
+
+**The shell** draws the title bar, the activity bar, the sidebars — from the
+`uiPane` templates in the order the panes stand, or the application's own
+`uiSidebar` — the panels with each tab's `uiPanelContent` template (projected
+into its group with the group's injector, so `uiPanelBody` finds it), the
+bottom panel, the other sub-applications, the status bar, and over them the
+context menus, the gear's menu and the palette. It answers the window's keys
+(`UiKeybindingsFeature.handleShortcut`), `Ctrl`+`Tab` round the parts of the
+window and `Tab` between panels (PRD 002, §2.6), writes the session before the
+page goes, and starts the workbench (`UiWorkbenchService.start`) as it is
+made. A desktop shell's extras are its inputs and outputs: `zoom`, `upgrade`,
+`windowControls`, `draggable`, `leadingInset`, `functionKeys`, and
+`panelFilesDrop` for files dropped on a panel.
+
+**The session** (PRD 003, §6) is written a moment after each change under
+`<prefix>.session.v1:<scope>`: the grid, every group with its tabs, the active
+panel, the regions' sizes, the panes (open, hidden, order, heights), the
+hidden sidebars, the bottom panel — and the application's `extras`. A snapshot
+that does not hold together is ignored. *Reset Layout* asks first, forgets it
+and reloads.
+
+`provideUiWorkbench` provides a `UiKeymap` of its own beside the workbench, so
+it can be given on a lazily loaded route with the keys of the components it
+uses (`UI_KEYBINDING_DEFAULTS`) — tr-file's workbench route is.
 
 ## Panel content
 
@@ -96,9 +222,11 @@ body by the application:
 ```
 
 Each kind of content is its own component with its own model and its own
-toolbar. File management is `UiFileBrowser` over a `UiFileBrowserModel`: a path
-bar, a `UiPanelToolbar` and a list, a grid or a read-only document. A new kind
-of content follows the same shape:
+toolbar — tr-file's file management is `UiFileBrowser` over a
+`UiFileBrowserModel` (`@tr-file/file-ui`): a path bar, a `UiPanelToolbar` and
+a list, a grid or a read-only document. In the shell, the content is the
+application's `uiPanelContent` template for the tab's kind. A new kind of
+content follows the same shape:
 
 - **Model** — its own interface; `UiPanelGroupModel` never grows fields for it.
 - **Toolbar** — `UiPanelToolbar` for the row itself, with icon `actions`, a
@@ -123,68 +251,6 @@ A group with no tabs has no content and renders `UiPanelGroupModel.empty`.
 Icons are a `<symbol>` sprite (`UiIconSprite`, rendered once by `UiWorkbench`);
 `UiIcon` references symbols by a name from the `UiIconName` union, so a typo is
 a compile error rather than an empty box.
-
-## What every file manager has (PRD 003, §5)
-
-The library reports these; what they do is the application's.
-
-- **Sorting.** `UiFileList` with `sortable` draws its headers as buttons that
-  report `sort` with the column's key; the column carrying `sort` shows the
-  order. Once the re-sorted rows render, focus goes back to the cursor's
-  row, not the header — or, when nothing is selected, to the first row, which
-  becomes the selection (PRD 002, §3.1). `UiFileBrowserModel.sortable` turns it on for a browser, which
-  re-emits `sortChange`.
-- **Keys.** `Shift`+`Delete` is the `delete-permanently` panel key, and `+` /
-  `-` are `select-pattern` / `unselect-pattern` (PRD 004, §2), in the list and
-  the grid. `UiFileBrowser` adds `Ctrl`+`Z` (`undo`), `Ctrl`+`Shift`+`N`
-  (`new-folder`), `Ctrl`+`R` (`refresh`) and `Ctrl`+`Shift`+`C` (`copy-path`,
-  PRD 004, §1.3.2) — never inside a text field — and
-  the mouse's back and forward buttons as `back` / `forward`. No function key
-  is a panel key: `F1`–`F10` are the window's, and the app binds them.
-- **Filter box.** Given `searchPlaceholder`, the toolbar shows
-  `UiSearchField` holding `filterText`; typing is `filterChange`. `Ctrl`+`F`
-  goes there, `Escape` empties it (and, empty, leaves it), `↓` / `Enter` go
-  back to the listing. `UiSearchField.focusToken` asks for focus the way
-  `focusBody` does.
-- **Address bar.** Given `location` (`/docs/prd`), `UiBreadcrumbs` turns into
-  a text field on a click on its blank space, its pencil button, or
-  `Ctrl`+`L`; `Enter` is `pathSubmit`, `Escape` or leaving the field puts the
-  crumbs back, and focus returns where it was.
-- **Requests from a menu.** `filterFocus` and `locationEdit` on the model are
-  tokens: bump one to focus the filter box or edit the path, as the keys do.
-- **Context menus.** A right-click, `Shift`+`F10` or the menu key reports a
-  `UiContextMenuRequest` (`target`, viewport `x`/`y`): `UiFileBrowser.contextMenu`
-  (an entry — selected first if it was not — or `null` for blank space; a
-  document keeps the browser's own menu), `UiTree.contextMenu` and
-  `UiTabBar` / `UiPanelGroup.tabContextMenu`. `UiContextMenu`, when `fixed`
-  and opening from its top-left corner, moves back inside the viewport.
-
-## Git (PRD 011, §1)
-
-`UiSourceControl` draws a `UiScmModel`: the branch button (`branchSelect`),
-the sync button (`syncSelect`), a commit message box whose `Ctrl`+`Enter` is
-the Commit button (`commit`), the changes by group — each row reports
-`itemOpen`, its buttons `itemAction`, a group's header buttons `groupAction`
-— and the latest commits (`moreCommits`). `UiDocumentView` takes a
-`kind: 'diff'` document of `UiDiffLine`s, coloured by kind. `UiPane.actionAt`
-reports a header button together with where it is, for a `…` menu.
-
-## Disk usage (PRD 013, §2.1)
-
-`UiDiskUsage` is panel content for what takes up the space in a folder. It has a file
-browser's path bar (`UiBreadcrumbs`, with the same editing and suggestions) and a toolbar
-(the app's buttons, a `UiSegmented` for the view, and the depth as − / +). It draws a
-`UiDiskUsageItem` tree, already sized and labelled, three ways:
-- **pie**: a sunburst, a ring per level, with a legend of the folder's own entries
-- **table**: rows depth first, each with a bar for its share of the folder
-- **rectangles**: a squarified treemap, folders under their names, laid out in pixels
-  the component measures
-
-The geometry is plain functions in `disk-usage/disk-usage-layout.ts` (`sunburst`,
-`treemap`, `squarify`, `tableRows`), and an entry keeps its top-level entry's hue
-everywhere. Clicking an `openable` folder, or `Enter` on it in the table or legend, emits
-`open`. The keymap's `go.up`, `view.refresh` and `view.stopLoading` emit the toolbar's
-`up` / `refresh` / `stop`, while those buttons are there. `Ctrl`+`L` edits the path bar.
 
 ## Deviations from the mockup
 
@@ -240,6 +306,10 @@ however many chrome buttons follow. The app sets it while a newer version is
 there (`busy` while it is being put in place) and hears `upgradeSelect`.
 
 ## Panel interactions
+
+The gestures of the panels and the shell. Those on a listing's rows and tiles are
+`@tr-file/file-ui`'s (`UiFileList`, `UiIconView`, `UiFileBrowser`), listed here
+because they are what a panel of tr-file answers.
 
 | Gesture | Result |
 | --- | --- |
@@ -308,172 +378,6 @@ twice for the same group has to be two asks. A request whose body is still
 has been fetched still ends up focused; any other unsatisfied request is spent
 at once, so a stale ask can never steal focus back from the user.
 
-### Inside a panel body
-
-The two directory views answer to the keyboard a file manager trains people to
-expect (PRD 001, Section 6.2). `UiFileList` moves with `↑`/`↓`, `Home`/`End`
-and `PageUp`/`PageDown`; `UiIconView` adds `←`/`→` for one tile and uses the
-vertical arrows for a whole *visual row*, whose width it measures off the
-rendered tiles because `auto-fill` — not the component — decides how many fit.
-Typing letters jumps to a name in both: a prefix while the keystrokes keep
-coming, and a single letter pressed repeatedly cycles through the entries
-sharing it.
-
-`UiFileBrowser` adds the chords that are about the *folder* rather than what
-is selected in it: `Alt`+`←`/`→` walks the folders the panel has visited
-(PRD 001, §6.2.1) and `Alt`+`↑` leaves the current one for its parent (§6.2.3)
-— the trail and the tree are different journeys, so they are different chords.
-They are handled on its `uiPanelBody` rather than in either view, so they work
-just as well over a document or an empty placeholder — neither of which has a
-keyboard of its own — and both views let an `Alt` chord bubble untouched so it
-arrives exactly once.
-
-Some chords belong to the panel as a whole rather than to what is selected in
-it: `/` splits it, `Ctrl`+`T` opens a new tab in it (PRD 002, §2.2), `Ctrl`+`W` closes its
-focused tab (PRD 001, §6.2.2)
-and `Ctrl`+`PageUp`/`PageDown` moves between its tabs, wrapping at either end
-(§6.2.4). They are bound on the group's host, so they answer with focus
-anywhere inside — its content, or a tab in the bar — and each
-emits exactly what the equivalent pointer gesture emits: the split and close
-buttons, or a click on the neighbouring tab. The pointer and the keyboard
-cannot drift apart, and switching by keyboard lands focus in the new tab's
-content just as clicking would. `/` is a plain character, which type-to-find
-would otherwise take: the list and the icon view let a character bound in the
-panel or window pass while no name is being typed (`isPanelCharacter`), and the
-group ignores an unmodified chord typed into a text field.
-
-`Ctrl`+`Enter` is the exception to that symmetry (§6.2.5): opening an entry in
-the other panel (PRD 002, §2.5) has no tab-bar equivalent, so it leaves as a
-`UiPanelKey` for the application to carry out — as does its pointer twin,
-`Ctrl`+double click, which the views report as `activateAside`. It is `UiFileBrowser`'s, bound
-on its host so it answers from a row, a tile, the document or the path bar,
-and it supplies the entry from its own model — the cursor if there is one, the
-selection otherwise — which is what lets one handler serve the listing and the
-grid alike. With focus on a tab in the bar the key goes to the group, which has
-no entries to open, so it does nothing there.
-
-Both body views therefore let an `Alt` *or* `Ctrl` chord bubble untouched. The
-list pages its rows on a bare `PageDown`, so without that it would page **and**
-switch tabs on the same key.
-
-An **empty folder** is the case that makes all of this hold together. Its
-placeholder contains nothing focusable, so the `uiPanelBody` element carries
-`tabindex="-1"` and takes focus itself when it has nothing else to offer (the
-group's own body does the same when it has no content at all); without that the
-keyboard would fall out of the panel and every one of its keys would reach
-nothing — a keyboard user could walk into an empty folder and not get out. For
-the same reason the browser answers `Backspace` when its body *itself* has focus,
-and only then: whenever there is a row or a tile to stand on, the key belongs
-to the view that owns it.
-
-Two rules are worth stating outright. **Selection follows focus**: arrowing
-onto an entry selects it, so the details sidebar tracks the keyboard the same
-way it tracks the mouse. Focus handed to a list or grid from outside — the
-panel giving its content the keyboard, `Tab` from another panel, a sort — while
-nothing is selected moves to the first entry and selects it (PRD 002, §3.1); a
-pointer press and the view's own moves (`Ctrl`+arrow, `Insert`) keep their own
-rules.
-
-Selection is **multiple** in all three views (PRD 004, §1.2). `UiListSelection`
-(`lib/keyboard/list-selection.ts`) is the one place the rules live — replace,
-toggle, range from an anchor, range added, cursor only, all — and `UiFileList`
-and `UiIconView` only decide which rule a gesture means. Every change leaves as
-one `selectionChange: { selected, focused }`, the whole selection in list order
-plus the entry the cursor is on; `select` still names that entry, and
-`UiFileBrowser` forwards `selectionChange`. The icon view's box selection is
-hit-tested against the grid's geometry, not the rendered tiles, so it reaches
-tiles the virtual window has not drawn, and scrolls the panel when dragged
-near its edge. And **the views move focus but decide nothing**:
-`Enter`, `Space`, `Backspace`, `Delete`, `+` and `-` leave as a `UiPanelKey`
-(`open` / `select` / `up` / `delete` / `select-pattern` / `unselect-pattern`) for the application to interpret — in
-the app that is `PanelKeyboardFeature`, which is the whole answer to "what does
-this key do in a panel". Focus movement stays in the component because a
-roving tabindex can only be rolled where the elements are.
-
-`UiTree` follows the ARIA tree keyboard pattern — `↑`/`↓`, `Home`/`End` move
-between rows, `→` opens a directory (or steps into an open one) and `←` closes
-it (or steps out to its parent). That is not decoration: the twisty is
-`aria-hidden`, because a focusable button inside a `treeitem` is an AXE
-violation, so these keys are the only way a keyboard user can expand anything.
-
-`UiDocumentView` is the read-only preview a file tab opens (PRD 001, Section
-7.3). It parses nothing: a `markdown` document arrives as finished, already
-sanitised HTML — **the application renders the markdown, not this library**,
-which keeps the parser (and its dependency) out of the component library — and
-the view supplies only the typography and the `[innerHTML]` binding, which
-Angular's default sanitiser scrubs on the way in. A `text` document is printed
-verbatim in a monospace block, and an `image` document is handed to
-`UiImageView`. Nothing in it is editable, and the only focusable element is the
-scroll container — or, for an image, the viewport.
-
-`UiImageView` is the picture half of that preview (PRD 001, §7.3.1). It is
-deliberately thin: what the viewer *is* — the scale, the pan, every fit and the
-arithmetic that holds a point still under the pointer — lives in
-`UiImageViewService`, which the component provides one of. That is the only
-service in a library of otherwise presentational components, and it earns its
-place by being **component-scoped**: two images open in two panels zoom
-independently, and nothing outside a viewer can reach another's state.
-
-One model drives all five controls: the image is drawn at its natural size and
-transformed, so `contain`, `cover` and `100%` are three ways of computing one
-`scale`, the wheel and the `+`/`-` buttons set it directly, and panning is a
-`translate`. Wheeling or dragging switches to a free zoom, which is why the fit
-buttons stay meaningful rather than becoming a mode the viewer is stuck in; a
-double click returns to `contain`. Two details are deliberate: a wheel zoom is
-anchored under the pointer, so zooming into a corner works instead of
-recentring, and the pan is clamped on the way *out*, so a hard drag can never
-park the picture off-screen and an image smaller than the frame simply stays
-centred. Like the rest of the viewer it fetches nothing — `src` is a URL the
-application made, owns and revokes.
-
-`interactive: false` is the difference between the viewer in a panel and the
-thumbnail in the details sidebar (§9): it drops the controls, the gestures and
-the tab stop, leaving the default `contain` fit. A thumbnail is a picture, not
-something to operate. `UiPreviewCard` uses exactly that when the selected entry
-has an `imageSrc`, so a selected image shows itself in place of its type icon.
-
-Two inputs exist for the asynchronous world the workbench now lives in:
-`UiTreeNode.busy` turns a row's twisty into a spinner while its contents are
-being fetched, and `UiPanelGroupModel.loading` lights a 2px indeterminate rail
-under the tab bar. Both are pure inputs — the library never knows what is being
-loaded, only that something is.
-
-### Copy, paste, drag and drop (PRD 005, §2)
-
-`UiFileBrowser` adds file-manager clipboard chords and drag and drop to any
-listing, and — as everywhere else — decides nothing about what they do:
-
-- **`Ctrl`+`C` / `X` / `V`** (`Cmd` on macOS) leave as the `copy`, `cut` and
-  `paste` `UiPanelKey`s, with the entry the cursor is on. Not in a text field,
-  and not over a document, where the chords keep their meaning for text.
-- **Dragging** a row or tile drags the selection it is part of — or that entry
-  alone, which it then selects — as `UI_ENTRY_MIME` (`{ sources }`), so it
-  passes between browsers and nothing else (the group's zones, the OS file
-  drop) takes it. Several entries drag as a count.
-- **Dropping**: a row or tile marked `dropTarget` (a folder) lights up under
-  the drag; elsewhere the listing's blank space takes it for the listed folder
-  when the model says `dropFolder`. A browser never offers its own dragged
-  entries as their target, nor its own blank space for a plain move — which
-  would put entries where they already are. The drop is an `entryDrop`
-  (`UiEntryDrop`: `sources`, `target` or `null` for the listed folder, and
-  `copy` when `Ctrl` or `Alt` was held — a move otherwise, as in VS Code).
-- Rows and tiles marked **`cut`** are drawn faded, as file managers draw what
-  waits to be moved.
-- **Files from outside** (PRD 003, §6) — the system's file manager, or a
-  native drag of this app's — are taken the same way, onto a folder row or the
-  listing's blank space when `dropFolder`, and reported as `filesDrop`
-  (`UiFilesDrop`: the `File`s, their `FileSystemEntry`s read during the drop
-  so a folder can be walked, `target`, `copy`); the group around the browser
-  does not hear of them. `UiPanelGroup` reports the same shape as `filesDrop`
-  beside `fileDrop`.
-- **`nativeDrag`** makes a drag the system's: the browser cancels the page's
-  drag and emits `nativeDragStart` with the sources, for the application to
-  hand to the operating system (the desktop's `webContents.startDrag`).
-- **Thumbnails**: a tile with `thumbnail` (any `<img>` URL) draws it in the
-  icon's place, the same height; `UiIconView.shown` — `itemsShown` on the
-  browser — reports the tiles rendered whenever that set changes, so the
-  application reads pictures only for what is on screen.
-
 ## Quick input (PRD 009, §1)
 
 `UiQuickInput` is VS Code's quick input: a box hanging from the top of the
@@ -487,8 +391,8 @@ chips, and `buttons` — VS Code's row actions, shown on the active row and the
 one under the pointer, each with an optional `shortcut` (e.g. `F2`,
 `Shift+Delete`) that works on the active row, reported as `itemButton`;
 `busy` draws a progress rail along the top. It filters nothing and decides
-nothing: in the app the command palette (`CommandPaletteFeature`) owns the
-list, the matching and what accepting means.
+nothing: the command palette (`UiCommandPaletteFeature`) owns the list, the
+matching (`fuzzyMatch`) and what accepting means.
 
 ## Modal windows (PRD 002, §3)
 
@@ -518,10 +422,18 @@ Two pieces, split the way VS Code's own are:
 
 Anything else — a form, a picker — is projected into `UiModal` as it is.
 `button[uiButton]` (`variant: 'primary' | 'secondary'`) is the text button both
-use. Making the page behind the window `inert` is the host's job: the library
-does not own the page. In the app, `ModalService` (`confirm`, `prompt`,
-`message`, `show`, and `open` for a component of its own) keeps the stack and
-`ModalHost` draws it.
+use.
+
+`UiModalService` keeps the stack of windows and `UiModalHost` draws it, once,
+at the root: `await modal.confirm(…)`, `prompt(…)`, `message(…)`, `show(…)` for
+a whole message dialog, or `open(Component, …)` for a component of the
+application's, which closes itself through `UI_MODAL_REF`. Every call resolves
+when its window closes — `null` for `Escape`. A dialog shown with `onTop`
+stays above every window opened after it (PRD 004, §2.2). Making the page
+behind the windows `inert` is the host's job — the library does not own the
+page: `[attr.inert]="modal.isOpen() ? '' : null"` around everything but the
+host. The settings and Help windows (`UiSettingsModal`, `UiHelpModal`) are
+opened this way by their features.
 
 ## Key bindings (PRD 010, §2)
 
@@ -532,20 +444,27 @@ tile, `panel` for a panel's content and the group around it, `window` for the
 application's own. A binding is `{ command, key, when }`, VS Code's shape; a
 key is a chord as `chordOf` writes it (`Ctrl+Shift+P`, `Alt+Left`, `F5`,
 `Plus`, `*`), with `Cmd` read as `Ctrl` and a symbol written without the
-`Shift` it took. The keymap starts with `UI_DEFAULT_KEYBINDINGS`, so the
-library works as it is; the application hands it the whole table with `set`.
+`Shift` it took.
 
-A key the library answers for a command of the application's table is bound
-to that command's id (`file.open`, `edit.copy`, `go.up`), so one binding
-governs both the key and what a menu shows beside the command. The library's
-own gestures have ids of their own: `list.select`, `list.toggleSelection`,
-`list.mark`, `list.toggleAll`, `panel.contextMenu`, `view.splitRight`,
-`tab.previous`, `tab.next`. Navigation is not bound — the arrows, `Home` /
+The keymap starts with its `defaults`: every table provided as
+`UI_KEYBINDING_DEFAULTS` (`multi`) — `@tr-file/file-ui`'s listings' keys, with
+`provideFileUi()` — then `UI_DEFAULT_KEYBINDINGS`, the library's own: a panel
+group's (split, new tab, maximize, close, the next and previous tab) and the
+image viewer's (zoom and fit). So the components work as they are. In a
+workbench, `UiKeybindingsFeature` owns the table in force — those defaults,
+then the configuration's `keybindings`, less what the user removed and with
+what they added (`<prefix>.keybindings.v1`) — and hands it to the keymap on
+every change; the menus, the palette and the cheatsheet read the keys they
+show from it, so what is shown is what works. It also runs the window's keys
+(`when: 'window'`) as commands of the table.
+
+A key a component answers for a command of the application's table is bound
+to that command's id (`tab.new`, or tr-file's `file.open`), so one binding
+governs both the key and what a menu shows beside the command. Gestures have
+ids of their own: `view.splitRight`, `tab.previous`, `tab.next`,
+`image.zoomIn`, … Navigation is not bound — the arrows, `Home` /
 `End`, the page keys, type-to-find, `Escape`, and the keys inside menus,
 dialogs and the quick input are what those widgets *are*, not commands.
-
-A single-character chord bound in a list (`*`, `+`, `-`, a letter) is taken as
-part of a name while type-to-find is running.
 
 `UiSettingsEditor` and `UiKeybindingsTable` draw the settings window
 (PRD 010): a table of contents, a search box, pages of settings drawn the way
@@ -556,25 +475,11 @@ recorded: each key is reported as a chord, `Enter` accepts (or is recorded
 itself, as the first key), `Escape` gives up, and neither reaches the modal
 around it.
 
-## Long lists
-
-`UiFileList` (tree mode included) and `UiIconView` render only what is near the
-viewport once they hold `VIRTUAL_THRESHOLD` (200) entries or more; below that
-every entry is rendered, exactly as before. `UiVirtualViewport` follows the
-nearest scrolling ancestor — the panel body scrolls, not the list — and
-`visibleRange` turns its scroll position into a slice, counted in *lines*: a
-table row, or one visual row of tiles whose column count is measured from the
-layout. Spacers above and below keep the scrollbar the whole list's, and
-`aria-rowcount` / `aria-setsize` tell assistive tech the real size.
-
-Every key still reaches every entry: a move to one that is not rendered
-scrolls it in and focuses it after the next render, and the roving tab stop is
-always a rendered entry — the focused one when it is in view, else the first
-that is.
-
 ## Testing
 
-Specs for the library components live with the app's tests
-(`frontend/src/app/workbench/ui-library.spec.ts`) because the app's test target
-is what compiles this source. Run them with `pnpm exec ng test` from
-`prj/frontend`.
+The library has its own specs, next to what they test, and its own test target
+(`@angular/build:unit-test`, Vitest in jsdom): `pnpm --filter @tr-file/ui test`,
+or `pnpm test:libs` at the workspace root for both libraries, after the
+boundaries check. `ui-workbench-shell.spec.ts` runs the shell on a small
+workbench of its own; helpers that are only for specs live in `src/testing/`,
+outside the package.

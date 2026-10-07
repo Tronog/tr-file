@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import type { UiPanelView } from '@tr-file/ui';
+import type { UiPanelView } from '@tr-file/file-ui';
 import type { PanelSort, PanelSortKey } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
 

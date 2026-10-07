@@ -1,96 +1,139 @@
-@let apps = workbench.subAppsFt;
-@let chrome = workbench.chromeFt;
 @let windowControls = workbench.windowControlsFt;
-@let resize = workbench.resizeFt;
-@let palette = workbench.commandPaletteFt;
+@let files = workbench.fileBrowserFt;
+@let panelKeys = workbench.panelKeyboardFt;
 @let contextMenu = workbench.contextMenuFt;
+@let archive = workbench.archiveBrowserFt;
+@let diff = workbench.gitDiffFt;
+@let trash = workbench.trashFt;
+@let panel = workbench.bottomPanelFt;
 
-@let explorerSide = workbench.preferencesFt.explorerSide();
-@let detailsSide = workbench.preferencesFt.detailsSide();
-
-<!-- The `left` slot is the Explorer and the `right` one Details, at whichever
-     edge the settings put each — both may be at the same one (PRD 010, §3). -->
-<ui-workbench
-  [leftAt]="explorerSide"
-  [rightAt]="detailsSide"
-  leftSashLabel="Resize Explorer"
-  rightSashLabel="Resize Details"
-  [leftVisible]="apps.fileManager() && chrome.isShown('explorer')"
-  [rightVisible]="apps.fileManager() && chrome.isShown('details')"
-  [leftWidth]="workbench.leftSidebarWidth()"
-  [rightWidth]="workbench.rightSidebarWidth()"
-  [leftMin]="resize.leftBounds.min"
-  [leftMax]="resize.leftBounds.max"
-  [rightMin]="resize.rightBounds.min"
-  [rightMax]="resize.rightBounds.max"
-  (leftResize)="resize.resizeLeftSidebar($event)"
-  (rightResize)="resize.resizeRightSidebar($event)"
+<ui-workbench-shell
+  [zoom]="windowControls.zoom()"
+  (zoomRequest)="windowControls.zoomTo($event)"
+  [upgrade]="workbench.appUpdateFt.upgrade()"
+  (upgradeSelect)="workbench.appUpdateFt.run()"
+  [windowControls]="windowControls.controls()"
+  [draggable]="windowControls.draggable()"
+  [leadingInset]="windowControls.leadingInset()"
+  (windowControlSelect)="windowControls.run($event)"
+  (dragAreaDoubleClick)="windowControls.toggleFromDragArea()"
+  [functionKeys]="workbench.functionKeysFt.strip()"
+  (functionKeySelect)="workbench.functionKeysFt.run($event)"
+  (panelFilesDrop)="files.dropFiles($event.groupId, $event.drop)"
 >
-  <h1 uiSlot="title" class="app-heading">tr-file</h1>
+  <!-- The file manager's sidebars (PRD 001, §9): the Explorer and Details. -->
+  <ng-template uiSidebar="explorer"><app-file-manager-explorer /></ng-template>
+  <ng-template uiSidebar="details"><app-file-manager-details /></ng-template>
 
-  <ui-title-bar
-    uiSlot="title"
-    [menuItems]="chrome.menuItems()"
-    [commandLabel]="chrome.commandLabel"
-    [commandKeys]="chrome.commandKeys"
-    [actions]="chrome.titleBarActions()"
-    [zoom]="windowControls.zoom()"
-    (zoomRequest)="windowControls.zoomTo($event)"
-    [upgrade]="workbench.appUpdateFt.upgrade()"
-    (upgradeSelect)="workbench.appUpdateFt.run()"
-    [windowControls]="windowControls.controls()"
-    [draggable]="windowControls.draggable()"
-    [leadingInset]="windowControls.leadingInset()"
-    (windowControlSelect)="windowControls.run($event)"
-    (commandSelect)="palette.show()"
-    (actionSelect)="chrome.runTitleBarAction($event)"
-    (menuOpenChange)="chrome.setMenuOpen($event)"
-    (menuItemSelect)="chrome.runMenuItem($event)"
-    (dragAreaDoubleClick)="windowControls.toggleFromDragArea()"
-  />
+  <!-- What a panel's active tab shows: one template per kind of panel content. -->
+  <ng-template uiPanelContent="files" let-groupId>
+    @if (files.browser(groupId); as browser) {
+      <ui-file-browser
+        [browser]="browser"
+        (toolbarAction)="files.runToolbarAction(groupId, $event)"
+        (breadcrumbSelect)="files.openBreadcrumb(groupId, $event)"
+        (viewChange)="files.setView(groupId, $event)"
+        (selectionChange)="files.setSelection(groupId, $event)"
+        (rowActivate)="files.openEntry(groupId, $event)"
+        (rowToggle)="files.toggleEntry(groupId, $event)"
+        (itemActivate)="files.openEntry(groupId, $event)"
+        (command)="panelKeys.run(groupId, $event)"
+        (entryDrop)="files.dropEntries(groupId, $event)"
+        (sortChange)="files.toggleSort(groupId, $event)"
+        (filterChange)="files.setFilter(groupId, $event)"
+        (pathSubmit)="files.goToLocation(groupId, $event)"
+        (locationInput)="files.locationInput(groupId, $event)"
+        (contextMenu)="contextMenu.openInPanel(groupId, $event)"
+        [nativeDrag]="files.nativeDrag()"
+        (nativeDragStart)="files.startNativeDrag($event)"
+        (filesDrop)="files.dropFiles(groupId, $event)"
+        (itemsShown)="files.showItems($event)"
+      />
+    }
+  </ng-template>
+  <!-- A file's git changes (PRD 011, §1): read-only, as VS Code's diff editor. -->
+  <ng-template uiPanelContent="diff" let-groupId>
+    @if (diff.browser(groupId); as browser) {
+      <ui-file-browser
+        [browser]="browser"
+        (toolbarAction)="diff.runToolbarAction(groupId, $event)"
+        (breadcrumbSelect)="diff.openBreadcrumb(groupId, $event)"
+        (command)="diff.runKey(groupId, $event.command)"
+      />
+    }
+  </ng-template>
+  <!-- The trash (PRD 001, §14.1): what was thrown away, read-only. -->
+  <ng-template uiPanelContent="trash" let-groupId>
+    @if (trash.browser(groupId); as browser) {
+      <ui-file-browser
+        [browser]="browser"
+        (toolbarAction)="trash.runToolbarAction(groupId, $event)"
+        (selectionChange)="trash.setSelection(groupId, $event)"
+        (command)="trash.runKey(groupId, $event.command)"
+      />
+    }
+  </ng-template>
+  <!-- Inside a zip (PRD 003, §6): read-only, one folder of it at a time. -->
+  <ng-template uiPanelContent="archive" let-groupId>
+    @if (archive.browser(groupId); as browser) {
+      <ui-file-browser
+        [browser]="browser"
+        (toolbarAction)="archive.runToolbarAction(groupId, $event)"
+        (breadcrumbSelect)="archive.openBreadcrumb(groupId, $event)"
+        (selectionChange)="archive.setSelection(groupId, $event)"
+        (rowActivate)="archive.openEntry(groupId, $event)"
+        (command)="archive.runKey(groupId, $event.command, $event.entryId)"
+      />
+    }
+  </ng-template>
 
-  <ui-activity-bar
-    uiSlot="activity"
-    [side]="explorerSide"
-    [items]="chrome.activityItems()"
-    [bottomItems]="chrome.activityBottomItems()"
-    (select)="chrome.selectActivity($event)"
-    (menuOpen)="chrome.openMenu($event)"
-  />
+  <!-- The bottom panel's tabs (PRD 001, §12). -->
+  <ng-template uiBottomTab="transfers">
+    @if (panel.transfersEmpty()) {
+      <p class="panel-note">No transfers yet — drop files onto a panel, or use its upload button.</p>
+    } @else {
+      <ui-transfer-list [transfers]="panel.transfers()" (cancel)="workbench.transfersFt.cancel($event)" />
+    }
+  </ng-template>
+  <ng-template uiBottomTab="progress">
+    @if (panel.operations().length === 0) {
+      <p class="panel-note">Nothing running — copy, move or delete something, and its progress shows here.</p>
+    } @else {
+      <ui-transfer-list [transfers]="panel.operations()" (cancel)="workbench.operationsFt.cancel($event)" />
+    }
+  </ng-template>
+  <ng-template uiBottomTab="problems">
+    @if (panel.problems().length === 0) {
+      <p class="panel-note">No problems. Every folder opened cleanly.</p>
+    } @else {
+      <ul class="problem-list">
+        @for (problem of panel.problems(); track problem.id) {
+          <li class="problem">
+            <span class="problem-path">{{ problem.path }}</span>
+            <span class="problem-message">{{ problem.message }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </ng-template>
+  <ng-template uiBottomTab="notes">
+    <ui-notes
+      placeholder="Write notes here — they are kept on this computer."
+      [text]="workbench.notesFt.text()"
+      [error]="workbench.notesFt.error()"
+      (textChange)="workbench.notesFt.edit($event)"
+      (commit)="workbench.notesFt.flush()"
+    />
+  </ng-template>
 
-  <!-- The sub-application shown (PRD 001, §1.1) fills the sidebars and the centre; the title,
-       activity and status bars are everyone's. One drawn before stays, hidden, while another is
-       shown (`SubAppsFeature`). The sidebars are the file manager's, so another hides them. -->
-  <app-file-manager-explorer uiSlot="left" />
-  <app-file-manager-center uiSlot="center" />
-  @if (apps.isOpened('search')) {
-    <app-search-app uiSlot="center" />
-  }
-  @if (apps.isOpened('disk-usage')) {
-    <app-disk-usage-app uiSlot="center" />
-  }
-  <app-file-manager-details uiSlot="right" />
-
-  <ui-status-bar
-    uiSlot="status"
-    [leadingItems]="chrome.statusLeadingItems()"
-    [trailingItems]="chrome.statusTrailingItems()"
-    [functionKeys]="workbench.functionKeysFt.strip()"
-    (select)="chrome.runStatusAction($event)"
-    (functionKeySelect)="workbench.functionKeysFt.run($event)"
-  />
-</ui-workbench>
+  <!-- The other sub-applications (PRD 001, §1.1). -->
+  <ng-template uiSubApp="search"><app-search-app /></ng-template>
+  <ng-template uiSubApp="disk-usage"><app-disk-usage-app /></ng-template>
+  <ng-template uiSubApp="task-manager"><app-task-manager-app /></ng-template>
+</ui-workbench-shell>
 
 <!-- The file picker a group's upload button opens; never visible. -->
-<input
-  #filePicker
-  class="file-picker"
-  type="file"
-  multiple
-  tabindex="-1"
-  aria-hidden="true"
-  (change)="onFilesChosen($event)"
-/>
+<input #filePicker class="file-picker" type="file" multiple tabindex="-1" aria-hidden="true" (change)="onFilesChosen($event)" />
 
 <!-- The folder picker of Upload Folder… (PRD 003, §6); never visible either. -->
 <input
@@ -103,50 +146,3 @@
   aria-hidden="true"
   (change)="onFilesChosen($event)"
 />
-
-<!-- The Settings gear's menu (PRD 007, §1): fixed, beside the gear, opening upward. -->
-@if (chrome.settingsMenu(); as menu) {
-  <ui-context-menu
-    label="Settings"
-    [origin]="menu.leftward ? 'bottom-right' : 'bottom-left'"
-    [fixed]="true"
-    [x]="menu.x"
-    [y]="menu.y"
-    [items]="chrome.settingsMenuItems()"
-    (select)="chrome.runSettingsItem($event)"
-    (dismiss)="chrome.closeSettingsMenu()"
-  />
-}
-
-<!-- The right-click menus (PRD 003, §5): on an entry, blank space, a tree folder or a tab. -->
-@for (menu of contextMenu.menus(); track menu) {
-  <ui-context-menu
-    [label]="menu.label"
-    [fixed]="true"
-    [x]="menu.x"
-    [y]="menu.y"
-    [items]="menu.items"
-    (select)="contextMenu.run($event)"
-    (dismiss)="contextMenu.close()"
-  />
-}
-
-<!-- The command palette (PRD 009, §1): VS Code's quick input, at the top of the window. -->
-@if (palette.isOpen()) {
-  <ui-quick-input
-    emptyText="No matching commands"
-    [label]="palette.label()"
-    [value]="palette.query()"
-    [placeholder]="palette.placeholder()"
-    [items]="palette.items()"
-    [activeId]="palette.activeId()"
-    [message]="palette.message()"
-    [showList]="palette.showList()"
-    [busy]="palette.busy()"
-    (valueChange)="palette.setQuery($event)"
-    (activeChange)="palette.setActive($event)"
-    (accept)="palette.accept()"
-    (itemButton)="palette.itemButton($event)"
-    (dismiss)="palette.close()"
-  />
-}

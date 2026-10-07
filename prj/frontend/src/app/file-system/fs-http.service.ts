@@ -34,6 +34,9 @@ import type {
   FsWatchResult,
   FsDiskUsageReport,
   FsDiskUsageScan,
+  FsProcessEndResult,
+  FsProcessesHistory,
+  FsProcessesSnapshot,
 } from './file-system.model';
 import type { AuthStatus } from '../auth/auth.model';
 import { FS_ABORTED, FsError } from './fs-error';
@@ -549,6 +552,19 @@ export class FsHttpService implements FsTransport {
 
   async cancelDiskUsage(id: string): Promise<FsDiskUsageScan> {
     return this.request(this.http.post<FsEnvelope<FsDiskUsageScan>>(`/api/disk-usage/scans/${encodeURIComponent(id)}/cancel`, {}));
+  }
+
+  async processes(): Promise<FsProcessesSnapshot> {
+    return this.request(this.http.get<FsEnvelope<FsProcessesSnapshot>>('/api/processes'));
+  }
+
+  async processHistory(keys: readonly string[]): Promise<FsProcessesHistory> {
+    const params = new HttpParams().set('keys', keys.join(','));
+    return this.request(this.http.get<FsEnvelope<FsProcessesHistory>>(`/api/processes/history?${params.toString()}`));
+  }
+
+  async endProcess(key: string, tree = false): Promise<FsProcessEndResult> {
+    return this.request(this.http.post<FsEnvelope<FsProcessEndResult>>('/api/processes/end', { key, ...(tree ? { tree } : {}) }));
   }
 
   private async request<T>(response: Observable<FsEnvelope<T>>): Promise<T> {
