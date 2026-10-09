@@ -133,6 +133,7 @@ export class MockDataWorkbenchService {
         { id: 'view.toggleExplorer', label: 'Toggle Explorer' },
         { id: 'view.toggleDetails', label: 'Toggle Details' },
         { id: 'view.toggleSidebars', label: 'Toggle Explorer and Details' },
+        { id: 'view.toggleActivityBar', label: 'Toggle Activity Bar' },
         { id: 'view.togglePanel', label: 'Toggle Panel' },
         { id: 'view.notes', label: 'Show Notes' },
         { id: 'view.resetLayout', label: 'Reset Layout' },

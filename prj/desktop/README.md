@@ -417,9 +417,10 @@ One file per platform, nothing to install:
 pnpm package          # both, from this package
 pnpm package:linux    # release/tr-file-0.1.0-x86_64.AppImage
 pnpm package:win      # release/tr-file-0.1.0-x64.exe, release/tr-file-Setup-0.1.0-x64.exe
+pnpm package:mac      # release/tr-file-0.1.0-mac-x64.tar.gz, …-mac-arm64.tar.gz
 ```
 
-From the workspace root: `pnpm desktop:package`, `…:linux`, `…:win`, which
+From the workspace root: `pnpm desktop:package`, `…:linux`, `…:win`, `…:mac`, which
 build the whole workspace first. Everything lands in `desktop/release/`.
 
 **AppImage** on Linux and **portable `.exe`** on Windows are the two targets
@@ -524,6 +525,16 @@ that, once), or this copy does not update itself (a development run, or
 `release/` to the share, each under a dot-name renamed into place, so no copy
 ever sees half a file.
 
+`pnpm publish:github [owner/repo]` (PRD 017, §1) makes a GitHub release of the
+same version instead, for the `github` remote unless told another
+(`TR_FILE_GITHUB_REPO`): the AppImage, both `.exe`s and both mac `.tar.gz`s,
+through the `gh` CLI (`gh auth login` once). It refuses unless all five are in
+`release/`, and unless HEAD is already pushed to GitHub, since the tag —
+`v<version>` — is made there, on that commit. A release that exists already
+has its files replaced; a new release is a new `version` in this
+`package.json`. From the workspace root `pnpm desktop:release:github` builds
+everything and publishes it.
+
 ### Why the main process is bundled
 
 `scripts/bundle.mjs` compiles `src/main.ts` — and with it the backend, Express
@@ -562,6 +573,20 @@ need no Wine — electron-builder carries its own NSIS, and stamps the
 executable's icon and version itself; the setup does (see above). What
 it cannot do from here is *sign* either one, so both are unsigned — Windows
 will show a SmartScreen warning the first time one is run.
+
+macOS is built from here too, but only as a `.tar.gz` of `tr-file.app` (x64
+and arm64; `pnpm package:mac`, not part of `pnpm package`): a `.dmg` needs
+macOS's `hdiutil`, a zip made here stores the framework's symlinks as copies
+(three times the size, and a bundle `codesign` rejects), and signing and notarizing need `codesign` / `notarytool` and an
+Apple Developer ID. Unsigned, Gatekeeper refuses the downloaded app, and on
+Apple Silicon — where the packager's changes to the bundle break Electron's
+ad-hoc signature — calls it "damaged". On the Mac, once, after unpacking:
+
+```bash
+xattr -cr tr-file.app && codesign --force --deep -s - tr-file.app
+```
+
+A mac copy never updates itself (`updateSource` is `null` on darwin).
 
 ### What the build needs beforehand
 

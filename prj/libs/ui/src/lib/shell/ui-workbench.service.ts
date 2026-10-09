@@ -193,12 +193,12 @@ export class UiWorkbenchService<
     if (restored === null) {
       return;
     }
-    this.bottomPanelFt.restore(restored.bottomPanel.collapsed);
+    this.bottomPanelFt.restore(restored.bottomPanel.collapsed, restored.bottomPanel.hidden === true);
     this.sidebarPanesFt.restore(restored.panes);
     this.sidebarPanesFt.restoreOrders(restored.paneOrder);
     this.sidebarPanesFt.restoreSizes(restored.paneSizes);
     this.sidebarPanesFt.restoreHidden(restored.hiddenPanes);
-    this.chromeFt.restoreSidebars(restored.hiddenSidebars);
+    this.chromeFt.restoreSidebars(restored.hiddenSidebars, restored.activityBarHidden === true);
   }
 }
 

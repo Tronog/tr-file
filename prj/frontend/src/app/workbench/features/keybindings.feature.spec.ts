@@ -234,7 +234,7 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
     expect(chrome.hiddenSidebars()).toEqual([]);
   });
 
-  it('toggles both sidebars on Ctrl+/ — either shown, both go; both hidden, both come back (PRD 001, §9.2.1)', async () => {
+  it('toggles both sidebars, the activity bar and the bottom panel on Ctrl+/ — either sidebar shown, all go; both hidden, all come back (PRD 001, §9.2.1)', async () => {
     await setUp();
     const chrome = workbench.chromeFt;
     expect(keys().label('view.toggleSidebars')).toBe('Ctrl+/');
@@ -243,14 +243,25 @@ describe('KeybindingsFeature (PRD 010, §2)', () => {
     keys().handleShortcut(both);
     expect(both.defaultPrevented).toBe(true);
     expect(chrome.hiddenSidebars()).toEqual(['explorer', 'details']);
+    expect(chrome.activityShown()).toBe(false);
+    expect(workbench.bottomPanelFt.hidden()).toBe(true);
 
     keys().handleShortcut(key('/', { ctrlKey: true }));
     expect(chrome.hiddenSidebars()).toEqual([]);
+    expect(chrome.activityShown()).toBe(true);
+    expect(workbench.bottomPanelFt.hidden()).toBe(false);
 
-    // One shown: it goes too, rather than the two trading places.
+    // One shown: it goes too, rather than the two trading places — and the activity bar with them.
     chrome.toggleSidebar('details');
     keys().handleShortcut(key('/', { ctrlKey: true }));
     expect(chrome.hiddenSidebars()).toEqual(['explorer', 'details']);
+    expect(chrome.activityShown()).toBe(false);
+
+    // A sidebar brought back alone leaves the activity bar put away; View › Toggle Activity Bar brings it back.
+    keys().handleShortcut(key('e', { ctrlKey: true }));
+    expect(chrome.activityShown()).toBe(false);
+    workbench.commandsFt.run('view.toggleActivityBar');
+    expect(chrome.activityShown()).toBe(true);
   });
 
   it('toggles the bottom panel on Ctrl+Shift+` — from a text field too (PRD 001, §12.3)', async () => {

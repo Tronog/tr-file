@@ -21,7 +21,9 @@
     "package": "pnpm build && ELECTRON_BUILDER_WINE_TOOLSET_DIR=$PWD/scripts/nsis-toolset electron-builder --linux --win --publish never",
     "package:linux": "pnpm build && electron-builder --linux --publish never",
     "package:win": "pnpm build && ELECTRON_BUILDER_WINE_TOOLSET_DIR=$PWD/scripts/nsis-toolset electron-builder --win --publish never",
+    "package:mac": "pnpm build && electron-builder --mac --publish never",
     "publish:share": "node scripts/publish-share.mjs",
+    "publish:github": "node scripts/publish-github.mjs",
     "clean": "rm -rf dist release"
   },
   "//devDependencies": "Nothing here is a runtime dependency of the distributable: scripts/bundle.mjs compiles the backend and its Express/Busboy into dist/main.cjs, so the packaged app loads no node_modules at all (PRD 001, §8.3).",

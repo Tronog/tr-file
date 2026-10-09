@@ -133,6 +133,13 @@ export class UiCommandsFeature<T extends UiCommandTarget = UiCommandTarget> {
         (sidebar): UiCommandSpec<T> => ({ id: sidebar.toggleCommand, category: 'View', label: `Toggle ${sidebar.label}`, run: () => p.chromeFt.toggleSidebar(sidebar.id) }),
       ),
       { id: 'view.toggleSidebars', category: 'View', label: `Toggle ${first.label} and ${second.label}`, run: () => p.chromeFt.toggleSidebars() },
+      {
+        id: 'view.toggleActivityBar',
+        category: 'View',
+        label: 'Toggle Activity Bar',
+        checked: () => p.chromeFt.activityShown(),
+        run: () => p.chromeFt.toggleActivityBar(),
+      },
       /* The sidebars' `…` menus (PRD 001, §9.2): one row per pane, checked while it is shown. */
       ...p.config.sidebars.flatMap((sidebar) =>
         sidebar.panes.map(

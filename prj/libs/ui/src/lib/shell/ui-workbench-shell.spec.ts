@@ -199,4 +199,56 @@ describe('UiWorkbenchShell', () => {
     expect(workbench.chromeFt.isShown('right')).toBe(false);
     expect($('ui-panel-group .page-button')?.textContent).toBe('Page 2');
   });
+
+  /** PRD 001, §9.2.1 — `Ctrl`+`/` puts the activity bar and the bottom panel away with the sidebars, and the session remembers it. */
+  it('hides the activity bar and the bottom panel with both sidebars, and keeps them hidden on the next start', async () => {
+    await create();
+    const activity = (): HTMLElement => $('ui-workbench .activity-slot') as HTMLElement;
+    expect(activity().classList).not.toContain('is-hidden');
+
+    const bottom = (): HTMLElement => $('ui-bottom-panel') as HTMLElement;
+    workbench.bottomPanelFt.toggleCollapsed();
+    workbench.chromeFt.toggleSidebars();
+    await render();
+    expect(activity().classList).toContain('is-hidden');
+    expect(bottom().classList).toContain('is-hidden');
+    expect($('ui-sash[label="Resize bottom panel"]')).toBeNull();
+    workbench.sessionFt.flush();
+    expect(store.get('toy.session.v1:local')).toMatchObject({
+      hiddenSidebars: ['left', 'right'],
+      activityBarHidden: true,
+      bottomPanel: { collapsed: false, hidden: true },
+    });
+
+    fixture.nativeElement.remove();
+    TestBed.resetTestingModule();
+    await create();
+    expect(workbench.chromeFt.activityShown()).toBe(false);
+    expect(workbench.bottomPanelFt.hidden()).toBe(true);
+    expect(activity().classList).toContain('is-hidden');
+
+    // Back as it was: open.
+    workbench.chromeFt.toggleSidebars();
+    await render();
+    expect(activity().classList).not.toContain('is-hidden');
+    expect(bottom().classList).not.toContain('is-hidden');
+    expect(workbench.bottomPanelFt.collapsed()).toBe(false);
+  });
+
+  it('brings the bottom panel back, open, for a tab chosen or its toggle', async () => {
+    await create();
+    workbench.chromeFt.toggleSidebars();
+    expect(workbench.bottomPanelFt.hidden()).toBe(true);
+    expect(workbench.focusCycleFt.ring()).not.toContain('bottom');
+
+    workbench.bottomPanelFt.toggleCollapsed();
+    expect([workbench.bottomPanelFt.hidden(), workbench.bottomPanelFt.collapsed()]).toEqual([false, false]);
+
+    // The sidebars are still hidden: one Ctrl+/ brings all back, the next puts all away.
+    workbench.chromeFt.toggleSidebars();
+    workbench.chromeFt.toggleSidebars();
+    expect(workbench.bottomPanelFt.hidden()).toBe(true);
+    workbench.bottomPanelFt.select(workbench.bottomPanelFt.activeTab());
+    expect(workbench.bottomPanelFt.hidden()).toBe(false);
+  });
 });

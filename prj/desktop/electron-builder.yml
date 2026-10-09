@@ -60,6 +60,23 @@ win:
     - nsis
   artifactName: ${productName}-${version}-${arch}.${ext}
 
+mac:
+  # A tar.gz of the .app, x64 and Apple Silicon: a dmg needs macOS's hdiutil,
+  # and a zip made on Linux stores the framework's symlinks as copies — three
+  # of the 200 MB Electron Framework, in a bundle codesign then calls
+  # ambiguous. tar keeps them (Archive Utility opens it). Nothing signs it from here
+  # (codesign and notarytool are macOS's too), so `identity: null` says so
+  # rather than letting the packager look for a certificate; see the README
+  # for what the Mac has to do before it will run it.
+  target:
+    - target: tar.gz
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.utilities
+  identity: null
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
 portable:
   # No `unpackDirName`: the launcher unpacks into a folder of its own each run
   # (it unpacks afresh every time anyway) and removes it as it exits. With a

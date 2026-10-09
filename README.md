@@ -1,3 +1,22 @@
+# Overview
+
+A Universal File Manager. Made for workers with workflows.
+
+# Development
+
+Project is an internal tool used by Tronog. Feel free to use it and fork it.
+
+It was "vibe" coded, but with engineering touch.
+
+Desired state is described in PRDs in docs/prd. They are an aggregation that describes the final desired state of an application.
+
+Whenever new functionality is needed, a new section is added in a PRD document. Then to apply changes, we run inside Claude Code:
+```bash
+claude
+
+> re-read /home/user/src/tr-file/docs/prd/00x.md and execute `Section Y`
+```
+
 # tr-file — a quick tour
 
 tr-file is a two-panel file manager that runs in the browser or as a desktop app. It looks like
@@ -12,7 +31,7 @@ them all.
 
 ## 1. The window
 
-![The tr-file window](images/01-overview.png)
+![The tr-file window](docs/tutorial/images/01-overview.png)
 
 1. **Main menu** — File, Edit, Selection, View, Go, Help. `F9` opens it from the keyboard.
 2. **Command palette** — every command, searchable (`Ctrl`+`Shift`+`P`).
@@ -37,7 +56,7 @@ them all.
 
 ## 2. A panel
 
-![Anatomy of a panel](images/02-panel.png)
+![Anatomy of a panel](docs/tutorial/images/02-panel.png)
 
 1. **Tabs** — a panel can hold many folders and files. `Ctrl`+`T` opens a new tab and
    `Ctrl`+`W` closes one.
@@ -56,14 +75,14 @@ them all.
 Moving around with the keyboard works as you would expect. The arrows, `Home`/`End` and the page
 keys move the cursor, and typing letters jumps to a name. `Enter` opens a folder or file.
 
-![Typing a path](images/12-location.png)
+![Typing a path](docs/tutorial/images/12-location.png)
 
 **The path bar suggests as you type** (1–2). `↓`/`↑` choose, `Tab` completes and `Enter` goes.
 Typing a file's path opens its folder with the file selected.
 
 ## 3. Selecting, copying, moving
 
-![Selecting several files](images/03-selection.png)
+![Selecting several files](docs/tutorial/images/03-selection.png)
 
 1. **Select several entries** with `Ctrl`+click and `Shift`+click, or with the keyboard:
    `Insert` marks an entry and moves down, `*` selects all or none, and `+` / `-` select or
@@ -76,7 +95,7 @@ Typing a file's path opens its folder with the file selected.
    `F2` renames and `F4` edits the entry under the cursor.
 6. **The status bar** shows how many entries are selected and how big they are together.
 
-![The copy dialog](images/04-copy-dialog.png)
+![The copy dialog](docs/tutorial/images/04-copy-dialog.png)
 
 `F5` asks where to copy, and it offers the other panel's folder (1). Copies and moves run in the
 background. A long one shows a progress window (*Run in Background* / *Cancel*) and a row in the
@@ -94,7 +113,7 @@ Other ways to do the same:
 - **Undo** — `Ctrl`+`Z` reverses the last change: a rename, a new file, a copy, a move or a
   move to the trash.
 
-![The context menu](images/11-context-menu.png)
+![The context menu](docs/tutorial/images/11-context-menu.png)
 
 **Right-click** (or `Shift`+`F10`) shows every action for what you clicked on (1). That
 includes *Copy Path* (`Ctrl`+`Shift`+`C`; press it twice for a UNIX-style path), *Compress…*
@@ -103,7 +122,7 @@ their own.
 
 ## 4. Panels, tabs and layout
 
-![Three panels with tabs](images/23-layout.png)
+![Three panels with tabs](docs/tutorial/images/23-layout.png)
 
 1. **Tabs per panel.** `Ctrl`+`PageUp` / `Ctrl`+`PageDown` switch between them, and a tab can be
    dragged to another panel. Each tab remembers its selection.
@@ -116,7 +135,7 @@ menu has *Reset Layout*.
 
 ## 5. Pictures
 
-![Image viewer and grid view](images/05-image-viewer.png)
+![Image viewer and grid view](docs/tutorial/images/05-image-viewer.png)
 
 1. **Double-click a file** to open it read-only in a new tab. `Escape` closes the tab and takes
    you back to the listing.
@@ -128,13 +147,13 @@ menu has *Reset Layout*.
 
 ## 6. Reading and editing files
 
-![Markdown rendered](images/06-markdown.png)
+![Markdown rendered](docs/tutorial/images/06-markdown.png)
 
 Text files open in a viewer. Markdown is rendered (1), and you can select and copy its text. The
 toolbar (2) goes to the file's folder, reloads it, downloads it, or opens it in a browser tab.
 Files the app cannot show (PDF, Office documents, …) open in the system's app, or in a browser tab.
 
-![The editor](images/07-editor.png)
+![The editor](docs/tutorial/images/07-editor.png)
 
 **`F4` — or the pencil — edits** the file in place:
 
@@ -145,7 +164,7 @@ Files the app cannot show (PDF, Office documents, …) open in the system's app,
    indents.
 4. The status line shows the line, column and language.
 
-![JSON as a tree](images/08-json.png)
+![JSON as a tree](docs/tutorial/images/08-json.png)
 
 **JSON opens as a tree.**
 
@@ -159,7 +178,7 @@ Files the app cannot show (PDF, Office documents, …) open in the system's app,
 Double-click a key or a value (or press `F2`) to change it in place. The file keeps its own
 layout and is saved with `Ctrl`+`S`. *Format Document* lays out the whole file again.
 
-![CSV as a spreadsheet](images/09-csv.png)
+![CSV as a spreadsheet](docs/tutorial/images/09-csv.png)
 
 **CSV and TSV files open as a spreadsheet**, with Excel's keys:
 
@@ -172,20 +191,20 @@ layout and is saved with `Ctrl`+`S`. *Format Document* lays out the whole file a
 6. `F4` makes the sheet editable: type into a cell, use `F2`, `Delete`, paste and undo.
    *Show as Text* switches to the raw file.
 
-![Inside a zip](images/21-archive.png)
+![Inside a zip](docs/tutorial/images/21-archive.png)
 
 **A `.zip` opens like a folder** (1), read-only. *Extract Here*, *Extract To…* and *Compress…*
 are in the context menu. A folder or a selection downloads as one zip.
 
 ## 7. Finding things
 
-![Command palette](images/10-palette.png)
+![Command palette](docs/tutorial/images/10-palette.png)
 
 **The command palette** (`Ctrl`+`Shift`+`P`, or click the box in the title bar) lists every command.
 Typing filters them (1), and each one shows its key (2). Some commands ask for a value right in
 the box — *Go: Jump to Folder…* takes a path.
 
-![Search by name](images/20-search.png)
+![Search by name](docs/tutorial/images/20-search.png)
 
 **Search** (`Ctrl`+`Shift`+`F`) finds files by name under the whole workspace or the active
 folder (1). Click a result to show it in the active panel (2).
@@ -195,7 +214,7 @@ in order. On the desktop, `Ctrl`+`1` … `Ctrl`+`9` open the first nine.
 
 ## 8. Git
 
-![The Git pane and a diff](images/13-git.png)
+![The Git pane and a diff](docs/tutorial/images/13-git.png)
 
 When the folder shown is in a Git repository, the Git pane appears at the top of Details:
 
@@ -211,7 +230,7 @@ up by itself.
 
 ## 9. Disk Usage
 
-![Disk Usage](images/14-disk-usage.png)
+![Disk Usage](docs/tutorial/images/14-disk-usage.png)
 
 The activity bar's *Disk Usage* (5) shows where the space went. You can also press a folder's
 *Size* in Details.
@@ -224,7 +243,7 @@ The activity bar's *Disk Usage* (5) shows where the space went. You can also pre
 
 ## 10. Task Manager
 
-![Task Manager — processes](images/15-task-manager.png)
+![Task Manager — processes](docs/tutorial/images/15-task-manager.png)
 
 The *Task Manager* is like Windows' own, for the machine tr-file runs on (`Ctrl`+`Shift`+`T` on
 the desktop):
@@ -238,14 +257,14 @@ the desktop):
 `Delete` ends a task and `Shift`+`Delete` ends the whole process tree — both ask first. The
 right-click menu also has *Open File Location* and *Copy Details*.
 
-![Task Manager — graphs](images/16-performance.png)
+![Task Manager — graphs](docs/tutorial/images/16-performance.png)
 
 **Graph** shows CPU, memory, disk and each network adapter (1), over the last 60 seconds or
 10 minutes (2). CPU can be one graph, or one per logical processor (3).
 
 ## 11. The bottom panel and Notes
 
-![Bottom panel with Notes](images/19-bottom-panel.png)
+![Bottom panel with Notes](docs/tutorial/images/19-bottom-panel.png)
 
 1. **Transfers** (uploads and downloads), **Progress** (file jobs), **Problems** and **Notes**.
    The counts on the tabs tell you when something happened.
@@ -254,12 +273,12 @@ right-click menu also has *Open File Location* and *Copy Details*.
 
 ## 12. Settings, themes and help
 
-![The gear menu](images/22-gear.png)
+![The gear menu](docs/tutorial/images/22-gear.png)
 
 The **gear** at the bottom of the activity bar (1) has Settings, Keyboard Shortcuts, hidden
 files (`Ctrl`+`H`) and the layout options.
 
-![Settings](images/18-settings.png)
+![Settings](docs/tutorial/images/18-settings.png)
 
 **Settings** (`Ctrl`+`,`):
 
@@ -269,11 +288,11 @@ files (`Ctrl`+`H`) and the layout options.
 3. Color theme: dark, light, or follow the system.
 4. Put the Explorer and Details on either side of the window.
 
-![Light theme](images/24-light.png)
+![Light theme](docs/tutorial/images/24-light.png)
 
 **Light or dark** — the title bar's sun / moon button (1) switches between them.
 
-![Help — the cheatsheet](images/17-help.png)
+![Help — the cheatsheet](docs/tutorial/images/17-help.png)
 
 **`F1` opens the cheatsheet** (1). It lists every key as it is bound right now, including your
 own changes, and you can search it (2). The full list is also in [SHORTCUTS.md](../../SHORTCUTS.md).

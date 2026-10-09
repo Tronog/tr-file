@@ -68,13 +68,14 @@ describe('ChromeFeature', () => {
       await startRoot();
       const view = () => menus().find((menu) => menu.id === 'view')?.items ?? [];
       const checked = () => view().filter((item) => item.checked).map((item) => item.id);
-      expect(checked()).toEqual(['view.list', 'view.sort.name']);
+      // The activity bar is shown, so its toggle is checked (PRD 001, §9.2.1).
+      expect(checked()).toEqual(['view.list', 'view.sort.name', 'view.toggleActivityBar']);
 
       workbench.chromeFt.runMenuItem({ menuId: 'view', itemId: 'view.sort.size' });
       workbench.chromeFt.runMenuItem({ menuId: 'view', itemId: 'view.sortDescending' });
       workbench.chromeFt.runMenuItem({ menuId: 'view', itemId: 'view.grid' });
 
-      expect(checked()).toEqual(['view.grid', 'view.sort.size', 'view.sortDescending']);
+      expect(checked()).toEqual(['view.grid', 'view.sort.size', 'view.sortDescending', 'view.toggleActivityBar']);
       expect(workbench.chromeFt.statusTrailingItems().find((item) => item.id === 'sort')?.label).toBe(
         'Sorted by Size, descending',
       );

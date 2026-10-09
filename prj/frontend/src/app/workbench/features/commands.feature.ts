@@ -470,6 +470,7 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
       this.builtin('view.toggleExplorer'),
       this.builtin('view.toggleDetails'),
       this.builtin('view.toggleSidebars'),
+      this.builtin('view.toggleActivityBar'),
       /* The sidebars' `…` menus (PRD 001, §9.2); the folder tree's header is the root's name. */
       ...this.builtinsOf('view.pane.').map((spec) => (spec.id === 'view.pane.explorer-tree' ? { ...spec, label: () => p.explorerFt.title } : spec)),
       /* Session (PRD 003, §6), and the title bar's sun / moon (PRD 001, §8.2.2) */

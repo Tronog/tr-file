@@ -18,6 +18,13 @@ export class UiBottomPanelFeature {
   /** Whether the panel is showing its tab bar only. */
   readonly collapsed: WritableSignal<boolean>;
 
+  /**
+   * Whether the panel is put away altogether, tab bar and all — by `Ctrl`+`/`
+   * with the sidebars (PRD 001, §9.2.1). It comes back as it was, collapsed
+   * or open, and for anything asked of it: a tab chosen, the toggle.
+   */
+  readonly hidden = signal(false);
+
   private readonly focusToken = signal(0);
 
   /** Raised to put the keyboard in the active tab's content; `UiBottomPanel` answers it. */
@@ -71,6 +78,7 @@ export class UiBottomPanelFeature {
   select(id: string): void {
     this.activeTabId.set(id);
     this.collapsed.set(false);
+    this.hidden.set(false);
   }
 
   /** The tab showing. */
@@ -78,9 +86,23 @@ export class UiBottomPanelFeature {
     return this.activeTabId();
   }
 
-  /** Puts the panel back as a restored session had it: open or collapsed — not the tab, which is the default on every start. */
-  restore(collapsed: boolean): void {
+  /** Puts the panel back as a restored session had it: open or collapsed, or put away — not the tab, which is the default on every start. */
+  restore(collapsed: boolean, hidden = false): void {
     this.collapsed.set(collapsed);
+    this.hidden.set(hidden);
+  }
+
+  /** Puts the panel away, or brings it back as it was; put away with the keyboard in it, the keyboard goes to the active panel. */
+  setHidden(hidden: boolean): void {
+    if (hidden === this.hidden()) {
+      return;
+    }
+    const focused = globalThis.document?.activeElement;
+    const hadFocus = hidden && focused instanceof Element && focused.closest('[data-focus-region="bottom"]') !== null;
+    this.hidden.set(hidden);
+    if (hadFocus) {
+      this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
+    }
   }
 
   /** Shows a tab with the keyboard in it, the main sub-application forward first (PRD 001, §1.1). */
@@ -100,7 +122,12 @@ export class UiBottomPanelFeature {
    * take the keyboard: only this, which is the user asking for the panel.
    */
   toggleCollapsed(): void {
-    if (this.collapsed()) {
+    if (this.hidden()) {
+      // Put away by `Ctrl`+`/`: asked for, it comes back open.
+      this.hidden.set(false);
+      this.collapsed.set(false);
+      this.focusToken.update((token) => token + 1);
+    } else if (this.collapsed()) {
       this.collapsed.set(false);
       this.focusToken.update((token) => token + 1);
     } else {

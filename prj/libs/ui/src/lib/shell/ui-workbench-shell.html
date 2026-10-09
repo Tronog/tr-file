@@ -17,6 +17,7 @@
   [rightSashLabel]="'Resize ' + right.label"
   [leftVisible]="apps.mainShown() && chrome.isShown(left.id)"
   [rightVisible]="apps.mainShown() && chrome.isShown(right.id)"
+  [activityVisible]="chrome.activityShown()"
   [leftWidth]="wb.leftSidebarWidth()"
   [rightWidth]="wb.rightSidebarWidth()"
   [leftMin]="resize.leftBounds.min"
@@ -108,7 +109,7 @@
     </div>
 
     <!-- Nothing to resize while the panel is its tab bar. -->
-    @if (!panel.collapsed()) {
+    @if (!panel.collapsed() && !panel.hidden()) {
       <ui-sash
         orientation="horizontal"
         label="Resize bottom panel"
@@ -122,6 +123,7 @@
     <ui-bottom-panel
       data-focus-region="bottom"
       class="bottom-panel"
+      [class.is-hidden]="panel.hidden()"
       [label]="wb.config.bottomPanel.label"
       [style.height.px]="panel.collapsed() ? null : wb.bottomPanelHeight()"
       [collapsed]="panel.collapsed()"

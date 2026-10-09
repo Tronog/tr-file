@@ -35,7 +35,7 @@ the configurable keys as they are bound now, the user's changes included.
 | `` Ctrl+Shift+` `` | Show or hide the bottom panel (the key left of `1`, on any layout) | Anywhere |
 | `Ctrl`+`E` | Show or hide the Explorer | Anywhere |
 | `Ctrl`+`D` | Show or hide Details | Anywhere |
-| `Ctrl`+`/` | Show or hide both sidebars — either shown, both are hidden; both hidden, both come back | Anywhere |
+| `Ctrl`+`/` | Show or hide both sidebars, the activity bar and the bottom panel — either sidebar shown, all are hidden; both hidden, all come back (the bottom panel as it was) | Anywhere |
 | `Ctrl`+`U` | Check for updates (desktop) | Anywhere |
 | `Ctrl`+`S` | Save the file being edited | Anywhere, while a file is being edited |
 | `Ctrl`+`Tab` / `Ctrl`+`Shift`+`Tab` | Focus next / previous part: Explorer → each panel → bottom panel (while open) → Details, and round | Anywhere |

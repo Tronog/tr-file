@@ -43,6 +43,9 @@ export class UiWorkbench {
 
   readonly rightVisible = input<boolean>(true);
 
+  /** The activity bar is shown; `Ctrl`+`/` puts it away with the sidebars (PRD 001, §9.2.1). */
+  readonly activityVisible = input<boolean>(true);
+
   /** Bounds the left sidebar may be dragged between, in px — announced by its sash. */
   readonly leftMin = input<number>(180);
 

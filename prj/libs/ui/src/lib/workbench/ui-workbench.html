@@ -5,7 +5,7 @@
 </div>
 
 <div class="body">
-  <div class="activity-slot" role="navigation" aria-label="Activity bar" [style.order]="activityOrder()">
+  <div class="activity-slot" role="navigation" aria-label="Activity bar" [class.is-hidden]="!activityVisible()" [style.order]="activityOrder()">
     <ng-content select="[uiSlot=activity]" />
   </div>
 

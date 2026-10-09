@@ -47,7 +47,7 @@ export class UiFocusCycleFeature {
     return [
       ...at('left'),
       ...this.parent.panelLayoutFt.groupIds().map((id) => `group:${id}`),
-      ...(this.parent.bottomPanelFt.collapsed() ? [] : ['bottom']),
+      ...(this.parent.bottomPanelFt.collapsed() || this.parent.bottomPanelFt.hidden() ? [] : ['bottom']),
       ...[...at('right')].reverse(),
     ];
   });

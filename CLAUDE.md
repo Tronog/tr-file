@@ -284,7 +284,7 @@ The title bar's buttons (`ChromeFeature.titleBarActions`, `runTitleBarAction`) a
 table: first of them, leftmost but for the zoom, the light/dark toggle (PRD 001, §8.2.2; `view.toggleTheme`,
 `PreferencesFeature.toggleTheme`) — a sun in the dark, a moon in the light, choosing the other of the
 theme in force outright, so a window following the system stops following it —, then *Toggle Explorer* / *Toggle Details* (`view.toggleExplorer` / `view.toggleDetails`, `Ctrl`+`E` /
-`Ctrl`+`D` — PRD 001, §9.2.1; `Ctrl`+`/` is both, `view.toggleSidebars`, `ChromeFeature.toggleSidebars`: either shown, both are hidden, else both shown —, drawn on the
+`Ctrl`+`D` — PRD 001, §9.2.1; `Ctrl`+`/` is both, `view.toggleSidebars`, `ChromeFeature.toggleSidebars`: either shown, both are hidden, else both shown — and the activity bar and the bottom panel with them (`activityShown`, the session's `activityBarHidden`, `UiWorkbench.activityVisible`; *View › Toggle Activity Bar*, `view.toggleActivityBar`, brings it back alone; the bottom panel is put away whole, `UiBottomPanelFeature.hidden` / `setHidden`, the session's `bottomPanel.hidden`, kept in the page, out of the `Ctrl`+`Tab` ring, and back as it was — or open, for a tab chosen or its toggle) —, drawn on the
 side each sidebar is on, pressed while shown — `ChromeFeature.isShown`, the session's
 `hiddenSidebars`; hidden, a sidebar leaves the `Ctrl`+`Tab` ring, gives the keyboard back to the
 active panel, and comes back for anything shown in it), *Toggle Panel* (§12.3), and last, the
@@ -776,6 +776,12 @@ new version is started directly (`startDetached`, with `--tr-file-upgraded`, so 
 *File › Check for Updates…* (§8.6.1, `file.checkForUpdates`, `Ctrl`+`U`, desktop only) looks now — the channel's
 `check` — and always answers: up to date, a newer version to upgrade to (*Upgrade* / *Later*), the
 folder unreadable, or a copy that does not update itself (`supported: false`).
+
+PRD 017, §1: the same distributables — AppImage, portable `.exe`, setup and the two mac `.tar.gz` — go to
+a GitHub release of the `github` remote (`Tronog/tr-file`): `pnpm desktop:release:github` builds them all
+and runs `publish:github` (`desktop/scripts/publish-github.mjs`), which uploads them with the `gh` CLI under
+the tag `v<version>` on HEAD — all five or nothing, HEAD already pushed to GitHub, a release that exists
+has its files replaced.
 
 Section 8.2 took the window's frame away: `UiTitleBar` is the title bar, with the drag
 region and the window buttons in it. `WindowControlsChannel` plus the preload give the

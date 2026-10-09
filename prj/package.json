@@ -20,6 +20,8 @@
     "desktop:package": "pnpm build && pnpm --filter @tr-file/desktop package",
     "desktop:package:linux": "pnpm build && pnpm --filter @tr-file/desktop package:linux",
     "desktop:package:win": "pnpm build && pnpm --filter @tr-file/desktop package:win",
+    "desktop:package:mac": "pnpm build && pnpm --filter @tr-file/desktop package:mac",
+    "desktop:release:github": "pnpm build && pnpm --filter @tr-file/desktop package && pnpm --filter @tr-file/desktop package:mac && pnpm --filter @tr-file/desktop publish:github",
     "docker:dev": "docker compose -f compose.dev.yaml up --build",
     "docker:dev:down": "docker compose -f compose.dev.yaml down -v",
     "docker:prod": "docker compose -f compose.prod.yaml up --build -d",

@@ -40,6 +40,11 @@
 
 .bottom-panel {
   flex: none;
+
+  /* Put away by Ctrl+/ (PRD 001, §9.2.1): kept, with what its tabs hold, but takes no room. */
+  &.is-hidden {
+    display: none;
+  }
 }
 
 /* Kept, hidden, while another sub-application is shown (PRD 001, §1.1). */

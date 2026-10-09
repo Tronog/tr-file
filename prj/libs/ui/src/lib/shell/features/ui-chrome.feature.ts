@@ -23,6 +23,9 @@ export class UiChromeFeature {
   /** Whether each sidebar is shown, by id — the title bar's sidebar buttons. */
   private readonly shown: WritableSignal<Readonly<Record<string, boolean>>>;
 
+  /** Whether the activity bar is shown: `Ctrl`+`/` puts it away with the sidebars (PRD 001, §9.2.1). */
+  readonly activityShown = signal(true);
+
   constructor(protected readonly parent: UiWorkbenchService) {
     const config = parent.config;
     this.commandLabel = config.commandCenter?.label ?? 'Search commands…';
@@ -47,12 +50,34 @@ export class UiChromeFeature {
   }
 
   /**
-   * Both sidebars at once (PRD 001, §9.2.1): either shown, both go — the
-   * panels get the whole window —; both hidden, both come back.
+   * Both sidebars at once, and the activity bar and the bottom panel with
+   * them (PRD 001, §9.2.1): either sidebar shown, all go — the panels get the
+   * whole window —; both hidden, all come back, the bottom panel as it was.
    */
   toggleSidebars(): void {
     const ids = this.parent.config.sidebars.map((sidebar) => sidebar.id);
-    this.setShown(ids, ids.every((id) => !this.isShown(id)));
+    const show = ids.every((id) => !this.isShown(id));
+    this.setShown(ids, show);
+    this.setActivityShown(show);
+    this.parent.bottomPanelFt.setHidden(!show);
+  }
+
+  /** The activity bar alone — *View › Toggle Activity Bar*, to bring it back without the sidebars. */
+  toggleActivityBar(): void {
+    this.setActivityShown(!this.activityShown());
+  }
+
+  /** Shows or hides the activity bar; hidden with the keyboard on it, the keyboard goes to the active panel. */
+  private setActivityShown(show: boolean): void {
+    if (show === this.activityShown()) {
+      return;
+    }
+    const focused = globalThis.document?.activeElement;
+    const hadFocus = !show && focused instanceof Element && focused.closest('ui-activity-bar') !== null;
+    this.activityShown.set(show);
+    if (hadFocus) {
+      this.parent.panelFocusFt.focusBody(this.parent.activeGroupId());
+    }
   }
 
   /** Shows a sidebar if it is hidden — for something shown in it. */
@@ -71,9 +96,10 @@ export class UiChromeFeature {
     }
   }
 
-  /** Puts the sidebars back as a restored session had them. */
-  restoreSidebars(hidden: readonly string[]): void {
+  /** Puts the sidebars — and the activity bar — back as a restored session had them. */
+  restoreSidebars(hidden: readonly string[], activityHidden = false): void {
     this.shown.set(Object.fromEntries(this.parent.config.sidebars.map((sidebar) => [sidebar.id, !hidden.includes(sidebar.id)])));
+    this.activityShown.set(!activityHidden);
   }
 
   /** The hidden sidebars, for the session. */
@@ -100,7 +126,7 @@ export class UiChromeFeature {
         return preferences.effectiveTheme() === 'dark' ? { id, label: 'Switch to Light Theme', icon: 'sun' } : { id, label: 'Switch to Dark Theme', icon: 'moon' };
       }
       if (toggles === 'bottom-panel') {
-        return { id, label, icon, active: !this.parent.bottomPanelFt.collapsed() };
+        return { id, label, icon, active: !this.parent.bottomPanelFt.collapsed() && !this.parent.bottomPanelFt.hidden() };
       }
       if (toggles?.startsWith('sidebar:')) {
         const sidebar = toggles.slice('sidebar:'.length);

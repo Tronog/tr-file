@@ -12,7 +12,8 @@ const SAVE_DELAY_MS = 400;
 export interface UiSessionSnapshot<TGroup extends UiGroupState = UiGroupState> extends UiWorkbenchLayout<TGroup> {
   readonly version: 1;
   /** Open or collapsed; not the tab, which is the default on every start (PRD 001, §12.2). */
-  readonly bottomPanel: { readonly collapsed: boolean };
+  /** Open or collapsed — and `hidden`, put away by `Ctrl`+`/` (PRD 001, §9.2.1), written only then. */
+  readonly bottomPanel: { readonly collapsed: boolean; readonly hidden?: boolean };
   /** The sidebar panes that were open. */
   readonly panes: readonly string[];
   /** The order of the sidebars' panes (PRD 002, §5.1), where it is not the default. */
@@ -23,6 +24,8 @@ export interface UiSessionSnapshot<TGroup extends UiGroupState = UiGroupState> e
   readonly hiddenPanes: readonly string[];
   /** The sidebars the title bar hid. */
   readonly hiddenSidebars: readonly string[];
+  /** The activity bar was hidden (PRD 001, §9.2.1) — written only then. */
+  readonly activityBarHidden?: boolean;
   /** The application's own fields (`UiWorkbenchConfig.readSession`), written beside the rest. */
   readonly extras: Readonly<Record<string, unknown>>;
 }
@@ -173,12 +176,13 @@ export class UiSessionFeature<TTab extends UiTabState = UiTabState, TGroup exten
       leftSidebarWidth: p.leftSidebarWidth(),
       rightSidebarWidth: p.rightSidebarWidth(),
       bottomPanelHeight: p.bottomPanelHeight(),
-      bottomPanel: { collapsed: p.bottomPanelFt.collapsed() },
+      bottomPanel: { collapsed: p.bottomPanelFt.collapsed(), ...(p.bottomPanelFt.hidden() ? { hidden: true } : {}) },
       panes: p.sidebarPanesFt.expandedIds(),
       paneOrder: p.sidebarPanesFt.changedOrders(),
       paneSizes: p.sidebarPanesFt.paneSizes(),
       hiddenPanes: p.sidebarPanesFt.hiddenIds(),
       hiddenSidebars: p.chromeFt.hiddenSidebars(),
+      ...(p.chromeFt.activityShown() ? {} : { activityBarHidden: true }),
       extras: this.extras(),
     };
   }
@@ -238,11 +242,12 @@ export class UiSessionFeature<TTab extends UiTabState = UiTabState, TGroup exten
       rightSidebarWidth: width('rightSidebarWidth', config.layout.rightSidebarWidth),
       bottomPanelHeight: width('bottomPanelHeight', config.layout.bottomPanelHeight),
       // A `tab` saved before §12.2 is ignored.
-      bottomPanel: { collapsed: bottom['collapsed'] !== false },
+      bottomPanel: { collapsed: bottom['collapsed'] !== false, ...(bottom['hidden'] === true ? { hidden: true } : {}) },
       panes: UiSessionFeature.strings(raw['panes']),
       paneOrder: UiSessionFeature.paneOrder(raw['paneOrder'], sidebars),
       paneSizes: UiSessionFeature.paneSizes(raw['paneSizes']),
       hiddenSidebars: UiSessionFeature.strings(raw['hiddenSidebars']).filter((name) => sidebars.includes(name)),
+      ...(raw['activityBarHidden'] === true ? { activityBarHidden: true } : {}),
       // A session from before §9.2 hid nothing on purpose: it gets the default.
       hiddenPanes: Array.isArray(raw['hiddenPanes'])
         ? UiSessionFeature.strings(raw['hiddenPanes'])
