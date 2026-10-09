@@ -1,6 +1,6 @@
 # Overview
 
-A Universal File Manager. Made for workers with workflows.
+A Universal File Manager. Made for working class.
 
 # Development
 
