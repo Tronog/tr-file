@@ -763,19 +763,23 @@ development). Electron 44 cannot propose a punctuation key to the portal (electr
 binds the shortcut with no key: `Ctrl`+`` ` `` is assigned once in Settings › Apps › tr-file › Global
 Shortcuts. A chord already taken is logged, not fatal.
 
-Section 8.6: the desktop updates itself from a folder on the share (`S:\Library\Software\Applications\Tronog\TR-File`,
-`/S/Library/Software/Applications/Tronog/TR-File`; `TR_FILE_UPDATE_DIR`, `off`). `SelfUpdate`
-(`desktop/src/self-update.ts`) judges a file new by size and modified time (never its name, which may stay the same) against the key
-recorded in `update-state.json`; `UpdateMonitor` looks at start and every 15 minutes; `UpdateChannel` and
+Section 8.6: the desktop updates itself — since PRD 017, §2, from the latest GitHub release of `Tronog/tr-file`
+(`GitHubReleaseFeed`, `releases/latest` asked with its `ETag`, through `net.fetch`; the repository must be public),
+or from a folder where `TR_FILE_UPDATE_DIR` names one (`FolderUpdateFeed`, the share as it was;
+`TR_FILE_UPDATE_REPO` another repository; `off`). `SelfUpdate` (`desktop/src/self-update.ts`, over an
+`UpdateFeed`) offers a release whose tag is newer than the running version, never an older one, and judges
+one of the same version — or a folder's file — new by size and modified (upload) time (never its name,
+which may stay the same) against the key recorded in `update-state.json`; a download must match the
+asset's SHA-256 `digest`; `UpdateMonitor` looks at start and every 15 minutes; `UpdateChannel` and
 the preload's `trFileUpdate` reach `AppUpdateFeature`, whose blue *Upgrade* sits right of the command palette box
 (`UiTitleBar.upgrade`). Upgrading renames an AppImage over the running one (same path); on Windows the
-new file is first copied into the local temp folder (a program on the share will not run) and run from
+new file is first downloaded into the local temp folder (a program on a share will not run) and run from
 there — the portable `.exe` as the app from then on, the setup silently over the installation — and the
 new version is started directly (`startDetached`, with `--tr-file-upgraded`, so it waits for the old one's single-instance lock) before this one quits; the portable launcher has no `unpackDirName`, so old and new never share an unpack folder. Every step goes to `update.log` in the user-data folder.
-`pnpm --filter @tr-file/desktop publish:share` puts a release there.
+`pnpm desktop:release:github` publishes a release (PRD 017, §1); `publish:share` still fills a folder.
 *File › Check for Updates…* (§8.6.1, `file.checkForUpdates`, `Ctrl`+`U`, desktop only) looks now — the channel's
-`check` — and always answers: up to date, a newer version to upgrade to (*Upgrade* / *Later*), the
-folder unreadable, or a copy that does not update itself (`supported: false`).
+`check` — and always answers: up to date, a newer version to upgrade to (*Upgrade* / *Later*), why
+GitHub (or the folder) could not be read, or a copy that does not update itself (`supported: false`).
 
 PRD 017, §1: the same distributables — AppImage, portable `.exe`, setup and the two mac `.tar.gz` — go to
 a GitHub release of the `github` remote (`Tronog/tr-file`): `pnpm desktop:release:github` builds them all

@@ -333,7 +333,7 @@ are `window-zoom.ts`'s.
 | `src/system-clipboard.ts`, `src/electron-clipboard.ts` | Files on the system clipboard, both ways |
 | `src/drag-out.channel.ts` | Entries dragged out of a panel into other apps |
 | `src/window-controls.channel.ts` | The four verbs a page may use on its own window |
-| `src/self-update.ts`, `src/update.channel.ts` | Upgrading from the share: what is newer, putting it in place, the *Upgrade* button's channel |
+| `src/self-update.ts`, `src/update.channel.ts` | Upgrading from the latest GitHub release (or a folder): what is newer, putting it in place, the *Upgrade* button's channel |
 | `src/app-menu.ts` | The accelerator table; deliberately without `Ctrl`+`W` |
 | `src/preload.cts` | The two small objects the renderer is given |
 | `scripts/bundle.mjs` | The build: one file for the main process, one for the preload |
@@ -457,39 +457,55 @@ README). So `pnpm package:win` needs nothing installed: no Wine, no `sudo`, no
 Docker. (electron-builder's own downloadable Linux Wine, `toolsets.wine`, is no
 help here: its archive ships without Wine's Windows DLLs and cannot start.)
 
-### Self-updating (PRD 001, §8.6)
+### Self-updating (PRD 001, §8.6; PRD 017, §2)
 
-The distributables are published to a folder on the office share, and every
-packaged copy watches it — at start and every 15 minutes:
+Every packaged copy watches the **latest GitHub release** of `Tronog/tr-file`
+— what `pnpm desktop:release:github` publishes — at start and every 15 minutes
+(`GitHubReleaseFeed`: `GET /repos/…/releases/latest`, through Electron's
+`net.fetch` so the system's proxy applies). Each kind of copy takes its own
+asset:
 
-| Platform | Folder | Files |
-| --- | --- | --- |
-| Windows | `S:\Library\Software\Applications\Tronog\TR-File` | `*.exe` — the portable one for a portable copy, `*Setup*` for an installed one |
-| Linux | `/S/Library/Software/Applications/Tronog/TR-File` | `*.AppImage` |
+| Copy | Asset |
+| --- | --- |
+| Linux AppImage | `*.AppImage` |
+| Windows portable | `*.exe` but the setup |
+| Windows installed | `*Setup*.exe` |
 
-`TR_FILE_UPDATE_DIR` names another folder, and `off` turns it off; a
-development run (not packaged, or no `APPIMAGE` / Windows) never updates.
+`TR_FILE_UPDATE_REPO` names another repository, `TR_FILE_UPDATE_DIR` a folder
+of distributables to look in instead (`FolderUpdateFeed` — the office share, as
+it was before PRD 017; `pnpm publish:share` still fills one), and `off` in
+either turns updating off; a development run (not packaged, or no `APPIMAGE` /
+Windows) never updates.
 
-There is no feed and no version to read: a file is a new version when its
-**size and modified time** are not those of the file this copy was installed
-from — the **name** plays no part, and may stay the same from one version to
-the next. `update-state.json` in the user-data folder records that key, and
-the file it was installed as. Of several, the most recently modified wins; one
-modified in the last 30 s is taken to be still copying and waits. Where the
-running file is not the one recorded (a copy installed by hand, or an older one
-started from its old shortcut), it stands in itself — the same size is the same
-file, whatever a copy did to its time — or, for the installed kind, a name
-carrying `app.getVersion()`; either records the share's key from then on.
+The repository has to be **public**: GitHub answers an anonymous client `404`
+for a private one's releases, so no copy would ever see an update. Anonymous
+API calls are limited to 60 an hour per address; each check is asked with the
+last answer's `ETag`, and an unchanged answer (`304`) does not count, so an
+office of copies behind one address stays well under.
+
+A release's tag is its version: one newer than `app.getVersion()` is offered,
+one older never is. The **same** version — a release published again with its
+files replaced — is told by the asset's **size and upload time**, against the
+key of the file this copy was installed from (a folder, which has no version,
+is judged by that key alone: size and modified time; the name plays no part).
+`update-state.json` in the user-data folder records that key, and the file it
+was installed as. In a folder, of several the most recently modified wins, and
+one modified in the last 30 s is taken to be still copying and waits; on GitHub
+an asset still uploading is not offered. Where the running file is not the one
+recorded (a copy installed by hand, or an older one started from its old
+shortcut), it stands in itself — the same size is the same file, whatever a
+copy did to its time — or, for the installed kind, a name carrying
+`app.getVersion()`; either records the feed's key from then on.
 
 While one is there the page's title bar shows a blue **Upgrade** right of the
 command palette box (`UpdateChannel` → `window.trFileUpdate` → `AppUpdateFeature`). Pressed
 and confirmed, `SelfUpdate.apply`:
 
-- **AppImage** — copies the new file beside the running one (a dot-name) and
-  renames it over it, so the path every shortcut points at stays.
-- **Windows** — a program on a network share will not run, so the new file is
-  always copied into the **local temporary folder** first
-  (`%TEMP%\tr-file-update\…`) and run from there:
+- **AppImage** — downloads (or copies) the new file beside the running one (a
+  dot-name) and renames it over it, so the path every shortcut points at stays.
+- **Windows** — the new file is downloaded into the **local temporary folder**
+  (`%TEMP%\tr-file-update\…`) — copied there from a folder, since a program on
+  a network share will not run — and run from there:
   - **portable `.exe`** — into a folder of its own per version, and that copy
     is the app from then on; the old `.exe` is left alone (started again, it
     is offered the upgrade once more). Folders of versions no longer running
@@ -497,9 +513,11 @@ and confirmed, `SelfUpdate.apply`:
   - **installed** — the setup, run with `--updated /S --force-run`: silent,
     over the installation (§8.4), and it starts the app when done.
 
-The file on the share is checked again before and after the copy, so one
-changed meanwhile is refused and the running copy left alone; a failure is
-said in the window. The new copy is then started directly — the local
+A download must arrive whole and match the SHA-256 digest GitHub keeps for
+the asset (so one replaced meanwhile is refused), and stalls after 60 s with
+nothing received; a folder's file is checked again before and after the copy.
+Either way the running copy is left alone on a failure, which is said in the
+window. The new copy is then started directly — the local
 AppImage or `.exe`, or the setup — as a process of its own, with
 `--tr-file-upgraded`, and the app quits once it is running (if it cannot start,
 the window says so and stays). Nothing waits in between: a copy started with
@@ -517,16 +535,13 @@ the first thing to read when an upgrade does not come back.
 *File › Check for Updates…* (§8.6.1) asks the same channel to look now
 (`check`) rather than at the next quarter hour, and the window always answers:
 up to date, a newer version — offered for upgrade on the spot, or left on the
-title bar for later —, the folder could not be read (a periodic check only logs
-that, once), or this copy does not update itself (a development run, or
-`TR_FILE_UPDATE_DIR=off`).
+title bar for later —, why GitHub (or the folder) could not be read — not
+reached, out of checks for the hour, an error (a periodic check only logs
+that, once) —, or this copy does not update itself (a development run, or
+updating turned `off`).
 
-`pnpm publish:share [folder]` copies this version's AppImage and `.exe`s from
-`release/` to the share, each under a dot-name renamed into place, so no copy
-ever sees half a file.
-
-`pnpm publish:github [owner/repo]` (PRD 017, §1) makes a GitHub release of the
-same version instead, for the `github` remote unless told another
+`pnpm publish:github [owner/repo]` (PRD 017, §1) makes the GitHub release the
+copies update from, for the `github` remote unless told another
 (`TR_FILE_GITHUB_REPO`): the AppImage, both `.exe`s and both mac `.tar.gz`s,
 through the `gh` CLI (`gh auth login` once). It refuses unless all five are in
 `release/`, and unless HEAD is already pushed to GitHub, since the tag —
@@ -534,6 +549,11 @@ through the `gh` CLI (`gh auth login` once). It refuses unless all five are in
 has its files replaced; a new release is a new `version` in this
 `package.json`. From the workspace root `pnpm desktop:release:github` builds
 everything and publishes it.
+
+`pnpm publish:share [folder]` copies this version's AppImage and `.exe`s from
+`release/` to a folder instead (the share by default), each under a dot-name
+renamed into place, so no copy ever sees half a file — for copies whose
+`TR_FILE_UPDATE_DIR` names it.
 
 ### Why the main process is bundled
 
@@ -586,7 +606,7 @@ ad-hoc signature — calls it "damaged". On the Mac, once, after unpacking:
 xattr -cr tr-file.app && codesign --force --deep -s - tr-file.app
 ```
 
-A mac copy never updates itself (`updateSource` is `null` on darwin).
+A mac copy never updates itself (`detectInstallation` is `null` on darwin).
 
 ### What the build needs beforehand
 

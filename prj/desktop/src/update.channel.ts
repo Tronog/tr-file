@@ -24,7 +24,7 @@ const UP_TO_DATE: UpdateStatus = { available: null, upgrading: false };
  * The self-update, as far as the page sees it (PRD 001, §8.6): `status` for
  * the title bar's *Upgrade* button, `check` for *File › Check for Updates…*
  * (§8.6.1), `upgrade` when the button is pressed, and a pushed
- * status whenever the share has something new. With no monitor — a
+ * status whenever the feed has something new. With no monitor — a
  * development run, macOS, updating turned off — it answers "up to date".
  *
  * Checked like every other channel: only the app's own origin is answered.

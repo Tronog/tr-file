@@ -5,8 +5,8 @@ import type { WorkbenchService } from '../workbench.service';
 /**
  * The blue *Upgrade* button right of the command palette box (PRD 001, §8.6).
  *
- * The desktop shell watches the share the distributables are published on and
- * says when a newer one is there (`DesktopUpdateService`); this feature turns
+ * The desktop shell watches the latest GitHub release of the app (PRD 017, §2)
+ * and says when a newer one is there (`DesktopUpdateService`); this feature turns
  * that into the button, and a press into an upgrade — asked first, since the
  * window closes and the new version starts in its place, taking any job still
  * running with it. In a browser there is never a button. *File › Check for
@@ -44,7 +44,7 @@ export class AppUpdateFeature {
   }
 
   /**
-   * *File › Check for Updates…* (PRD 001, §8.6.1): the share is looked at now
+   * *File › Check for Updates…* (PRD 001, §8.6.1): the release is looked at now
    * rather than at the next quarter hour, and the answer is always said — up
    * to date, a newer version (upgraded from right there, if wanted), or why
    * it could not be looked at.
@@ -58,7 +58,7 @@ export class AppUpdateFeature {
     if (!update.supported()) {
       await this.parent.modal.message({
         message: 'This copy of tr-file does not update itself.',
-        detail: 'Only a packaged AppImage, portable .exe or installed copy is upgraded from the update folder.',
+        detail: 'Only a packaged AppImage, portable .exe or installed copy is upgraded to a newer release.',
         severity: 'info',
       });
       return;

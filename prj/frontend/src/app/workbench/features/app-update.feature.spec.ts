@@ -22,7 +22,7 @@ class FakeUpdateApi {
   status: Status = { available: null, upgrading: false };
   supported = true;
   error: string | undefined;
-  /** What the share holds, found by the next `check`. */
+  /** What the latest release holds, found by the next `check`. */
   onShare: string | null | undefined;
   checkError: string | undefined;
   private listener: ((status: unknown) => void) | undefined;
@@ -181,15 +181,15 @@ describe('File › Check for Updates… (PRD 001, §8.6.1)', () => {
     expect(workbench.appUpdateFt.upgrade()).toMatchObject({ label: 'Upgrade' });
   });
 
-  it('says why the share could not be looked at, or that this copy does not update', async () => {
+  it('says why the release could not be looked at, or that this copy does not update', async () => {
     const api = new FakeUpdateApi();
-    api.checkError = 'The update folder /S/x could not be read.';
+    api.checkError = 'GitHub could not be reached: fetch failed';
     const workbench = bootstrap(api);
     await settled();
     const message = vi.spyOn(workbench.modal, 'message').mockResolvedValue();
 
     await workbench.appUpdateFt.check();
-    expect(message).toHaveBeenLastCalledWith(expect.objectContaining({ detail: 'The update folder /S/x could not be read.', severity: 'warning' }));
+    expect(message).toHaveBeenLastCalledWith(expect.objectContaining({ detail: 'GitHub could not be reached: fetch failed', severity: 'warning' }));
 
     api.supported = false;
     await workbench.appUpdateFt.check();

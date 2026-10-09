@@ -290,7 +290,7 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
         run: (t) => p.systemOpenFt.copyPaths(some(t) ? t.paths : [t.folder as string]),
       },
       { id: 'file.emptyTrash', category: 'File', label: 'Empty Trash…', run: () => p.operationsFt.emptyTrash() },
-      // The share looked at now for a newer version (PRD 001, §8.6.1); only the desktop app updates itself.
+      // The latest release looked at now for a newer version (PRD 001, §8.6.1); only the desktop app updates itself.
       {
         id: 'file.checkForUpdates',
         category: 'File',

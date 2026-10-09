@@ -85,7 +85,7 @@ export class WorkbenchService extends UiWorkbenchService<PanelTabState, PanelGro
    */
   readonly desktopWindow = inject(DesktopWindowService);
 
-  /** The desktop's self-update: whether the share holds a newer version (PRD 001, §8.6). */
+  /** The desktop's self-update: whether a newer release is out (PRD 001, §8.6; PRD 017, §2). */
   readonly desktopUpdate = inject(DesktopUpdateService);
 
   /**

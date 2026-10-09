@@ -30,7 +30,7 @@ const UP_TO_DATE: DesktopUpdateStatus = { available: null, upgrading: false };
 /**
  * The desktop's self-update, as the page sees it (PRD 001, §8.6).
  *
- * The main process looks at the share and decides what is newer; this is the
+ * The main process looks at the latest release and decides what is newer; this is the
  * seam that hears about it and asks for the upgrade. Thin on purpose: what the
  * title bar shows, and asking the user first, is `AppUpdateFeature`'s. In a
  * browser there is nothing to update and `status` stays up to date.
@@ -65,7 +65,7 @@ export class DesktopUpdateService {
   }
 
   /**
-   * Looks at the share now (*File › Check for Updates…*, PRD 001, §8.6.1).
+   * Looks at the latest release now (*File › Check for Updates…*, PRD 001, §8.6.1).
    * Resolves with why it could not, or `null` — `status` and `supported` say
    * what was found.
    */

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { access, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -6,18 +7,25 @@ import { after, before, describe, it } from 'node:test';
 
 import {
   appendUpdateLog,
+  compareVersions,
   detectInstallation,
+  FolderUpdateFeed,
+  GitHubReleaseFeed,
   startDetached,
   isDistributableFor,
   SelfUpdate,
   UpdateMonitor,
   updateSource,
+  type HttpFetch,
   type Installation,
   type Relaunch,
   type UpdateStatus,
 } from './self-update.js';
 
-/** PRD 001, §8.6 — a new version is a file on the share whose name, size or modified time is not what is installed. */
+/**
+ * PRD 001, §8.6 — a new version is a file whose size or modified time is not what is installed;
+ * PRD 017, §2 — found in the latest GitHub release, whose tag says its version.
+ */
 
 let root: string;
 
@@ -48,7 +56,7 @@ async function publish(path: string, content: string, ageMs = 60_000): Promise<v
 
 function updater(dirs: { share: string; data: string }, installation: Installation): SelfUpdate {
   return new SelfUpdate({
-    source: dirs.share,
+    feed: new FolderUpdateFeed(dirs.share),
     installation,
     stateFile: join(dirs.data, 'update-state.json'),
     tempDir: join(dirs.data, 'tmp'),
@@ -69,12 +77,20 @@ describe('which copy is running', () => {
     assert.equal(detectInstallation('darwin', {}, true, '1.0.0'), null);
   });
 
-  it('looks on the share by default, elsewhere when told, nowhere when off', () => {
-    assert.equal(updateSource('linux', {}), '/S/Library/Software/Applications/Tronog/TR-File');
-    assert.equal(updateSource('win32', {}), 'S:\\Library\\Software\\Applications\\Tronog\\TR-File');
-    assert.equal(updateSource('linux', { TR_FILE_UPDATE_DIR: '/tmp/x' }), '/tmp/x');
-    assert.equal(updateSource('linux', { TR_FILE_UPDATE_DIR: 'off' }), null);
-    assert.equal(updateSource('darwin', {}), null);
+  it('follows the GitHub releases by default, another repository or a folder when told, nothing when off', () => {
+    assert.deepEqual(updateSource({}), { kind: 'github', repo: 'Tronog/tr-file' });
+    assert.deepEqual(updateSource({ TR_FILE_UPDATE_REPO: 'me/fork' }), { kind: 'github', repo: 'me/fork' });
+    assert.deepEqual(updateSource({ TR_FILE_UPDATE_DIR: '/tmp/x' }), { kind: 'folder', path: '/tmp/x' });
+    assert.equal(updateSource({ TR_FILE_UPDATE_DIR: 'off' }), null);
+    assert.equal(updateSource({ TR_FILE_UPDATE_REPO: 'off' }), null);
+  });
+
+  it('orders versions', () => {
+    assert.equal(compareVersions('0.1.10', '0.1.9'), 1);
+    assert.equal(compareVersions('v1.0', '1.0.0'), 0);
+    assert.equal(compareVersions('1.0.0-beta.1', '1.0.0'), -1);
+    assert.equal(compareVersions('0.9.0', '1.0.0'), -1);
+    assert.equal(compareVersions('latest', '1.0.0'), null);
   });
 
   it('matches each kind to its own distributable', () => {
@@ -226,6 +242,184 @@ describe('SelfUpdate', () => {
     assert.equal(candidate?.name, 'tr-file-Setup-1.0.1-x64.exe');
     const relaunch = await update.apply(candidate!);
     // Run from the local temporary folder: a program on the share will not run.
+    assert.equal(relaunch.command, join(dirs.data, 'tmp', 'setup', 'tr-file-Setup-1.0.1-x64.exe'));
+    assert.deepEqual(relaunch.args, ['--updated', '/S', '--force-run']);
+    assert.equal(await readFile(relaunch.command, 'utf8'), 'setup 2');
+  });
+});
+
+/** A release asset as GitHub's API describes it, for `content` uploaded `ageMs` ago. */
+function asset(name: string, content: string, ageMs = 60_000, state = 'uploaded'): GitHubAsset {
+  return {
+    name,
+    size: Buffer.byteLength(content),
+    state,
+    updated_at: new Date(Date.now() - ageMs).toISOString(),
+    browser_download_url: `https://github.com/o/r/releases/download/v/${name}`,
+    digest: `sha256:${createHash('sha256').update(content).digest('hex')}`,
+    content,
+  };
+}
+
+interface GitHubAsset {
+  name: string;
+  size: number;
+  state: string;
+  updated_at: string;
+  browser_download_url: string;
+  digest: string;
+  content: string;
+}
+
+/** GitHub, as far as the feed asks of it: `releases/latest` (with its ETag) and the downloads. */
+class FakeGitHub {
+  release: { tag_name: string; assets: GitHubAsset[] } | null = null;
+  /** What `releases/latest` answers instead, when set: a status and headers. */
+  refuse: { status: number; headers?: Record<string, string> } | null = null;
+  /** Served for a download in place of the asset's own content. */
+  tampered: string | null = null;
+  readonly asked: { url: string; etag: string | null; status: number }[] = [];
+
+  readonly fetch: HttpFetch = async (url, init) => {
+    const etag = new Headers(init?.headers).get('if-none-match');
+    const answer = (response: Response): Response => {
+      this.asked.push({ url, etag, status: response.status });
+      return response;
+    };
+    if (url.endsWith('/releases/latest')) {
+      if (this.refuse) {
+        return answer(new Response('{}', this.refuse));
+      }
+      if (this.release === null) {
+        return answer(new Response('{"message":"Not Found"}', { status: 404 }));
+      }
+      const body = JSON.stringify(this.release);
+      const tag = `"${createHash('sha1').update(body).digest('hex')}"`;
+      return answer(etag === tag ? new Response(null, { status: 304 }) : new Response(body, { status: 200, headers: { etag: tag } }));
+    }
+    const found = this.release?.assets.find((each) => each.browser_download_url === url);
+    return answer(found ? new Response(this.tampered ?? found.content) : new Response('', { status: 404 }));
+  };
+}
+
+function gitHubUpdater(github: FakeGitHub, data: string, installation: Installation): SelfUpdate {
+  return new SelfUpdate({
+    feed: new GitHubReleaseFeed('o/r', github.fetch, 'https://api.github.test'),
+    installation,
+    stateFile: join(data, 'update-state.json'),
+    tempDir: join(data, 'tmp'),
+  });
+}
+
+describe('GitHub releases (PRD 017, §2)', () => {
+  it('offers a newer release’s distributable for this kind, never an older one', async () => {
+    const dirs = await fixture('gh-newer');
+    const self = join(dirs.home, 'tr-file.AppImage');
+    await publish(self, 'v1', 0);
+    const github = new FakeGitHub();
+    const install: Installation = { kind: 'appimage', path: self, version: '1.0.0' };
+
+    // No release yet: nothing to offer, and nothing wrong.
+    assert.equal(await gitHubUpdater(github, dirs.data, install).check(), null);
+
+    github.release = {
+      tag_name: 'v1.0.1',
+      assets: [
+        asset('tr-file-1.0.1-x86_64.AppImage', 'v1.0.1'),
+        asset('tr-file-1.0.1-x64.exe', 'windows'),
+        asset('tr-file-1.0.1-mac-arm64.tar.gz', 'mac'),
+      ],
+    };
+    const candidate = await gitHubUpdater(github, dirs.data, install).check();
+    assert.equal(candidate?.name, 'tr-file-1.0.1-x86_64.AppImage');
+    assert.equal(candidate?.version, '1.0.1');
+    assert.equal(candidate?.source, 'https://github.com/o/r/releases/download/v/tr-file-1.0.1-x86_64.AppImage');
+
+    // A copy newer than the latest release is not offered a downgrade.
+    assert.equal(await gitHubUpdater(github, dirs.data, { ...install, version: '1.1.0' }).check(), null);
+
+    // One still uploading is not offered yet.
+    github.release = { tag_name: 'v1.0.2', assets: [asset('tr-file-1.0.2-x86_64.AppImage', 'v1.0.2', 0, 'starter')] };
+    assert.equal(await gitHubUpdater(github, dirs.data, install).check(), null);
+  });
+
+  it('tells a release of the same version, published again, by its files', async () => {
+    const dirs = await fixture('gh-same');
+    const self = join(dirs.home, 'tr-file-1.0.0-x64.exe');
+    await publish(self, 'build 1', 0);
+    const github = new FakeGitHub();
+    const install: Installation = { kind: 'portable', path: self, version: '1.0.0' };
+
+    github.release = { tag_name: 'v1.0.0', assets: [asset('tr-file-1.0.0-x64.exe', 'build 1', 300_000)] };
+    assert.equal(await gitHubUpdater(github, dirs.data, install).check(), null);
+
+    // Its files replaced by a rebuild (`publish:github` on a release that exists).
+    github.release = { tag_name: 'v1.0.0', assets: [asset('tr-file-1.0.0-x64.exe', 'build 2', 1_000)] };
+    assert.equal((await gitHubUpdater(github, dirs.data, install).check())?.name, 'tr-file-1.0.0-x64.exe');
+  });
+
+  it('asks again with the last ETag, and says when GitHub allows no more', async () => {
+    const dirs = await fixture('gh-etag');
+    const github = new FakeGitHub();
+    github.release = { tag_name: 'v1.0.1', assets: [asset('tr-file-Setup-1.0.1-x64.exe', 'setup')] };
+    const update = gitHubUpdater(github, dirs.data, { kind: 'installed', version: '1.0.0' });
+
+    assert.equal((await update.check())?.name, 'tr-file-Setup-1.0.1-x64.exe');
+    assert.equal((await update.check())?.name, 'tr-file-Setup-1.0.1-x64.exe');
+    assert.deepEqual(
+      github.asked.map(({ etag, status }) => [etag !== null, status]),
+      [
+        [false, 200],
+        [true, 304],
+      ],
+    );
+
+    github.refuse = { status: 403, headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '0' } };
+    await assert.rejects(update.check(), /allows no more update checks/);
+    github.refuse = { status: 502 };
+    await assert.rejects(update.check(), /GitHub answered 502/);
+  });
+
+  it('says when GitHub cannot be reached', async () => {
+    const dirs = await fixture('gh-offline');
+    const feed = new GitHubReleaseFeed('o/r', async () => {
+      throw new TypeError('fetch failed');
+    });
+    const update = new SelfUpdate({ feed, installation: { kind: 'installed', version: '1.0.0' }, stateFile: join(dirs.data, 's.json'), tempDir: dirs.data });
+    await assert.rejects(update.check(), /GitHub could not be reached: fetch failed/);
+  });
+
+  it('downloads an AppImage in place of the running one, checking it against its digest', async () => {
+    const dirs = await fixture('gh-apply');
+    const self = join(dirs.home, 'tr-file.AppImage');
+    await publish(self, 'old', 0);
+    const github = new FakeGitHub();
+    github.release = { tag_name: 'v1.0.1', assets: [asset('tr-file-1.0.1-x86_64.AppImage', 'new version')] };
+    const update = gitHubUpdater(github, dirs.data, { kind: 'appimage', path: self, version: '1.0.0' });
+
+    const candidate = await update.check();
+    assert.ok(candidate);
+    // Replaced on GitHub meanwhile, though the same size: refused, the running copy left alone.
+    github.tampered = 'NEW VERSION';
+    await assert.rejects(update.apply(candidate), /did not download as published/);
+    assert.equal(await readFile(self, 'utf8'), 'old');
+    await assert.rejects(access(join(dirs.home, '.tr-file.AppImage.update-part')));
+
+    github.tampered = null;
+    assert.deepEqual(await update.apply(candidate), { command: self, args: [] });
+    assert.equal(await readFile(self, 'utf8'), 'new version');
+    assert.equal((await stat(self)).mode & 0o111, 0o111);
+  });
+
+  it('downloads a newer setup into the local temporary folder, to be run silently', async () => {
+    const dirs = await fixture('gh-setup');
+    const github = new FakeGitHub();
+    github.release = { tag_name: 'v1.0.1', assets: [asset('tr-file-Setup-1.0.1-x64.exe', 'setup 2'), asset('tr-file-1.0.1-x64.exe', 'portable')] };
+    const update = gitHubUpdater(github, dirs.data, { kind: 'installed', version: '1.0.0' });
+
+    const candidate = await update.check();
+    assert.equal(candidate?.name, 'tr-file-Setup-1.0.1-x64.exe');
+    const relaunch = await update.apply(candidate!);
     assert.equal(relaunch.command, join(dirs.data, 'tmp', 'setup', 'tr-file-Setup-1.0.1-x64.exe'));
     assert.deepEqual(relaunch.args, ['--updated', '/S', '--force-run']);
     assert.equal(await readFile(relaunch.command, 'utf8'), 'setup 2');
