@@ -445,7 +445,8 @@ export class FileBrowserFeature implements PanelContentFeature {
    * selection, or takes them out of it. The cursor stays where it is.
    *
    * An entry selected only because the cursor stands on it was never picked,
-   * so selecting by a pattern starts without it, as `Insert` does.
+   * so selecting by a pattern starts without it, as `Insert` does — in normal
+   * selection mode; in additive mode it was marked.
    */
   async selectByPattern(groupId: string, select: boolean): Promise<void> {
     if (this.groups.stateOf(groupId) === undefined || this.entriesShown(groupId).length === 0) {
@@ -468,7 +469,8 @@ export class FileBrowserFeature implements PanelContentFeature {
     this.lastPattern = answer.trim();
 
     const matches = namePattern(answer);
-    const lone = group.selection.length === 1 && group.selection[0] === group.focusedEntryId;
+    // In additive selection (PRD 004, §2.2) the lone entry was picked, not stood on.
+    const lone = !this.parent.selectionModeFt.isAdditive(groupId) && group.selection.length === 1 && group.selection[0] === group.focusedEntryId;
     const selected = new Set(select && lone ? [] : group.selection);
     const shown = this.entriesShown(groupId);
     for (const path of shown) {
@@ -851,6 +853,9 @@ export class FileBrowserFeature implements PanelContentFeature {
       case 'upload-folder':
         this.parent.requestUpload(groupId, undefined, true);
         break;
+      case 'selection-mode':
+        this.parent.selectionModeFt.toggle(groupId);
+        break;
       default:
         break;
     }
@@ -1131,6 +1136,10 @@ export class FileBrowserFeature implements PanelContentFeature {
       { id: 'new-file', label: 'New file…', icon: 'file-plus' },
       { id: 'new-folder', label: 'New folder… (Ctrl+Shift+N)', icon: 'folder-plus' },
       { id: 'upload', label: 'Upload files', icon: 'upload' },
+      // PRD 004, §2.2: pressed while the panel marks additively.
+      this.parent.selectionModeFt.isAdditive(group.id)
+        ? { id: 'selection-mode', label: 'Additive selection — click to go back to normal (Escape)', icon: 'list-check', active: true }
+        : { id: 'selection-mode', label: 'Normal selection — click for additive (Insert)', icon: 'list-check' },
     ];
   }
 
@@ -1158,6 +1167,7 @@ export class FileBrowserFeature implements PanelContentFeature {
       searchPlaceholder: FILTER_PLACEHOLDER,
       filterText: filter,
       sortable: true,
+      selectionMode: this.parent.selectionModeFt.modeOf(group.id),
       ...this.focusTokens(group.id),
       columns: columnsFor(this.sortOf(group.id)),
       // Only what the view shows: a folder of a million entries is a million of each (PRD 004, §3.1).
@@ -1185,6 +1195,7 @@ export class FileBrowserFeature implements PanelContentFeature {
       searchPlaceholder: FILTER_PLACEHOLDER,
       filterText: this.filterOf(group.id),
       sortable: true,
+      selectionMode: this.parent.selectionModeFt.modeOf(group.id),
       ...this.focusTokens(group.id),
       columns: columnsFor(this.sortOf(group.id)),
       rows: [],

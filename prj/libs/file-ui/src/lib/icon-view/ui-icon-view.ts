@@ -12,18 +12,18 @@ import {
   viewChildren,
 } from '@angular/core';
 import {
-  clickMode,
   isTypeaheadKey,
-  moveMode,
   pageStep,
   UiIcon,
   UiKeymap,
   UiListSelection,
+  uiSelectionMode,
   UiTypeahead,
   UiVirtualViewport,
   VIRTUAL_THRESHOLD,
   visibleRange,
   type UiSelectionChange,
+  type UiSelectionModeId,
   type UiSelectMode,
 } from '@tr-file/ui';
 import { isBoundAbove, isPanelCharacter, LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
@@ -166,6 +166,16 @@ export class UiIconView {
 
   /** Tiles may be dragged (PRD 005, §2); `UiFileBrowser` handles the drag. */
   readonly draggable = input(false);
+
+  /**
+   * How a click and a key select (PRD 004, §2.2): `normal`, or Midnight
+   * Commander's `additive` marking — see `UiSelectionModeFeature`. The panel
+   * keeps it; `Insert` in normal mode asks for additive (`additive-selection`).
+   */
+  readonly selectionMode = input<UiSelectionModeId>('normal');
+
+  /** The mode in force, which every gesture asks what it means. */
+  private readonly modeFt = computed(() => uiSelectionMode(this.selectionMode()));
 
   /** The folder tile a drag is over, lit as the drop target. */
   readonly dropTargetId = input<string | null>(null);
@@ -362,7 +372,7 @@ export class UiIconView {
   protected onClick(event: MouseEvent, index: number): void {
     const item = this.items()[index];
     if (item) {
-      this.pick(item.id, clickMode(event));
+      this.pick(item.id, this.modeFt().click(event));
     }
   }
 
@@ -408,7 +418,7 @@ export class UiIconView {
       if (command && (event.key === 'PageUp' || event.key === 'PageDown')) {
         return;
       }
-      this.focusTile(target, moveMode(event));
+      this.focusTile(target, this.modeFt().move(event));
       event.preventDefault();
       return;
     }
@@ -464,7 +474,12 @@ export class UiIconView {
           selected: this.selectedIds(),
           target: item.id,
           next: (items[next] as UiIconViewItem).id,
+          keepsLone: this.modeFt().keepsLone,
         });
+        // In normal mode `Insert` also turns marking on (PRD 004, §2.2): the panel switches to additive.
+        if (this.selectionMode() === 'normal') {
+          this.command.emit({ command: 'additive-selection', entryId: item.id });
+        }
         this.moveFocus(next);
         this.report(change);
         break;
@@ -531,7 +546,8 @@ export class UiIconView {
       return;
     }
     const point = this.pointIn(event);
-    const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+    // A modifier, or additive selection (PRD 004, §2.2), adds the box to what is selected.
+    const additive = event.ctrlKey || event.metaKey || event.shiftKey || !this.modeFt().blankPressClears;
     this.drag = {
       pointerId: event.pointerId,
       startX: point.x,
@@ -586,7 +602,7 @@ export class UiIconView {
     }
     // A plain click on blank space clears the selection, as in every file
     // manager; with a modifier held it leaves it be.
-    if (!drag.dragging && drag.base.size === 0 && !(event.ctrlKey || event.metaKey || event.shiftKey)) {
+    if (!drag.dragging && drag.base.size === 0 && this.modeFt().blankPressClears && !(event.ctrlKey || event.metaKey || event.shiftKey)) {
       if (this.selectedIds().size > 0) {
         this.selection.setAnchor(null);
         this.selectionChange.emit({ selected: [], focused: null });
@@ -643,7 +659,7 @@ export class UiIconView {
   }
 
   /** Moves focus to a tile and selects by `mode` — the tile alone unless told otherwise; indices are clamped. */
-  private focusTile(index: number, mode: UiSelectMode = 'replace'): void {
+  private focusTile(index: number, mode: UiSelectMode = this.modeFt().find()): void {
     const item = this.moveFocus(index);
     if (item !== undefined) {
       this.pick(item.id, mode);

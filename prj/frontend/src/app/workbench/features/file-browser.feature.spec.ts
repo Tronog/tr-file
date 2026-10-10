@@ -134,11 +134,11 @@ describe('FileBrowserFeature', () => {
   });
 
   describe('runToolbarAction()', () => {
-    it('offers Back, Forward, Up, Refresh, New File, New Folder and Upload — at the root, with nowhere to go back or up to', async () => {
+    it('offers Back, Forward, Up, Refresh, New File, New Folder, Upload and the selection mode — at the root, with nowhere to go back or up to', async () => {
       await start();
 
       const actions = workbench.fileBrowserFt.browser('group-root')?.toolbarActions ?? [];
-      expect(actions.map((action) => action.id)).toEqual(['back', 'forward', 'up', 'refresh', 'new-file', 'new-folder', 'upload']);
+      expect(actions.map((action) => action.id)).toEqual(['back', 'forward', 'up', 'refresh', 'new-file', 'new-folder', 'upload', 'selection-mode']);
       expect(actions.filter((action) => action.disabled).map((action) => action.id)).toEqual(['back', 'forward', 'up']);
     });
 

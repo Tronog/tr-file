@@ -28,7 +28,8 @@ const DOUBLE_PRESS_MS = 1000;
  * `V` are the clipboard (§2). PRD 003, §5 adds `Shift`+`Delete` (delete for
  * good, after asking), `Ctrl`+`Shift`+`N` (new folder) and `Ctrl`+`Z` (undo)
  * — each the same command its menu entry runs — and PRD 004, §2 `+` / `-`,
- * select and unselect by a pattern. The function keys are not here: they
+ * select and unselect by a pattern, and §2.2 `Insert` / `Escape`, into and
+ * out of additive selection. The function keys are not here: they
  * mean the same wherever focus is, and `FunctionKeysFeature` binds them.
  */
 export class PanelKeyboardFeature {
@@ -162,6 +163,14 @@ export class PanelKeyboardFeature {
       case 'select-pattern':
       case 'unselect-pattern':
         void files.selectByPattern(groupId, key.command === 'select-pattern');
+        break;
+
+      // PRD 004, §2.2: `Insert` in normal mode turns marking on; `Escape` turns it off, nothing selected.
+      case 'additive-selection':
+        this.parent.selectionModeFt.enterAdditive(groupId);
+        break;
+      case 'normal-selection':
+        this.parent.selectionModeFt.reset(groupId);
         break;
     }
   }

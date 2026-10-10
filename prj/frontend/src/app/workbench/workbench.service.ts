@@ -17,6 +17,7 @@ import { FileViewModelFeature } from './features/file-view-model.feature';
 import { FsDataFeature } from './features/fs-data.feature';
 import { PanelHistoryFeature } from './features/panel-history.feature';
 import { PanelKeyboardFeature } from './features/panel-keyboard.feature';
+import { SelectionModeFeature } from './features/selection-mode.feature';
 import { PreviewRetentionFeature } from './features/preview-retention.feature';
 import { SidebarPanesFeature } from './features/sidebar-panes.feature';
 import { ListingOrderFeature } from './listing/listing-order.feature';
@@ -220,6 +221,8 @@ export class WorkbenchService extends UiWorkbenchService<PanelTabState, PanelGro
   /** Frees cached file contents once nothing on screen shows them. */
   readonly previewRetentionFt = new PreviewRetentionFeature(this);
   readonly detailsFt = new DetailsFeature(this);
+  /** Each panel's selection mode, normal or additive (PRD 004, §2.2). */
+  readonly selectionModeFt = new SelectionModeFeature(this);
   /** The panel key map; every binding it runs belongs to the features above. */
   readonly panelKeyboardFt = new PanelKeyboardFeature(this);
   /** Each panel's own trail of folders, walked with `Alt`+`←`/`→`. */

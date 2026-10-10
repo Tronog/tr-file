@@ -13,18 +13,18 @@ import {
   viewChildren,
 } from '@angular/core';
 import {
-  clickMode,
   isTypeaheadKey,
-  moveMode,
   pageStep,
   UiIcon,
   UiKeymap,
   UiListSelection,
+  uiSelectionMode,
   UiTypeahead,
   UiVirtualViewport,
   VIRTUAL_THRESHOLD,
   visibleRange,
   type UiSelectionChange,
+  type UiSelectionModeId,
   type UiSelectMode,
 } from '@tr-file/ui';
 import { isBoundAbove, isPanelCharacter, LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
@@ -107,6 +107,16 @@ export class UiFileList {
 
   /** Rows may be dragged (PRD 005, §2); `UiFileBrowser` handles the drag. */
   readonly draggable = input(false);
+
+  /**
+   * How a click and a key select (PRD 004, §2.2): `normal`, or Midnight
+   * Commander's `additive` marking — see `UiSelectionModeFeature`. The panel
+   * keeps it; `Insert` in normal mode asks for additive (`additive-selection`).
+   */
+  readonly selectionMode = input<UiSelectionModeId>('normal');
+
+  /** The mode in force, which every gesture asks what it means. */
+  private readonly modeFt = computed(() => uiSelectionMode(this.selectionMode()));
 
   /** The folder row a drag is over, lit as the drop target. */
   readonly dropTargetId = input<string | null>(null);
@@ -326,7 +336,7 @@ export class UiFileList {
   protected onClick(event: MouseEvent, index: number): void {
     const row = this.rows()[index];
     if (row) {
-      this.pick(row.id, clickMode(event));
+      this.pick(row.id, this.modeFt().click(event));
     }
   }
 
@@ -373,7 +383,7 @@ export class UiFileList {
       if (command && (event.key === 'PageUp' || event.key === 'PageDown')) {
         return;
       }
-      this.focusRow(target, moveMode(event));
+      this.focusRow(target, this.modeFt().move(event));
       event.preventDefault();
       return;
     }
@@ -458,7 +468,12 @@ export class UiFileList {
           selected: this.selectedIds(),
           target: row.id,
           next: (rows[next] as UiFileRow).id,
+          keepsLone: this.modeFt().keepsLone,
         });
+        // In normal mode `Insert` also turns marking on (PRD 004, §2.2): the panel switches to additive.
+        if (this.selectionMode() === 'normal') {
+          this.command.emit({ command: 'additive-selection', entryId: row.id });
+        }
         this.moveFocus(next);
         this.report(change);
         break;
@@ -516,7 +531,7 @@ export class UiFileList {
    * Moves focus to a row and selects by `mode` — the row alone unless told
    * otherwise; indices are clamped.
    */
-  private focusRow(index: number, mode: UiSelectMode = 'replace'): void {
+  private focusRow(index: number, mode: UiSelectMode = this.modeFt().find()): void {
     const row = this.moveFocus(index);
     if (row !== undefined) {
       this.pick(row.id, mode);

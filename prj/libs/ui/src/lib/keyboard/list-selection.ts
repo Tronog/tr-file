@@ -103,17 +103,20 @@ export class UiListSelection {
    * Selection follows the cursor here, so an entry the cursor merely stands on
    * is already selected. That lone entry is *kept*, not dropped: the first
    * `Insert` on a fresh list marks the entry it is on, as it does in Midnight
-   * Commander. `Ctrl`+`Space` still takes it out.
+   * Commander. `Ctrl`+`Space` still takes it out. In additive selection
+   * (PRD 004, §2.2) the selection no longer follows the cursor, so a lone
+   * entry was picked and flips like any other: `keepsLone: false`.
    */
   mark(options: {
     readonly ids: readonly string[];
     readonly selected: ReadonlySet<string>;
     readonly target: string;
     readonly next: string;
+    readonly keepsLone?: boolean;
   }): UiSelectionChange {
     const { ids, selected, target } = options;
     const next = new Set(selected);
-    const lone = selected.size === 1 && selected.has(target);
+    const lone = (options.keepsLone ?? true) && selected.size === 1 && selected.has(target);
     if (selected.has(target) && !lone) {
       next.delete(target);
     } else {

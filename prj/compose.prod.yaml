@@ -12,7 +12,7 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 4310
+      PORT: 4311
       FILES_ROOT: /data
       # Signing in is required (PRD 003, §2); the backend will not start
       # without an account. Prefer a hash: `pnpm --filter backend hash-password`.
@@ -27,7 +27,7 @@ services:
       PROCESSES_ENABLED: ${PROCESSES_ENABLED:-false}
       PROCESSES_KILL_ENABLED: ${PROCESSES_KILL_ENABLED:-false}
     expose:
-      - "4310"
+      - "4311"
     volumes:
       - files_data:/data
     restart: unless-stopped

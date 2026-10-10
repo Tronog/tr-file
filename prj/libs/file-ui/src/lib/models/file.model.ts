@@ -1,4 +1,4 @@
-import type { UiBreadcrumb, UiDocumentModel, UiEmptyStateModel, UiGitDecoration, UiIconAction, UiIconName, UiIconTint, UiPathSuggestion } from '@tr-file/ui';
+import type { UiBreadcrumb, UiDocumentModel, UiEmptyStateModel, UiGitDecoration, UiIconAction, UiIconName, UiIconTint, UiPathSuggestion, UiSelectionModeId } from '@tr-file/ui';
 
 /*
  * The file manager's view models: what a listing, its rows and tiles, the
@@ -100,6 +100,8 @@ export interface UiFileBrowserModel {
   readonly stoppable?: boolean;
   /** The listing can be sorted by clicking its column headers. */
   readonly sortable?: boolean;
+  /** How the listing selects (PRD 004, §2.2); `normal` when absent. */
+  readonly selectionMode?: UiSelectionModeId;
   /**
    * Bump to put the keyboard in the filter box — a menu's *Filter Folder*,
    * where `Ctrl`+`F` in the panel does it itself. Any change is one request.
@@ -198,7 +200,9 @@ export type UiPanelCommand =
   | 'previous-image'
   | 'next-image'
   | 'close'
-  | 'stop-loading';
+  | 'stop-loading'
+  | 'additive-selection'
+  | 'normal-selection';
 
 /**
  * One `UiPanelCommand`, with the entry focus sat on when the key was hit.
@@ -212,6 +216,9 @@ export type UiPanelCommand =
  * `select-pattern` / `unselect-pattern` are `+` / `-` (PRD 004, §2): the
  * application asks for the pattern.
  * `close` is `Escape` over a file (PRD 005, §3.1; PRD 012, §1.3): the tab showing it closes.
+ * `additive-selection` is `Insert` in normal selection mode, which marks its entry and asks for
+ * additive mode; `normal-selection` is `Escape` over a listing: back to normal, nothing selected
+ * (PRD 004, §2.2). The panel keeps the mode and hands it back as `UiFileBrowserModel.selectionMode`.
  *
  * The function keys are not panel keys: `F1`–`F10` mean the same wherever
  * focus is (PRD 004, §2), so the application binds them for the whole window.

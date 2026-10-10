@@ -319,6 +319,22 @@ export class CommandsFeature extends UiCommandsFeature<CommandTarget> {
       { id: 'selection.all', category: 'Selection', label: 'Select All', enabled: listing, run: (t) => p.fileBrowserFt.selectAll(t.groupId) },
       { id: 'selection.none', category: 'Selection', label: 'Select None', enabled: some, run: (t) => p.fileBrowserFt.selectNone(t.groupId) },
       { id: 'selection.invert', category: 'Selection', label: 'Invert Selection', enabled: listing, run: (t) => p.fileBrowserFt.invertSelection(t.groupId) },
+      /* PRD 004, §2.2: Midnight Commander's marking, `Insert` into it and `Escape` out */
+      {
+        id: 'selection.additive',
+        category: 'Selection',
+        label: 'Additive Selection Mode',
+        enabled: listing,
+        checked: (t) => group(t) !== undefined && p.selectionModeFt.isAdditive(t.groupId),
+        run: (t) => p.selectionModeFt.toggle(t.groupId),
+      },
+      {
+        id: 'selection.clear',
+        category: 'Selection',
+        label: 'Back to Normal Selection',
+        enabled: listing,
+        run: (t) => p.selectionModeFt.reset(t.groupId),
+      },
       /* Midnight Commander's `+` and `-` (PRD 004, §2) */
       {
         id: 'selection.byPattern',

@@ -54,6 +54,11 @@ export type { UiKeybinding, UiKeyContext } from './lib/keyboard/keymap';
 /* lists: selection, keyboard navigation, type-to-find, virtual scrolling — for list components built on the library */
 export { clickMode, moveMode, UiListSelection } from './lib/keyboard/list-selection';
 export type { UiSelectMode } from './lib/keyboard/list-selection';
+export { UiSelectionModeFeature } from './lib/keyboard/selection-mode';
+export { uiSelectionMode } from './lib/keyboard/selection-modes';
+export type { UiSelectionModeId, UiSelectionKeys } from './lib/keyboard/selection-mode';
+export { UiNormalSelectionMode } from './lib/keyboard/normal-selection-mode';
+export { UiAdditiveSelectionMode } from './lib/keyboard/additive-selection-mode';
 export { isTypeaheadKey, pageStep, UiTypeahead } from './lib/keyboard/list-navigation';
 export { UiVirtualViewport, VIRTUAL_THRESHOLD, visibleRange } from './lib/virtual/ui-virtual-viewport';
 export type { UiVirtualRange } from './lib/virtual/ui-virtual-viewport';

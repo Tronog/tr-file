@@ -129,7 +129,14 @@ command of `CommandsFeature` run on the active panel; `FunctionKeysFeature` draw
 middle of `UiStatusBar` (`functionKeys`) from whatever they are bound to. `F5` copies, so refreshing is `Ctrl`+`R` (the desktop's
 accelerator table leaves it unbound). In the list and grid `Insert` marks and moves on and `*`
 selects all or none (`UiListSelection`); `+`/`-` select or unselect by a pattern
-(`FileBrowserFeature.selectByPattern`, `listing/name-pattern.ts`). `/` (split — PRD 002, §2.2),
+(`FileBrowserFeature.selectByPattern`, `listing/name-pattern.ts`). Selection has two modes (PRD 004, §2.2), a feature class each in the library —
+`UiNormalSelectionMode` (the selection follows the cursor) and `UiAdditiveSelectionMode` (moves leave the
+selection, a click toggles, `Shift` adds a range) — which `UiFileList` / `UiIconView` ask what a gesture
+means (`selectionMode`); `SelectionModeFeature` keeps each panel's, session only, starting from
+*Files: Selection Mode* (`files.selectionMode`). `Insert` in normal mode switches to additive
+(`additive-selection`), `Escape` over a listing goes back to normal with nothing selected (keymap
+`selection.clear`, after `view.stopLoading` and `viewer.close`; `normal-selection`), and the toolbar's
+`selection-mode` button (pressed while additive) and *Selection › Additive Selection Mode* switch it. `/` (split — PRD 002, §2.2),
 `Ctrl`+`T` (a new tab on the same folder, `EditorGroupsFeature.newTab`), `Ctrl`+`W` (close the
 focused tab) and `Ctrl`+`PageUp`/`PageDown` (previous/next tab) are bound on the group's host
 instead, and emit what the tab bar's buttons do (`new-tab` for `Ctrl`+`T`); `/` is a character, so

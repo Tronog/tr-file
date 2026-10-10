@@ -1,6 +1,6 @@
 {
   "/api": {
-    "target": "http://backend:4310",
+    "target": "http://backend:4311",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"

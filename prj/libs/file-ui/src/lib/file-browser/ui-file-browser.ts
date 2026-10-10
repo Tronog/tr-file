@@ -30,6 +30,7 @@ const PANEL_COMMANDS = [
   'image.next',
   'viewer.close',
   'view.stopLoading',
+  'selection.clear',
 ] as const;
 
 /** The panel commands that walk from folder to folder; see `onBodyKeydown`. */
@@ -248,8 +249,10 @@ export class UiFileBrowser {
    *   folder (PRD 012, §1.1);
    * - `Escape` while a large folder is being read: stop reading it (PRD 004,
    *   §3.1.4); over a file — text, markdown, a diff, an image: close its
-   *   tab (PRD 005, §3.1; PRD 012, §1.3) — only then; otherwise the key is
-   *   left alone.
+   *   tab (PRD 005, §3.1; PRD 012, §1.3); else over a listing in additive
+   *   selection mode, or with something selected: back to normal selection,
+   *   nothing selected (PRD 004, §2.2) — only then; otherwise the key is left
+   *   alone.
    *
    * None is claimed inside a text field. Handled before the key reaches the
    * group around it, which claims the tab chords. The browser knows which
@@ -350,6 +353,13 @@ export class UiFileBrowser {
           return false;
         }
         this.command.emit({ command: 'close', entryId: null });
+        return true;
+      case 'selection.clear':
+        // Over a listing in additive mode, or with something to deselect (PRD 004, §2.2).
+        if (!listing || (this.browser().selectionMode !== 'additive' && !this.entries().some((entry) => entry.selected || entry.inactiveSelected))) {
+          return false;
+        }
+        this.command.emit({ command: 'normal-selection', entryId });
         return true;
       default:
         return false;

@@ -71,6 +71,23 @@ export const PREFERENCES: readonly UiPreference[] = [
     kind: { type: 'boolean', default: false },
   },
   {
+    id: 'files.selectionMode',
+    section: 'general',
+    group: 'Files',
+    category: 'Files',
+    title: 'Selection Mode',
+    description:
+      'How a new panel selects. Normal: the selection follows the cursor, a click picks one entry. Additive: moving leaves the selection as it is and a click marks or unmarks. Insert switches a panel to additive, Escape back to normal.',
+    kind: {
+      type: 'choice',
+      default: 'normal',
+      options: [
+        { value: 'normal', label: 'Normal' },
+        { value: 'additive', label: 'Additive' },
+      ],
+    },
+  },
+  {
     id: 'files.autoRefresh',
     section: 'general',
     group: 'Files',
@@ -191,7 +208,7 @@ export const HELP: UiHelpConfig = {
       id: 'selection',
       title: 'Selection',
       hue: 'orange',
-      commands: ['list.select', 'list.toggleSelection', 'list.mark', 'list.toggleAll', 'selection.all', 'selection.byPattern', 'selection.unselectByPattern'],
+      commands: ['list.select', 'list.toggleSelection', 'list.mark', 'selection.clear', 'list.toggleAll', 'selection.all', 'selection.byPattern', 'selection.unselectByPattern'],
     },
     {
       id: 'image',

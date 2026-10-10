@@ -65,6 +65,7 @@
               [columns]="browser().columns"
               [rows]="browser().rows"
               [draggable]="true"
+              [selectionMode]="browser().selectionMode ?? 'normal'"
               [dropTargetId]="dropTargetId()"
               [sortable]="!!browser().sortable"
               (selectionChange)="selectionChange.emit($event)"
@@ -81,6 +82,7 @@
               [columns]="browser().columns"
               [rows]="browser().rows"
               [draggable]="true"
+              [selectionMode]="browser().selectionMode ?? 'normal'"
               [dropTargetId]="dropTargetId()"
               [sortable]="!!browser().sortable"
               (selectionChange)="selectionChange.emit($event)"
@@ -95,6 +97,7 @@
             <ui-icon-view
               [items]="browser().items"
               [draggable]="true"
+              [selectionMode]="browser().selectionMode ?? 'normal'"
               [dropTargetId]="dropTargetId()"
               (selectionChange)="selectionChange.emit($event)"
               (activate)="itemActivate.emit($event)"

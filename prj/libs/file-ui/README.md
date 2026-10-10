@@ -174,7 +174,13 @@ rules.
 Selection is **multiple** in all three views (PRD 004, §1.2). `UiListSelection`
 (`@tr-file/ui`) is the one place the rules live — replace,
 toggle, range from an anchor, range added, cursor only, all — and `UiFileList`
-and `UiIconView` only decide which rule a gesture means. Every change leaves as
+and `UiIconView` only decide which rule a gesture means — by asking the
+*selection mode* they are given (`selectionMode`, PRD 004, §2.2), a feature class
+each in `@tr-file/ui`: `UiNormalSelectionMode` (the selection follows the cursor)
+or `UiAdditiveSelectionMode` (Midnight Commander's marking: moves leave the
+selection, a click toggles, `Shift` adds a range). `Insert` in normal mode
+reports `additive-selection`, and `Escape` over a listing `normal-selection`;
+the application keeps the mode. Every change leaves as
 one `selectionChange: { selected, focused }`, the whole selection in list order
 plus the entry the cursor is on; `select` still names that entry, and
 `UiFileBrowser` forwards `selectionChange`. The icon view's box selection is

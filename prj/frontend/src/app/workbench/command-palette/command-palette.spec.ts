@@ -256,6 +256,8 @@ describe('CommandPaletteFeature', () => {
       'Edit: Search Files…',
       'Selection: Select All',
       'Selection: Invert Selection',
+      'Selection: Additive Selection Mode',
+      'Selection: Back to Normal Selection',
       'Selection: Select by Pattern…',
       'Selection: Unselect by Pattern…',
       'View: List',
@@ -483,16 +485,16 @@ describe('CommandPaletteFeature', () => {
     });
 
     it('connects to a new server, signing in with its password, then keeps it — without the password — and starts over', async () => {
-      await add('ana:secret@nas.local:4310');
+      await add('ana:secret@nas.local:4311');
 
       expect(sent).toEqual([
-        { command: 'connect', scheme: 'http', host: 'nas.local', port: 4310, user: 'ana', password: 'secret' },
+        { command: 'connect', scheme: 'http', host: 'nas.local', port: 4311, user: 'ana', password: 'secret' },
       ]);
       expect(palette().isOpen()).toBe(false);
       expect(reloads).toBe(1);
-      expect(workbench.connection.label()).toBe('ana@nas.local:4310');
+      expect(workbench.connection.label()).toBe('ana@nas.local:4311');
       expect(JSON.stringify(stored())).not.toContain('secret');
-      expect(stored()).toEqual([expect.objectContaining({ user: 'ana', host: 'nas.local', port: 4310, scheme: 'http' })]);
+      expect(stored()).toEqual([expect.objectContaining({ user: 'ana', host: 'nas.local', port: 4311, scheme: 'http' })]);
     });
 
     it('reaches a server over HTTPS when told to, or on port 443', async () => {
@@ -505,29 +507,29 @@ describe('CommandPaletteFeature', () => {
     it('stays open, keeping nothing, when the password is wrong', async () => {
       answer = () => ({ error: { code: 'UNAUTHORIZED', message: 'Wrong username or password', status: 401 } });
 
-      await add('ana:nope@nas.local:4310');
+      await add('ana:nope@nas.local:4311');
 
       expect(palette().isOpen()).toBe(true);
-      expect(palette().message()).toEqual({ severity: 'error', text: 'Wrong username or password for nas.local:4310.' });
+      expect(palette().message()).toEqual({ severity: 'error', text: 'Wrong username or password for nas.local:4311.' });
       expect(stored()).toBeNull();
       expect(reloads).toBe(0);
     });
 
     it('says so when the server cannot be reached', async () => {
       answer = () => ({
-        error: { code: 'NETWORK_ERROR', message: 'Could not reach nas.local:4310: connect ECONNREFUSED', status: 0 },
+        error: { code: 'NETWORK_ERROR', message: 'Could not reach nas.local:4311: connect ECONNREFUSED', status: 0 },
       });
 
-      await add('nas.local:4310');
+      await add('nas.local:4311');
 
-      expect(palette().message()?.text).toBe('Could not reach nas.local:4310: connect ECONNREFUSED');
+      expect(palette().message()?.text).toBe('Could not reach nas.local:4311: connect ECONNREFUSED');
     });
 
     /** In a browser there is no main process to hold a connection. */
     it('needs the desktop app to connect at all', async () => {
       Object.defineProperty(window, 'trFileBridge', { configurable: true, writable: true, value: undefined });
 
-      await add('nas.local:4310');
+      await add('nas.local:4311');
 
       expect(palette().message()?.text).toBe('Connecting to a remote server needs the tr-file desktop app.');
       expect(stored()).toBeNull();
@@ -537,20 +539,20 @@ describe('CommandPaletteFeature', () => {
       // A clock that moves, so "most recently used" has an order to go by.
       let now = 1_000;
       vi.spyOn(Date, 'now').mockImplementation(() => (now += 1_000));
-      await add('first.local:4310');
-      await add('ana:pw@second.local:4310');
+      await add('first.local:4311');
+      await add('ana:pw@second.local:4311');
       sent = [];
       await connect();
-      expect(labels().slice(0, 2)).toEqual(['ana@second.local:4310', 'first.local:4310']);
+      expect(labels().slice(0, 2)).toEqual(['ana@second.local:4311', 'first.local:4311']);
       palette().setActive(palette().items()[1]?.id ?? '');
 
       await palette().accept();
 
       expect(sent).toEqual([
-        { command: 'connect', scheme: 'http', host: 'first.local', port: 4310, user: null, password: null },
+        { command: 'connect', scheme: 'http', host: 'first.local', port: 4311, user: null, password: null },
       ]);
       await connect();
-      expect(labels().slice(0, 2)).toEqual(['first.local:4310', 'ana@second.local:4310']);
+      expect(labels().slice(0, 2)).toEqual(['first.local:4311', 'ana@second.local:4311']);
     });
 
     it('offers edit and remove on a saved server, with keys for both', async () => {

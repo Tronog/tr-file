@@ -114,7 +114,7 @@ describe('ChromeFeature', () => {
             invoke: async (request: Record<string, unknown>) => {
               sent.push(request);
               return request['command'] === 'connection-status'
-                ? { data: { connected: true, scheme: 'http', host: 'nas.local', port: 4310, user: 'ana' } }
+                ? { data: { connected: true, scheme: 'http', host: 'nas.local', port: 4311, user: 'ana' } }
                 : { data: { connected: false } };
             },
             save: async () => ({ data: { saved: false } }),
@@ -132,7 +132,7 @@ describe('ChromeFeature', () => {
       it('checks Remote Computer, and names the server in the status bar', () => {
         expect(workbench.backend()).toBe('remote');
         expect(go()?.items?.slice(-2).map((item) => item.checked)).toEqual([false, true]);
-        expect(workbench.chromeFt.statusLeadingItems()[0]).toMatchObject({ label: 'ana@nas.local:4310', icon: 'cloud' });
+        expect(workbench.chromeFt.statusLeadingItems()[0]).toMatchObject({ label: 'ana@nas.local:4311', icon: 'cloud' });
       });
 
       it('disconnects with Local Computer, and starts over on this computer', async () => {

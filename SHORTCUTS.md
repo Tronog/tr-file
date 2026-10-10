@@ -100,7 +100,8 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | --- | --- | --- |
 | `Space` | Select the entry | On a row |
 | `Ctrl`+`Space` | Toggle the entry in the selection | On a row |
-| `Insert` | Mark the entry and move down | On a row |
+| `Insert` | Mark the entry and move down — and switch the panel to additive selection (PRD 004, §2.2) | On a row |
+| `Escape` | Back to normal selection, nothing selected (after stopping a large folder or closing a file) | In a panel, over a listing |
 | `*` | Select all or none | On a row |
 | `Ctrl`+`A` | Select all | On a row |
 | `+` | Select by pattern… | On a row |

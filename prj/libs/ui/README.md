@@ -99,7 +99,7 @@ literal. The light palette's text colours clear WCAG AA on its surfaces.
 | Modal windows | `UiModalService` (`confirm`, `prompt`, `message`, `show`, `open`), `UiModalHost`, `UI_MODAL_REF`; `UiModal` (`size: 'large'` for a window to work in), `UiDialog`, `UiProgressDialog`; `UiSettingsModal`, `UiHelpModal` |
 | Settings and help | `UiSettingsEditor`, `UiKeybindingsTable` (with its key recorder), `UiHelp`, `UiCheatsheet` (`UiCheatsheetSection` cards, each a `hue`, keys as keycaps) |
 | Keys | `UiKeymap`, `UI_DEFAULT_KEYBINDINGS`, `UI_KEYBINDING_DEFAULTS`, `chordOf`, `displayChord` … — see *Key bindings* |
-| Lists | `UiListSelection`, `clickMode`, `moveMode`, `UiTypeahead`, `pageStep`, `UiVirtualViewport`, `visibleRange` — the building blocks of a keyboard-driven, multi-select, virtualised list (`@tr-file/file-ui`'s are built of them) |
+| Lists | `UiListSelection`, `clickMode`, `moveMode`, the selection modes (`UiSelectionModeFeature`, `UiNormalSelectionMode`, `UiAdditiveSelectionMode`, `uiSelectionMode`), `UiTypeahead`, `pageStep`, `UiVirtualViewport`, `visibleRange` — the building blocks of a keyboard-driven, multi-select, virtualised list (`@tr-file/file-ui`'s are built of them) |
 | Palette | `UiQuickInput` — the palette's box; `fuzzyMatch` |
 | Settings store and themes | `UiSettingsStore`, `UI_SETTINGS_STORE` (`localStorage` unless provided), `UI_STORAGE_PREFIX`, `UiMemorySettingsStore`, `UiThemeService` |
 | Icons | `UiIcon`, `UiIconSprite` |

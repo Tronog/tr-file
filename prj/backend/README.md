@@ -7,7 +7,7 @@ services and models, per `docs/ai/EXPRESS.md`.
 ## Running it
 
 ```bash
-pnpm dev        # tsx watch, http://localhost:4310
+pnpm dev        # tsx watch, http://localhost:4311
 pnpm build      # tsc → dist/ (runtime only; tests are excluded)
 pnpm start      # node dist/main.js
 pnpm test       # node:test via tsx, straight from src/
@@ -17,7 +17,7 @@ pnpm hash-password  # reads a password on stdin, prints an AUTH_PASSWORD_HASH
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HOST` / `PORT` | `0.0.0.0` / `4310` | Listen address |
+| `HOST` / `PORT` | `0.0.0.0` / `4311` | Listen address |
 | `API_PREFIX` | `/api` | Mount prefix for every module |
 | `FILES_ROOT` | `process.cwd()` | Absolute path all file access is confined to; `/` on Windows means every drive (PRD 003, §6) |
 | `UPLOAD_MAX_BYTES` | `536870912` (512 MiB) | Per-upload limit |

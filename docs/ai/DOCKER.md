@@ -94,11 +94,11 @@ pnpm docker:dev:down && pnpm docker:dev    # down passes -v
 
 ## Proxy configuration
 
-`prj/frontend/proxy.conf.json` targets `http://localhost:4310` and is for
+`prj/frontend/proxy.conf.json` targets `http://localhost:4311` and is for
 running on the host. The dev container uses
-`prj/frontend/proxy.conf.docker.json`, which targets `http://backend:4310` —
+`prj/frontend/proxy.conf.docker.json`, which targets `http://backend:4311` —
 the Compose service name. Keep the two in sync.
 
 In production there is no Angular dev server: `prj/docker/nginx/default.conf`
 serves the static bundle with an SPA `try_files` fallback and reverse-proxies
-`/api/` to `backend:4310`.
+`/api/` to `backend:4311`.

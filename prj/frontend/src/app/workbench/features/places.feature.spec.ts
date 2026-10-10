@@ -227,10 +227,10 @@ describe('PlacesFeature', () => {
 
   it('keeps a remote server’s bookmarks apart from this computer’s', () => {
     localStorage.setItem(`${BOOKMARKS_KEY}:local`, JSON.stringify([{ path: 'home/me', label: 'me' }]));
-    localStorage.setItem(`${BOOKMARKS_KEY}:ana@nas:4310`, JSON.stringify([{ path: 'data', label: 'data' }]));
+    localStorage.setItem(`${BOOKMARKS_KEY}:ana@nas:4311`, JSON.stringify([{ path: 'data', label: 'data' }]));
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const connection = TestBed.inject(RemoteConnectionService) as unknown as { state: WritableSignal<RemoteConnectionStatus> };
-    connection.state.set({ connected: true, scheme: 'http', host: 'nas', port: 4310, user: 'ana' });
+    connection.state.set({ connected: true, scheme: 'http', host: 'nas', port: 4311, user: 'ana' });
     workbench = TestBed.inject(WorkbenchService);
     http = TestBed.inject(HttpTestingController);
 

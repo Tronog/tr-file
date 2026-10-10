@@ -11,7 +11,7 @@ FROM node:24-alpine AS base
 ENV PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH \
     HOST=0.0.0.0 \
-    PORT=4310
+    PORT=4311
 RUN corepack enable pnpm
 WORKDIR /app
 
@@ -61,7 +61,7 @@ ENV NODE_ENV=development
 COPY tsconfig.base.json ./tsconfig.base.json
 COPY backend/ backend/
 WORKDIR /app/backend
-EXPOSE 4310
+EXPOSE 4311
 CMD ["pnpm", "dev"]
 
 # ---------------------------------------------------------------------------
@@ -82,5 +82,5 @@ RUN mkdir -p /data && chown node:node /data
 
 USER node
 WORKDIR /app/backend
-EXPOSE 4310
+EXPOSE 4311
 CMD ["node", "dist/main.js"]

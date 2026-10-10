@@ -180,6 +180,41 @@ describe('UiFileList keyboard', () => {
       ]);
     });
 
+    /** PRD 004, §2.2. */
+    it('Insert in normal mode asks for additive selection, and not again once in it', () => {
+      press(0, 'Insert');
+      fixture.componentRef.setInput('selectionMode', 'additive');
+      fixture.detectChanges();
+      press(1, 'Insert');
+
+      expect(commands).toEqual([{ command: 'additive-selection', entryId: 'alpha.ts' }]);
+    });
+
+    it('in additive mode the arrows move the cursor and leave the selection', () => {
+      fixture.componentRef.setInput('selectionMode', 'additive');
+      withSelection(['alpha.ts', 'docs'], 'docs');
+      press(1, 'ArrowDown');
+
+      expect(changes).toEqual([{ selected: ['alpha.ts', 'docs'], focused: 'download.zip' }]);
+    });
+
+    it('in additive mode a lone selected row the cursor is on is unmarked by Insert', () => {
+      fixture.componentRef.setInput('selectionMode', 'additive');
+      fixture.detectChanges();
+      press(0, 'Insert');
+
+      expect(changes).toEqual([{ selected: [], focused: 'docs' }]);
+    });
+
+    it('in additive mode a click toggles its row', () => {
+      fixture.componentRef.setInput('selectionMode', 'additive');
+      withSelection(['alpha.ts'], 'alpha.ts');
+      rows()[2]?.click();
+      fixture.detectChanges();
+
+      expect(changes).toEqual([{ selected: ['alpha.ts', 'download.zip'], focused: 'download.zip' }]);
+    });
+
     it('takes *, + and - as part of a name being typed', () => {
       press(0, 'a');
       press(0, '-');
@@ -579,11 +614,32 @@ describe('panel keys', () => {
     };
 
     it('stops what is being read — only while there is something to stop', () => {
+      show({ rows: ROWS.map(({ selected: _selected, ...row }) => row) });
       expect(escape().defaultPrevented).toBe(false);
       expect(commands).toEqual([]);
 
       show({ stoppable: true });
       expect(escape().defaultPrevented).toBe(true);
+      expect(commands).toEqual([{ command: 'stop-loading', entryId: null }]);
+    });
+
+    /** PRD 004, §2.2 — over a listing, back to normal selection with nothing selected. */
+    it('goes back to normal selection while there is a selection or additive mode', () => {
+      expect(escape().defaultPrevented).toBe(true);
+      show({ rows: ROWS.map(({ selected: _selected, ...row }) => row), selectionMode: 'additive' });
+      expect(escape().defaultPrevented).toBe(true);
+      show({ rows: ROWS.map(({ selected: _selected, ...row }) => row), selectionMode: 'normal' });
+      expect(escape().defaultPrevented).toBe(false);
+
+      expect(commands).toEqual([
+        { command: 'normal-selection', entryId: 'alpha.ts' },
+        { command: 'normal-selection', entryId: 'alpha.ts' },
+      ]);
+    });
+
+    it('stops reading before it touches the selection', () => {
+      show({ stoppable: true, selectionMode: 'additive' });
+      escape();
       expect(commands).toEqual([{ command: 'stop-loading', entryId: null }]);
     });
 

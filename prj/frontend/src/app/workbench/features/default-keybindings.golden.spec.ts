@@ -40,6 +40,7 @@ const GOLDEN = [
   'panel PageDown image.next',
   // PRD 005, §3.1 / PRD 012, §1.3: after `view.stopLoading`, which has the key first wherever there is a folder to stop.
   'panel Escape viewer.close',
+  'panel Escape selection.clear',
   // Task Manager's list (PRD 014, §2): after the file browser's, sharing no command with them.
   'list Delete process.endTask',
   'list Shift+Delete process.endTree',

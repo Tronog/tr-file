@@ -111,6 +111,7 @@ export class MockDataWorkbenchService {
         { id: 'selection.all', label: 'Select All' },
         { id: 'selection.none', label: 'Select None' },
         { id: 'selection.invert', label: 'Invert Selection' },
+        { id: 'selection.additive', label: 'Additive Selection Mode', separatorBefore: true },
         { id: 'selection.byPattern', label: 'Select by Pattern…', separatorBefore: true },
         { id: 'selection.unselectByPattern', label: 'Unselect by Pattern…' },
       ],
