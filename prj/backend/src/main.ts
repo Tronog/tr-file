@@ -3,7 +3,7 @@ import { AppConfig } from './config/index.js';
 import { Logger } from './core/index.js';
 import { Server } from './server.js';
 
-const VERSION = process.env['npm_package_version'] ?? '0.1.0';
+const VERSION = process.env['npm_package_version'] ?? '0.1.1';
 
 async function bootstrap(): Promise<void> {
   const config = AppConfig.fromEnv();

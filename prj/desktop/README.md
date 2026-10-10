@@ -415,9 +415,9 @@ One file per platform, nothing to install:
 
 ```bash
 pnpm package          # both, from this package
-pnpm package:linux    # release/tr-file-0.1.0-x86_64.AppImage
-pnpm package:win      # release/tr-file-0.1.0-x64.exe, release/tr-file-Setup-0.1.0-x64.exe
-pnpm package:mac      # release/tr-file-0.1.0-mac-x64.tar.gz, …-mac-arm64.tar.gz
+pnpm package:linux    # release/tr-file-0.1.1-x86_64.AppImage
+pnpm package:win      # release/tr-file-0.1.1-x64.exe, release/tr-file-Setup-0.1.1-x64.exe
+pnpm package:mac      # release/tr-file-0.1.1-mac-x64.tar.gz, …-mac-arm64.tar.gz
 ```
 
 From the workspace root: `pnpm desktop:package`, `…:linux`, `…:win`, `…:mac`, which

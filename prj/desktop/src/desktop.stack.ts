@@ -12,7 +12,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import type { DesktopConfig } from './desktop.config.js';
 
 /** Reported by the health endpoint and the window title. */
-const VERSION = process.env['npm_package_version'] ?? '0.1.0';
+const VERSION = process.env['npm_package_version'] ?? '0.1.1';
 
 /**
  * The whole stack, in one process (PRD 001, Section 8).
