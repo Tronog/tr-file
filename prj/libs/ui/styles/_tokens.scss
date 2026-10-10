@@ -43,6 +43,11 @@
   --vsc-accent-hover: #026ec1;
   --vsc-accent-fg: #ffffff;
 
+  /* A status bar item while a job runs: light green, dark text on it (>7:1). */
+  --vsc-statusbar-running-bg: #a7e5b4;
+  --vsc-statusbar-running-hover-bg: #bdeec7;
+  --vsc-statusbar-running-fg: #0b3518;
+
   /* Midnight Commander's key bar (PRD 004, §2): its cyan label blocks, with dark
      text on them (7:1), and a lighter cyan under the pointer. */
   --vsc-function-key-bg: #2aa1b3;
@@ -207,6 +212,9 @@
   --vsc-accent: #005fb8;
   --vsc-accent-hover: #0258a8;
   --vsc-accent-fg: #ffffff;
+  --vsc-statusbar-running-bg: #c8f0d1;
+  --vsc-statusbar-running-hover-bg: #b3e8bf;
+  --vsc-statusbar-running-fg: #0b3518;
   --vsc-function-key-bg: #2aa1b3;
   --vsc-function-key-hover-bg: #3fbdd0;
   --vsc-function-key-fg: #000000;

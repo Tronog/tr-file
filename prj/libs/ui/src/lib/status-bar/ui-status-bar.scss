@@ -66,6 +66,16 @@
       background: var(--vsc-accent-hover);
     }
   }
+
+  // A job is running: a light green item, dark text on it, in both themes.
+  &.is-running {
+    background: var(--vsc-statusbar-running-bg);
+    color: var(--vsc-statusbar-running-fg);
+
+    &:hover {
+      background: var(--vsc-statusbar-running-hover-bg);
+    }
+  }
 }
 
 /* -- function keys (PRD 004, §2) ------------------------------------------- */

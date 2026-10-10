@@ -35,6 +35,7 @@
     type="button"
     class="status-item"
     [class.is-accent]="item.accent"
+    [class.is-running]="item.running"
     [attr.title]="item.title ?? item.label"
     [attr.aria-label]="item.label"
     (click)="select.emit(item.id)"

@@ -98,6 +98,8 @@ export interface UiStatusItem {
   readonly trailingIcon?: UiIconName;
   /** Renders on the accent background, like VS Code's remote indicator. */
   readonly accent?: boolean;
+  /** Renders on a light green background: a job is running (tr-prd PRD 002, §5.1). */
+  readonly running?: boolean;
   readonly title?: string;
 }
 
