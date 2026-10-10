@@ -28,7 +28,7 @@ prj/
 ├── backend/
 ├── frontend/
 ├── desktop/              # @tr-file/desktop — Electron shell
-├── demo/                 # @tr-file/demo — a notes app on @tr-file/ui alone (port 4300)
+├── demo/                 # @tr-file/demo — a notes app on @tr-file/ui alone (port 4301)
 ├── scripts/              # check-library-boundaries.mjs
 └── libs/
     ├── ui/               # @tr-file/ui — the workbench library (ng-packagr)

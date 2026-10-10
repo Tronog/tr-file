@@ -4,8 +4,8 @@
   "private": true,
   "description": "A small notes app built on @tr-file/ui alone — proof that the workbench is a library (PRD 001, §17.1)",
   "scripts": {
-    "dev": "ng serve --host 0.0.0.0 --port 4300",
-    "start": "ng serve --host 0.0.0.0 --port 4300",
+    "dev": "ng serve --host 0.0.0.0 --port 4301",
+    "start": "ng serve --host 0.0.0.0 --port 4301",
     "build": "ng build",
     "build:dist": "ng build --configuration production,dist",
     "test": "ng test"
