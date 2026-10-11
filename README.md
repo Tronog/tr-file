@@ -1,3 +1,5 @@
+![The tr-file window](docs/tutorial/images/screenshot.png)
+
 # Overview
 
 A Universal File Manager. Made for working class.
