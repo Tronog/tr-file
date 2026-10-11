@@ -200,6 +200,7 @@ The editor's own keys; everything else in it is a text field's (undo, the clipbo
 | `Ctrl`+`F` | Find in the file — the selection, if any, is what is looked for |
 | `Enter` / `Shift`+`Enter` (find box), `F3` / `Shift`+`F3` | Next / previous match |
 | `Escape` | Close the find box |
+| `Ctrl`+`Shift`+`[` / `Ctrl`+`Shift`+`]` | Fold / unfold the block at the caret — or click its chevron in the gutter, or the `⋯` of a folded line |
 
 ### CSV table
 

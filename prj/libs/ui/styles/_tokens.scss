@@ -140,6 +140,8 @@
   --vsc-editor-selection-bg: #264f78;
   --vsc-editor-line-number: #6e7681;
   --vsc-editor-line-number-active: #cccccc;
+  /* a folded block's `⋯` (tr-prd PRD 005, §1.2): Dark Modern's editor.foldBackground */
+  --vsc-editor-fold-bg: rgb(38 79 120 / 50%);
   /* find (PRD 005, §5.1): every match, and the one the cursor is on */
   --vsc-find-match-bg: rgb(234 92 0 / 33%);
   --vsc-find-current-bg: #9e6a03;
@@ -296,6 +298,7 @@
   --vsc-editor-selection-bg: #add6ff;
   --vsc-editor-line-number: #6e7681;
   --vsc-editor-line-number-active: #171184;
+  --vsc-editor-fold-bg: rgb(173 214 255 / 50%);
   --vsc-find-match-bg: rgb(234 92 0 / 33%);
   --vsc-find-current-bg: #a8ac94;
   --vsc-find-match-border: #b58900;

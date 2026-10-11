@@ -25,7 +25,7 @@
 .gutter {
   position: relative;
   flex: none;
-  width: calc(var(--ui-code-digits, 2) * 1ch + 28px);
+  width: calc(var(--ui-code-digits, 2) * 1ch + 36px);
   overflow: hidden;
   color: var(--vsc-editor-line-number);
   text-align: right;
@@ -44,8 +44,9 @@
 }
 
 .number {
+  position: relative;
   height: var(--ui-code-line-height);
-  padding-right: 12px;
+  padding-right: 20px;
   padding-left: 8px;
 
   &.is-current {
@@ -79,6 +80,8 @@
 }
 
 .input {
+  /* Room below the last line, so the caret on a new, empty last line can be scrolled into view (tr-prd PRD 005, §1.1). */
+  padding-bottom: calc(var(--ui-code-pad-y) + var(--ui-code-line-height));
   overflow: auto;
   resize: none;
   border: 0;
@@ -118,6 +121,42 @@
 
 .line {
   height: var(--ui-code-line-height);
+}
+
+/* Folds (tr-prd PRD 005, §1.2): a block's chevron, shown while the pointer is on the gutter — a folded one's always. */
+.fold {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: var(--ui-code-line-height);
+  color: var(--vsc-fg-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.1s;
+
+  &:hover {
+    color: var(--vsc-fg-bright);
+  }
+
+  .gutter:hover &,
+  &.is-folded {
+    opacity: 1;
+  }
+}
+
+/* What a folded line hides, after its text: it takes the pointer, to open it. */
+.folded {
+  margin-left: 4px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--vsc-editor-fold-bg);
+  color: var(--vsc-fg-muted);
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 /* Find (PRD 005, §5.1): its bar over the text's top right, and the matches marked in the text. */

@@ -10,6 +10,12 @@
           [attr.title]="line.index + 1 === problem()?.line ? problem()?.message : null"
         >
           {{ line.index + 1 }}
+          @if (line.fold) {
+            <!-- Folds (tr-prd PRD 005, §1.2): the chevron of a block; Ctrl+Shift+[ / ] at the caret are the keyboard's way. -->
+            <span class="fold" [class.is-folded]="line.fold === 'folded'" (mousedown)="toggleFold(line.index, $event)">
+              <ui-icon [name]="line.fold === 'folded' ? 'chevron-right' : 'chevron-down'" />
+            </span>
+          }
         </div>
       }
     </div>
@@ -39,6 +45,7 @@
     [attr.autocorrect]="'off'"
     [attr.aria-label]="label()"
     [readOnly]="readonly()"
+    (beforeinput)="onBeforeInput($event)"
     (input)="onInput()"
     (scroll)="onScroll()"
     (keydown)="onKeydown($event)"
@@ -51,7 +58,7 @@
     <div #canvas class="canvas">
       <div class="lines" [style.top.px]="view.visible().start * lineHeight">
         @for (line of view.visible().rows; track line.index) {
-          <div class="line">@for (token of line.tokens; track $index) {<span [class]="(token.kind ? 'tok-' + token.kind : '') + (token.mark ? ' is-' + token.mark : '')">{{ token.text }}</span>}</div>
+          <div class="line">@for (token of line.tokens; track $index) {<span [class]="(token.kind ? 'tok-' + token.kind : '') + (token.mark ? ' is-' + token.mark : '')">{{ token.text }}</span>}@if (line.fold === 'folded') {<span class="folded" (mousedown)="toggleFold(line.index, $event)">⋯</span>}</div>
         }
       </div>
     </div>

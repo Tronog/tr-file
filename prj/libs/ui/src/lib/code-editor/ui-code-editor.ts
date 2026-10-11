@@ -1,8 +1,9 @@
 import { Component, computed, effect, inject, input, output, signal, untracked, viewChild, type ElementRef } from '@angular/core';
 import { UiIconButton } from '../controls/ui-icon-button';
+import { UiIcon } from '../icon/ui-icon';
 import { UiSearchField } from '../controls/ui-search-field';
 import type { UiSyntaxLanguage } from './syntax/syntax.model';
-import { UI_CODE_LINE_HEIGHT, UiCodeEditorService, type UiCodeMatch, type UiCodePosition } from './ui-code-editor.service';
+import { UI_CODE_LINE_HEIGHT, UI_CODE_PADDING_TOP, UiCodeEditorService, type UiCodeMatch, type UiCodePosition } from './ui-code-editor.service';
 
 /** A character's width in the editor's font, when the font cannot be measured (a test). */
 const FALLBACK_CHAR_WIDTH = 7.8;
@@ -43,10 +44,20 @@ const OPENS_BLOCK = /[{[(]\s*$/;
  * match is marked, `Enter` / `Shift`+`Enter` (`F3` / `Shift`+`F3` in the text)
  * select the next or previous one, `Escape` closes it and gives the text the
  * keyboard with the match selected.
+ *
+ * Folds (tr-prd PRD 005, §1.2): a block — markdown's sections and fenced
+ * blocks, anything else's indented ones — folds and opens from a chevron in
+ * the gutter, by `Ctrl`+`Shift`+`[` / `]` at the caret, or by the `⋯` a folded
+ * line ends with. The textarea then holds the text without the folded lines;
+ * the editor keeps the whole of it, works each edit of the textarea's into it
+ * (`UiCodeEditorService.input`) and reports the whole. A block opens before an
+ * edit would reach into it — a selection across it, `Backspace` or `Delete`
+ * at its edge — and when find goes to a match in it. Folding or opening puts
+ * new text in the textarea, which starts the browser's undo afresh.
  */
 @Component({
   selector: 'ui-code-editor',
-  imports: [UiIconButton, UiSearchField],
+  imports: [UiIcon, UiIconButton, UiSearchField],
   templateUrl: './ui-code-editor.html',
   styleUrl: './ui-code-editor.scss',
   providers: [UiCodeEditorService],
@@ -114,10 +125,11 @@ export class UiCodeEditor {
       const text = this.text();
       const area = this.areaRef().nativeElement;
       untracked(() => {
-        if (area.value !== text) {
+        if (this.view.content() !== text || area.value !== this.view.shown()) {
           // Setting the value puts the caret at the end; a file opens at its top, and
           // text replaced under the caret (*Format Document*) keeps it where it was.
-          const caret = area.value === '' ? 0 : Math.min(area.selectionStart, text.length);
+          const caret = area.value === '' ? 0 : Math.min(this.view.toFull(area.selectionStart), text.length);
+          this.view.load(text);
           area.value = text;
           area.setSelectionRange(caret, caret);
           if (caret === 0) {
@@ -153,11 +165,51 @@ export class UiCodeEditor {
     this.areaRef().nativeElement.focus();
   }
 
+  /** Folds every block that folds (tr-prd PRD 005, §1.2). */
+  foldAll(): void {
+    this.refold(() => this.view.foldAll());
+  }
+
+  /** Opens every folded block. */
+  unfoldAll(): void {
+    this.refold(() => this.view.unfoldAll());
+  }
+
   protected onInput(): void {
     const area = this.areaRef().nativeElement;
-    this.view.setText(area.value);
-    this.view.moveCaret(area.value, area.selectionStart);
-    this.textChange.emit(area.value);
+    const folded = this.view.hidden().length > 0;
+    const caret = this.view.input(area.value, area.selectionStart);
+    if (folded && area.value !== this.view.shown()) {
+      // A fold the edit reached into is gone: its lines are put back.
+      area.value = this.view.shown();
+      const at = this.view.toView(caret);
+      area.setSelectionRange(at, at);
+    }
+    this.view.moveCaret(this.view.content(), caret);
+    this.reveal();
+    this.textChange.emit(this.view.content());
+  }
+
+  /**
+   * The caret's line scrolled into view, padding and all (PRD 005 of tr-prd,
+   * §1.1). The browser's own scroll after an edit stops short of it — `Enter`
+   * at the end of the text left the new, empty last line below the fold.
+   */
+  private reveal(): void {
+    const area = this.areaRef().nativeElement;
+    if (area.clientHeight === 0) {
+      return;
+    }
+    const top = this.view.rowOf(this.view.caret().line - 1) * UI_CODE_LINE_HEIGHT;
+    const bottom = top + UI_CODE_LINE_HEIGHT + 2 * UI_CODE_PADDING_TOP;
+    if (top < area.scrollTop) {
+      area.scrollTop = top;
+    } else if (bottom > area.scrollTop + area.clientHeight) {
+      area.scrollTop = bottom - area.clientHeight;
+    } else {
+      return;
+    }
+    this.onScroll();
   }
 
   protected onScroll(): void {
@@ -169,14 +221,22 @@ export class UiCodeEditor {
 
   protected onCaret(): void {
     const area = this.areaRef().nativeElement;
-    this.view.moveCaret(area.value, area.selectionDirection === 'backward' ? area.selectionStart : area.selectionEnd);
+    // A selection across a folded block opens it: what is typed over the selection, cut or dragged takes its lines too.
+    if (area.selectionStart !== area.selectionEnd) {
+      this.unfoldAcross(area.selectionStart, area.selectionEnd);
+    }
+    this.view.moveCaret(this.view.content(), this.view.toFull(area.selectionDirection === 'backward' ? area.selectionStart : area.selectionEnd));
   }
 
   protected onKeydown(event: KeyboardEvent): void {
-    if (this.onFindKey(event)) {
+    if (this.onFindKey(event) || this.onFoldKey(event)) {
       event.preventDefault();
       event.stopPropagation();
       return;
+    }
+    if (!this.readonly() && !event.isComposing && (event.key === 'Backspace' || event.key === 'Delete')) {
+      // At a folded block's edge, it opens first — then the key does what it does.
+      this.unfoldAtBreak(event.key === 'Delete');
     }
     if (this.readonly() || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
       return;
@@ -190,6 +250,104 @@ export class UiCodeEditor {
     }
     event.preventDefault();
     event.stopPropagation();
+  }
+
+  /**
+   * The last guard of the folded lines: an edit that would still reach into
+   * them — a selection across them not seen yet — is not made, and they open.
+   */
+  protected onBeforeInput(event: InputEvent): void {
+    if (event.inputType.startsWith('history')) {
+      return;
+    }
+    const area = this.areaRef().nativeElement;
+    const { selectionStart: start, selectionEnd: end, value } = area;
+    let from = start;
+    let to = end;
+    if (start === end) {
+      const backward = event.inputType.startsWith('delete') && event.inputType.includes('Backward');
+      const forward = event.inputType.startsWith('delete') && !backward;
+      if (backward && value[start - 1] === '\n') {
+        from = start - 1;
+      } else if (forward && value[start] === '\n') {
+        to = start + 1;
+      } else {
+        return;
+      }
+    }
+    if (this.view.crosses(from, to)) {
+      event.preventDefault();
+      this.unfoldAcross(from, to);
+    }
+  }
+
+  /* -- folds (tr-prd PRD 005, §1.2) --------------------------------------- */
+
+  /** `Ctrl`+`Shift`+`[` folds the innermost block at the caret, `Ctrl`+`Shift`+`]` opens it — VS Code's keys. */
+  private onFoldKey(event: KeyboardEvent): boolean {
+    if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey || (event.code !== 'BracketLeft' && event.code !== 'BracketRight')) {
+      return false;
+    }
+    const line = this.view.caret().line - 1;
+    this.refold(() => (event.code === 'BracketLeft' ? this.view.foldAt(line) : this.view.unfoldAt(line)));
+    return true;
+  }
+
+  /** The gutter's chevron, or the `⋯` of a folded line: folds the block, or opens it. */
+  protected toggleFold(line: number, event: MouseEvent): void {
+    event.preventDefault();
+    this.refold(() => this.view.toggleFold(line));
+  }
+
+  /** `Backspace` at the start of a line, `Delete` at the end of one: the folded block the break is the edge of opens. */
+  private unfoldAtBreak(forward: boolean): void {
+    const { selectionStart: start, selectionEnd: end, value } = this.areaRef().nativeElement;
+    if (start !== end) {
+      return;
+    }
+    if (forward && value[start] === '\n') {
+      this.unfoldAcross(start, start + 1);
+    } else if (!forward && value[start - 1] === '\n') {
+      this.unfoldAcross(start - 1, start);
+    }
+  }
+
+  /** Opens the folded blocks `[from, to)` of the textarea's text crosses — and those in them, folded too. */
+  private unfoldAcross(from: number, to: number): void {
+    if (this.view.crosses(from, to)) {
+      this.refold(() => this.view.unfoldBetween(this.view.toFull(from), this.view.toFull(to)));
+    }
+  }
+
+  /**
+   * Folds or opens (`change`, `true` when it did): the textarea given the text
+   * without the folded lines, the selection kept where it was in the text —
+   * at the end of a block's first line when it was in what folded — and the
+   * view where it was.
+   */
+  private refold(change: () => boolean): void {
+    const area = this.areaRef().nativeElement;
+    const from = this.view.toFull(area.selectionStart);
+    const to = this.view.toFull(area.selectionEnd);
+    const direction = area.selectionDirection;
+    const { scrollTop, scrollLeft } = area;
+    if (!change()) {
+      return;
+    }
+    area.value = this.view.shown();
+    const start = this.view.toView(from);
+    const end = this.view.toView(to);
+    // A selection that now runs across a folded block keeps only its caret.
+    if (this.view.crosses(start, end)) {
+      const caret = direction === 'backward' ? start : end;
+      area.setSelectionRange(caret, caret);
+    } else {
+      area.setSelectionRange(start, end, direction);
+    }
+    area.scrollTop = scrollTop;
+    area.scrollLeft = scrollLeft;
+    this.onScroll();
+    this.view.moveCaret(this.view.content(), this.view.toFull(area.selectionDirection === 'backward' ? area.selectionStart : area.selectionEnd));
   }
 
   /* -- find (PRD 005, §5.1) ------------------------------------------------ */
@@ -262,7 +420,7 @@ export class UiCodeEditor {
     const area = this.areaRef().nativeElement;
     let index = this.view.findIndex();
     if (index < 0) {
-      const caret = direction === 1 ? area.selectionEnd : area.selectionStart;
+      const caret = this.view.toFull(direction === 1 ? area.selectionEnd : area.selectionStart);
       const after = matches.findIndex((match) => this.view.offsetOf(match.line, match.start) >= caret);
       index = direction === 1 ? (after === -1 ? 0 : after) : (after === -1 ? matches.length : after) - 1;
     } else {
@@ -279,9 +437,12 @@ export class UiCodeEditor {
   /** A match selected in the text, and in view: its line near the middle, its columns on screen. */
   private select(match: UiCodeMatch): void {
     const area = this.areaRef().nativeElement;
-    const start = this.view.offsetOf(match.line, match.start);
+    if (this.view.isHidden(match.line)) {
+      this.refold(() => this.view.reveal(match.line));
+    }
+    const start = this.view.toView(this.view.offsetOf(match.line, match.start));
     area.setSelectionRange(start, start + (match.end - match.start));
-    const top = match.line * UI_CODE_LINE_HEIGHT;
+    const top = this.view.rowOf(match.line) * UI_CODE_LINE_HEIGHT;
     if (top < area.scrollTop || top + UI_CODE_LINE_HEIGHT > area.scrollTop + area.clientHeight) {
       area.scrollTop = Math.max(0, top - area.clientHeight / 2);
     }
@@ -296,7 +457,7 @@ export class UiCodeEditor {
       area.scrollLeft = right - area.clientWidth + 80;
     }
     this.onScroll();
-    this.view.moveCaret(area.value, start);
+    this.view.moveCaret(this.view.content(), this.view.toFull(start));
   }
 
   /** One character's width in the editor's monospace font, measured once. */
@@ -323,7 +484,7 @@ export class UiCodeEditor {
   }
 
   /** `Tab` / `Shift`+`Tab`: one step in or out — of every selected line when the selection spans lines. */
-  private indent(out: boolean): void {
+  private indent(out: boolean, opened = false): void {
     const area = this.areaRef().nativeElement;
     const { value, selectionStart, selectionEnd } = area;
     const unit = this.view.indentUnit();
@@ -335,6 +496,12 @@ export class UiCodeEditor {
     const start = value.lastIndexOf('\n', selectionStart - 1) + 1;
     const lineEnd = value.indexOf('\n', selectionEnd - (selectionEnd > selectionStart && value[selectionEnd - 1] === '\n' ? 1 : 0));
     const end = lineEnd === -1 ? value.length : lineEnd;
+    // A folded block among the lines opens, to be indented with them.
+    if (multiline && !opened && this.view.crosses(start, end + 1)) {
+      this.unfoldAcross(start, end + 1);
+      this.indent(out, true);
+      return;
+    }
     const lines = value.slice(start, end).split('\n');
     const changed = lines.map((line) => (out ? line.replace(new RegExp(`^(\\t| {1,${unit === '\t' ? 4 : unit.length}})`), '') : line === '' ? line : unit + line));
     area.setSelectionRange(start, end);
