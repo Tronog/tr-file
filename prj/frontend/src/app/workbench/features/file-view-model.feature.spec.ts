@@ -40,6 +40,12 @@ describe('FileViewModelFeature', () => {
     it('switches to GB at 1024 MB', () => {
       expect(files.formatBytes(1024 ** 3)).toBe('1.0 GB');
       expect(files.formatBytes(3 * 1024 ** 3)).toBe('3.0 GB');
+      expect(files.formatBytes(1023 * 1024 ** 3)).toBe('1023 GB');
+    });
+
+    it('switches to TB at 1024 GB — free disk space (PRD 001, §14.2)', () => {
+      expect(files.formatBytes(1024 ** 4)).toBe('1.0 TB');
+      expect(files.formatBytes(12 * 1024 ** 4)).toBe('12 TB');
     });
   });
 

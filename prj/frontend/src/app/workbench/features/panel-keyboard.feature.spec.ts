@@ -94,9 +94,24 @@ describe('PanelKeyboardFeature', () => {
     await openDocs();
 
     workbench.panelKeyboardFt.run(groupId(), { command: 'up', entryId: 'docs/NOTES.md' });
+    http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDirectoryDetails('docs')));
     await settled();
 
     expect(crumbs()).toBe('tr-file');
+  });
+
+  /** PRD 002, §2.3.1: Alt+Up lands on the folder it came from. */
+  it('puts the cursor on the folder it came up from', async () => {
+    await start();
+    await openDocs();
+
+    workbench.panelKeyboardFt.run(groupId(), { command: 'up', entryId: null });
+    http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDirectoryDetails('docs')));
+    await settled();
+
+    expect(activeBrowser()?.rows.find((row) => row.id === 'docs')).toMatchObject({ selected: true, focused: true });
+    expect(activeBrowser()?.rows.find((row) => row.id === 'README.md')?.selected).toBeUndefined();
+    expect(workbench.selectedEntryId()).toBe('docs');
   });
 
   it('re-reads the listing on Ctrl+R', async () => {
@@ -121,6 +136,7 @@ describe('PanelKeyboardFeature', () => {
     expect(crumbs()).toBe('tr-file/docs');
 
     workbench.panelKeyboardFt.run(groupId(), { command: 'up', entryId: null });
+    http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDirectoryDetails('docs')));
     await settled();
     expect(crumbs()).toBe('tr-file');
   });
@@ -173,12 +189,13 @@ describe('PanelKeyboardFeature', () => {
       expect(token()).toBeGreaterThan(before);
     });
 
-    /** Every folder here is already cached, so no request is expected. */
+    /** Every folder here is already cached, so only the details of the folder Up lands on are asked for. */
     it('does so for up, back and forward as well', async () => {
       await start();
       await openDocs();
 
       workbench.panelKeyboardFt.run(groupId(), { command: 'up', entryId: null });
+      http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDirectoryDetails('docs')));
       await settled();
       const afterUp = token();
       expect(afterUp).toBeGreaterThan(0);

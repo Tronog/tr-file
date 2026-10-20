@@ -1,4 +1,4 @@
-import { serializeDelimited } from '@tr-file/ui';
+import { serializeDelimited } from '@vsc-ngx/ui';
 import type { FsDiskUsageNode } from '../../file-system/file-system.model';
 
 /** The columns of the export, as its first line names them. */

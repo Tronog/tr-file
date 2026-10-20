@@ -1,5 +1,5 @@
 import { Component, effect, inject, input, type Signal } from '@angular/core';
-import { UiProgressDialog, type UiProgressDialogModel, UI_MODAL_REF, type UiModalRef } from '@tr-file/ui';
+import { UiProgressDialog, type UiProgressDialogModel, UI_MODAL_REF, type UiModalRef } from '@vsc-ngx/ui';
 
 /**
  * A file operation's progress in a modal window (PRD 005, §1), opened by

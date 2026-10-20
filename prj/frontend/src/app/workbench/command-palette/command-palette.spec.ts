@@ -2,8 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiQuickInput, fuzzyMatch } from '@tr-file/ui';
-import type { UiQuickPickItem } from '@tr-file/ui';
+import { UiQuickInput, fuzzyMatch } from '@vsc-ngx/ui';
+import type { UiQuickPickItem } from '@vsc-ngx/ui';
 import {
   detailsUrl,
   fsDetails,

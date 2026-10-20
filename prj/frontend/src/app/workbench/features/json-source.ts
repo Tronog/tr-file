@@ -1,4 +1,4 @@
-import type { UiJsonEdit } from '@tr-file/ui';
+import type { UiJsonEdit } from '@vsc-ngx/ui';
 
 /** Where a value is in the text, and — in an object — its key: `[start, end)` offsets. */
 interface JsonSpan {

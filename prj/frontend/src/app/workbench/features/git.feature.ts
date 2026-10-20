@@ -1,5 +1,5 @@
 import { DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
-import type { UiIconAction, UiQuickPickItem } from '@tr-file/ui';
+import type { UiIconAction, UiQuickPickItem } from '@vsc-ngx/ui';
 import type {
   UiScmActionEvent,
   UiScmCommit,

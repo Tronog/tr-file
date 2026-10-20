@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { UiKeymap } from '@tr-file/ui';
+import { UiKeymap } from '@vsc-ngx/ui';
 import { DEFAULT_KEYBINDINGS } from './keybindings.feature';
 
 /**

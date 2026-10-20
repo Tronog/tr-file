@@ -1,5 +1,5 @@
 import { Component, ElementRef, afterRenderEffect, computed, inject, input, output, signal, viewChild } from '@angular/core';
-import { UiButton, UiEmptyState, UiIcon, UiIconButton, UiKeymap, UiSearchField, UiTypeahead, isTypeaheadKey, pageStep } from '@tr-file/ui';
+import { UiButton, UiEmptyState, UiIcon, UiIconButton, UiKeymap, UiSearchField, UiTypeahead, isTypeaheadKey, pageStep } from '@vsc-ngx/ui';
 import type { UiProcessListModel, UiProcessMenuRequest, UiProcessRow } from '../models';
 
 /** The keymap's commands a process list answers on a row (`list`) and anywhere in it (`panel`). */

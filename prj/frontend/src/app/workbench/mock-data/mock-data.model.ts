@@ -1,4 +1,4 @@
-import type { UiGridNode } from '@tr-file/ui';
+import type { UiGridNode } from '@vsc-ngx/ui';
 import type { PanelGroupState } from '../panel-group.model';
 
 /**

@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import type { UiSettingsStore } from '@tr-file/ui';
+import type { UiSettingsStore } from '@vsc-ngx/ui';
 import { SettingsService } from '../../settings/settings.service';
 
 /** The settings key of the notes; the suffix is its format's version. */

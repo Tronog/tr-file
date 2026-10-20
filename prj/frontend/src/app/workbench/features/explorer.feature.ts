@@ -1,5 +1,5 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
-import type { UiIconAction, UiTreeNode } from '@tr-file/ui';
+import type { UiIconAction, UiTreeNode } from '@vsc-ngx/ui';
 import type { FsEntry } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
 import { isFolder } from '../../file-system/fs-entry-kind';

@@ -1,5 +1,5 @@
 import { computed } from '@angular/core';
-import { UiPreferencesFeature, uiPreferencesKey, type UiPreference } from '@tr-file/ui';
+import { UiPreferencesFeature, uiPreferencesKey, type UiPreference } from '@vsc-ngx/ui';
 import { STORAGE_PREFIX } from '../../settings/settings.service';
 import type { WorkbenchService } from '../workbench.service';
 

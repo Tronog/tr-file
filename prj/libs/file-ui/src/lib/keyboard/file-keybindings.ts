@@ -1,5 +1,5 @@
 import { makeEnvironmentProviders, type EnvironmentProviders } from '@angular/core';
-import { UI_KEYBINDING_DEFAULTS, type UiKeybinding } from '@tr-file/ui';
+import { UI_KEYBINDING_DEFAULTS, type UiKeybinding } from '@vsc-ngx/ui';
 
 /**
  * The file manager's keys, as they are until the application says otherwise:

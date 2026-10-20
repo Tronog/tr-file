@@ -1,4 +1,4 @@
-import { chordOf, type UiKeymap } from '@tr-file/ui';
+import { chordOf, type UiKeymap } from '@vsc-ngx/ui';
 import type { UiPanelCommand } from '../models';
 
 /** The commands a row or a tile answers (`when: 'list'`); see `UI_DEFAULT_KEYBINDINGS`. */

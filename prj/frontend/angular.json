@@ -35,7 +35,7 @@
             "outputPath": "dist/frontend",
             "stylePreprocessorOptions": {
               "includePaths": [
-                "../libs/ui/styles"
+                "node_modules/@vsc-ngx/ui/styles"
               ]
             }
           },

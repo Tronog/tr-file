@@ -1,4 +1,4 @@
-import { UiCommandPaletteFeature, type UiInputStep, type UiPaletteCommand, type UiPaletteStep, type UiPickStep } from '@tr-file/ui';
+import { UiCommandPaletteFeature, type UiInputStep, type UiPaletteCommand, type UiPaletteStep, type UiPickStep } from '@vsc-ngx/ui';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import { FsError } from '../../file-system/fs-error';
 import { describeRemoteTarget, parseRemoteTarget, type RemoteTarget } from '../command-palette/remote-target';

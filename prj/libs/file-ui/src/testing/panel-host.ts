@@ -1,7 +1,7 @@
 import { Component, input, viewChild } from '@angular/core';
-import { UiPanelGroup } from '@tr-file/ui';
+import { UiPanelGroup } from '@vsc-ngx/ui';
 import { UiFileBrowser } from '../lib/file-browser/ui-file-browser';
-import type { UiPanelGroupModel } from '@tr-file/ui';
+import type { UiPanelGroupModel } from '@vsc-ngx/ui';
 import type { UiFileBrowserModel } from '../lib/models';
 
 /**

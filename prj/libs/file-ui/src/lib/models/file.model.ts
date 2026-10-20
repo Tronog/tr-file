@@ -1,4 +1,4 @@
-import type { UiBreadcrumb, UiDocumentModel, UiEmptyStateModel, UiGitDecoration, UiIconAction, UiIconName, UiIconTint, UiPathSuggestion, UiSelectionModeId } from '@tr-file/ui';
+import type { UiBreadcrumb, UiDocumentModel, UiEmptyStateModel, UiGitDecoration, UiIconAction, UiIconName, UiIconTint, UiPathSuggestion, UiSelectionModeId } from '@vsc-ngx/ui';
 
 /*
  * The file manager's view models: what a listing, its rows and tiles, the

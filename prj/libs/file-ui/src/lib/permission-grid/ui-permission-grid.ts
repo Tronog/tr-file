@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { UiIcon } from '@tr-file/ui';
+import { UiIcon } from '@vsc-ngx/ui';
 import type { UiPermissions, UiPermissionTriplet } from '../models';
 
 /** One rendered cell of the matrix. */

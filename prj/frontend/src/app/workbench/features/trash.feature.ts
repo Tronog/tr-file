@@ -7,7 +7,7 @@ import type {
   UiProperty,
   UiPropertyActivation,
   UiSelectionChange,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import type { UiFileBrowserModel, UiFileColumn, UiFileRow } from '@tr-file/file-ui';
 import type { FsTrashItem, FsTrashListing } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';

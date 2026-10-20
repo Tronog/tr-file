@@ -3,12 +3,12 @@
 {
   "extends": "../tsconfig.angular.json",
   "compilerOptions": {
-    /* The libraries are consumed as source and compiled by this app's build —
-       one type-check across all of them, and edits to a library are live in
-       `ng serve`. Their own builds (ng-packagr, `pnpm build:libs`) check the
-       packaged form. */
+    /* `@tr-file/file-ui` is consumed as source and compiled by this app's
+       build — one type-check across it and the app, and edits to it are live in
+       `ng serve`. Its own build (ng-packagr, `pnpm build:libs`) checks the
+       packaged form. `@vsc-ngx/ui` comes from the vsc-ngx repo as built there
+       (a `file:` dependency; `pnpm ui:build` after it changes). */
     "paths": {
-      "@tr-file/ui": ["../libs/ui/src/public-api.ts"],
       "@tr-file/file-ui": ["../libs/file-ui/src/public-api.ts"]
     }
   },

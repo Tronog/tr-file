@@ -1,5 +1,5 @@
 import { computed } from '@angular/core';
-import type { UiFunctionKey } from '@tr-file/ui';
+import type { UiFunctionKey } from '@vsc-ngx/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /** The strip's word for a command — Midnight Commander's, where it fits what the command does here. */

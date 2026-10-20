@@ -1,5 +1,5 @@
 import { computed, signal, type Signal, type WritableSignal } from '@angular/core';
-import type { UiTreeNode } from '@tr-file/ui';
+import type { UiTreeNode } from '@vsc-ngx/ui';
 import type { DemoWorkbenchService } from './demo-workbench.service';
 import type { Note } from './notes.model';
 

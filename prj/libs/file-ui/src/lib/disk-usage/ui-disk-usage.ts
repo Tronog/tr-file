@@ -1,5 +1,5 @@
 import { Component, DestroyRef, ElementRef, afterRenderEffect, computed, inject, input, output, signal, viewChild } from '@angular/core';
-import { UiBreadcrumbs, UiIconButton, UiSegmented, type UiSegmentedOption, UiEmptyState, UiIcon, UiKeymap, UiPanelBody, UiPanelToolbar } from '@tr-file/ui';
+import { UiBreadcrumbs, UiIconButton, UiSegmented, type UiSegmentedOption, UiEmptyState, UiIcon, UiKeymap, UiPanelBody, UiPanelToolbar } from '@vsc-ngx/ui';
 import type { UiDiskUsageItem, UiDiskUsageModel, UiDiskUsageView } from '../models';
 import { PIE_INNER, sunburst, tableRows, treemap, TREEMAP_HEADER, type DiskUsageHue } from './disk-usage-layout';
 

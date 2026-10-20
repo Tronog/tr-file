@@ -1,4 +1,4 @@
-import type { UiSyntaxLanguage } from '@tr-file/ui';
+import type { UiSyntaxLanguage } from '@vsc-ngx/ui';
 
 /** Names of shell scripts that carry no extension. */
 const SHELL_NAMES = new Set(['.bashrc', '.bash_profile', '.bash_aliases', '.bash_logout', '.profile', '.zshrc', '.zprofile', '.zshenv', '.kshrc']);
@@ -16,6 +16,16 @@ const BY_EXTENSION: Readonly<Record<string, UiSyntaxLanguage>> = {
   jsonc: 'json',
   json5: 'json',
   webmanifest: 'json',
+  ts: 'typescript',
+  mts: 'typescript',
+  cts: 'typescript',
+  tsx: 'typescript',
+  js: 'typescript',
+  mjs: 'typescript',
+  cjs: 'typescript',
+  jsx: 'typescript',
+  mmd: 'mermaid',
+  mermaid: 'mermaid',
 };
 
 /** How the editor's status line names each language (PRD 005, §4). */
@@ -24,6 +34,8 @@ export const LANGUAGE_LABELS: Readonly<Record<UiSyntaxLanguage, string>> = {
   markdown: 'Markdown',
   bash: 'Shell Script',
   json: 'JSON',
+  typescript: 'TypeScript',
+  mermaid: 'Mermaid',
 };
 
 /**

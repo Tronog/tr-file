@@ -4,7 +4,7 @@ import type {
   UiEmptyStateModel,
   UiIconAction,
   UiSelectionChange,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import type { UiFileBrowserModel, UiFileColumn, UiFileRow } from '@tr-file/file-ui';
 import type { FsArchiveEntry, FsArchiveListing } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
@@ -189,6 +189,8 @@ export class ArchiveBrowserFeature implements PanelContentFeature {
       this.parent.fileBrowserFt.selectEntry(groupId, tab.path);
     } else {
       this.goTo(groupId, tab, parentOf(inner));
+      // On the folder it came from, as out of the archive (PRD 002, §2.3.1).
+      this.setSelection(groupId, { selected: [inner], focused: inner });
     }
     this.parent.panelFocusFt.focusBody(groupId);
   }

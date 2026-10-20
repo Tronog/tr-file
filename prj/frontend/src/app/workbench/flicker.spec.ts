@@ -8,7 +8,7 @@ import {
   UiPanelGroup,
   type UiGridNode,
   type UiPanelGroupModel,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import { ImageSourceService } from '../file-system/image-source.service';
 import {
   detailsUrl,

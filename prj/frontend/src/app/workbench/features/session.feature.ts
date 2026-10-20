@@ -1,4 +1,4 @@
-import { UiSessionFeature, uiRestoreSessionKey, uiSessionKey, type UiSessionSnapshot } from '@tr-file/ui';
+import { UiSessionFeature, uiRestoreSessionKey, uiSessionKey, type UiSessionSnapshot } from '@vsc-ngx/ui';
 import { STORAGE_PREFIX } from '../../settings/settings.service';
 import { MockDataWorkbenchService } from '../mock-data/mock-data-workbench.service';
 import type { PanelGroupState, PanelTabState } from '../panel-group.model';

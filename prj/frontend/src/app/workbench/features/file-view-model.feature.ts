@@ -1,4 +1,4 @@
-import type { UiIconName, UiIconTint } from '@tr-file/ui';
+import type { UiIconName, UiIconTint } from '@vsc-ngx/ui';
 import type { FsEntry, FsEntryType } from '../../file-system/file-system.model';
 import { isFolder } from '../../file-system/fs-entry-kind';
 
@@ -105,7 +105,11 @@ export class FileViewModelFeature {
       return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
     }
     const gb = mb / 1024;
-    return `${gb < 10 ? gb.toFixed(1) : Math.round(gb)} GB`;
+    if (gb < 1024) {
+      return `${gb < 10 ? gb.toFixed(1) : Math.round(gb)} GB`;
+    }
+    const tb = gb / 1024;
+    return `${tb < 10 ? tb.toFixed(1) : Math.round(tb)} TB`;
   }
 
   /**

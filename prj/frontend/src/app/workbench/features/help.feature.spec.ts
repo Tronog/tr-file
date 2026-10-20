@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { UiCheatsheet, UiHelp } from '@tr-file/ui';
+import { UiCheatsheet, UiHelp } from '@vsc-ngx/ui';
 import { settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
 

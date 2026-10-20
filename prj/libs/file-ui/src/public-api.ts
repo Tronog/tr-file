@@ -1,5 +1,5 @@
 /**
- * @tr-file/file-ui — the file manager's components, built on `@tr-file/ui`.
+ * @tr-file/file-ui — the file manager's components, built on `@vsc-ngx/ui`.
  *
  * Presentational like the rest: a file browser and its listings (list, grid,
  * tree), disk usage, a git pane, transfers, a permission grid — and Task

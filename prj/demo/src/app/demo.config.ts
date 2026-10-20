@@ -5,7 +5,7 @@ import {
   uiSidebarLocationPreference,
   type UiSidebarDef,
   type UiWorkbenchConfig,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import type { NoteGroup, NoteTab } from './notes.model';
 
 const EXPLORER: UiSidebarDef = {

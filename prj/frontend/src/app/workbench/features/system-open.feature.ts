@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import type { UiProperty } from '@tr-file/ui';
+import type { UiProperty } from '@vsc-ngx/ui';
 import { FsError } from '../../file-system/fs-error';
 import type { WorkbenchService } from '../workbench.service';
 import { shownPath, type FsPathStyle } from '../../file-system/fs-path';

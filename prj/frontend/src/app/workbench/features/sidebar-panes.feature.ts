@@ -1,5 +1,5 @@
 import { computed } from '@angular/core';
-import { UiSidebarPanesFeature } from '@tr-file/ui';
+import { UiSidebarPanesFeature } from '@vsc-ngx/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /** The sidebars whose panes can be rearranged (PRD 002, §5.1). */

@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import type { UiSettingsStore } from '@tr-file/ui';
+import type { UiSettingsStore } from '@vsc-ngx/ui';
 import { SettingsService } from '../../settings/settings.service';
 import type { RemoteTarget } from '../command-palette/remote-target';
 

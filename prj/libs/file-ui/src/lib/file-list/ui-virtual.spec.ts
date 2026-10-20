@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
 import { UiFileList, UiIconView } from '../../public-api';
 import type { UiFileColumn, UiFileRow, UiIconViewItem } from '../../public-api';
-import { visibleRange } from '@tr-file/ui';
+import { visibleRange } from '@vsc-ngx/ui';
 
 /**
  * PRD 003, §1 — a long folder renders only what is near the viewport. jsdom

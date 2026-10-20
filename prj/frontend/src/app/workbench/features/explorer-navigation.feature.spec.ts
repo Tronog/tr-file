@@ -247,6 +247,9 @@ describe('ExplorerNavigationFeature', () => {
       expect(highlighted()).toEqual(['docs/prd']);
       workbench.fileBrowserFt.navigateUp(group());
       expect(highlighted()).toEqual(['docs']);
+      // The cursor is on the folder it came up from, which the details describe (PRD 002, §2.3.1).
+      http.expectOne(detailsUrl('docs/prd')).flush(fsEnvelope(fsDetails('docs/prd')));
+      await settled();
     });
 
     it('reveals the folder a file is in when the file is opened', async () => {

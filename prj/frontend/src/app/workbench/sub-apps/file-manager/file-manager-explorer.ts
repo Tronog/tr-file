@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { UiPane, UiSearchField, UiSidebar, UiTree } from '@tr-file/ui';
+import { UiPane, UiSearchField, UiSidebar, UiTree } from '@vsc-ngx/ui';
 import { WorkbenchService } from '../../workbench.service';
 
 /**

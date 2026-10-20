@@ -7,7 +7,7 @@ import {
   type UiPreference,
   type UiSidebarDef,
   type UiWorkbenchConfig,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import { BOOKMARK_KEYS, openBookmarkCommand } from './features/places.feature';
 import { WORKBENCH_DEFAULT_KEYBINDINGS } from './features/keybindings.feature';
 import type { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';

@@ -3,7 +3,7 @@
 The default keys of tr-file. Every key in the **configurable** tables can be changed or
 removed in *Settings › Keyboard Shortcuts* (`Ctrl`+`,`), stored per user under
 `tr-file.keybindings.v1`; the tables below are the defaults
-(`UI_DEFAULT_KEYBINDINGS` in `prj/libs/ui/src/lib/keyboard/keymap.ts` plus
+(`UI_DEFAULT_KEYBINDINGS` in `../vsc-ngx/projects/vsc-ngx/ui/src/lib/keyboard/keymap.ts` (in the vsc-ngx repo) plus
 `WORKBENCH_DEFAULT_KEYBINDINGS` in `prj/frontend/src/app/workbench/features/keybindings.feature.ts`).
 Navigation keys — arrows, `Home`/`End`, page keys, type-to-find, `Escape`, keys inside menus
 and dialogs — are **fixed** (PRD 010, §2).
@@ -79,7 +79,7 @@ the rest on the active panel's selection. `F5`/`F6` offer the other panel's fold
 | Key | Command | Where |
 | --- | --- | --- |
 | `Alt`+`←` / `Alt`+`→` | Back / forward in the panel's history | In a panel |
-| `Alt`+`↑` | Up one folder | In a panel |
+| `Alt`+`↑` | Up one folder, onto the folder left | In a panel |
 | `Ctrl`+`R` | Refresh (large folders are refreshed only this way) | In a panel |
 | `Escape` | Stop reading a large folder — what has come stays (only while one is being read); in Disk Usage, stop the scan (PRD 013, §2.1.1) | In a panel |
 | `Ctrl`+`L` | Edit the path bar — go to a location | In a panel |

@@ -1,5 +1,5 @@
 import { computed, linkedSignal, signal } from '@angular/core';
-import type { UiActionListItem, UiPreview, UiProperty, UiPropertyActivation } from '@tr-file/ui';
+import type { UiActionListItem, UiPreview, UiProperty, UiPropertyActivation } from '@vsc-ngx/ui';
 import type { UiPermissions } from '@tr-file/file-ui';
 import type { CopyablePath } from './system-open.feature';
 import type { FsDetails } from '../../file-system/file-system.model';

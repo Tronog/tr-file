@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
 import { UiFileList, UiIconView } from '../../public-api';
-import type { UiPanelGroupModel, UiSelectionChange } from '@tr-file/ui';
+import type { UiPanelGroupModel, UiSelectionChange } from '@vsc-ngx/ui';
 import type {
   UiFileBrowserModel,
   UiFileColumn,

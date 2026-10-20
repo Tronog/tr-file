@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import { parseDelimited, type UiDelimitedText, type UiDocumentEditModel, type UiJsonEdit, type UiSyntaxLanguage } from '@tr-file/ui';
+import { parseDelimited, type UiDelimitedText, type UiDocumentEditModel, type UiJsonEdit, type UiSyntaxLanguage } from '@vsc-ngx/ui';
 import { contentTag } from '../../file-system/content-tag';
 import { FsError } from '../../file-system/fs-error';
 import { sniffText } from '../../file-system/text-sniff';

@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import { UiChromeFeature, type UiActivityItem, type UiCommandTarget, type UiMenuItem, type UiStatusItem } from '@tr-file/ui';
+import { UiChromeFeature, type UiActivityItem, type UiCommandTarget, type UiMenuItem, type UiStatusItem } from '@vsc-ngx/ui';
 import type { WorkbenchService } from '../workbench.service';
 import { isFolder } from '../../file-system/fs-entry-kind';
 

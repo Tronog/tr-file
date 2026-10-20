@@ -1,3 +1,4 @@
-# TODO:
-* screenshot app
-* insert select - morevement with arrows does not deselect, resets when nothing is selected
+# Overview (design)
+We are creating a file manager app.
+
+# Section 1

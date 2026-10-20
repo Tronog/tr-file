@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiBreadcrumbs, UiContextMenu, UiTabBar, UiTree } from '@tr-file/ui';
+import { UiBreadcrumbs, UiContextMenu, UiTabBar, UiTree } from '@vsc-ngx/ui';
 import { UiFileBrowser, UiFileList } from '../../public-api';
-import type { UiContextMenuRequest, UiSelectionChange } from '@tr-file/ui';
+import type { UiContextMenuRequest, UiSelectionChange } from '@vsc-ngx/ui';
 import type {
   UiFileBrowserModel,
   UiFileColumn,

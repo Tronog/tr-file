@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { UiEmptyState } from '@tr-file/ui';
+import { UiEmptyState } from '@vsc-ngx/ui';
 import { WorkbenchService } from '../../workbench.service';
 
 /**

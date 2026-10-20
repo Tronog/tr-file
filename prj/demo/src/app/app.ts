@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { UiModalHost, UiModalService, UiThemeService } from '@tr-file/ui';
+import { UiModalHost, UiModalService, UiThemeService } from '@vsc-ngx/ui';
 import { DemoWorkbench } from './demo-workbench';
 
 /** The page: the workbench, and the modal windows over it — which make it inert while one is open. */

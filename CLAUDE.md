@@ -7,7 +7,9 @@ It is a full stack application consisting of
   * development - ports directly exposed
   * production - behind nginx proxy
 * Electron desktop shell - `prj/desktop`
-* libraries - `prj/libs`: the workbench (`@tr-file/ui`) and the file manager's components (`@tr-file/file-ui`)
+* libraries - the workbench `@vsc-ngx/ui` (its own repo, `../vsc-ngx`, consumed as built there: a `file:`
+  dependency on `../vsc-ngx/dist/vsc-ngx/ui`; after it changes run `pnpm ui:build` from `prj/`), and the file
+  manager's components `@tr-file/file-ui` in `prj/libs`
 * a demo app on the workbench library alone - `prj/demo`
 
 # Layout
@@ -28,11 +30,10 @@ prj/
 ├── backend/
 ├── frontend/
 ├── desktop/              # @tr-file/desktop — Electron shell
-├── demo/                 # @tr-file/demo — a notes app on @tr-file/ui alone (port 4301)
+├── demo/                 # @tr-file/demo — a notes app on @vsc-ngx/ui alone (port 4301)
 ├── scripts/              # check-library-boundaries.mjs
 └── libs/
-    ├── ui/               # @tr-file/ui — the workbench library (ng-packagr)
-    └── file-ui/          # @tr-file/file-ui — the file manager's components on it
+    └── file-ui/          # @tr-file/file-ui — the file manager's components on @vsc-ngx/ui
 ```
 
 Use pnpm (via `corepack enable pnpm`). Run `pnpm install` from `prj/`.
@@ -42,8 +43,9 @@ Refer to `docs/ai/ANGULAR.md` for architecture (component / component service / 
 Refer to `docs/ai/VSCODE-UI.md` for all Tabler UI markup, layouts and classes — use it instead of
 fetching the Tabler docs.
 
-**The libraries (PRD 001, §17.1).** The workbench is a library of its own, `prj/libs/ui`
-(`@tr-file/ui`): zoneless and signal-based, ported from `mockup/001/` — see `prj/libs/ui/README.md`,
+**The libraries (PRD 001, §17.1).** The workbench is a library of its own, `@vsc-ngx/ui`, now in its
+own repo (`/data/src/vsc-ngx`, `projects/vsc-ngx/ui`): zoneless and signal-based, ported from
+`mockup/001/` — see `/data/src/vsc-ngx/projects/vsc-ngx/ui/README.md`,
 including why it does not load Tabler. It holds nothing of an application's business (nothing that
 touches a backend, directly or through a feature or a service): the presentational components, and
 a configurable shell — `UiWorkbenchService` with its features (sub-apps, panels and their layout,
@@ -54,9 +56,10 @@ and the settings store (`UI_SETTINGS_STORE`, `UI_STORAGE_PREFIX`). The file mana
 `UiFileBrowser`, `UiFileList`, `UiIconView`, `UiDiskUsage`, `UiProcessList`, `UiSourceControl`, `UiTransferList`,
 `UiPermissionGrid`, their models and keys (`provideFileUi`) — are `prj/libs/file-ui`
 (`@tr-file/file-ui`, `prj/libs/file-ui/README.md`). Both are ng-packagr libraries with their own
-tests (`pnpm build:libs`, `pnpm test:libs`, after `scripts/check-library-boundaries.mjs`); the
-apps compile their sources (`paths`). `prj/demo` (`pnpm demo`) is a notes app on `@tr-file/ui`
-alone, built against the packaged library by `pnpm demo:build`.
+tests. `@vsc-ngx/ui` is built in vsc-ngx and consumed here as built (a `file:` dependency;
+`pnpm ui:build` rebuilds it and reinstalls). `@tr-file/file-ui` is built and tested here
+(`pnpm build:libs`, `pnpm test:libs`, after `scripts/check-library-boundaries.mjs`); the app
+compiles its sources (`paths`). `prj/demo` (`pnpm demo`) is a notes app on `@vsc-ngx/ui` alone.
 
 The app composes them in `prj/frontend/src/app/workbench`: `WorkbenchService` extends
 `UiWorkbenchService` — a thin service holding the app's shared state, plus feature classes holding
@@ -107,7 +110,7 @@ Which folders are open is `FileBrowserFeature`'s state, per panel; opening one i
 fetches it.
 A new kind of content is a new tab kind in `editor.contents`, a component, a feature class
 registered as its driver, and a `uiPanelContent` template in `workbench.html` — see
-`prj/libs/ui/README.md` § Panel content.
+`/data/src/vsc-ngx/projects/vsc-ngx/ui/README.md` § Panel content.
 
 The explorer tree lists *folders only* (§9.1.1) — it is a map of the workspace, and files
 belong to the panels. Clicking a folder in the explorer shows it in the *active* panel; that
@@ -161,7 +164,7 @@ follow it (`UiFocusCycleFeature.enter` → `UiEditorGroupsFeature.entered` → t
 what its cursor is on, else the first entry selected there, else its folder or file — a press says what
 it pressed on itself, so a mere activation (a split, a command) asks for nothing.
 A browser keeps those chords for its own tabs, so they reach the page on the desktop only; the desktop shell installs its own accelerator
-table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory, and `Alt`+`←`/`→` walks
+table so Electron's default `Ctrl`+`W` cannot close the window instead (`prj/desktop/src/app-menu.ts`). `Alt`+`↑` goes up a directory — landing on the folder (or file) it came from, selected (PRD 002, §2.3.1; `FileBrowserFeature.runToolbarAction` `up`, and inside a zip `ArchiveBrowserFeature.up`) —, and `Alt`+`←`/`→` walks
 `PanelHistoryFeature`, which keeps a browser-style trail of visited folders *per panel*,
 since two panels are two places someone is working. Each stop keeps what was selected there and the
 cursor (PRD 002, §2.1): `FileBrowserFeature.navigateTo` calls `leave` just before the folder's
@@ -363,7 +366,7 @@ not repeated), then the fixed keys (`HELP.fixed`) — keep both in step with `SH
 help is a tab in the config's `help.tabs` and a `@case` in `UiHelpModal`.
 
 **Every key is configurable (PRD 010, §2).** The library's components never test a key for a
-command themselves: they ask `UiKeymap` (`prj/libs/ui/src/lib/keyboard/keymap.ts`; the workbench
+command themselves: they ask `UiKeymap` (`../vsc-ngx/projects/vsc-ngx/ui/src/lib/keyboard/keymap.ts`; the workbench
 route's own, which `provideUiWorkbench` brings) which of their commands it is bound to, in their
 context — `list`, `panel` or `window` (VS Code's `when`). `KeybindingsFeature` (the library's
 `UiKeybindingsFeature`) owns the table: the components' defaults — `FILE_UI_DEFAULT_KEYBINDINGS`
@@ -606,6 +609,11 @@ panel is the system's (`UiFileBrowser.nativeDrag`), and files dropped from outsi
 root holds are moved like entries (`FileBrowserFeature.dropFiles`); anything else dropped —
 folders too — is uploaded (`TransfersFeature.uploadDropped`, *Upload Folder…*). The icon
 view draws thumbnails `ThumbnailsFeature` makes of what it has on screen (`UiIconView.shown`).
+Every mount point in Places — the root, drives, USB sticks, shares — shows its free space on the right
+(PRD 001, §14.2): the backend's `PlacesService` adds `space` (`statfs`, `{ free, total }`, 1.5 s at most per
+file system) to those places, `PlacesFeature` writes it as the row's `meta` (`48 GB free`), and asks for the
+places again every minute once they were listed (`start`, from the `Workbench` component) and when a file
+job ends (`refresh`).
 The trash (PRD 001, §14.1) is the last row of Places: `TrashFeature` opens it as a `trash` tab
 (read-only, like a zip) listing what `GET /api/ops/trash-items` (bridge `op-trash-list`) says is in
 it — where each entry was and when — with *Restore* where the trash can (the server's) and *Empty

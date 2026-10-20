@@ -1,6 +1,6 @@
 import { PROCESS_COLUMNS } from '../task-manager/process-rows';
 import type { TaskManagerView } from './task-manager.feature';
-import { UiCommandsFeature, type UiCommand, type UiCommandSpec, type UiCommandTarget } from '@tr-file/ui';
+import { UiCommandsFeature, type UiCommand, type UiCommandSpec, type UiCommandTarget } from '@vsc-ngx/ui';
 import type { UiPanelView } from '@tr-file/file-ui';
 import { isFile, isFolder } from '../../file-system/fs-entry-kind';
 import type { PanelSortKey } from '../panel-group.model';

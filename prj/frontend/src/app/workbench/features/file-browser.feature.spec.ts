@@ -155,8 +155,51 @@ describe('FileBrowserFeature', () => {
 
       expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('docs');
       expect(workbench.editorGroupsFt.group('group-root')?.tabs[0]?.label).toBe('docs');
-      // `docs` is still cached, so walking back up costs no request.
+      // `docs` is still cached, so walking back up costs no request but the
+      // description of the folder it came from, which the cursor is on.
       http.expectNone(listUrl('docs'));
+      http.expectOne(detailsUrl('docs/prd')).flush(fsEnvelope(fsDetails('docs/prd')));
+      await settled();
+    });
+
+    /** PRD 002, §2.3.1: the cursor lands on the folder just left, selected, the details on it. */
+    it('up lands on the folder it came from', async () => {
+      await start();
+      workbench.fileBrowserFt.openEntry('group-root', 'docs');
+      http.expectOne(listUrl('docs')).flush(fsEnvelope(fsListing('docs', [fsEntry('docs/a.md'), fsDirectory('docs/prd')])));
+      await settled();
+      workbench.fileBrowserFt.openEntry('group-root', 'docs/prd');
+      http.expectOne(listUrl('docs/prd')).flush(fsEnvelope(fsListing('docs/prd')));
+      await settled();
+
+      workbench.fileBrowserFt.runToolbarAction('group-root', 'up');
+      http.expectOne(detailsUrl('docs/prd')).flush(fsEnvelope(fsDetails('docs/prd')));
+      await settled();
+
+      expect(workbench.editorGroupsFt.stateOf('group-root')).toMatchObject({ selection: ['docs/prd'], focusedEntryId: 'docs/prd' });
+      expect(rowOf('group-root', 'docs/prd')).toMatchObject({ selected: true, focused: true });
+      expect(rowOf('group-root', 'docs/a.md')?.selected).toBeUndefined();
+      expect(workbench.selectedEntryId()).toBe('docs/prd');
+
+      // And on again, from `docs` to the root.
+      workbench.fileBrowserFt.runToolbarAction('group-root', 'up');
+      http.expectOne(detailsUrl('docs')).flush(fsEnvelope(fsDetails('docs')));
+      await settled();
+      expect(rowOf('group-root', 'docs')).toMatchObject({ selected: true, focused: true });
+    });
+
+    it('up from a file shows its folder with the file under the cursor', async () => {
+      await start();
+      workbench.fileBrowserFt.openEntry('group-root', 'README.md');
+      http.expectOne(detailsUrl('README.md')).flush(fsEnvelope(fsDetails('README.md')));
+      http.expectOne(downloadUrl('README.md')).flush(new Blob(['# Title'], { type: 'text/markdown' }));
+      await settled();
+
+      workbench.fileBrowserFt.runToolbarAction('group-root', 'up');
+      await settled();
+
+      expect(workbench.editorGroupsFt.pathOf('group-root')).toBe('');
+      expect(rowOf('group-root', 'README.md')).toMatchObject({ selected: true, focused: true });
     });
 
     it('up does nothing at the root', async () => {

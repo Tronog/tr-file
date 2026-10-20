@@ -44,12 +44,28 @@ export const NO_PLACES: PlacesProvider = {
   places: async () => [],
 };
 
+/** The kinds of place that are a file system of their own — a mount point (PRD 001, §14.2). */
+export const MOUNT_KINDS: ReadonlySet<PlaceKind> = new Set<PlaceKind>(['root', 'drive', 'removable', 'network']);
+
+/** How much room a mounted file system has, in bytes (PRD 001, §14.2). */
+export interface PlaceSpaceDto {
+  /** What the user may still write — `bavail`, not the blocks kept for root. */
+  readonly free: number;
+  readonly total: number;
+}
+
 /** One place, as `GET /api/fs/places` answers it: a root-relative path. */
 export interface PlaceDto {
   readonly id: string;
   readonly label: string;
   readonly kind: PlaceKind;
   readonly path: string;
+  /**
+   * A mount point's free space (PRD 001, §14.2) — the root, drives, USB
+   * sticks and shares; left out for the user's folders, and for a file
+   * system that would not say in time (`PlacesService.SPACE_TIMEOUT_MS`).
+   */
+  readonly space?: PlaceSpaceDto;
 }
 
 /** `GET /api/fs/places`: where to start, and what to list in the Places pane. */

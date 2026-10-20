@@ -1,4 +1,4 @@
-import { UiContextMenuFeature, type UiContextMenuRequest, type UiMenuLayout, type UiOpenContextMenu } from '@tr-file/ui';
+import { UiContextMenuFeature, type UiContextMenuRequest, type UiMenuLayout, type UiOpenContextMenu } from '@vsc-ngx/ui';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import type { CommandTarget } from './commands.feature';
 import type { PlaceSection } from './places.feature';

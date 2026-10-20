@@ -1,5 +1,5 @@
 import { Component, ElementRef, afterRenderEffect, computed, input, output, viewChild } from '@angular/core';
-import { UiEmptyState } from '@tr-file/ui';
+import { UiEmptyState } from '@vsc-ngx/ui';
 import type { UiPerfSeries, UiPerfSpan, UiPerformanceModel } from '../models';
 import { PERF_BOX, areaPath, linePath } from './perf-paths';
 

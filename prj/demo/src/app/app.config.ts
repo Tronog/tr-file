@@ -1,5 +1,5 @@
 import { type ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
-import { UI_STORAGE_PREFIX, provideUiWorkbench } from '@tr-file/ui';
+import { UI_STORAGE_PREFIX, provideUiWorkbench } from '@vsc-ngx/ui';
 import { DEMO_CONFIG } from './demo.config';
 import { DemoWorkbenchService } from './demo-workbench.service';
 

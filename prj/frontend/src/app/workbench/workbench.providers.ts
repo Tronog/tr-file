@@ -1,6 +1,6 @@
 import { type EnvironmentProviders, inject, makeEnvironmentProviders } from '@angular/core';
 import { provideFileUi } from '@tr-file/file-ui';
-import { provideUiWorkbench } from '@tr-file/ui';
+import { provideUiWorkbench } from '@vsc-ngx/ui';
 import { FileSystemService } from '../file-system/file-system.service';
 import { RemoteConnectionService } from '../file-system/remote-connection.service';
 import { MockDataWorkbenchService } from './mock-data/mock-data-workbench.service';

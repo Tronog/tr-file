@@ -1,5 +1,5 @@
 import { Service } from '@angular/core';
-import { UiWorkbenchService } from '@tr-file/ui';
+import { UiWorkbenchService } from '@vsc-ngx/ui';
 import { DemoCommandsFeature } from './demo-commands.feature';
 import type { NoteGroup, NoteTab } from './notes.model';
 import { NotesFeature } from './notes.feature';

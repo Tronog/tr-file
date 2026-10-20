@@ -1,6 +1,6 @@
 import { DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { UiPerfSpan, UiPerformanceModel, UiProcessListModel, UiProcessMenuRequest } from '@tr-file/file-ui';
-import type { UiStatusItem } from '@tr-file/ui';
+import type { UiStatusItem } from '@vsc-ngx/ui';
 import type { FsProcess, FsProcessesHistory, FsProcessesSnapshot } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
 import {

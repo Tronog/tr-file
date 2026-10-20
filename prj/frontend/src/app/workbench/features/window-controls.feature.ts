@@ -1,5 +1,5 @@
 import { computed } from '@angular/core';
-import type { UiTitleBarZoom, UiWindowControl, UiZoomRequest } from '@tr-file/ui';
+import type { UiTitleBarZoom, UiWindowControl, UiZoomRequest } from '@vsc-ngx/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /** The window's zoom range, in percent — the main process's `MIN_ZOOM` / `MAX_ZOOM` (PRD 001, §8.2.3). */

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiTabBar } from '@tr-file/ui';
-import type { UiPanelGroupModel, UiTab } from '@tr-file/ui';
+import { UiTabBar } from '@vsc-ngx/ui';
+import type { UiPanelGroupModel, UiTab } from '@vsc-ngx/ui';
 import type { UiFileBrowserModel, UiFileRow } from '../../public-api';
 import { PanelHost } from '../../testing/panel-host';
 

@@ -4,7 +4,7 @@
   "deleteDestPath": true,
   "lib": {
     "entryFile": "src/public-api.ts",
-    "styleIncludePaths": ["../ui/styles"]
+    "styleIncludePaths": ["node_modules/@vsc-ngx/ui/styles"]
   },
   "inlineStyleLanguage": "scss"
 }

@@ -1,5 +1,5 @@
 import { Component, input, output } from '@angular/core';
-import { UiIconButton, UiIcon, UiProgress } from '@tr-file/ui';
+import { UiIconButton, UiIcon, UiProgress } from '@vsc-ngx/ui';
 import type { UiTransfer } from '../models';
 
 /**

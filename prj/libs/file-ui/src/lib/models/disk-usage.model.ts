@@ -1,4 +1,4 @@
-import type { UiBreadcrumb, UiEmptyStateModel, UiIconAction, UiPathSuggestion } from '@tr-file/ui';
+import type { UiBreadcrumb, UiEmptyStateModel, UiIconAction, UiPathSuggestion } from '@vsc-ngx/ui';
 
 /** How a `UiDiskUsage` draws a folder (PRD 013, §2.1). */
 export type UiDiskUsageView = 'pie' | 'table' | 'rectangles';

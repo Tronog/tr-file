@@ -1,5 +1,5 @@
 /* The browser and Angular options every Angular package of the workspace shares:
-   the app (`frontend`), the libraries (`libs/ui`, `libs/file-ui`) and the demo.
+   the app (`frontend`), the library (`libs/file-ui`) and the demo.
    The base targets NodeNext/CommonJS-interop for the backend; the browser build
    needs the bundler resolution mode and DOM libs instead. */
 {

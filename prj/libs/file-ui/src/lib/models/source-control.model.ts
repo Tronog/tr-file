@@ -1,4 +1,4 @@
-import type { UiIconAction, UiIconName, UiIconTint } from '@tr-file/ui';
+import type { UiIconAction, UiIconName, UiIconTint } from '@vsc-ngx/ui';
 
 /** How a change is coloured: VS Code's git decorations. */
 export type UiScmTone = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict';

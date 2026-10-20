@@ -1,4 +1,4 @@
-import type { UiGroupState, UiTabState } from '@tr-file/ui';
+import type { UiGroupState, UiTabState } from '@vsc-ngx/ui';
 
 /** A note: what the demo keeps. */
 export interface Note {

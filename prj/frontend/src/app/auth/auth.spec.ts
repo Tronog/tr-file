@@ -9,7 +9,7 @@ import { settled } from '../workbench/testing/fs-fixtures';
 import { AuthService } from './auth.service';
 import { Login } from './login/login';
 import { SessionExpiryService } from './session-expiry.service';
-import { UiModalService } from '@tr-file/ui';
+import { UiModalService } from '@vsc-ngx/ui';
 
 /** PRD 003, §2 — signing in, and the header that keeps other sites out. */
 

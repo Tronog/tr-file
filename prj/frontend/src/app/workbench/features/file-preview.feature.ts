@@ -1,6 +1,6 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { Marked } from 'marked';
-import { detectDelimiter, parseDelimited, type UiDocumentModel, type UiEmptyStateModel } from '@tr-file/ui';
+import { detectDelimiter, parseDelimited, type UiDocumentModel, type UiEmptyStateModel } from '@vsc-ngx/ui';
 import { MAX_IMAGE_BYTES } from '../../file-system/image-source.service';
 import { FsError } from '../../file-system/fs-error';
 import { sniffText, type SniffResult, type TextEncoding } from '../../file-system/text-sniff';

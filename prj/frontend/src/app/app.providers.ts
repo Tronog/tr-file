@@ -1,5 +1,5 @@
 import { type EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { UI_SETTINGS_STORE, UI_STORAGE_PREFIX } from '@tr-file/ui';
+import { UI_SETTINGS_STORE, UI_STORAGE_PREFIX } from '@vsc-ngx/ui';
 import { SettingsService, STORAGE_PREFIX } from './settings/settings.service';
 
 /**

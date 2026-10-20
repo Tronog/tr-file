@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { UiDocumentView, UiProgressDialog, UiTree } from '@tr-file/ui';
+import { UiDocumentView, UiProgressDialog, UiTree } from '@vsc-ngx/ui';
 import { UiFileList, UiTransferList } from '../../public-api';
-import type { UiDocumentModel, UiProgressDialogModel, UiTreeNode } from '@tr-file/ui';
+import type { UiDocumentModel, UiProgressDialogModel, UiTreeNode } from '@vsc-ngx/ui';
 import type { UiFileColumn, UiFileRow, UiPanelKey } from '../../public-api';
 
 const TREE_NODES: readonly UiTreeNode[] = [

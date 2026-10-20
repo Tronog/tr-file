@@ -1,5 +1,5 @@
 import { Service } from '@angular/core';
-import { UiLocalStorageSettingsStore, type UiSettingsStore } from '@tr-file/ui';
+import { UiLocalStorageSettingsStore, type UiSettingsStore } from '@vsc-ngx/ui';
 
 /** What the desktop's preload puts on `window` (PRD 003, §6); see `prj/desktop`. */
 interface SettingsBridgeApi {

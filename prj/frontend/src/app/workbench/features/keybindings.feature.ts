@@ -1,5 +1,5 @@
 import { FILE_UI_DEFAULT_KEYBINDINGS } from '@tr-file/file-ui';
-import { UI_DEFAULT_KEYBINDINGS, UI_FOCUS_COMMANDS, UiKeybindingsFeature, uiKeybindingsKey, type UiKeybinding } from '@tr-file/ui';
+import { UI_DEFAULT_KEYBINDINGS, UI_FOCUS_COMMANDS, UiKeybindingsFeature, uiKeybindingsKey, type UiKeybinding } from '@vsc-ngx/ui';
 import { STORAGE_PREFIX } from '../../settings/settings.service';
 import type { WorkbenchService } from '../workbench.service';
 import type { CommandTarget } from './commands.feature';

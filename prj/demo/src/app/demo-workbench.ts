@@ -12,7 +12,7 @@ import {
   UiWorkbenchService,
   UiWorkbenchShell,
   type UiProperty,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import type { DemoWorkbenchService } from './demo-workbench.service';
 
 /**
@@ -91,7 +91,7 @@ import type { DemoWorkbenchService } from './demo-workbench.service';
       <!-- The other sub-application. -->
       <ng-template uiSubApp="about">
         <div class="about">
-          <ui-empty-state [state]="{ icon: 'info', title: 'A workbench, as a library', hint: 'This demo is @tr-file/ui alone (PRD 001, §17.1).' }" />
+          <ui-empty-state [state]="{ icon: 'info', title: 'A workbench, as a library', hint: 'This demo is @vsc-ngx/ui alone (PRD 001, §17.1).' }" />
         </div>
       </ng-template>
     </ui-workbench-shell>

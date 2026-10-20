@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import type { UiIconAction, UiTreeNode } from '@tr-file/ui';
+import type { UiIconAction, UiTreeNode } from '@vsc-ngx/ui';
 import type { FsEntry } from '../../file-system/file-system.model';
 import { isFolder } from '../../file-system/fs-entry-kind';
 import { FsError } from '../../file-system/fs-error';

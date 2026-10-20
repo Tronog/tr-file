@@ -1,4 +1,4 @@
-import type { UiEmptyStateModel, UiIconName } from '@tr-file/ui';
+import type { UiEmptyStateModel, UiIconName } from '@vsc-ngx/ui';
 
 /**
  * One column of a `UiProcessList` (PRD 014, §2): Windows 10 Task Manager's

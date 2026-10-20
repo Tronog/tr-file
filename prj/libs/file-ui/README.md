@@ -1,6 +1,6 @@
 # @tr-file/file-ui
 
-The file manager's components (PRD 001, §17.1), built on `@tr-file/ui`: the
+The file manager's components (PRD 001, §17.1), built on `@vsc-ngx/ui`: the
 file browser that is a panel's content — a path bar, a toolbar, and a listing
 as a details table (`UiFileList`), large icons (`UiIconView`) or a tree, or a
 file read-only — and disk usage (`UiDiskUsage`), the git pane
@@ -35,10 +35,10 @@ The models — `UiFileRow`, `UiIconViewItem`, `UiFileBrowserModel`,
 disk-usage models — are exported beside the components. What any panel content
 shares — `UiPanelBody`, `UiPanelToolbar`, `UiBreadcrumbs`, `UiDocumentView`,
 the list building blocks (`UiListSelection`, `UiTypeahead`,
-`UiVirtualViewport`) — is `@tr-file/ui`'s.
+`UiVirtualViewport`) — is `@vsc-ngx/ui`'s.
 
-Built like `@tr-file/ui` (ng-packagr, `pnpm build:libs` builds `ui` first and
-this against it), consumed from its sources inside the workspace
+Built like `@vsc-ngx/ui` (ng-packagr, `pnpm build:libs`, against `@vsc-ngx/ui`
+as built in the vsc-ngx repo — `pnpm ui:build`), consumed from its sources inside the workspace
 (`paths`: `@tr-file/file-ui` → `../libs/file-ui/src/public-api.ts`), tested
 on its own (`pnpm --filter @tr-file/file-ui test`; `src/testing/panel-host.ts`
 puts a browser in a `UiPanelGroup` for the specs that need both).
@@ -172,11 +172,11 @@ pointer press and the view's own moves (`Ctrl`+arrow, `Insert`) keep their own
 rules.
 
 Selection is **multiple** in all three views (PRD 004, §1.2). `UiListSelection`
-(`@tr-file/ui`) is the one place the rules live — replace,
+(`@vsc-ngx/ui`) is the one place the rules live — replace,
 toggle, range from an anchor, range added, cursor only, all — and `UiFileList`
 and `UiIconView` only decide which rule a gesture means — by asking the
 *selection mode* they are given (`selectionMode`, PRD 004, §2.2), a feature class
-each in `@tr-file/ui`: `UiNormalSelectionMode` (the selection follows the cursor)
+each in `@vsc-ngx/ui`: `UiNormalSelectionMode` (the selection follows the cursor)
 or `UiAdditiveSelectionMode` (Midnight Commander's marking: moves leave the
 selection, a click toggles, `Shift` adds a range). `Insert` in normal mode
 reports `additive-selection`, and `Escape` over a listing `normal-selection`;

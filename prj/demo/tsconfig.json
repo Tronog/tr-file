@@ -1,13 +1,8 @@
-/* The demo reads `@tr-file/ui` from its sources, as tr-file does — edits to the
-   library are live in `ng serve`. `tsconfig.app.dist.json` builds it against the
-   packaged library instead (`pnpm demo:build`). */
+/* The demo reads `@vsc-ngx/ui` as built in the vsc-ngx repo (a `file:`
+   dependency; `pnpm ui:build` after it changes) — a consumer of the published
+   package, not of its sources. */
 {
   "extends": "../tsconfig.angular.json",
-  "compilerOptions": {
-    "paths": {
-      "@tr-file/ui": ["../libs/ui/src/public-api.ts"]
-    }
-  },
   "files": [],
   "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.spec.json" }]
 }

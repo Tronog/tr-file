@@ -2,11 +2,9 @@
 /**
  * The libraries' boundaries (PRD 001, §17.1): what each may import.
  *
- * - `@tr-file/ui` is generic: no file manager (`@tr-file/file-ui`), no HTTP,
- *   nothing of an application.
- * - `@tr-file/file-ui` is the file manager's components on `@tr-file/ui`: no
- *   HTTP, nothing of an application.
- * - Neither reaches into another package's sources by path.
+ * - `@tr-file/file-ui` is the file manager's components on `@vsc-ngx/ui` (the
+ *   workbench, now its own repo, vsc-ngx): no HTTP, nothing of an application.
+ * - It does not reach into another package's sources by path.
  *
  * Business — anything that talks to a backend — is the application's.
  */
@@ -16,8 +14,7 @@ import { join, relative } from 'node:path';
 const root = new URL('..', import.meta.url).pathname;
 
 const RULES = [
-  { dir: 'libs/ui/src', forbidden: [/@tr-file\/file-ui/, /@angular\/common\/http/, /\/frontend\//, /\.\.\/\.\.\/\.\.\/\.\.\//] },
-  { dir: 'libs/file-ui/src', forbidden: [/@angular\/common\/http/, /\/frontend\//, /libs\/ui\/src/, /\.\.\/\.\.\/\.\.\/\.\.\//] },
+  { dir: 'libs/file-ui/src', forbidden: [/@angular\/common\/http/, /\/frontend\//, /vsc-ngx\/projects/, /\.\.\/\.\.\/\.\.\/\.\.\//] },
 ];
 
 const files = (dir) =>

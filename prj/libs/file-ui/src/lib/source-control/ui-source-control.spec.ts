@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { UiDocumentView } from '@tr-file/ui';
+import { UiDocumentView } from '@vsc-ngx/ui';
 import { UiSourceControl } from '../../public-api';
-import type { UiDocumentModel } from '@tr-file/ui';
+import type { UiDocumentModel } from '@vsc-ngx/ui';
 import type { UiScmActionEvent, UiScmModel } from '../../public-api';
 
 /** PRD 011, §1 — the library's source control view and the diff document. */

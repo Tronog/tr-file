@@ -7,7 +7,7 @@ import type { RemoteConnectionStatus } from '../../file-system/fs-bridge.service
 import type { FsPlaces } from '../../file-system/file-system.model';
 import { fsDirectory, fsEnvelope, fsListing, listUrl, settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';
-import { BOOKMARKS_KEY, RECENT_KEY, RECENT_LIMIT } from './places.feature';
+import { BOOKMARKS_KEY, PLACES_REFRESH_MS, RECENT_KEY, RECENT_LIMIT } from './places.feature';
 
 /** PRD 003, §6 — Places, Bookmarks and Recent: what a file manager's sidebar lists above the tree. */
 
@@ -67,6 +67,83 @@ describe('PlacesFeature', () => {
       ['place:media/me/USB', 'USB', 'usb', undefined],
       ['trash:', 'Trash', 'trash', undefined],
     ]);
+  });
+
+  describe('free space (PRD 001, §14.2)', () => {
+    const SPACED: FsPlaces = {
+      home: 'home/me',
+      places: [
+        { id: 'root', label: 'File System', kind: 'root', path: '', space: { free: 48 * 1024 ** 3, total: 256 * 1024 ** 3 } },
+        { id: 'home', label: 'Home', kind: 'home', path: 'home/me' },
+        {
+          id: 'mount-/media/me/USB',
+          label: 'USB',
+          kind: 'removable',
+          path: 'media/me/USB',
+          space: { free: 2 * 1024 ** 4, total: 4 * 1024 ** 4 },
+        },
+      ],
+    };
+
+    it('shows the free space of each mount point on the right of its row, and none for the user folders', async () => {
+      create();
+      void places().load();
+      http.expectOne('/api/fs/places').flush(fsEnvelope(SPACED));
+      await settled();
+
+      expect(places().placeNodes().map((node) => [node.label, node.meta])).toEqual([
+        ['File System', '48 GB free'],
+        ['Home', undefined],
+        ['USB', '2.0 TB free'],
+        ['Trash', undefined],
+      ]);
+    });
+
+    it('asks again on refresh once listed, one ask at a time, and keeps what it had when that fails', async () => {
+      create();
+      places().refresh();
+      http.expectNone('/api/fs/places'); // Never listed: nothing to keep up to date.
+
+      void places().load();
+      http.expectOne('/api/fs/places').flush(fsEnvelope(SPACED));
+      await settled();
+
+      places().refresh();
+      places().refresh();
+      const less: FsPlaces = {
+        ...SPACED,
+        places: SPACED.places.map((place) => (place.id === 'root' ? { ...place, space: { free: 1024 ** 3, total: 256 * 1024 ** 3 } } : place)),
+      };
+      http.expectOne('/api/fs/places').flush(fsEnvelope(less));
+      await settled();
+      expect(places().placeNodes()[0]?.meta).toBe('1.0 GB free');
+
+      places().refresh();
+      http.expectOne('/api/fs/places').flush(null, { status: 500, statusText: 'Server Error' });
+      await settled();
+      expect(places().placeNodes()[0]?.meta).toBe('1.0 GB free');
+    });
+
+    it('asks again every minute once started', async () => {
+      vi.useFakeTimers();
+      try {
+        create();
+        void places().load();
+        http.expectOne('/api/fs/places').flush(fsEnvelope(SPACED));
+        await vi.advanceTimersByTimeAsync(0);
+
+        places().start();
+        await vi.advanceTimersByTimeAsync(PLACES_REFRESH_MS - 1);
+        http.expectNone('/api/fs/places');
+        await vi.advanceTimersByTimeAsync(1);
+        http.expectOne('/api/fs/places').flush(fsEnvelope(SPACED));
+        places().stop();
+        await vi.advanceTimersByTimeAsync(PLACES_REFRESH_MS);
+        http.expectNone('/api/fs/places');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('takes a server from before places existed for one with only its root', async () => {

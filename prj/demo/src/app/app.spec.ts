@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { UiWorkbenchService } from '@tr-file/ui';
+import { UiWorkbenchService } from '@vsc-ngx/ui';
 import { App } from './app';
 import { appConfig } from './app.config';
 import type { DemoWorkbenchService } from './demo-workbench.service';

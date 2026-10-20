@@ -36,6 +36,9 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      # @vsc-ngx/ui, as vsc-ngx builds it (`pnpm ui:build`); see frontend/Dockerfile.
+      additional_contexts:
+        vsc-ngx-ui: ../../vsc-ngx/dist/vsc-ngx/ui
       target: production
     ports:
       - "80:80"

@@ -2,8 +2,8 @@ import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 import { Login } from './auth/login/login';
-import { UiThemeService } from '@tr-file/ui';
-import { UiModalHost, UiModalService } from '@tr-file/ui';
+import { UiThemeService } from '@vsc-ngx/ui';
+import { UiModalHost, UiModalService } from '@vsc-ngx/ui';
 
 /**
  * The shell around every screen: the workbench once there is a session — or

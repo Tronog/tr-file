@@ -25,7 +25,7 @@ import {
   type UiSelectionChange,
   type UiSelectionModeId,
   type UiSelectMode,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import { isBoundAbove, isPanelCharacter, LIST_PANEL_KEYS, listCommandFor, listKeyShortcuts, type UiListCommand } from '../keyboard/list-keys';
 import type { UiIconViewItem, UiPanelKey } from '../models';
 

@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
 import { UiFileList, UiIconView } from '../../public-api';
-import type { UiSelectionChange } from '@tr-file/ui';
+import type { UiSelectionChange } from '@vsc-ngx/ui';
 import type { UiFileColumn, UiFileRow, UiIconViewItem } from '../../public-api';
-import { UiListSelection } from '@tr-file/ui';
+import { UiListSelection } from '@vsc-ngx/ui';
 
 /**
  * PRD 004, §1.2 — every view selects many: `Shift` for a range, `Ctrl` to

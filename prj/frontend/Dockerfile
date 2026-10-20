@@ -9,6 +9,11 @@
 # Two final stages are a contract with compose.dev.yaml / compose.prod.yaml:
 #   development -> Angular dev server (ng serve) with the docker proxy config
 #   production  -> static bundle served by nginx
+#
+# @vsc-ngx/ui comes from the vsc-ngx library repo, as built there: the `file:`
+# dependency points outside this context, so compose passes the build in as the
+# named context `vsc-ngx-ui`, and it is put back at the very path the lockfile
+# names, `../../vsc-ngx/dist/vsc-ngx/ui` from /app.
 
 # ---------------------------------------------------------------------------
 # deps: full workspace install (incl. devDependencies), cached on manifests only
@@ -24,9 +29,9 @@ COPY backend/package.json ./backend/
 # Every workspace member's manifest must be present for `--frozen-lockfile` to
 # resolve, even the ones this image never builds.
 COPY desktop/package.json ./desktop/
-COPY libs/ui/package.json ./libs/ui/
 COPY libs/file-ui/package.json ./libs/file-ui/
 COPY demo/package.json ./demo/
+COPY --from=vsc-ngx-ui . /vsc-ngx/dist/vsc-ngx/ui
 
 # lmdb / msgpackr-extract have no musl prebuild and there is no compiler in the
 # image; pnpm demotes those optional install scripts to warnings. Expected.
@@ -51,7 +56,7 @@ CMD ["pnpm", "exec", "ng", "serve", "--host", "0.0.0.0", "--port", "4200", "--pr
 FROM deps AS build
 WORKDIR /app
 COPY tsconfig.base.json tsconfig.angular.json ./
-# The libraries (@tr-file/ui, …) are compiled from source by this build.
+# @tr-file/file-ui is compiled from source by this build.
 COPY libs ./libs
 COPY frontend ./frontend
 RUN pnpm --filter frontend build

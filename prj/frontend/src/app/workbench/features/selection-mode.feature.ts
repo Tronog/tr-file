@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import type { UiSelectionModeId } from '@tr-file/ui';
+import type { UiSelectionModeId } from '@vsc-ngx/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /** The setting a new panel's selection mode comes from (PRD 004, §2.2). */

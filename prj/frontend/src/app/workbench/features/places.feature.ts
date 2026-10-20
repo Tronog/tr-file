@@ -1,6 +1,6 @@
-import { computed, signal } from '@angular/core';
-import type { UiContextMenuRequest, UiIconName, UiTreeMove, UiTreeNode } from '@tr-file/ui';
-import type { FsPlaceKind, FsPlaces } from '../../file-system/file-system.model';
+import { DestroyRef, computed, inject, signal } from '@angular/core';
+import type { UiContextMenuRequest, UiIconName, UiTreeMove, UiTreeNode } from '@vsc-ngx/ui';
+import type { FsPlace, FsPlaceKind, FsPlaces } from '../../file-system/file-system.model';
 import type { WorkbenchService } from '../workbench.service';
 import { TRASH_PLACE } from './trash.feature';
 import { shownPath } from '../../file-system/fs-path';
@@ -11,6 +11,12 @@ export const RECENT_KEY = 'tr-file.recent.v1';
 
 /** How many recent folders are kept. */
 export const RECENT_LIMIT = 12;
+
+/**
+ * How often the places are asked again once listed, so a mount point's free
+ * space (PRD 001, §14.2) — and a stick plugged in since — keep up.
+ */
+export const PLACES_REFRESH_MS = 60 * 1000;
 
 /** How many bookmarks have a key of their own: `Ctrl`+`1` to `Ctrl`+`9` (PRD 002, §6.1). */
 export const BOOKMARK_KEYS = 9;
@@ -59,10 +65,49 @@ export class PlacesFeature {
   private loading: Promise<FsPlaces | null> | null = null;
   private readonly bookmarkList = signal<readonly Bookmark[]>([]);
   private readonly recentList = signal<readonly string[]>([]);
+  /** A re-ask in flight (`refresh`): one at a time. */
+  private refreshing = false;
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly parent: WorkbenchService) {
     this.bookmarkList.set(this.loadBookmarks());
     this.recentList.set(this.loadRecent());
+    inject(DestroyRef).onDestroy(() => this.stop());
+  }
+
+  /**
+   * Asks again every `PLACES_REFRESH_MS` once the places have been listed;
+   * the workbench component calls it, so a service built for a test asks nothing.
+   */
+  start(): void {
+    this.refreshTimer ??= setInterval(() => this.refresh(), PLACES_REFRESH_MS);
+  }
+
+  stop(): void {
+    if (this.refreshTimer !== null) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  /**
+   * Asks the backend for its places again — their free space (PRD 001,
+   * §14.2) after a job wrote or freed some, or now and then. Nothing until
+   * they were first listed: a pane never opened asks nothing. A failed ask
+   * keeps what is shown.
+   */
+  refresh(): void {
+    if (this.answer() === null || this.refreshing) {
+      return;
+    }
+    this.refreshing = true;
+    void this.parent.fileSystem.readFt
+      .places()
+      .then(
+        (places) => this.answer.set(places),
+        () => undefined,
+      )
+      .finally(() => (this.refreshing = false));
   }
 
   /** What the root is called: the backend's name for it, or the workspace's until it says. */
@@ -96,9 +141,14 @@ export class PlacesFeature {
 
   /* -- the panes ------------------------------------------------------------ */
 
-  /** The backend's places, and the trash last (PRD 001, §14.1) — lit while the active panel shows it. */
+  /**
+   * The backend's places, and the trash last (PRD 001, §14.1) — lit while the
+   * active panel shows it. A mount point has its free space on the right (§14.2).
+   */
   readonly placeNodes = computed<readonly UiTreeNode[]>(() => [
-    ...(this.answer()?.places ?? []).map((place) => this.node('place', place.path, place.label, ICONS[place.kind])),
+    ...(this.answer()?.places ?? []).map((place) =>
+      this.node('place', place.path, place.label, ICONS[place.kind], this.freeLabel(place)),
+    ),
     {
       id: TRASH_PLACE,
       label: this.parent.trashFt.label(),
@@ -358,8 +408,8 @@ export class PlacesFeature {
 
   /**
    * One row. The hint beside a label is kept short — a whole path would push
-   * the label out of a narrow sidebar — so only a recent folder has one: the
-   * folder it is in, to tell two of one name apart.
+   * the label out of a narrow sidebar: a recent folder's is the folder it is
+   * in, to tell two of one name apart; a mount point's its free space (PRD 001, §14.2).
    */
   private node(section: PlaceSection, path: string, label: string, icon: UiIconName, meta?: string): UiTreeNode {
     // Lit for the folder the active panel lists — not for the trash, whose tab has no folder (PRD 001, §14.1).
@@ -376,6 +426,11 @@ export class PlacesFeature {
       ...(meta === undefined ? {} : { meta }),
       ...(groupPath === path ? { selected: true } : {}),
     };
+  }
+
+  /** `48 GB free` — what a mount point can still take (PRD 001, §14.2); nothing for a place that did not say. */
+  private freeLabel(place: FsPlace): string | undefined {
+    return place.space === undefined ? undefined : `${this.parent.fileViewModel.formatBytes(place.space.free)} free`;
   }
 
   private labelFor(path: string): string {

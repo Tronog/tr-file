@@ -1,5 +1,5 @@
 import { Component, ElementRef, afterRenderEffect, input, output, viewChild } from '@angular/core';
-import { UiButton, UiIcon } from '@tr-file/ui';
+import { UiButton, UiIcon } from '@vsc-ngx/ui';
 import type { UiScmActionEvent, UiScmModel } from '../models';
 
 /**

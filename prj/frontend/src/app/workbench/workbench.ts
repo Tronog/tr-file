@@ -1,5 +1,5 @@
 import { Component, ElementRef, effect, inject, viewChild } from '@angular/core';
-import { UiBottomTabTemplate, UiNotes, UiPanelContentTemplate, UiSidebarTemplate, UiSubAppTemplate, UiWorkbenchShell } from '@tr-file/ui';
+import { UiBottomTabTemplate, UiNotes, UiPanelContentTemplate, UiSidebarTemplate, UiSubAppTemplate, UiWorkbenchShell } from '@vsc-ngx/ui';
 import { UiFileBrowser, UiTransferList } from '@tr-file/file-ui';
 import { DiskUsageApp } from './sub-apps/disk-usage/disk-usage-app';
 import { FileManagerDetails } from './sub-apps/file-manager/file-manager-details';
@@ -61,6 +61,8 @@ export class Workbench {
     this.workbench.appUpdateFt.start();
     // Task Manager (PRD 014) asks for the processes while it is shown — from here too.
     this.workbench.taskManagerFt.start();
+    // Places' free space (PRD 001, §14.2) is asked for again now and then — from here too.
+    this.workbench.placesFt.start();
 
     // A feature asked for files — or a folder (PRD 003, §6); only the component may open the picker.
     effect(() => {

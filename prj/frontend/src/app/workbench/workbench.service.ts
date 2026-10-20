@@ -1,5 +1,5 @@
 import { computed, inject, Service, signal } from '@angular/core';
-import { UiWorkbenchService } from '@tr-file/ui';
+import { UiWorkbenchService } from '@vsc-ngx/ui';
 import { DesktopWindowService } from '../desktop/desktop-window.service';
 import { DesktopUpdateService } from '../desktop/desktop-update.service';
 import { FileSystemService } from '../file-system/file-system.service';

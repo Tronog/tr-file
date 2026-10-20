@@ -118,6 +118,8 @@ describe('ArchiveBrowserFeature', () => {
 
     workbench.archiveBrowserFt.up(group);
     expect(tab()?.inner).toBe('');
+    // On the folder of the archive it came up from (PRD 002, §2.3.1).
+    expect(browser()?.rows.find((row) => row.id === 'src')).toMatchObject({ selected: true, focused: true });
     workbench.archiveBrowserFt.up(group);
     expect(tab()).toMatchObject({ kind: 'folder', path: 'docs' });
     expect(workbench.editorGroupsFt.stateOf(group)?.selection).toEqual(['docs/bundle.zip']);

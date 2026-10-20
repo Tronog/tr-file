@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import type { UiTreeNode } from '@tr-file/ui';
+import type { UiTreeNode } from '@vsc-ngx/ui';
 import {
   fsDirectory,
   fsEntry,

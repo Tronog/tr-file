@@ -27,7 +27,7 @@
             "styles": ["src/styles.scss"],
             "outputPath": "dist/demo",
             "stylePreprocessorOptions": {
-              "includePaths": ["../libs/ui/styles"]
+              "includePaths": ["node_modules/@vsc-ngx/ui/styles"]
             }
           },
           "configurations": {
@@ -42,9 +42,6 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
-            },
-            "dist": {
-              "tsConfig": "tsconfig.app.dist.json"
             }
           },
           "defaultConfiguration": "production"

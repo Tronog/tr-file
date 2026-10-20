@@ -1,5 +1,5 @@
 import { computed } from '@angular/core';
-import { UiBottomPanelFeature, type UiIconAction } from '@tr-file/ui';
+import { UiBottomPanelFeature, type UiIconAction } from '@vsc-ngx/ui';
 import type { UiTransfer } from '@tr-file/file-ui';
 import type { WorkbenchService } from '../workbench.service';
 

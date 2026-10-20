@@ -1,5 +1,5 @@
 import { Service } from '@angular/core';
-import type { UiActivityItem, UiIconAction, UiMenuBarItem, UiMenuItem } from '@tr-file/ui';
+import type { UiActivityItem, UiIconAction, UiMenuBarItem, UiMenuItem } from '@vsc-ngx/ui';
 import type { MockWorkbenchLayout } from './mock-data.model';
 
 /**

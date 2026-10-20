@@ -1,4 +1,4 @@
-import type { UiPanelContentDriver } from '@tr-file/ui';
+import type { UiPanelContentDriver } from '@vsc-ngx/ui';
 import type { PanelGroupState, PanelTabState } from './panel-group.model';
 
 /**

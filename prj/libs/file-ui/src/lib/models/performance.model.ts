@@ -1,4 +1,4 @@
-import type { UiEmptyStateModel } from '@tr-file/ui';
+import type { UiEmptyStateModel } from '@vsc-ngx/ui';
 
 /** A resource's colour, as Task Manager gives each its own: CPU blue, memory purple, disk green, network orange. */
 export type UiPerfHue = 'blue' | 'purple' | 'green' | 'orange';

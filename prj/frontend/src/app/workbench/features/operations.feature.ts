@@ -1,5 +1,5 @@
 import { computed, signal, type WritableSignal } from '@angular/core';
-import type { UiProgressDialogModel } from '@tr-file/ui';
+import type { UiProgressDialogModel } from '@vsc-ngx/ui';
 import type { UiTransfer } from '@tr-file/file-ui';
 import type {
   FsConflictPolicy,
@@ -499,6 +499,8 @@ export class OperationsFeature {
     if (['trash', 'empty-trash', 'restore'].includes(record.job.kind)) {
       this.parent.trashFt.reload();
     }
+    // It took up or freed room: the Places pane's free space follows (PRD 001, §14.2).
+    this.parent.placesFt.refresh();
     this.reread.set(record.job.id, reread);
     // The keyboard goes back to the panel once the folders are read again —
     // the rows it stood on may be gone — and, while its progress window is

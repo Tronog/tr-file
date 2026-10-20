@@ -1,5 +1,5 @@
 import { computed } from '@angular/core';
-import type { UiTitleBarUpgrade } from '@tr-file/ui';
+import type { UiTitleBarUpgrade } from '@vsc-ngx/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /**

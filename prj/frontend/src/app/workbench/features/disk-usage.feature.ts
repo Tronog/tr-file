@@ -4,7 +4,7 @@ import type {
   UiIconAction,
   UiPanelGroupModel,
   UiTab,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import type { UiDiskUsageItem, UiDiskUsageModel, UiDiskUsageView } from '@tr-file/file-ui';
 import type { FsDiskUsageNode, FsDiskUsageScan } from '../../file-system/file-system.model';
 import { FsError } from '../../file-system/fs-error';
@@ -12,7 +12,7 @@ import { shownPath } from '../../file-system/fs-path';
 import { saveText } from '../../file-system/save-text';
 import { diskUsageCsv, diskUsageFileName } from './disk-usage-export';
 import type { WorkbenchService } from '../workbench.service';
-import { UiPanelLayout } from '@tr-file/ui';
+import { UiPanelLayout } from '@vsc-ngx/ui';
 
 /** How often a running scan is asked how far it has got (PRD 013, §1). */
 export const DISK_USAGE_POLL_MS = 3000;

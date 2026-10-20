@@ -362,6 +362,18 @@ export interface FsPlace {
   readonly kind: FsPlaceKind;
   /** Root-relative folder. */
   readonly path: string;
+  /**
+   * A mount point's room, in bytes (PRD 001, §14.2): the root, drives, USB
+   * sticks, shares. Absent for the user's folders, for a file system that did
+   * not say in time, and from a server from before it was sent.
+   */
+  readonly space?: FsPlaceSpace;
+}
+
+/** How much a mounted file system can still take (`free`, what the user may write) of `total`. */
+export interface FsPlaceSpace {
+  readonly free: number;
+  readonly total: number;
 }
 
 /** `GET /api/fs/places`: where a session starts, and what the Places pane lists. */

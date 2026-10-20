@@ -54,9 +54,14 @@ root `packageManager` pin. Copy the manifests (`package.json`,
 and run `pnpm install --frozen-lockfile` *before* copying sources, so a source
 edit does not invalidate the dependency layer. **Every** workspace member's
 manifest must be copied, including `desktop/` and `demo/`, which no image builds,
-and both libraries (`libs/ui/`, `libs/file-ui/`) — with one missing,
-`--frozen-lockfile` cannot resolve. The frontend build compiles the libraries
-from their sources (`paths`), so no image runs ng-packagr; it needs
+and the library (`libs/file-ui/`) — with one missing,
+`--frozen-lockfile` cannot resolve. `@vsc-ngx/ui` is a `file:` dependency on
+the vsc-ngx repo's build (`../../vsc-ngx/dist/vsc-ngx/ui` from `prj/`), outside
+the build context: both compose files pass it to the frontend image as the named
+context `vsc-ngx-ui` (`additional_contexts`), and the Dockerfile copies it to
+`/vsc-ngx/dist/vsc-ngx/ui` — the path the lockfile names, seen from `/app`. Build
+it in vsc-ngx first (`pnpm ui:build`). The frontend build compiles
+`@tr-file/file-ui` from its sources (`paths`), so no image runs ng-packagr; it needs
 `tsconfig.base.json` and `tsconfig.angular.json` beside them. The install is then narrowed with
 `--filter "<package>..."` so the desktop shell's Electron binary (~230 MB) never
 reaches these images.
@@ -78,8 +83,7 @@ a fault.
 In `compose.dev.yaml` the workspace root (`prj/`) is bind-mounted at `/app`,
 which would otherwise mask the dependencies installed into the image. Named
 volumes are layered over `/app/node_modules`, `/app/backend/node_modules`,
-`/app/frontend/node_modules`, `/app/libs/ui/node_modules`,
-`/app/libs/file-ui/node_modules` and `/app/frontend/.angular` to preserve them.
+`/app/frontend/node_modules`, `/app/libs/file-ui/node_modules` and `/app/frontend/.angular` to preserve them.
 Add a matching volume for any new workspace package.
 
 These are **named** volumes, and Docker seeds a volume from the image only

@@ -1,4 +1,4 @@
-import { UiSubAppsFeature } from '@tr-file/ui';
+import { UiSubAppsFeature } from '@vsc-ngx/ui';
 import type { WorkbenchService } from '../workbench.service';
 
 /**

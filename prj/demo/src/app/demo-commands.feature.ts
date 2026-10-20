@@ -1,4 +1,4 @@
-import { UiCommandsFeature, type UiCommandSpec } from '@tr-file/ui';
+import { UiCommandsFeature, type UiCommandSpec } from '@vsc-ngx/ui';
 import type { DemoWorkbenchService } from './demo-workbench.service';
 
 /** The demo's command table: its two commands, then the library's. */

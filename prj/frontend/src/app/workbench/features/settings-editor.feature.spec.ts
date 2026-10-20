@@ -1,8 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import type { UiSettingsEditorModel } from '@tr-file/ui';
-import { UiMemorySettingsStore } from '@tr-file/ui';
+import type { UiSettingsEditorModel } from '@vsc-ngx/ui';
+import { UiMemorySettingsStore } from '@vsc-ngx/ui';
 import { SettingsService } from '../../settings/settings.service';
 import { fsDirectory, fsEntry, fsEnvelope, fsListing, listUrl, settled } from '../testing/fs-fixtures';
 import { WorkbenchService } from '../workbench.service';

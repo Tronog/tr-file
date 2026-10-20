@@ -1,4 +1,4 @@
-import { UiEditorGroupsFeature, type UiIconName, type UiIconTint, type UiNewTab } from '@tr-file/ui';
+import { UiEditorGroupsFeature, type UiIconName, type UiIconTint, type UiNewTab } from '@vsc-ngx/ui';
 import type { PanelGroupState, PanelTabMemory, PanelTabState } from '../panel-group.model';
 import type { WorkbenchService } from '../workbench.service';
 

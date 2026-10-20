@@ -1,5 +1,5 @@
 import { Component, afterRenderEffect, computed, inject, input, output, signal, viewChild, type ElementRef } from '@angular/core';
-import { type UiJsonEdit, UiBreadcrumbs, UiSearchField, UiSegmented, type UiSegmentedOption, UiDocumentView, UiEmptyState, UiKeymap, UiPanelBody, UiPanelToolbar, type UiContextMenuRequest, type UiFilesDrop, type UiSelectionChange } from '@tr-file/ui';
+import { type UiJsonEdit, UiBreadcrumbs, UiSearchField, UiSegmented, type UiSegmentedOption, UiDocumentView, UiEmptyState, UiKeymap, UiPanelBody, UiPanelToolbar, type UiContextMenuRequest, type UiFilesDrop, type UiSelectionChange } from '@vsc-ngx/ui';
 import { UiFileList } from '../file-list/ui-file-list';
 import { UiIconView } from '../icon-view/ui-icon-view';
 import { UI_ENTRY_MIME, type UiEntryDrop, type UiFileBrowserModel, type UiPanelKey, type UiPanelView } from '../models';

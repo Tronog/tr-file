@@ -160,7 +160,7 @@ path reaches the file system.
 | GET | `/api/fs/list-progress?token=&namesFrom=&detailsFrom=` | A large folder's reading (PRD 004, §3.1): `{ path, total, names, namesDone, details, gone, done }` — the names after `namesFrom` (the first ones came with the listing) as the worker reads them, 10 000 at most per answer (with the type the directory records; `total` is `null` until the last is read — there is no count of its own), then, once every name is out, the details after `detailsFrom` (`index` into the names, `type`, `size`, dates, `targetType` for links). Answers are capped (10 000 names, 50 000 details) and the same cursors get the same answer; `404` once the reading is forgotten (a minute unasked) |
 | DELETE | `/api/fs/list-progress?token=` | Stops reading a large folder nobody wants any more (PRD 004, §3.1.2) and forgets it; an unknown token is no error |
 | GET | `/api/fs/details?path=&recount=` | Full metadata for one entry. A folder's `entryCount` stops at 1000 with `entryCountMore: true` (a network share would otherwise be read through on every look); `recount=1` counts it through, and that count is kept and given from then on, until the next `recount=1` |
-| GET | `/api/fs/places` | `{ home, places: [{ id, label, kind, path }] }`: where a session starts, and the Places pane (PRD 003, §6) |
+| GET | `/api/fs/places` | `{ home, places: [{ id, label, kind, path, space? }] }`: where a session starts, and the Places pane (PRD 003, §6); a mount point's `space` is `{ free, total }` in bytes (PRD 001, §14.2) |
 | GET | `/api/fs/download?path=&inline=` | Stream a file (`Accept-Ranges`, `Content-Disposition: attachment`, or `inline` for `inline=true`); a range past the end — any range on an empty file — is `416` |
 | POST | `/api/fs/upload?path=&overwrite=` | Upload one file, `multipart/form-data`, field `file` |
 | POST | `/api/fs/rename` | JSON `{ path, to }`; `to` is the full new path. `200`, the entry's details |
@@ -277,6 +277,13 @@ server — then whatever the `PlacesProvider` `App` was given names (the
 desktop's home, user folders, drives and mounts), each proven to be a folder
 inside the root, host paths never disclosed. A server has no provider and
 lists its root alone.
+
+Every mount point — the root (unless it is the list of drives), a `drive`,
+`removable` or `network` place — carries its `space` (PRD 001, §14.2):
+`statfs`'s `bavail` (what the user may still write) and the whole, in bytes.
+It is read on every ask, so asking again is how it stays current; a file
+system that does not answer within 1.5 s (a share whose server has gone) is
+listed without it.
 
 `FileSystemBridge.fromLocalPaths(absolute[])` — like `localPath`, a method for
 the desktop shell, never a command — answers the root-relative path of each

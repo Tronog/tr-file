@@ -1,5 +1,5 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import { type UiFilesDrop, type UiSelectionChange } from '@tr-file/ui';
+import { type UiFilesDrop, type UiSelectionChange } from '@vsc-ngx/ui';
 import {
   UI_ENTRY_MIME,
   UiFileBrowser,

@@ -7,7 +7,7 @@ import type {
   UiIconAction,
   UiPathSuggestion,
   UiSelectionChange,
-} from '@tr-file/ui';
+} from '@vsc-ngx/ui';
 import type {
   UiEntryDrop,
   UiFileBrowserModel,
@@ -722,8 +722,9 @@ export class FileBrowserFeature implements PanelContentFeature {
   }
 
   /**
-   * `Backspace` inside a panel body: the same journey as the toolbar's Up
-   * button, which is the one traditional file managers bind it to.
+   * `Backspace` and `Alt`+`↑` inside a panel body: the same journey as the
+   * toolbar's Up button, which is the one traditional file managers bind it
+   * to — landing on the entry it came from (PRD 002, §2.3.1).
    */
   navigateUp(groupId: string): void {
     this.runToolbarAction(groupId, 'up');
@@ -809,6 +810,9 @@ export class FileBrowserFeature implements PanelContentFeature {
         }
         const parentPath = parentOf(from);
         this.openFolder(groupId, parentPath, this.labelFor(parentPath));
+        // The cursor lands on where it came from — the folder just left, or the
+        // file that was open (PRD 002, §2.3.1) — as Midnight Commander's does.
+        this.setSelection(groupId, { selected: [from], focused: from });
         break;
       }
       case 'refresh':
