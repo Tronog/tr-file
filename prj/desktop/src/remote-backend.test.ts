@@ -400,10 +400,16 @@ describe('RemoteBackend time (PRD 001, §13.1)', () => {
 describe('RemoteBackend places and archives (PRD 003, §6)', () => {
   it('answers the server’s places: its root and nothing else', async () => {
     const remote = await connected();
-    assert.deepEqual(dataOf(await remote.dispatch({ command: 'places' })), {
-      home: '',
-      places: [{ id: 'root', label: 'Files', kind: 'root', path: '' }],
-    });
+    const answer = dataOf<{ home: string; places: { space?: { free: number; total: number } }[] }>(
+      await remote.dispatch({ command: 'places' }),
+    );
+    // The root is a mount point, so it says its free space (PRD 001, §14.2) — the test disk's own.
+    const space = answer.places[0]?.space;
+    assert.ok(space && space.free >= 0 && space.total >= space.free, JSON.stringify(space));
+    assert.deepEqual(
+      { ...answer, places: answer.places.map(({ space: _space, ...place }) => place) },
+      { home: '', places: [{ id: 'root', label: 'Files', kind: 'root', path: '' }] },
+    );
   });
 
   it('compresses on the server, lists the zip, and saves a zip of it here', async () => {
