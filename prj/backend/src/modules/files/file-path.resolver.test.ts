@@ -44,6 +44,20 @@ describe('FilePathResolver', () => {
     }
   });
 
+  /** PRD 004, §1.4.1 — a Windows path pasted on a Linux host: the drive is a folder of the root. */
+  it('takes a pasted Windows drive for a folder of the root', { skip: process.platform === 'win32' }, () => {
+    assert.equal(resolver.resolve('S:\\Library').relative, 'S/Library');
+    assert.equal(resolver.resolve('S:\\Library\\notes.txt').absolute, join(ROOT, 'S', 'Library', 'notes.txt'));
+    assert.equal(resolver.resolve('c:/Users/me').relative, 'c/Users/me');
+    assert.equal(resolver.resolve('T:').relative, 'T');
+    assert.equal(resolver.resolve('T:\\').relative, 'T');
+    assert.equal(resolver.resolve('/S:\\Library').relative, 'S/Library');
+    // Only a drive at the start — a colon further in is just a character on Linux.
+    assert.equal(resolver.resolve('docs/a:b.txt').relative, 'docs/a:b.txt');
+    assert.equal(resolver.resolve('S:x').relative, 'S:x');
+    assert.throws(() => resolver.resolve('S:\\..\\..\\etc'), (error: unknown) => error instanceof HttpError && error.status === 403);
+  });
+
   it('rejects null bytes with 400', () => {
     assert.throws(
       () => resolver.resolve('a\0b'),

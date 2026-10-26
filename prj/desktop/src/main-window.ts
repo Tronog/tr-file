@@ -4,7 +4,7 @@ import { app, BrowserWindow, shell } from 'electron';
 
 import { DARK_BACKGROUND } from './window-background.js';
 import { DEFAULT_WINDOW_STATE, fitToScreens, MIN_WINDOW_SIZE, type WindowRect, type WindowState, type WindowStateFile } from './window-state.js';
-import { toggleVisibility } from './window-visibility.js';
+import { bringForward, type ForwardOutcome, toggleVisibility } from './window-visibility.js';
 import { WINDOW_STATE_EVENT, WindowControlsChannel, watchZoom } from './window-controls.channel.js';
 
 /**
@@ -60,7 +60,7 @@ export class MainWindow {
   /** Creates the window and loads the workbench into it. */
   async open(): Promise<void> {
     if (this.isOpen) {
-      this.window?.focus();
+      await this.focus();
       return;
     }
 
@@ -124,31 +124,40 @@ export class MainWindow {
     }
   }
 
-  focus(): void {
+  /**
+   * Brings the open window to the front with the keyboard (PRD 001, §8.5.1):
+   * launching the app again, the dock icon, and the global shortcut for a
+   * window that is not the one being looked at. Hidden by the shortcut,
+   * minimised or behind another app's — it comes back all the same.
+   */
+  async focus(): Promise<ForwardOutcome | null> {
     if (this.window === null || this.window.isDestroyed()) {
-      return;
+      return null;
     }
-    if (this.window.isMinimized()) {
-      this.window.restore();
-    }
-    // Hidden by the visibility shortcut (PRD 001, §8.5): launching the app again brings it back too.
-    if (!this.window.isVisible()) {
-      this.window.show();
-    }
-    this.window.focus();
+    const outcome = await bringForward(this.window, process.platform);
+    this.frontmost();
+    return outcome;
   }
 
   /**
    * The global `Ctrl`+`` ` `` (PRD 001, §8.5): hides the window the user is
-   * looking at, brings back one that is hidden, minimised or behind another
-   * app's. On macOS an app that is not frontmost has to be made so, or the
-   * window would come back behind the one the user is in.
+   * looking at, brings forward one that is hidden, minimised or behind another
+   * app's (§8.5.1).
    */
-  toggleVisibility(): void {
+  async toggleVisibility(): Promise<'hidden' | ForwardOutcome | null> {
     if (this.window === null || this.window.isDestroyed()) {
-      return;
+      return null;
     }
-    if (toggleVisibility(this.window) === 'shown' && process.platform === 'darwin') {
+    const outcome = await toggleVisibility(this.window, process.platform);
+    if (outcome !== 'hidden') {
+      this.frontmost();
+    }
+    return outcome;
+  }
+
+  /** On macOS an app that is not frontmost has to be made so, or its window comes back behind the one the user is in. */
+  private frontmost(): void {
+    if (process.platform === 'darwin') {
       app.focus({ steal: true });
     }
   }

@@ -156,7 +156,8 @@ class DesktopApplication {
 
   /** Everything after the lock: the lifecycle's handlers, and the start once ready. */
   private begin(): void {
-    app.on('second-instance', () => this.window?.focus());
+    // Launched again while open (PRD 001, §8.5.1): the running copy comes forward.
+    app.on('second-instance', () => void this.window?.focus().then((outcome) => this.forwarded('second launch', outcome)));
     app.on('window-all-closed', () => {
       // macOS keeps the app running with no windows; everywhere else, closing
       // the last window means quitting.
@@ -232,12 +233,21 @@ class DesktopApplication {
       // `Ctrl`+`` ` `` shows and hides the window from anywhere (PRD 001, §8.5).
       this.visibilityShortcut = new VisibilityShortcut(
         globalShortcut,
-        () => this.window?.toggleVisibility(),
+        () => void this.window?.toggleVisibility().then((outcome) => this.forwarded('shortcut', outcome)),
         (message, fields) => this.stack.log.warn(message, fields),
       );
       this.visibilityShortcut.register();
     } catch (error: unknown) {
       this.fail(error);
+    }
+  }
+
+  /** Says when the window manager would not let the window come forward (PRD 001, §8.5.1). */
+  private forwarded(by: string, outcome: string | null | undefined): void {
+    if (outcome === 'refused') {
+      this.stack.log.warn('window could not be brought forward', { by });
+    } else if (outcome === 'remapped') {
+      this.stack.log.info('window brought forward by showing it afresh', { by });
     }
   }
 
@@ -282,7 +292,7 @@ class DesktopApplication {
 
   private async openWindow(): Promise<void> {
     if (this.window?.isOpen) {
-      this.window.focus();
+      await this.window.focus();
       return;
     }
 

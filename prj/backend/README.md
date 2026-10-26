@@ -205,6 +205,11 @@ Notes worth knowing before you call it:
   spelling (`path` in a listing or the details), so everything opened from it matches
   what listings report (PRD 004, §4.1). On a drive mapped to a share the share's spelling
   is taken. A link is never swapped for where it leads.
+- **A Windows path on a Linux host** (PRD 004, §1.4.1) — pasted into the path bar,
+  `S:\Library` — takes its drive for a folder of the root, `C:` for `/C`, and every
+  `\` for a `/`: `S/Library`. Only a path that starts with a drive, and only where the
+  root is one folder on a POSIX host; over the drives of a Windows machine (below) a
+  drive is a drive.
 - **Symlinks** are reported as `type: 'symlink'`, with `targetType` saying what
   the link leads to — `'directory'`, `'file'`, `'other'`, or `null` when it is
   dangling or leads outside the root. A link to a folder inside the root lists

@@ -589,7 +589,9 @@ when next shown.
 
 **A whole computer's files (PRD 003, §6).** On the desktop the root is `/` — on Windows every
 drive, `FilePathResolver.drives()`, paths like `C:/Users`, shown so and never `/C:/Users` (PRD 004,
-§1.4: `shownPath` in `file-system/fs-path.ts`, `FilePathResolver.shown` in the backend) — and a fresh window starts in the
+§1.4: `shownPath` in `file-system/fs-path.ts`, `FilePathResolver.shown` in the backend; the other way round, on a Linux host whose
+root is one folder a pasted Windows path takes its drive for a folder of the root, `S:\Library` → `/S/Library` — PRD 004, §1.4.1,
+`FilePathResolver.resolve`, so the path bar and *Jump to Folder* need know nothing of the host) — and a fresh window starts in the
 home folder `/api/fs/places` names. `PlacesFeature` fills the explorer's Places pane (root,
 home, user folders, drives, mounts — a server names its root only, so in a browser the pane
 starts closed and asks when opened), Bookmarks and Recent; the activity bar's Bookmarks opens
@@ -777,6 +779,11 @@ for the copy that is running, with its icon in the user's hicolor theme (`deskto
 development). Electron 44 cannot propose a punctuation key to the portal (electron#52223), so GNOME
 binds the shortcut with no key: `Ctrl`+`` ` `` is assigned once in Settings › Apps › tr-file › Global
 Shortcuts. A chord already taken is logged, not fatal.
+§8.5.1: a window already open — the shortcut over a window not being looked at, a second launch, the
+dock icon — comes forward with the keyboard (`bringForward`): `focus()` alone is turned down for an app not
+in front, so on Windows the window is topmost for a moment, on Linux one still unfocused 150 ms later is
+hidden and shown again (GNOME on Wayland focuses a newly mapped window, not a request), on macOS the app is
+made frontmost; one that still did not come forward is logged.
 
 Section 8.6: the desktop updates itself — since PRD 017, §2, from the latest GitHub release of `Tronog/tr-file`
 (`GitHubReleaseFeed`, `releases/latest` asked with its `ETag`, through `net.fetch`; the repository must be public),

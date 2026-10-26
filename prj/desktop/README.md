@@ -395,6 +395,18 @@ on macOS too, because `Cmd`+`` ` `` is the system's own window-cycling key.
 Launching the app again also brings a hidden window back (the single-instance
 lock hands the launch to the running copy).
 
+Coming back means *in front, with the keyboard* (§8.5.1), and `focus()` alone
+is not enough for that: a window manager that guards against focus stealing
+turns the request down for an app that is not in front — which is exactly
+when it is made. So `bringForward` asks the way each platform listens: on
+Windows the window is made topmost for a moment (else only its taskbar button
+flashes); on Linux, a window still not focused 150 ms later is hidden and
+shown again, since GNOME on Wayland gives a newly *mapped* window the focus
+where it would otherwise only post a "tr-file is ready" notice; on macOS the
+app is made frontmost. The shortcut, a second launch and the dock icon all go
+through it, and a window that still did not come forward is logged
+(`window could not be brought forward`).
+
 When the chord cannot be had — another app owns it, or the session offers no
 global shortcuts — the app logs a warning and runs without it. On Linux the
 `GlobalShortcutsPortal` feature is switched on, so a Wayland session grants it

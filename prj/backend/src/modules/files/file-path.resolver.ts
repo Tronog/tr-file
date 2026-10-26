@@ -90,7 +90,7 @@ export class FilePathResolver {
     if (this.allDrives) {
       return this.resolveOnDrive(cleaned);
     }
-    const absolute = resolve(this.root, cleaned);
+    const absolute = resolve(this.root, FilePathResolver.fromWindows(cleaned));
     this.assertInsideRoot(absolute);
 
     const relative = FilePathResolver.toPosix(relativePath(this.root, absolute));
@@ -198,6 +198,21 @@ export class FilePathResolver {
       return null;
     }
     return FilePathResolver.toPosix(relativePath(this.root, normalised));
+  }
+
+  /**
+   * A Windows path pasted on a Linux host (PRD 004, §1.4.1): `S:\Library` is
+   * `S/Library` — a drive is taken for a folder of the root, `C:` for `/C`,
+   * and every `\` for a `/`, since the path is Windows-spelled anyway. Only
+   * a path that starts with a drive is touched, and only where a drive is
+   * nothing else: a POSIX host whose root is one folder, not the drives.
+   */
+  private static fromWindows(cleaned: string): string {
+    const drive = /^([A-Za-z]):(?:[\\/]|$)/.exec(cleaned);
+    if (sep !== '/' || drive === null) {
+      return cleaned;
+    }
+    return `${drive[1] as string}/${cleaned.slice(drive[0].length).replace(/\\/g, '/')}`;
   }
 
   /** `C:/Users/me` → `C:\Users\me`; the first segment must name a drive. */
